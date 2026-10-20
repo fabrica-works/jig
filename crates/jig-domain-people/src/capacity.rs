@@ -53,8 +53,10 @@ pub struct CapacityRefusal {
     pub cause: CapacityCause,
 }
 
-pub(crate) fn action(ask: &Ask, person: u64) -> CapacityAction {
-    match ask {
+/// The refused operation's action; none for an account request, which the deployment's page
+/// has no action for until the client wire carries account requests (JP10).
+pub(crate) fn action(ask: &Ask, person: u64) -> Option<CapacityAction> {
+    Some(match ask {
         Ask::Compound { .. } => CapacityAction::Compound,
         Ask::Application { connector, .. } => CapacityAction::Application { connector: *connector },
         Ask::EditNote { name, .. } => CapacityAction::Note { name: *name },
@@ -82,7 +84,8 @@ pub(crate) fn action(ask: &Ask, person: u64) -> CapacityAction {
         Ask::Cancel { task, .. } => CapacityAction::Cancel { task: *task },
         Ask::Release { task, .. } => CapacityAction::Release { task: *task },
         Ask::MarkSeen { seen } => CapacityAction::MarkSeen { seen: *seen },
-    }
+        Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => return None,
+    })
 }
 
 pub(crate) fn project(ask: &Ask) -> Option<u32> {
@@ -114,7 +117,7 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
             crate::ApplicationScope::Project(project) => Some(*project),
             crate::ApplicationScope::Deployment => Some(0),
         },
-        Ask::MarkSeen { .. } => None,
+        Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => None,
     }
 }
 
@@ -146,6 +149,8 @@ pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
         | Outcome::PolicyChanged { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
+        | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountSignedOut { .. }
         | Outcome::MarkedSeen { .. } => None,
     }
 }
@@ -190,7 +195,11 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
             | LimitKind::Priority
             | LimitKind::Policy
             | LimitKind::Resource
-            | LimitKind::Service => None,
+            | LimitKind::Service
+            | LimitKind::Accounts
+            | LimitKind::HolderAccounts
+            | LimitKind::Sources
+            | LimitKind::SignIns => None,
         },
         Refusal::NotWellFormed { .. }
         | Refusal::Role { .. }

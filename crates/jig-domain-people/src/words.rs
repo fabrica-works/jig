@@ -43,7 +43,9 @@ pub(crate) fn valid(ask: &Ask) -> bool {
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::Withdraw { .. } => true,
+        | Ask::Withdraw { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. } => true,
     }
 }
 

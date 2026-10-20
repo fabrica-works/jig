@@ -7,8 +7,8 @@ const STOPPED_CHAT: u64 = 7;
 const HOLD_REVISION: u64 = 1;
 const CONTINUE_KEY: u8 = 2;
 use jig_domain_people::{
-    Again, Ask, Entry, EntryKind, Holding, IdentityKey, InitialOwner, Outcome, ProposalChoice, ProposalDecision,
-    Proposer, Refusal, Reply, Role, Seed, Whom,
+    AccountHolder, Again, Ask, Entry, EntryKind, Holding, IdentityKey, InitialOwner, Outcome, ProposalChoice,
+    ProposalDecision, Proposer, Refusal, Reply, Role, Seed, Whom,
 };
 use jig_people_world::fixtures::member;
 use jig_people_world::{Settings, World};
@@ -116,6 +116,53 @@ fn a_service_creates_a_task_its_role_allows() {
     world.commit_all();
     assert!(matches!(world.reply(goal), Some(Reply::Outcome(Outcome::Created { .. }))));
     assert_eq!(world.tasks(), 1);
+    world.assert_settled();
+}
+
+#[test]
+fn an_account_request_is_admitted_only_from_its_holder() {
+    let owners = Box::new([InitialOwner {
+        project: 1,
+        identity: IdentityKey { provider: 0, subject: 1_u64.to_be_bytes().into() },
+    }]);
+    let mut world = World::with_owners(Settings::calm(16), owners);
+    world.roles(1, Box::new([]));
+    world.commit_all();
+    world.signin(10, 1);
+    world.signin(11, 2);
+    world.commit_all();
+    let service = world.request(
+        10,
+        [1; 16],
+        Ask::MakeService { project: 1, name: b"build".to_vec().into_boxed_slice(), role: Role::Member },
+    );
+    world.commit_all();
+    let Some(Reply::Outcome(Outcome::ServiceMade { person })) = world.reply(service) else { panic!("service made") };
+    world.signin_service(12, person);
+    world.commit_all();
+    let routes = world.stats().routes;
+    let sign_in = |holder| Ask::AccountSignIn { holder, provider: 3 };
+    let own = world.request(10, [2; 16], sign_in(AccountHolder::Own));
+    let deployment = world.request(10, [3; 16], sign_in(AccountHolder::Deployment));
+    let sign_out = world.request(11, [4; 16], Ask::AccountSignOut { holder: AccountHolder::Own, source: 1 });
+    world.commit_all();
+    let started = Some(Reply::Outcome(Outcome::AccountSignInStarted { source: 1 }));
+    assert_eq!(world.reply(own), started, "a person's own");
+    assert_eq!(world.reply(deployment), started, "a first owner's for the deployment");
+    assert_eq!(world.reply(sign_out), Some(Reply::Outcome(Outcome::AccountSignedOut { confirmed: true })));
+    assert_eq!(world.stats().routes, routes + 3);
+    let refused = Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: None })));
+    let other = world.request(11, [5; 16], sign_in(AccountHolder::Deployment));
+    let services = world.request(12, [6; 16], sign_in(AccountHolder::Own));
+    world.commit_all();
+    assert_eq!(world.reply(other), refused, "another person's for the deployment");
+    assert_eq!(world.reply(services), refused, "a service holds no account");
+    assert_eq!(world.stats().routes, routes + 3, "a refused request reaches no child");
+    world.restart();
+    let replay = world.request(10, [2; 16], sign_in(AccountHolder::Own));
+    world.commit_all();
+    assert_eq!(world.reply(replay), started, "the saved answer, not a second sign-in");
+    assert_eq!(world.stats().routes, routes + 3);
     world.assert_settled();
 }
 

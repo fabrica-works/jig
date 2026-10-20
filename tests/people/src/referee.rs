@@ -13,6 +13,7 @@ pub enum RouteKind {
     Proposal,
     TakePerson,
     Control,
+    Account,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -65,13 +66,15 @@ impl Expectations for People {
                     judge.fail("observer request routed");
                 }
                 RouteKind::Service if role != Role::Owner => judge.fail("service creation beyond owner role"),
+                RouteKind::Account if service => judge.fail("a service's account request routed"),
                 RouteKind::Chat
                 | RouteKind::Goal
                 | RouteKind::Service
                 | RouteKind::Proposal
                 | RouteKind::TakePerson
                 | RouteKind::Control
-                | RouteKind::Application => {}
+                | RouteKind::Application
+                | RouteKind::Account => {}
             },
             Seen::RoleWaitingOpened { task, both_present } => {
                 if !both_present || !self.role_waiting.insert(task) {

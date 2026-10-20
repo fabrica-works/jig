@@ -462,6 +462,14 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
                 },
             )?)
         }
+        domain::Ask::AccountSignIn { holder, provider } => wire::Ask::AccountSignIn(wire::AskAccountSignIn::new(
+            limits,
+            wire::AskAccountSignInParts { holder: encode_account_holder(*holder), provider: *provider },
+        )?),
+        domain::Ask::AccountSignOut { holder, source } => wire::Ask::AccountSignOut(wire::AskAccountSignOut::new(
+            limits,
+            wire::AskAccountSignOutParts { holder: encode_account_holder(*holder), source: *source },
+        )?),
     })
 }
 #[expect(clippy::too_many_lines, reason = "one exhaustive arm translates each kind of keyed request")]
@@ -591,7 +599,27 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             let wire::AskDecideEscalationParts { project, task, revision, decision } = value.into_parts();
             domain::Ask::DecideEscalation { project, task, revision, decision: decode_escalation_decision(decision) }
         }
+        wire::Ask::AccountSignIn(value) => {
+            let wire::AskAccountSignInParts { holder, provider } = value.into_parts();
+            domain::Ask::AccountSignIn { holder: decode_account_holder(holder), provider }
+        }
+        wire::Ask::AccountSignOut(value) => {
+            let wire::AskAccountSignOutParts { holder, source } = value.into_parts();
+            domain::Ask::AccountSignOut { holder: decode_account_holder(holder), source }
+        }
     })
+}
+const fn encode_account_holder(value: domain::AccountHolder) -> wire::AccountHolder {
+    match value {
+        domain::AccountHolder::Own => wire::AccountHolder::Own,
+        domain::AccountHolder::Deployment => wire::AccountHolder::Deployment,
+    }
+}
+const fn decode_account_holder(value: wire::AccountHolder) -> domain::AccountHolder {
+    match value {
+        wire::AccountHolder::Own => domain::AccountHolder::Own,
+        wire::AccountHolder::Deployment => domain::AccountHolder::Deployment,
+    }
 }
 
 fn encode_application_scope(

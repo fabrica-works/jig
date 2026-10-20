@@ -35,6 +35,8 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
             wire::OutcomeAgainParts { value: encode_again(*value, limits) },
         )?),
         domain::Outcome::SignedOut => wire::Outcome::SignedOut,
+        domain::Outcome::AccountSignInStarted { source } => account_sign_in_started(*source, limits)?,
+        domain::Outcome::AccountSignedOut { confirmed } => account_signed_out(*confirmed, limits)?,
         domain::Outcome::NoteEdited { name } => wire::Outcome::NoteEdited(wire::OutcomeNoteEdited::new(
             limits,
             wire::OutcomeNoteEditedParts { name: *name },
@@ -104,6 +106,14 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
         )?),
     })
 }
+fn account_sign_in_started(source: u32, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
+    let parts = wire::OutcomeAccountSignInStartedParts { source };
+    Ok(wire::Outcome::AccountSignInStarted(wire::OutcomeAccountSignInStarted::new(limits, parts)?))
+}
+fn account_signed_out(confirmed: bool, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
+    let parts = wire::OutcomeAccountSignedOutParts { confirmed };
+    Ok(wire::Outcome::AccountSignedOut(wire::OutcomeAccountSignedOut::new(limits, parts)?))
+}
 pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
     match value {
         wire::Outcome::Compound(value) => {
@@ -125,6 +135,12 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             domain::Outcome::Again(decode_again(value))
         }
         wire::Outcome::SignedOut => domain::Outcome::SignedOut,
+        wire::Outcome::AccountSignInStarted(value) => {
+            domain::Outcome::AccountSignInStarted { source: value.into_parts().source }
+        }
+        wire::Outcome::AccountSignedOut(value) => {
+            domain::Outcome::AccountSignedOut { confirmed: value.into_parts().confirmed }
+        }
         wire::Outcome::NoteEdited(value) => {
             let wire::OutcomeNoteEditedParts { name } = value.into_parts();
             domain::Outcome::NoteEdited { name }

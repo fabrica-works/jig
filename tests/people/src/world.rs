@@ -494,7 +494,13 @@ impl World {
                 Request::Erase { key } => changes.push(Change::Erase(key)),
                 Request::Reply { to, reply } => replies.push((to.into_token().raw(), reply)),
                 Request::Route { request, person, project, role, ask } => {
-                    assert!(project == 1 || matches!(ask.as_ref(), Ask::MarkSeen { .. }));
+                    assert!(
+                        project == 1
+                            || matches!(
+                                ask.as_ref(),
+                                Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. }
+                            )
+                    );
                     let key = self.context.expect("a routed call carries the client's key");
                     assert_eq!(person, key.person);
                     let kind = match ask.as_ref() {
@@ -514,6 +520,7 @@ impl World {
                         Ask::MarkSeen { .. } | Ask::Release { .. } | Ask::Amend { .. } | Ask::Say { .. } => {
                             RouteKind::Control
                         }
+                        Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => RouteKind::Account,
                         Ask::EditNote { .. }
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
@@ -538,7 +545,8 @@ impl World {
                         RouteKind::Chat | RouteKind::Goal | RouteKind::Proposal | RouteKind::TakePerson => {
                             role.is_some() && role != Some(Role::Observer)
                         }
-                        RouteKind::Control | RouteKind::Application => true,
+                        // People checked an account request's holder; it carries no role.
+                        RouteKind::Control | RouteKind::Application | RouteKind::Account => true,
                     };
                     if !allowed {
                         people::step(
@@ -606,6 +614,24 @@ impl World {
                                     &mut self.domain,
                                     &self.env,
                                     Event::Decided { request, outcome: Outcome::Applied { connector, token } },
+                                    &mut self.out,
+                                );
+                            }
+                            // The accounts child's decision is the accounts world's; this
+                            // parent answers as it would once the sign-in or sign-out is under way.
+                            Ask::AccountSignIn { .. } => {
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome: Outcome::AccountSignInStarted { source: 1 } },
+                                    &mut self.out,
+                                );
+                            }
+                            Ask::AccountSignOut { .. } => {
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome: Outcome::AccountSignedOut { confirmed: true } },
                                     &mut self.out,
                                 );
                             }
@@ -805,7 +831,9 @@ impl World {
                                         | Ask::SetRoles { .. }
                                         | Ask::ChangePolicy { .. }
                                         | Ask::SetPool { .. }
-                                        | Ask::DecideEscalation { .. } => unreachable!("person task act"),
+                                        | Ask::DecideEscalation { .. }
+                                        | Ask::AccountSignIn { .. }
+                                        | Ask::AccountSignOut { .. } => unreachable!("person task act"),
                                     },
                                     None => Outcome::Refused(Refusal::Unknown),
                                 };

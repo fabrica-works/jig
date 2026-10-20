@@ -184,6 +184,14 @@ pub enum LimitKind {
     Resource,
     /// The service payload exceeds its bounds.
     Service,
+    /// The deployment has no room for another LLM account.
+    Accounts,
+    /// The holder has no room for another LLM account.
+    HolderAccounts,
+    /// The account, or the sources signing out, have no room for another source.
+    Sources,
+    /// As many sign-ins are under way as the deployment allows.
+    SignIns,
 }
 
 /// A party in an ending fact, independent of the tasks child's vocabulary.

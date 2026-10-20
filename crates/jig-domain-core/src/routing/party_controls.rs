@@ -165,7 +165,9 @@ pub(super) fn cancel_request(
         | people::Ask::DecideEscalation { .. }
         | people::Ask::Say { .. }
         | people::Ask::AnswerQuestion { .. }
-        | people::Ask::Move { .. } => unreachable!("cancel route retains its ask"),
+        | people::Ask::Move { .. }
+        | people::Ask::AccountSignIn { .. }
+        | people::Ask::AccountSignOut { .. } => unreachable!("cancel route retains its ask"),
     };
     match admitted {
         Ok(task) => {
@@ -229,7 +231,9 @@ pub(super) fn release_request(
                 | people::Ask::SetRoles { .. }
                 | people::Ask::ChangePolicy { .. }
                 | people::Ask::SetPool { .. }
-                | people::Ask::DecideEscalation { .. } => unreachable!("release route owns its ask"),
+                | people::Ask::DecideEscalation { .. }
+                | people::Ask::AccountSignIn { .. }
+                | people::Ask::AccountSignOut { .. } => unreachable!("release route owns its ask"),
             };
             let message = match core.release_admit(task, revision, again) {
                 Ok(message) => message,

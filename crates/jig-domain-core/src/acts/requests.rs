@@ -17,7 +17,12 @@ pub(crate) fn request(
     decision: skein_lib::Wall,
 ) -> Result<(), people::Refusal> {
     let (act, subject) = match ask {
-        people::Ask::Application { .. } | people::Ask::Compound { .. } | people::Ask::Withdraw { .. } => return Ok(()),
+        // An account request's check is its holder's, which people made (domain/authority.md, 8.4).
+        people::Ask::Application { .. }
+        | people::Ask::Compound { .. }
+        | people::Ask::Withdraw { .. }
+        | people::Ask::AccountSignIn { .. }
+        | people::Ask::AccountSignOut { .. } => return Ok(()),
         people::Ask::Create { .. } | people::Ask::Propose { .. } => {
             return standing::role(core, project, role, Act::Amend);
         }
@@ -124,7 +129,9 @@ pub(crate) fn request(
         | people::Ask::ChangePolicy { .. }
         | people::Ask::SetRoles { .. }
         | people::Ask::MakeService { .. }
-        | people::Ask::SetPool { .. } => {}
+        | people::Ask::SetPool { .. }
+        | people::Ask::AccountSignIn { .. }
+        | people::Ask::AccountSignOut { .. } => {}
     }
     match &subject {
         documents::Subject::PersonTask { task } => {

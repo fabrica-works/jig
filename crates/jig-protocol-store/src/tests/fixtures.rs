@@ -549,6 +549,8 @@ pub fn people_asks() -> Box<[people::Ask]> {
             }),
         },
         Ask::MakeService { project: 1, name: Box::new([2]), role: people::Role::Maintainer },
+        Ask::AccountSignIn { holder: people::AccountHolder::Own, provider: 2 },
+        Ask::AccountSignOut { holder: people::AccountHolder::Deployment, source: 3 },
         Ask::Adopt {
             project: 1,
             adoption: people::Adoption {

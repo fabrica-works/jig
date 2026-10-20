@@ -120,6 +120,10 @@ pub fn limit_kind_values() -> Box<[domain::LimitKind]> {
         domain::LimitKind::Service,
         domain::LimitKind::Grace,
         domain::LimitKind::Goals,
+        domain::LimitKind::Accounts,
+        domain::LimitKind::HolderAccounts,
+        domain::LimitKind::Sources,
+        domain::LimitKind::SignIns,
     ])
 }
 pub fn refusal_values() -> Box<[domain::Refusal]> {
@@ -171,6 +175,8 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         domain::Outcome::SignedOut,
         domain::Outcome::NoteEdited { name: 2 },
         domain::Outcome::ServiceMade { person: 2 },
+        domain::Outcome::AccountSignInStarted { source: 2 },
+        domain::Outcome::AccountSignedOut { confirmed: true },
         domain::Outcome::Adopted { project: 2 },
         domain::Outcome::Proposed { proposal: 2, to: 0 },
         domain::Outcome::Withdrawn { proposal: 2 },

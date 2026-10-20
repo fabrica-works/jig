@@ -243,6 +243,8 @@ impl Core {
                 | people::Outcome::PolicyChanged { .. }
                 | people::Outcome::PoolSet { .. }
                 | people::Outcome::EscalationDecided { .. }
+                | people::Outcome::AccountSignInStarted { .. }
+                | people::Outcome::AccountSignedOut { .. }
                 | people::Outcome::Refused(..) => true,
             },
             people::Stored::Person { .. }

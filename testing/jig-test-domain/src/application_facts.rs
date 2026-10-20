@@ -106,6 +106,10 @@ pub(super) fn limit_kind(value: people::LimitKind) -> application::LimitKind {
         people::LimitKind::Policy => application::LimitKind::Policy,
         people::LimitKind::Resource => application::LimitKind::Resource,
         people::LimitKind::Service => application::LimitKind::Service,
+        people::LimitKind::Accounts
+        | people::LimitKind::HolderAccounts
+        | people::LimitKind::Sources
+        | people::LimitKind::SignIns => unreachable!("an application asks for no account"),
     }
 }
 

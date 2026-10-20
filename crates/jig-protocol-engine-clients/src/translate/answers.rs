@@ -197,6 +197,9 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
                 },
             )?)
         }
+        p::Outcome::AccountSignInStarted { .. } | p::Outcome::AccountSignedOut { .. } => {
+            return Err(refusals::account_not_carried());
+        }
         p::Outcome::CompoundRefused { .. }
         | p::Outcome::Applied { .. }
         | p::Outcome::Again(_)

@@ -139,7 +139,9 @@ impl Core {
             | people::Ask::DecideEscalation { .. }
             | people::Ask::Create { .. }
             | people::Ask::Propose { .. }
-            | people::Ask::Withdraw { .. } => unreachable!("control route owns its ask"),
+            | people::Ask::Withdraw { .. }
+            | people::Ask::AccountSignIn { .. }
+            | people::Ask::AccountSignOut { .. } => unreachable!("control route owns its ask"),
         };
         if let people::Ask::Cancel { grace: Some(span), .. } = ask
             && *span > limits.grace

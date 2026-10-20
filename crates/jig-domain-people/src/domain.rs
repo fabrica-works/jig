@@ -227,11 +227,13 @@ impl Domain {
         let mut ordered = Map::with_capacity(capacity);
         let mut ordinal = 0_u32;
         for (key, answer) in &self.answers {
-            if let Some(cause) = crate::capacity::permanent(answer.outcome) {
+            if let Some(cause) = crate::capacity::permanent(answer.outcome)
+                && let Some(action) = crate::capacity::action(&answer.ask, key.person)
+            {
                 let value = crate::CapacityRefusal {
                     key: *key,
                     project: crate::capacity::project(&answer.ask),
-                    action: crate::capacity::action(&answer.ask, key.person),
+                    action,
                     at: answer.at,
                     cause,
                 };
@@ -543,6 +545,8 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::PolicyChanged { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
+        | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountSignedOut { .. }
         | Outcome::Refused(_) => Reply::Outcome(outcome),
     }
 }
@@ -597,7 +601,9 @@ fn apply_roles(
         | Ask::Release { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
-        | Ask::Withdraw { .. } => {
+        | Ask::Withdraw { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. } => {
             return Err(Outcome::Refused(Refusal::Unknown));
         }
     };
@@ -642,7 +648,9 @@ fn apply_roles(
         | Ask::Release { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
-        | Ask::Withdraw { .. } => {
+        | Ask::Withdraw { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. } => {
             unreachable!("validated roster flight")
         }
     };
@@ -747,7 +755,9 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::DecideEscalation { .. } => unreachable!("service creation is routed only from its ask"),
+        | Ask::DecideEscalation { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. } => unreachable!("service creation is routed only from its ask"),
     };
     let identity = Identity {
         key: IdentityKey { provider: domain.deployment_provider, subject: person.to_be_bytes().into() },
@@ -928,7 +938,8 @@ fn project(ask: &Ask) -> u32 {
             crate::ApplicationScope::Project(project) => *project,
             crate::ApplicationScope::Own | crate::ApplicationScope::Deployment => 0,
         },
-        Ask::MarkSeen { .. } => 0,
+        // An account request names no project; its check is its holder (domain/authority.md, 8.4).
+        Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => 0,
         Ask::Compound { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
@@ -1052,7 +1063,7 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
             Seen::Results { .. } => true,
             Seen::Conversation { task, .. } => *task != 0,
         },
-        Ask::Application { .. } => true,
+        Ask::Application { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => true,
         Ask::EditNote { name, scope, change, .. } => valid_note(limits, *name, scope, change),
         Ask::MakeService { name, .. } => {
             let Some(bytes) = name.len().checked_add(size_of::<u64>()) else {
@@ -1152,7 +1163,9 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
         | Ask::Stop { .. }
         | Ask::Release { .. }
         | Ask::SetPool { .. }
-        | Ask::Withdraw { .. } => return Refusal::Unknown,
+        | Ask::Withdraw { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. } => return Refusal::Unknown,
         Ask::Adopt { .. } => LimitKind::Resource,
         Ask::SetRoles { .. } => LimitKind::Roles,
         Ask::ChangePolicy { .. } => LimitKind::Policy,
@@ -1222,6 +1235,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Pool(u32, u64),
         Adoption(u32),
         Escalation,
+        AccountSignIn,
+        AccountSignOut,
     }
 
     let expected = match ask {
@@ -1262,6 +1277,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::ChangePolicy { project, .. } => Expected::Policy(*project),
         Ask::SetPool { project, person, .. } => Expected::Pool(*project, *person),
         Ask::DecideEscalation { .. } => Expected::Escalation,
+        Ask::AccountSignIn { .. } => Expected::AccountSignIn,
+        Ask::AccountSignOut { .. } => Expected::AccountSignOut,
     };
 
     match outcome {
@@ -1302,6 +1319,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::PolicyChanged { project } => expected == Expected::Policy(project),
         Outcome::PoolSet { project, person } => expected == Expected::Pool(project, person),
         Outcome::EscalationDecided { .. } => expected == Expected::Escalation,
+        Outcome::AccountSignInStarted { .. } => expected == Expected::AccountSignIn,
+        Outcome::AccountSignedOut { .. } => expected == Expected::AccountSignOut,
         Outcome::Refused(_) => true,
         Outcome::Again(_) | Outcome::SignedOut => false,
     }
@@ -1371,7 +1390,11 @@ fn admit_ask(
         return again(to, Again::Busy, out);
     }
     let project = project(&ask);
-    let role = if let Ask::Application { scope: crate::ApplicationScope::Own, .. } = &ask {
+    // An account request's check is its holder, never a role (domain/authority.md, 8.4).
+    let role = if let Ask::Application { scope: crate::ApplicationScope::Own, .. }
+    | Ask::AccountSignIn { .. }
+    | Ask::AccountSignOut { .. } = &ask
+    {
         None
     } else {
         role(domain, key.person, project)
@@ -1397,6 +1420,7 @@ fn admit_ask(
 }
 
 fn room_pressure(domain: &mut Domain, env: &Env<Limits>, key: RequestKey, ask: &Ask, cause: crate::CapacityCause) {
+    let Some(action) = crate::capacity::action(ask, key.person) else { return };
     if domain.room_refusals.capacity() == 0 {
         domain.room_refusals_lost = domain.room_refusals_lost.saturating_add(1);
         return;
@@ -1408,7 +1432,7 @@ fn room_pressure(domain: &mut Domain, env: &Env<Limits>, key: RequestKey, ask: &
     domain.room_refusals.push(crate::CapacityRefusal {
         key,
         project: crate::capacity::project(ask),
-        action: crate::capacity::action(ask, key.person),
+        action,
         at: env.wall,
         cause,
     });
@@ -1483,6 +1507,8 @@ pub(super) fn answer_decided(
         | Outcome::PersonAnswered { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::ProposalDecided { .. }
+        | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountSignedOut { .. }
         | Outcome::Refused(_) => save_answer(domain, env, key, ask, outcome, out),
     }
     for to in replies.into_boxed() {
@@ -1648,7 +1674,9 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 | Ask::Release { .. }
                 | Ask::Create { .. }
                 | Ask::Propose { .. }
-                | Ask::Withdraw { .. } => {
+                | Ask::Withdraw { .. }
+                | Ask::AccountSignIn { .. }
+                | Ask::AccountSignOut { .. } => {
                     unreachable!("restored role success has a matching roster ask");
                 }
             },
@@ -1675,6 +1703,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::Withdrawn { .. }
             | Outcome::EscalationDecided { .. }
             | Outcome::ProposalDecided { .. }
+            | Outcome::AccountSignInStarted { .. }
+            | Outcome::AccountSignedOut { .. }
             | Outcome::Refused(_) => {}
             Outcome::Again(_) | Outcome::SignedOut => {
                 return restore_failed(domain, Key::Answer(*key), Refusal::Limit { which: LimitKind::Restore }, out);
@@ -1741,10 +1771,16 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Release { .. }
-        | Ask::EditNote { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
+        | Ask::EditNote { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
     };
     match &ask {
-        Ask::Application { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
+        // An account request is its holder's own and a sign-out waits on the accounts'
+        // component, so neither is a synchronous part of an application's request.
+        Ask::Application { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => {
+            return Err(Outcome::Refused(Refusal::NotOffered));
+        }
         Ask::Compound { .. }
         | Ask::MarkSeen { .. }
         | Ask::MakeService { .. }
@@ -1786,10 +1822,17 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     Ok(Request::Route { request, person, project: application_project, role, ask: Box::new(ask) })
 }
 
-fn admission(_domain: &Domain, _person: u64, _project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
+fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
     match ask {
         Ask::Application { scope, .. } => {
             if *scope == crate::ApplicationScope::Own || role.is_some() {
+                None
+            } else {
+                Some(Refusal::Role { held: None })
+            }
+        }
+        Ask::AccountSignIn { holder, .. } | Ask::AccountSignOut { holder, .. } => {
+            if holds(domain, person, *holder) {
                 None
             } else {
                 Some(Refusal::Role { held: None })
@@ -1818,6 +1861,27 @@ fn admission(_domain: &Domain, _person: u64, _project: u32, role: Option<Role>, 
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Release { .. } => None,
+    }
+}
+
+/// Whether this party is the holder an account request names: a person for their own, a first
+/// owner for the deployment's (domain/accounts.md, 3.2; domain/people.md, section 3). A service
+/// holds no account and decides none of the deployment's.
+fn holds(domain: &Domain, person: u64, holder: crate::AccountHolder) -> bool {
+    if domain.kind(person) != Some(Kind::Person) {
+        return false;
+    }
+    match holder {
+        crate::AccountHolder::Own => true,
+        crate::AccountHolder::Deployment => {
+            let Some(identity) = domain.identity(person) else { return false };
+            for owner in &domain.owners {
+                if owner.identity == identity.key {
+                    return true;
+                }
+            }
+            false
+        }
     }
 }
 

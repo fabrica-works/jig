@@ -87,6 +87,19 @@ fn a_service_result_contains_its_party_and_no_credential() {
     answer.encode(&mut out).expect("25-byte party-only answer");
     assert_eq!(out.finish().as_ref(), &f::SERVICE_ANSWER);
 }
+#[test]
+fn an_account_answer_or_bound_is_not_carried_to_a_client_before_jp10() {
+    let limits = f::wire();
+    let not_carried = w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag };
+    for outcome in [p::Outcome::AccountSignInStarted { source: 4 }, p::Outcome::AccountSignedOut { confirmed: true }] {
+        let answer = crate::translate::answers::answer(&p::Reply::Outcome(outcome), &limits);
+        assert_eq!(answer.err().as_ref(), Some(&not_carried));
+    }
+    for which in [p::LimitKind::Accounts, p::LimitKind::HolderAccounts, p::LimitKind::Sources, p::LimitKind::SignIns] {
+        let refused = crate::translate::refusals::refusal(p::Refusal::Limit { which }, &limits);
+        assert_eq!(refused.err().as_ref(), Some(&not_carried));
+    }
+}
 fn unanswered(exchange: &Exchange, owner: Token) -> bool {
     exchange.component.connections.get(&owner).expect("owner").response.is_none()
 }

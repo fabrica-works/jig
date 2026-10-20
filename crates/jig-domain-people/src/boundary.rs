@@ -74,6 +74,15 @@ pub enum Kind {
     Service,
 }
 
+/// Whose LLM account a party's account request is for (domain/accounts.md, 3.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AccountHolder {
+    /// The asking person's own; a service holds no account.
+    Own,
+    /// The deployment's, decided by its first owners (domain/people.md, section 3).
+    Deployment,
+}
+
 /// Root-configured first-owner grant used only when this identity's party record is first made;
 /// bootstrap matches are bounded. (domain/people.md, section 3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -276,6 +285,11 @@ pub enum Ask {
         /// One bounded semantic choice; root authorizes before mutation.
         decision: EscalationDecision,
     },
+    /// Sign an LLM provider's account in for this holder; admitted from the holder alone, never by
+    /// a role (domain/authority.md, 8.4), and decided by the accounts child (domain/accounts.md, 3.3).
+    AccountSignIn { holder: AccountHolder, provider: u32 },
+    /// Sign this holder's account's source out; admitted like a sign-in.
+    AccountSignOut { holder: AccountHolder, source: u32 },
 }
 
 /// A person's answer to a report, choice or failure contract; root translates it for tasks.
@@ -422,6 +436,10 @@ pub enum Outcome {
         at: Wall,
         choice: EscalationChoice,
     },
+    /// An account's sign-in is under way for this source; its end is the accounts child's fact.
+    AccountSignInStarted { source: u32 },
+    /// The source was signed out, and whether its provider confirmed the revocation.
+    AccountSignedOut { confirmed: bool },
     /// Final refusal, retained under the request key.
     Refused(/** Final refusal facts, retained under the request key. */ Refusal),
 }

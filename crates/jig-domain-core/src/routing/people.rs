@@ -13,6 +13,7 @@ use super::party_controls::{
 use super::party_decisions::{escalation_request, proposal_request};
 use crate::{Core, Event, Held, Key, Limits, Now, Record, Request, Requests, Write};
 use alloc::boxed::Box;
+use jig_domain_accounts as accounts;
 use jig_domain_people as people;
 use skein_lib::{Env, Queue, ReplyTo};
 
@@ -186,6 +187,8 @@ pub(super) fn tag_people(
                     | people::Outcome::PolicyChanged { .. }
                     | people::Outcome::PoolSet { .. }
                     | people::Outcome::EscalationDecided { .. }
+                    | people::Outcome::AccountSignInStarted { .. }
+                    | people::Outcome::AccountSignedOut { .. }
                     | people::Outcome::Refused(..),
                 )) => Request::Held(Box::new(Held::PeopleReply { to, reply })),
             },
@@ -297,6 +300,14 @@ pub(super) fn tag_people(
                             },
                         ),
                     },
+                    people::Ask::AccountSignIn { holder, provider } => {
+                        let holder = super::account_requests::holder(holder, person);
+                        work.push(Event::Account(accounts::Event::SignIn { request, holder, provider }));
+                    }
+                    people::Ask::AccountSignOut { holder, source } => {
+                        let holder = super::account_requests::holder(holder, person);
+                        work.push(Event::Account(accounts::Event::SignOut { request, holder, source }));
+                    }
                     people::Ask::Withdraw { proposal, .. } => super::propose::withdraw_request(
                         core,
                         work,

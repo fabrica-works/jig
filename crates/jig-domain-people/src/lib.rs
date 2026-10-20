@@ -86,8 +86,8 @@ pub use amendment::{
     ResourceScope, ResultsWake, Spec, Tracking, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
-    Adoption, Ask, Counts, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity,
-    IdentityKey, InitialOwner, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole,
+    AccountHolder, Adoption, Ask, Counts, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding,
+    Identity, IdentityKey, InitialOwner, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole,
     ProposalChoice, ProposalDecision, Proposer, Reply, Request, RequestKey, ResourceName, ResourceRole, Role, Seed,
     Stored, Whom,
 };

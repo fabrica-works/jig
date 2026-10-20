@@ -48,6 +48,7 @@ pub use vocabulary::{
 };
 pub(crate) use watch_marks::finish_watches;
 
+mod account_requests;
 mod children;
 mod first_start;
 mod historical;
@@ -427,7 +428,10 @@ pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
 
 /// Want every configured account once, at the restart's first step.
 pub fn want_accounts(core: &mut Core, env: &Env<Limits>) -> Requests {
-    route_account(core, env, accounts::Event::Want)
+    let mut work = Queue::with_capacity(0);
+    let requests = route_account(core, env, &mut work, accounts::Event::Want);
+    assert!(work.is_empty(), "wanting the accounts answers no party");
+    requests
 }
 
 /// Resume the fleet's next held placement or relay through the core's sibling routes.
@@ -587,7 +591,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
             procedure_holdings(core, env, work, task, step, connector, holdings)
         }
         Event::Brief(event) => route_brief(core, env, event),
-        Event::Account(event) => route_account(core, env, event),
+        Event::Account(event) => route_account(core, env, work, event),
         Event::View(event) => route_view(core, env, event),
         Event::Notes(event) => route_notes(core, env, work, event),
     }
@@ -637,7 +641,10 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
                 &mut out,
             );
             core.touch_deployment();
-            tag_account(core, env, out)
+            let mut work = Queue::with_capacity(0);
+            let requests = tag_account(core, env, &mut work, out);
+            assert!(work.is_empty(), "an account's alarm answers no party");
+            requests
         }
         Timer::View => {
             let mut out = Queue::with_capacity(views::max_out(&env.limits.views));

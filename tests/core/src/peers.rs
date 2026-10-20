@@ -616,6 +616,10 @@ fn party_limit(value: people::LimitKind) -> parties::LimitKind {
         people::LimitKind::Grace => parties::LimitKind::Grace,
         people::LimitKind::Goals => parties::LimitKind::Goals,
         people::LimitKind::Service => parties::LimitKind::Service,
+        people::LimitKind::Accounts
+        | people::LimitKind::HolderAccounts
+        | people::LimitKind::Sources
+        | people::LimitKind::SignIns => unreachable!("a fake party asks for no account"),
     }
 }
 

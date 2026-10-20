@@ -4,7 +4,7 @@
 use super::people_routes::tag_people;
 use super::route_room;
 use super::task_routes::tag_tasks;
-use crate::{Ask, Core, CoreRecord, Held, Key, Limits, Now, Record, Request, Requests, Write};
+use crate::{Ask, Core, CoreRecord, Event, Held, Key, Limits, Now, Record, Request, Requests, Write};
 use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
@@ -347,7 +347,9 @@ fn run_failed(now: Time, turned: fleet::Turned) -> accounts::Event {
 }
 
 fn append_account(core: &mut Core, env: &Env<Limits>, event: accounts::Event, out: &mut Queue<Request>) {
-    let Requests::Out(mut routed) = route_account(core, env, event);
+    let mut work = Queue::with_capacity(0);
+    let Requests::Out(mut routed) = route_account(core, env, &mut work, event);
+    assert!(work.is_empty(), "a run's account turn answers no party");
     for _ in 0..routed.len() {
         match routed.pop().expect("account route count") {
             Request::Decided => {}
@@ -358,7 +360,12 @@ fn append_account(core: &mut Core, env: &Env<Limits>, event: accounts::Event, ou
     }
 }
 
-pub(super) fn tag_account(core: &mut Core, env: &Env<Limits>, mut child: Queue<accounts::Request>) -> Requests {
+pub(super) fn tag_account(
+    core: &mut Core,
+    env: &Env<Limits>,
+    work: &mut Queue<Event>,
+    mut child: Queue<accounts::Request>,
+) -> Requests {
     let room = child
         .capacity()
         .checked_mul(fleet::max_out(&env.limits.fleet).checked_add(1).expect("grant routes"))
@@ -387,8 +394,11 @@ pub(super) fn tag_account(core: &mut Core, env: &Env<Limits>, mut child: Queue<a
             // decision that changes it.
             accounts::Request::Save { record } => out.push(Request::Write(Write::Save(Record::Accounts(record)))),
             accounts::Request::Erase { key } => out.push(Request::Write(Write::Erase(Key::Accounts(key)))),
-            // No party asks the child to sign in or out yet, so no answer has one to reach.
-            accounts::Request::Answer { .. } => {}
+            // People keeps the answer under the party's key, and replies once it is durable.
+            accounts::Request::Answer { request, answer } => {
+                let outcome = super::account_requests::outcome(answer);
+                work.push(Event::People(people::Event::Decided { request, outcome }));
+            }
         }
     }
     out.push(Request::Decided);
@@ -404,7 +414,12 @@ pub(super) fn remember_due(core: &mut Core, context: Box<tasks::RunContext>) {
     core.due.push(context);
 }
 
-pub(super) fn route_account(core: &mut Core, env: &Env<Limits>, event: accounts::Event) -> Requests {
+pub(super) fn route_account(
+    core: &mut Core,
+    env: &Env<Limits>,
+    work: &mut Queue<Event>,
+    event: accounts::Event,
+) -> Requests {
     let mut out = Queue::with_capacity(accounts::max_out(&env.limits.accounts));
     accounts::step(
         &mut core.accounts,
@@ -413,7 +428,7 @@ pub(super) fn route_account(core: &mut Core, env: &Env<Limits>, event: accounts:
         &mut out,
     );
     core.touch_deployment();
-    tag_account(core, env, out)
+    tag_account(core, env, work, out)
 }
 
 pub(super) fn route_brief(core: &mut Core, env: &Env<Limits>, event: brief::GatherEvent) -> Requests {

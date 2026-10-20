@@ -33,7 +33,9 @@ pub(crate) fn number(ask: &people::Ask) -> u64 {
         | people::Ask::Release { .. }
         | people::Ask::Create { .. }
         | people::Ask::Propose { .. }
-        | people::Ask::Withdraw { .. } => unreachable!("person-task route owns its ask"),
+        | people::Ask::Withdraw { .. }
+        | people::Ask::AccountSignIn { .. }
+        | people::Ask::AccountSignOut { .. } => unreachable!("person-task route owns its ask"),
     }
 }
 
@@ -142,7 +144,9 @@ impl Core {
             | people::Ask::Release { .. }
             | people::Ask::Create { .. }
             | people::Ask::Propose { .. }
-            | people::Ask::Withdraw { .. } => unreachable!("person-task route owns its ask"),
+            | people::Ask::Withdraw { .. }
+            | people::Ask::AccountSignIn { .. }
+            | people::Ask::AccountSignOut { .. } => unreachable!("person-task route owns its ask"),
         };
         let revision = if let people::Ask::AnswerPerson { revision, .. } = &ask { Some(*revision) } else { None };
         match crate::acts::person(self, person, act, task, revision) {
@@ -198,7 +202,9 @@ impl Core {
             | people::Ask::Release { .. }
             | people::Ask::Create { .. }
             | people::Ask::Propose { .. }
-            | people::Ask::Withdraw { .. } => unreachable!("person-task route owns its ask"),
+            | people::Ask::Withdraw { .. }
+            | people::Ask::AccountSignIn { .. }
+            | people::Ask::AccountSignOut { .. } => unreachable!("person-task route owns its ask"),
         };
         assert!(self.person_tasks.insert(request, route) == Ok(None), "one routed person task per keyed flight");
         Ok(event)

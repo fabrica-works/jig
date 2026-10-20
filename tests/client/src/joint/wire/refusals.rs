@@ -96,6 +96,10 @@ pub fn limit(value: people::LimitKind) -> client::AdmissionLimit {
         people::LimitKind::Policy => client::AdmissionLimit::Policy,
         people::LimitKind::Resource => client::AdmissionLimit::Resource,
         people::LimitKind::Service => client::AdmissionLimit::Service,
+        people::LimitKind::Accounts
+        | people::LimitKind::HolderAccounts
+        | people::LimitKind::Sources
+        | people::LimitKind::SignIns => unreachable!("no v10 ask is an account request"),
     }
 }
 
