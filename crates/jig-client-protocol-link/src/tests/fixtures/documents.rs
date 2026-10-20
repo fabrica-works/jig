@@ -421,7 +421,6 @@ pub fn task_with_authority_grants(count: u32) -> (w::Task, c::Task) {
         &w::CEILINGS,
         w::OwnerAuthorityDocumentParts {
             authority: translate::asks::wire_owner_authority(&expected.authority.authority, &w::CEILINGS).unwrap(),
-            cut: false,
         },
     )
     .unwrap();

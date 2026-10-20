@@ -259,7 +259,6 @@ pub fn owner_project_record() -> w::OwnerProject {
                                 },
                             )
                             .expect("literal fixture fits"),
-                            cut: false,
                         },
                     )
                     .expect("literal fixture fits"),

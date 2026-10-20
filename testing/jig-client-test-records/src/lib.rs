@@ -256,7 +256,6 @@ pub fn wire_owner_authority_document() -> w::OwnerAuthorityDocument {
                 },
             )
             .expect("literal fixture fits"),
-            cut: false,
         },
     )
     .expect("literal fixture fits")

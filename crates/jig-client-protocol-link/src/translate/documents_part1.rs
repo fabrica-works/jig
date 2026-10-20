@@ -251,10 +251,7 @@ pub(crate) fn owner_authority_document_fields(
     value: &w::OwnerAuthorityDocument,
     limits: &Limits,
 ) -> Result<c::OwnerAuthorityDocument, w::Problem> {
-    if value.cut() {
-        return Err(too_large());
-    }
-    Ok(c::OwnerAuthorityDocument { authority: owner_authority_fields(value.authority(), limits)?, cut: value.cut() })
+    Ok(c::OwnerAuthorityDocument::complete(owner_authority_fields(value.authority(), limits)?))
 }
 
 pub(crate) fn hold_reason_fields(value: &w::HoldReason, limits: &Limits) -> Result<c::HoldReason, w::Problem> {

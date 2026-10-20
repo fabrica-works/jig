@@ -483,7 +483,7 @@ record ResultDetails { contract: TaskContractDocument requester: OwnerRequester 
 enum ActKind { message, answer, take, hand_back, accept, reject, pass_up, release, leave_held, amend, stop, cancel, move_task, reorder, seen, edit_note, delete_note, adopt, change_policy, set_roles, make_service, set_pool, withdraw }
 record CreateProcedure { connector: u16 code: u32 }
 record OwnerKindImplication { connector: u16 kind: u16 implies: u16 }
-record OwnerAuthorityDocument { authority: OwnerAuthority cut: bool }
+record OwnerAuthorityDocument { authority: OwnerAuthority }
 record BoundsCreate { authority: OwnerAuthorityDocument pool_left: u64 charters: list 32 u32 procedures: list 32 CreateProcedure latest: option u64 budget: u64 maximum_budget: u64 maximum_deadline: option u64 }
 record BoundsAmend { budget_left: u64 grants: bytes 16777216 implications: list 32 OwnerKindImplication authority: OwnerAuthorityDocument ceiling: OwnerAuthorityDocument }
 enum Bounds { create: BoundsCreate, amend: BoundsAmend }

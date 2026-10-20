@@ -195,13 +195,3 @@ fn an_authority_uses_its_own_bound_beyond_the_document_rows() {
     let (record, _) = fixtures::task_with_authority_grants(limits.client.authority + 1);
     assert_eq!(documents::task(record, &limits), Err(Undecodable::TooLarge));
 }
-#[test]
-fn a_document_with_a_cut_authority_is_refused_as_too_large() {
-    let limits = fixtures::limits();
-    let (record, _) = fixtures::task_with_authority_grants(limits.client.authority);
-    let mut parts = record.into_parts();
-    let mut authority = parts.authority.into_parts();
-    authority.cut = true;
-    parts.authority = w::OwnerAuthorityDocument::new(&w::CEILINGS, authority).unwrap();
-    assert_eq!(documents::task(w::Task::new(&w::CEILINGS, parts).unwrap(), &limits), Err(Undecodable::TooLarge));
-}

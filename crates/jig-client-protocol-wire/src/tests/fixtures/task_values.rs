@@ -103,7 +103,7 @@ pub fn owner_authority(limits: &Limits) -> OwnerAuthority {
 }
 
 pub fn owner_authority_document(limits: &Limits) -> OwnerAuthorityDocument {
-    OwnerAuthorityDocument::new(limits, OwnerAuthorityDocumentParts { authority: owner_authority(limits), cut: true })
+    OwnerAuthorityDocument::new(limits, OwnerAuthorityDocumentParts { authority: owner_authority(limits) })
         .expect("bounded owner_authority_document")
 }
 
