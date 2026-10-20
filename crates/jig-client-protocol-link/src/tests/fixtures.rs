@@ -68,6 +68,17 @@ pub fn answer_done_chat(task: u64) -> Box<[u8]> {
     let made = w::OutcomeMade::new(&lim, w::OutcomeMadeParts { what: w::Made::Tasks(made_tasks) }).unwrap();
     final_answer(w::Final::Done(w::Done::new(&lim, w::DoneParts { outcome: w::Outcome::Made(made) }).unwrap()))
 }
+pub fn answer_key_conflict() -> Box<[u8]> {
+    final_answer(w::Final::Refused(
+        w::Refused::new(&limits().wire, w::RefusedParts { at: None, refusal: w::Refusal::KeyConflict }).unwrap(),
+    ))
+}
+pub fn answer_family(family: u16, version: u32) -> Box<[u8]> {
+    let lim = limits().wire;
+    let owner = w::Owner::Family(w::Family::new(&lim, w::FamilyParts { number: family }).unwrap());
+    let record = w::Owned::new(&lim, w::OwnedParts { owner, version, record: family_read().bytes }).unwrap();
+    encoded_answer(&w::KeyedAnswer::FinalAnswer(record))
+}
 pub fn answer_done_service(credential: &[u8]) -> Box<[u8]> {
     let lim = limits().wire;
     let row = w::MadeService::new(

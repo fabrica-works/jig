@@ -1,4 +1,5 @@
 //! One bounded exchange per request-table attempt (protocol/client.md, 5).
+//! A family's admission refusal uses jig's wire (contract.md, 3.3).
 use crate::{Event, Fact, Limits, Message, Request, Streamed, Unusable, translate};
 use alloc::boxed::Box;
 use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Retry, Watchable};
@@ -239,23 +240,7 @@ impl Link {
             w::KeyedAnswer::SignedOut => RequestEnvelope::SignedOut,
             w::KeyedAnswer::FinalAnswer(record) => {
                 let credential = translate::answers::credential(&record, &self.limits);
-                let answer = if record.owner() != &attempt.owner || record.version() != attempt.version {
-                    Err(translate::Undecodable::Version)
-                } else {
-                    match record.owner() {
-                        w::Owner::Jig => {
-                            match translate::answers::answer(w::KeyedAnswer::FinalAnswer(record), &self.limits) {
-                                Ok(answer) => Ok(Answered::Jig(answer)),
-                                Err(problem) => Err(problem),
-                            }
-                        }
-                        w::Owner::Family(owner) => Ok(Answered::Family(Family {
-                            family: owner.number(),
-                            version: record.version(),
-                            bytes: skein_lib::bytes::copy_of(record.record()),
-                        })),
-                    }
-                };
+                let answer = self.final_answer(&attempt, record);
                 match answer {
                     Ok(answer) => {
                         if let Some((party, credential)) = credential {
@@ -281,6 +266,29 @@ impl Link {
             out.push(Request::Signing { signing: crate::Signing::SignedOut });
         }
         out.push(Request::Answer { attempt: attempt.token, envelope, answer: None, why });
+    }
+    fn final_answer(&self, attempt: &Attempt, record: w::Owned) -> Result<Answered, translate::Undecodable> {
+        if record.owner() == &attempt.owner && record.version() == attempt.version {
+            return match record.owner() {
+                w::Owner::Jig => match translate::answers::answer(w::KeyedAnswer::FinalAnswer(record), &self.limits) {
+                    Ok(answer) => Ok(Answered::Jig(answer)),
+                    Err(problem) => Err(problem),
+                },
+                w::Owner::Family(owner) => Ok(Answered::Family(Family {
+                    family: owner.number(),
+                    version: record.version(),
+                    bytes: skein_lib::bytes::copy_of(record.record()),
+                })),
+            };
+        }
+        if record.owner() == &w::Owner::Jig && record.version() == wire::VERSION && attempt.owner != w::Owner::Jig {
+            let answer = translate::answers::answer(w::KeyedAnswer::FinalAnswer(record), &self.limits)?;
+            return match answer {
+                answer @ jig_client_domain::contract::Answer::Refused { .. } => Ok(Answered::Jig(answer)),
+                jig_client_domain::contract::Answer::Done(_) => Err(translate::Undecodable::Version),
+            };
+        }
+        Err(translate::Undecodable::Version)
     }
     fn read_answer(&mut self, attempt: Attempt, body: &[u8], out: &mut Queue<Request>) {
         if let ExchangeKind::Read { turn: Some(identity) } = attempt.kind {

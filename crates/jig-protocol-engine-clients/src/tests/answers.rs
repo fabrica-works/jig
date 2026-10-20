@@ -4,6 +4,21 @@ use jig_client_protocol_wire::v10 as w;
 use jig_domain_people as p;
 use skein_lib::{Reader, ReplyTo, Token};
 #[test]
+fn a_family_request_the_people_child_refuses_is_answered_under_jig_s_owner() {
+    let mut exchange = Exchange::new();
+    let (owner, to) = exchange.application();
+    exchange.reply(to, p::Reply::Refused(p::Refusal::KeyConflict));
+    assert_eq!(
+        exchange.final_answer(owner),
+        w::Final::Refused(
+            w::Refused::new(&f::wire(), w::RefusedParts { at: None, refusal: w::Refusal::KeyConflict })
+                .expect("refused")
+        )
+    );
+    assert!(exchange.component.pending.exchanges.is_empty());
+    assert!(exchange.out.is_empty());
+}
+#[test]
 fn a_made_chat_is_answered_done_with_its_task() {
     let mut exchange = Exchange::new();
     let (owner, to) = exchange.ask();

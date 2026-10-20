@@ -134,6 +134,52 @@ fn a_not_served_answer_holds_its_request_for_its_owner() {
 }
 
 #[test]
+fn a_jig_refusal_of_a_family_request_is_handed_up_final() {
+    let (mut h, exchange) = fixtures::Harness::sending_family();
+    h.answer(exchange, &fixtures::answer_key_conflict());
+    assert_eq!(
+        h.answered(fixtures::ATTEMPT),
+        Some((
+            RequestEnvelope::Final,
+            Some(&Answered::Jig(c::Answer::Refused { refusal: c::Refusal::KeyConflict, at: None }))
+        ))
+    );
+    assert!(!h.has(&Request::Fact { fact: Fact::UndecodableAnswer }));
+}
+
+#[test]
+fn a_jig_done_for_a_family_request_is_lost_and_reported() {
+    let (mut h, exchange) = fixtures::Harness::sending_family();
+    h.answer(exchange, &fixtures::answer_done_chat(31));
+    h.lost();
+    assert!(h.has(&Request::Fact { fact: Fact::UndecodableAnswer }));
+}
+
+#[test]
+fn a_family_answer_reaches_its_owner_as_bytes_only_for_its_own_owner_and_version() {
+    let (mut h, exchange) = fixtures::Harness::sending_family();
+    h.answer(exchange, &fixtures::answer_family(19, 23));
+    assert_eq!(
+        h.answered(fixtures::ATTEMPT),
+        Some((RequestEnvelope::Final, Some(&Answered::Family(fixtures::family_read()))))
+    );
+    for (family, version) in [(19, 24), (20, 23)] {
+        let (mut h, exchange) = fixtures::Harness::sending_family();
+        h.answer(exchange, &fixtures::answer_family(family, version));
+        h.lost();
+        assert!(h.has(&Request::Fact { fact: Fact::UndecodableAnswer }));
+    }
+}
+
+#[test]
+fn a_family_answer_to_a_jig_request_is_lost_and_reported() {
+    let (mut h, exchange) = fixtures::Harness::sending();
+    h.answer(exchange, &fixtures::answer_family(19, 23));
+    h.lost();
+    assert!(h.has(&Request::Fact { fact: Fact::UndecodableAnswer }));
+}
+
+#[test]
 fn a_seen_over_a_conversation_names_its_task() {
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     harness.send(

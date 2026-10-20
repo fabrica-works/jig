@@ -58,9 +58,12 @@ fn the_same_name_with_another_value_is_refused_once_and_its_value_is_erased() {
     story.carry(FAMILY_REQUEST, NAME, change(), VALUE);
     answered(&mut story, FAMILY_REQUEST);
     story.carry(STOP, NAME, change(), OTHER_VALUE);
-    // One answer: jig refuses a family's request under jig's owner, which
-    // the link reads as undecodable, so the client tells it lost.
-    assert_eq!(answered(&mut story, STOP).len(), 1);
+    let answers = answered(&mut story, STOP);
+    let [Outcome::Answered(Answered::Jig(contract::Answer::Refused { refusal, at }))] = answers.as_slice() else {
+        panic!("one jig refusal: {answers:?}")
+    };
+    assert_eq!(*refusal, contract::Refusal::KeyConflict);
+    assert!(at.is_none());
     assert_eq!(story.carried(), vec![FIRST]);
     assert_eq!(story.made_under(NAME), 1);
 }
