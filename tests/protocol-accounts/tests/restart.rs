@@ -61,15 +61,15 @@ fn a_restart_re_adds_a_party_signed_in_source() {
     assert!(matches!(event, translate::Up::Granted { account: 7, generation: 1, .. }), "{event:?}");
 }
 #[test]
-fn the_restart_erases_records_nothing_names_and_spares_configured_ones() {
+fn the_restart_spares_named_sources_of_every_holder_and_erases_only_unnamed_source_rows() {
     let mut world = World::new();
     for number in [1, 7, 8, 9, 10] {
         world.secret(Secrets::Keep { owner: SecretOwner::Source, number, value: Secret::new(Box::new([7; 32])) });
     }
     let carried = world.carry(&[9; 32]);
     let mut inventory = Inventory::new(2, 2);
-    inventory.name(1); // configured, with no child account row
-    inventory.name(7); // the child names its party source
+    inventory.name(1); // restored deployment-held key source
+    inventory.name(7); // restored party-held signed-in source
     assert!(inventory.step().is_none(), "nothing erased before Restored");
     inventory.restored();
     inventory.restored(); // ends the same pass, never starts another

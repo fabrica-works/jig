@@ -107,7 +107,7 @@ pub fn party_account(
 }
 
 /// Reattaches the stored record to a party source before its first Want.
-/// A missing or unreadable record remains an unloaded source, as configured ones do.
+/// A missing or unreadable record remains an unloaded source.
 pub fn restore(
     mut account: driver::Account,
     source: u32,

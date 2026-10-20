@@ -4,8 +4,8 @@ use crate::{Files, Seeds, values::Values};
 use alloc::boxed::Box;
 use jig_domain_accounts as domain;
 use jig_domain_core as core;
-use jig_protocol_accounts::{handed_in, installation, keys, party, records, restart, table, translate};
-use jig_protocol_config::{self as config, Path, Problems, Segment, What};
+use jig_protocol_accounts::{installation, keys, party, records, restart, table, translate};
+use jig_protocol_config::{self as config, Path, Problems, What};
 use jig_protocol_store as store;
 use jig_test_domain as root;
 use skein_io::{
@@ -21,7 +21,6 @@ pub(super) const PREFIX: u64 = 3_u64 << 60;
 /// answered under its source's number.
 const SWEEP: Token = Token::new(PREFIX | (1_u64 << 34));
 const KEY_EXCHANGE: u64 = PREFIX | (1_u64 << 33);
-const LOAD: Token = Token::new(PREFIX | (1_u64 << 32_u32));
 #[derive(Debug)]
 pub struct AccountsRuntime {
     /// LLM account sign-in endpoints and origins, keyed by provider number.
@@ -30,15 +29,13 @@ pub struct AccountsRuntime {
     pub trust_roots: u32,
     pub trust_root_bytes: u32,
 }
-/// Until the store's records are read the driver is not made; until the
-/// handed-in records are kept no request reaches it (llm.md 5.1, 5.4).
+/// The driver starts after the store supplies its durable installation identity (llm.md, 5.4).
 #[expect(
     clippy::large_enum_variant,
     reason = "one phase per service, and the sources it loads move once into the driver"
 )]
 enum Phase {
-    Loading { crypto: CryptoRng, after: Option<u64>, asked: bool },
-    HandingIn,
+    Loading { crypto: CryptoRng },
     Running,
 }
 /// One durable erase per source; only sign-out continues to driver removal.
@@ -62,7 +59,6 @@ pub(super) struct Accounts {
     key_out: Queue<keys::Next>,
     key_events: Queue<domain::FromComponent>,
     forgotten: Queue<u32>,
-    handed: Queue<(u32, oauth::SavedToken)>,
     early: Queue<domain::Request>,
     pub(super) io: Queue<io::Request>,
     above: Queue<driver::Event>,
@@ -72,17 +68,9 @@ pub(super) struct Accounts {
     aborting: bool,
     closed: bool,
 }
-fn problem(index: usize, what: What) -> Problems {
+fn problem(_index: usize, what: What) -> Problems {
     let mut found = Problems::empty();
-    found.push(
-        Path::root()
-            .member(b"engine")
-            .member(b"llm")
-            .member(b"accounts")
-            .child(Segment::Index(u32::try_from(index).expect("bounded accounts")))
-            .member(b"source"),
-        what,
-    );
+    found.push(Path::root().member(b"engine").member(b"llm").member(b"providers"), what);
     found
 }
 impl Files {
@@ -120,8 +108,7 @@ fn registration_input(
         redirect_port: configured.redirect_port,
     }
 }
-/// A copy of a configured source, without a record, for the check at
-/// start; configured sources name no origins.
+/// A provider registration copied without a source record.
 fn unkept(account: &driver::Account) -> driver::Account {
     match account {
         driver::Account::HandedIn => driver::Account::HandedIn,
@@ -196,8 +183,7 @@ fn provider_templates(
     Ok(providers)
 }
 impl Accounts {
-    /// Checks the configured sources and makes them ready to start; the
-    /// driver is made once the secrets' store's records are read.
+    /// Checks public provider registrations; restored sources are admitted after the store opens.
     pub fn new(
         config: &config::Engine,
         _files: &Files,
@@ -215,7 +201,7 @@ impl Accounts {
         let inventory = restart::Inventory::new(limits.accounts, secrets.page.rows);
         Ok(Self {
             component: None,
-            phase: Phase::Loading { crypto, after: None, asked: false },
+            phase: Phase::Loading { crypto },
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             ids: Map::with_capacity(limits.accounts),
             providers,
@@ -227,7 +213,6 @@ impl Accounts {
             key_out: Queue::with_capacity(room),
             key_events: Queue::with_capacity(room),
             forgotten: Queue::with_capacity(room),
-            handed: Queue::with_capacity(limits.accounts),
             early: Queue::with_capacity(room),
             io: Queue::with_capacity(room),
             above: Queue::with_capacity(room),
@@ -383,8 +368,7 @@ impl Accounts {
     }
     pub fn work_pending(&self, now: Time) -> bool {
         let starting = match &self.phase {
-            Phase::Loading { asked, .. } => !*asked,
-            Phase::HandingIn => !self.handed.is_empty() || !self.records.keeping(),
+            Phase::Loading { .. } => true,
             Phase::Running => !self.early.is_empty(),
         };
         starting
@@ -412,9 +396,6 @@ impl Accounts {
             self.closed = true;
         }
         self.phase = Phase::Running;
-        for _ in 0..self.handed.len() {
-            let _unkept = self.handed.pop();
-        }
         for _ in 0..self.early.len() {
             let _unasked = self.early.pop();
         }
@@ -681,7 +662,7 @@ impl Accounts {
     ) -> domain::Form {
         // An account with a provider account id is jig's live test's
         // (D2): its bearer goes out beside the id until JP13.
-        let id = self.ids.get(&account).expect("configured account id");
+        let id = self.ids.get(&account).expect("admitted source identity");
         let value = if id.expose().is_empty() {
             value
         } else {
@@ -748,7 +729,7 @@ impl Accounts {
             }
             match store.sources.pop().expect("source answers") {
                 store::Event::SecretsLoaded { owner: SWEEP, rows, next } => self.sweep_loaded(rows, next),
-                store::Event::SecretsLoaded { rows, next, .. } => self.loaded(rows, next, &store.installation),
+                store::Event::SecretsLoaded { .. } => unreachable!("only the source inventory loads pages"),
                 store::Event::Kept { owner } if owner.raw() & KEY_EXCHANGE == KEY_EXCHANGE => {
                     if !self.aborting
                         && let Some(next) = self.keys.kept(Token::new(owner.raw() & !KEY_EXCHANGE), true, self.env.now)
@@ -794,24 +775,13 @@ impl Accounts {
             }
         }
     }
-    /// One page of the store's records; after the last, the driver starts
-    /// from them (llm.md 5.1), each sign-in sending the installation's
-    /// identifier the store keeps (llm.md 5.4).
-    fn loaded(&mut self, rows: Box<[store::SecretRow]>, next: Option<u64>, kept: &[u8; 16]) {
-        let Phase::Loading { after, asked, .. } = &mut self.phase else { return; };
-        // Source values are loaded only when the restored child names their real source.
-        drop(rows);
-        if let Some(next) = next {
-            *after = Some(next);
-            *asked = false;
-            return;
-        }
-        let Phase::Loading { crypto, .. } = ::core::mem::replace(&mut self.phase, Phase::HandingIn)
-        else {
+    /// The durable installation identity replaces this start's draw before any Restore or SignIn.
+    fn opened(&mut self, kept: &[u8; 16]) {
+        let Phase::Loading { crypto } = ::core::mem::replace(&mut self.phase, Phase::Running) else {
             unreachable!("loading");
         };
-        let component =
-            driver::Component::new(List::with_capacity(0), &self.env.limits, crypto).expect("startup checked driver");
+        let component = driver::Component::new(List::with_capacity(0), &self.env.limits, crypto)
+            .expect("startup checked driver bounds");
         // The stored installation id, rather than this start's draw, goes on account sign-ins.
         let mut after = 0;
         for _ in 0..self.providers.len() {
@@ -826,33 +796,12 @@ impl Accounts {
         }
         self.component = Some(component);
     }
-    /// Asks for the next page of records, hands in the handed-in records
-    /// once kept, then lets the domain's requests through.
+    /// Wait for the store, then route the child's restored sources and runtime requests.
     fn start(&mut self, store: &mut crate::store::Store, values: &mut Values) {
         match &mut self.phase {
-            Phase::Loading { after, asked, .. } => {
-                if !*asked && store.opened && store.room() {
-                    *asked = true;
-                    let load = store::Secrets::Load { owner: store::SecretOwner::Source, after: *after };
-                    if let Some(store::Event::SecretsLoaded { owner: _, rows, next }) = store.secrets(LOAD, load) {
-                        self.loaded(rows, next, &store.installation);
-                    }
-                }
-            }
-            Phase::HandingIn => {
-                for _ in 0..self.handed.len() {
-                    if !store.room() || !self.down_room() {
-                        break;
-                    }
-                    let (account, record) = self.handed.pop().expect("handed-in records");
-                    match self.records.hand_in(account, record, &self.env.limits.client.document) {
-                        Ok(records::Next::Driver(request)) => self.down(request),
-                        Ok(records::Next::Store(keep)) => replace(store, keep),
-                        Err(handed_in::Unfit) => unreachable!("startup encoded each handed-in record"),
-                    }
-                }
-                if self.handed.is_empty() && !self.records.keeping() {
-                    self.phase = Phase::Running;
+            Phase::Loading { .. } => {
+                if store.opened {
+                    self.opened(&store.installation);
                 }
             }
             Phase::Running => {
@@ -997,18 +946,13 @@ pub(super) fn untag(mut event: io::Event) -> io::Event {
     }
     event
 }
-/// The accounts' bytes beside the driver's own: their queues, the sources
-/// as configured until the store's records are read, the handed-in records
-/// until kept, and each source's record on its way to the store.
+/// Bounded source records, restored identities, key flights and queues beside the driver.
 pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32, page_rows: u32) -> Option<u64> {
     let record = u64::from(limits.client.document.record_bytes);
     Queue::<io::Request>::worst_case(room)?
         .checked_add(Queue::<driver::Event>::worst_case(room)?)?
         .checked_add(Queue::<driver::FileLower>::worst_case(room)?)?
         .checked_add(Queue::<domain::Request>::worst_case(room)?)?
-        .checked_add(Map::<u32, driver::Account>::worst_case(limits.accounts)?)?
-        .checked_add(Queue::<(u32, oauth::SavedToken)>::worst_case(limits.accounts)?)?
-        .checked_add(u64::from(limits.accounts).checked_mul(record)?)?
         .checked_add(records::worst_case(limits.accounts, &limits.client.document)?)?
         .checked_add(keys::worst_case(limits.accounts, limits.client.document.token_bytes)?)?
         .checked_add(restart::worst_case(limits.accounts, page_rows)?)?

@@ -219,10 +219,7 @@ fn a_default_chooses_a_usable_provider_once_with_its_first_effort() {
 #[test]
 fn unknown_program_login_facts_also_hold_a_direct_run_off_workers() {
     let (mut core, limits) = ready(false);
-    core.accounts = accounts::Domain::new(
-        &limits.accounts,
-        core.settings.llm_providers.clone(),
-    );
+    core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
     account(
         &mut core,
         &limits,

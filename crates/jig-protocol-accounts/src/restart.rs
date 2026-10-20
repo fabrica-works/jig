@@ -34,7 +34,7 @@ impl Inventory {
             next: None,
         }
     }
-    /// Configured sources and the child's restored or newly admitted sources.
+    /// All restored or newly admitted signed-in and key sources, for every holder.
     pub fn name(&mut self, source: u32) {
         self.named.insert(u64::from(source)).expect("live sources fit driver bound");
     }

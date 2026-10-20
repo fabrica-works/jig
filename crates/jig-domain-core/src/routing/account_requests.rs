@@ -36,9 +36,7 @@ pub(super) fn outcome(answer: accounts::Answer) -> people::Outcome {
         accounts::Refusal::Numbers => people::Refusal::Limit { which: people::LimitKind::Arithmetic },
         // A provider offering no sign-in, or a configured source that no sign-out serves.
         accounts::Refusal::Provider { .. } | accounts::Refusal::Kind { .. } => people::Refusal::NotOffered,
-        accounts::Refusal::NotLimited | accounts::Refusal::Uses => {
-            people::Refusal::NotOffered
-        }
+        accounts::Refusal::NotLimited | accounts::Refusal::Uses => people::Refusal::NotOffered,
         accounts::Refusal::NotKept { why: accounts::KeyFailure::TooLong } => {
             people::Refusal::Limit { which: people::LimitKind::Words }
         }

@@ -635,10 +635,7 @@ impl Core {
             authority: config.authority,
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
             fleet: fleet::Domain::new(&limits.fleet, fleet_needs),
-            accounts: accounts::Domain::new(
-                &limits.accounts,
-                config.settings.llm_providers.clone(),
-            ),
+            accounts: accounts::Domain::new(&limits.accounts, config.settings.llm_providers.clone()),
             brief: brief::GatherDomain::new(&limits.brief),
             notes: notes::Domain::new(&limits.notes),
             views: views::Domain::new(&limits.views),

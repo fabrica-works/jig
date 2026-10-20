@@ -2,8 +2,8 @@
 //! kept by the store: each change saved in the step that makes it, and restored at the start.
 use jig_accounts_world::{LIMITS, World, account, provider, providers, source};
 use jig_domain_accounts::{
-    Bound, Event, Form, FromComponent, Held, Holder, Key, Kind, Refusal, Request, Scheme, SignIn, State,
-    Stored, ToComponent, room_for_sign_in,
+    Bound, Event, Form, FromComponent, Held, Holder, Key, Kind, Refusal, Request, Scheme, SignIn, State, Stored,
+    ToComponent, room_for_sign_in,
 };
 use skein_lib::{Duration, Time, Wall};
 use std::collections::BTreeMap;
@@ -338,7 +338,11 @@ fn a_record_breaking_a_rule_is_counted_and_dropped() {
     ];
     let mut world = World::with(providers(vec![provider(1, true, true)]), &[]);
     world.restore(records.clone());
-    assert_eq!(world.domain.unrestored(), 3, "an account and source cannot share a number; an unknown provider's rows wait");
+    assert_eq!(
+        world.domain.unrestored(),
+        3,
+        "an account and source cannot share a number; an unknown provider's rows wait"
+    );
     let alice = world.domain.account(7).expect("restored");
     assert_eq!((alice.holder(), alice.subject()), (ALICE, &b"alice"[..]));
     assert_eq!(alice.sources().iter().collect::<Vec<_>>(), vec![(&1, &8)]);

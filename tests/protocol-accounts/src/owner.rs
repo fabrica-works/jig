@@ -158,7 +158,8 @@ impl Owner {
                 &child_limits,
                 child::Providers {
                     providers: Box::new([child::Provider {
-                        number: 1, models: Box::new([]),
+                        number: 1,
+                        models: Box::new([]),
                         offers: child::Offers { sign_in: true, key: false, programs: Box::new([]) },
                     }]),
                 },
@@ -205,11 +206,26 @@ impl Owner {
             erasing: Map::with_capacity(limits.accounts),
             account_sign_out_asked: None,
         };
-            if !fixtures::account_sign_in(story) {
+        if !fixtures::account_sign_in(story) {
             let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: child_limits };
             for record in [
-                child::Stored::Account { number: account + 1_000, provider: 1, holder: child::Holder::Deployment, place: 0, uses: None, subject: Box::new([]), display: Box::new([]) },
-                child::Stored::Source { account: account + 1_000, number: account, place: 0, kind: child::Kind::SignIn, name: Box::new([]), held: None },
+                child::Stored::Account {
+                    number: account + 1_000,
+                    provider: 1,
+                    holder: child::Holder::Deployment,
+                    place: 0,
+                    uses: None,
+                    subject: Box::new([]),
+                    display: Box::new([]),
+                },
+                child::Stored::Source {
+                    account: account + 1_000,
+                    number: account,
+                    place: 0,
+                    kind: child::Kind::SignIn,
+                    name: Box::new([]),
+                    held: None,
+                },
             ] {
                 child::step(&mut owner.child, &env, child::Event::Restore { record }, &mut owner.child_out);
             }
@@ -219,7 +235,7 @@ impl Owner {
             // start opens the same stores again.
             assert_eq!(owner.open(kept), kept, "an empty store answers this start's draw");
             let stores = std::mem::replace(&mut owner.store, memory(&owner.store_limits)).into_stores();
-        owner.store = store::Store::over(&owner.store_limits, fixtures::APPLICATION, &[], stores);
+            owner.store = store::Store::over(&owner.store_limits, fixtures::APPLICATION, &[], stores);
         }
         owner.installation = owner.open(installation.drawn);
         if let Some(held) = held {

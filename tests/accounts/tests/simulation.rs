@@ -35,8 +35,14 @@ fn at(seconds: u64) -> Time {
 }
 /// The analyst's source's record, saved in the step that changes its hold.
 fn kept(held: Option<Held>) -> Request {
-    let record =
-        Stored::Source { account: 1_000 + ANALYST, number: ANALYST, place: 0, kind: Kind::SignIn, name: Box::new([]), held };
+    let record = Stored::Source {
+        account: 1_000 + ANALYST,
+        number: ANALYST,
+        place: 0,
+        kind: Kind::SignIn,
+        name: Box::new([]),
+        held,
+    };
     Request::Save { record }
 }
 /// Limited until a reset, on the world's wall clock, which starts at its epoch.
@@ -47,13 +53,21 @@ fn until(seconds: u64) -> Held {
 fn every_restored_source_is_named_before_it_is_wanted() {
     let mut world = World::restoring(&[ANALYST, 8]);
     let outputs = world.step(Event::Want);
-    assert_eq!(outputs, vec![
-        Request::Save { record: Stored::Next { number: 1_009 } },
-        Request::Signing(jig_domain_accounts::Signing::Restore { source: ANALYST, provider: 1, kind: Kind::SignIn }),
-        Request::Signing(jig_domain_accounts::Signing::Restore { source: 8, provider: 1, kind: Kind::SignIn }),
-        Request::Signing(jig_domain_accounts::Signing::Restored),
-        want(), Request::Component(ToComponent::Want { account: 8 }),
-    ]);
+    assert_eq!(
+        outputs,
+        vec![
+            Request::Save { record: Stored::Next { number: 1_009 } },
+            Request::Signing(jig_domain_accounts::Signing::Restore {
+                source: ANALYST,
+                provider: 1,
+                kind: Kind::SignIn
+            }),
+            Request::Signing(jig_domain_accounts::Signing::Restore { source: 8, provider: 1, kind: Kind::SignIn }),
+            Request::Signing(jig_domain_accounts::Signing::Restored),
+            want(),
+            Request::Component(ToComponent::Want { account: 8 }),
+        ]
+    );
     assert_eq!(world.step(Event::Want), vec![]);
 }
 #[test]
