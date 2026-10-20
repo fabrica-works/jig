@@ -280,6 +280,7 @@ mod tests {
                     task: 0,
                     revision: Some(client::Revision { value: 6 }),
                     change: Box::new(client::Amendment {
+                        llm: None,
                         addressed: Some(client::AddressChange { revision: client::Revision { value: 12 }, address }),
                         instructions: Some(text(b"")),
                         spec: None,
@@ -364,6 +365,7 @@ mod tests {
             task: u64::MAX,
             revision: Some(client::Revision { value: u64::MAX }),
             change: Box::new(client::Amendment {
+                llm: None,
                 addressed: None,
                 instructions: None,
                 spec: Some(selected),

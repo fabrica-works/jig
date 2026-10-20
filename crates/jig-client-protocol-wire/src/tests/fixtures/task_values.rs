@@ -5,6 +5,7 @@ pub fn task(limits: &Limits) -> Task {
     Task::new(
         limits,
         TaskParts {
+            llm: None,
             label: 0,
             flags: TaskFlags::new(
                 limits,

@@ -211,6 +211,7 @@ pub(crate) fn amendment_fields(value: &w::Amendment, limits: &Limits) -> Result<
             Some(value) => Some(crate::translate::operations::restore_tracking(value)),
             None => None,
         },
+        llm: crate::translate::llm::choice(value.llm().as_ref(), limits)?,
     })
 }
 

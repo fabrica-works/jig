@@ -83,6 +83,7 @@ pub(super) fn document() -> Me {
     let mut projects = List::with_capacity(2);
     projects
         .push(MeProject {
+            models: List::with_capacity(0),
             templates: crate::tests::fixtures::chat_templates(),
             creating: Some(crate::tests::fixtures::creating()),
             project: 4,

@@ -12,7 +12,7 @@ pub use decision::DecisionWord;
 use skein_lib::List;
 use skein_ui::phrases::{HoleKind, HoleShape, Language, PhraseId, PhraseShape};
 /// Phrase count, for a caller composing a bounded phrasebook.
-pub const PHRASES: u32 = 84;
+pub const PHRASES: u32 = 85;
 /// Owner of jig's public enum vocabulary.
 pub const OWNER: skein_ui::Owner = skein_ui::Owner { number: 65_537 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,6 +58,7 @@ pub enum RefusalWord {
     Unknown,
     NotOffered,
     KeyConflict,
+    Llm,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WaitingWord {
@@ -122,6 +123,7 @@ impl Word {
             Refusal::Unknown => RefusalWord::Unknown,
             Refusal::NotOffered => RefusalWord::NotOffered,
             Refusal::KeyConflict => RefusalWord::KeyConflict,
+            Refusal::Llm { .. } => RefusalWord::Llm,
         })
     }
     #[must_use]
@@ -161,7 +163,7 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 84] = [
+pub const ALL: [Word; 85] = [
     Word::Phase(Phase::Waiting),
     Word::Phase(Phase::Idle),
     Word::Phase(Phase::Due),
@@ -205,6 +207,7 @@ pub const ALL: [Word; 84] = [
     Word::Refusal(RefusalWord::Unknown),
     Word::Refusal(RefusalWord::NotOffered),
     Word::Refusal(RefusalWord::KeyConflict),
+    Word::Refusal(RefusalWord::Llm),
     Word::Waiting(WaitingWord::Party),
     Word::Waiting(WaitingWord::Delegates),
     Word::Waiting(WaitingWord::News),

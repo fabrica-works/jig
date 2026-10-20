@@ -34,6 +34,7 @@ fn intend(domain: &mut Fixture, id: Id<Object>, act: ActKind) -> Box<[Request]> 
 }
 pub(super) fn change() -> Amendment {
     Amendment {
+        llm: None,
         addressed: None,
         spec: specification(text(b"amended")).whole(),
         wake: None,
@@ -48,6 +49,7 @@ fn counts() -> PhaseCounts {
 }
 pub(super) fn task() -> Task {
     Task {
+        llm: None,
         label: 0,
         flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
         last_activity: Wall::EPOCH,

@@ -37,6 +37,8 @@ pub struct MeProject {
     pub pool: Option<PoolLedger>,
     pub templates: List<Template>,
     pub creating: Option<Creating>,
+    /// The models the party may choose here, as its authority allows them, in configuration's order.
+    pub models: List<super::MeModel>,
 }
 
 /// One actual procedure alternative supplied for the fixed goal form.
@@ -79,4 +81,6 @@ pub struct Template {
     pub flags: TaskFlags,
     pub label: u32,
     pub grace: Option<Duration>,
+    /// The LLM choice the template gives its task; `None` is its charter's default.
+    pub llm: Option<super::LlmChoice>,
 }

@@ -9,6 +9,7 @@ fn amendment(reason: &[u8]) -> Ask {
         revision: Some(Revision { value: 1 }),
         reason: text(reason),
         change: Box::new(Amendment {
+            llm: None,
             addressed: None,
             spec: None,
             instructions: Some(text(b"")),

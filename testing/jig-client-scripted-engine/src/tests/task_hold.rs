@@ -82,6 +82,7 @@ fn scripted_owner_hold_moves_return_exact_category_for_release_and_atomic_amend_
                     revision: Some(spec_revision),
 
                     change: Box::new(Amendment {
+                        llm: None,
                         addressed: None,
                         spec: None,
                         wake: None,

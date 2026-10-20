@@ -80,6 +80,7 @@ pub(crate) fn template(value: &w::Template, limits: &Limits) -> Result<c::Templa
         },
         label: value.label(),
         grace: *value.grace(),
+        llm: crate::translate::llm::choice(value.llm().as_ref(), limits)?,
     })
 }
 pub(crate) fn overrides(

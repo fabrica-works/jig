@@ -53,6 +53,7 @@ pub fn templates(values: &List<jig_domain_core::Template>, limits: &w::Limits) -
                 flags: flags(value.flags, limits)?,
                 label: value.label,
                 grace: value.grace,
+                llm: None,
             },
         )?)
         .expect("one row per template");

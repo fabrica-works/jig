@@ -157,6 +157,7 @@ fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::MeProje
                 Some(value) => Some(super::me::creating(value, limits)?),
                 None => None,
             },
+            models: List::with_capacity(0),
         },
     )
 }

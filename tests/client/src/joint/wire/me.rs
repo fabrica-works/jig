@@ -18,6 +18,7 @@ pub(super) fn templates(values: &List<Template>, limits: &Limits) -> Result<List
 }
 fn template(value: &Template, limits: &Limits) -> Result<c::Template, owner::Invalid> {
     Ok(c::Template {
+        llm: None,
         number: value.number,
         name: owner::text(&jig_domain_core::documents::Text { bytes: value.name.clone(), cut: false }, limits)?,
         executor: match value.executor {

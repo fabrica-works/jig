@@ -96,6 +96,7 @@ fn full_trail() -> List<Passed> {
 }
 fn full_amendment() -> Amendment {
     Amendment {
+        llm: None,
         addressed: Some(AddressChange { revision: Revision { value: 12 }, address: PersonAddress::Role(2) }),
         spec: Some(specification(full_text()).whole().unwrap()),
         instructions: Some(full_text()),

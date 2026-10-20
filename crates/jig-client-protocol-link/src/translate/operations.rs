@@ -252,6 +252,7 @@ fn new_task(v: &c::NewTask, limits: &w::Limits) -> Result<w::NewTask, w::Problem
                     },
                 },
             )?,
+            llm: super::llm::wire_choice(v.llm.as_ref(), limits)?,
         },
     )
 }
@@ -351,6 +352,7 @@ fn restore_task(v: &w::NewTask, limits: &crate::Limits) -> Result<c::NewTask, w:
                 w::Retention::ForgottenOnceRead => c::Retention::ForgottenOnceRead,
             },
         },
+        llm: super::llm::choice(v.llm().as_ref(), limits)?,
     })
 }
 

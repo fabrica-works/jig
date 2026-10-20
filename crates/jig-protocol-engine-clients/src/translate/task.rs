@@ -333,6 +333,7 @@ pub fn document(value: &d::Task, limits: &w::Limits) -> Result<w::Task, w::Probl
     w::Task::new(
         limits,
         w::TaskParts {
+            llm: None,
             label: value.label,
             flags: super::me::flags(value.flags, limits)?,
             last_activity: value.last_activity.as_nanos(),

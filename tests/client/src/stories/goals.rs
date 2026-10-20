@@ -34,6 +34,7 @@ pub fn board(seed: u64) -> World<Test, Scripted> {
 #[must_use]
 pub fn amendment() -> Amendment {
     Amendment {
+        llm: None,
         addressed: None,
         spec: None,
         wake: None,

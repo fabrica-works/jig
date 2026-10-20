@@ -4,6 +4,7 @@ pub mod asks;
 pub mod documents;
 mod facts;
 pub mod live;
+mod llm;
 mod operations;
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v10 as w;

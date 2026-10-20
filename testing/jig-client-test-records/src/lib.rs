@@ -115,6 +115,7 @@ pub fn task_record() -> w::Task {
     w::Task::new(
         &lim,
         w::TaskParts {
+            llm: None,
             label: 0,
             flags: w::TaskFlags::new(
                 &lim,

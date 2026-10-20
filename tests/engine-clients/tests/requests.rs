@@ -111,6 +111,7 @@ fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
                 change: w::Amendment::new(
                     &limits,
                     w::AmendmentParts {
+                        llm: None,
                         tracked: None,
                         addressed: None,
                         spec: None,

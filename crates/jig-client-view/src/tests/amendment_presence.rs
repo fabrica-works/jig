@@ -5,6 +5,7 @@ use crate::tests::fixtures::Fixture;
 
 fn empty() -> Amendment {
     Amendment {
+        llm: None,
         addressed: None,
         spec: None,
         instructions: None,

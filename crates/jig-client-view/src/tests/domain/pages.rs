@@ -22,6 +22,7 @@ fn text(value: &[u8]) -> Text {
 }
 pub(super) fn project(number: u32, chats: bool) -> MeProject {
     MeProject {
+        models: List::with_capacity(0),
         templates: if chats { crate::tests::fixtures::chat_templates() } else { List::with_capacity(0) },
         creating: Some(crate::tests::fixtures::creating()),
         project: number,

@@ -11,7 +11,15 @@ fn text(bytes: &[u8]) -> DocumentText {
     DocumentText::complete(Text::new(bytes.into(), 32).unwrap())
 }
 fn member(role: HeldRole) -> MeProject {
-    MeProject { templates: List::with_capacity(0), creating: None, project: u32::MAX, name: None, role, pool: None }
+    MeProject {
+        templates: List::with_capacity(0),
+        creating: None,
+        project: u32::MAX,
+        name: None,
+        role,
+        pool: None,
+        models: List::with_capacity(0),
+    }
 }
 #[test]
 fn me_preserves_roles_pools_and_independent_owner_counts() {

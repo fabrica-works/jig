@@ -11,6 +11,7 @@ pub fn create_tasks() -> List<c::NewTask> {
         }
         tasks
             .push(c::NewTask {
+                llm: None,
                 deadline: jig_client_domain::contract::NewDeadline::Named,
                 executor: c::OwnerExecutor::Agent { charter: 1 },
                 spec: c::Specification {

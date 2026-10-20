@@ -404,6 +404,7 @@ pub(crate) fn task_fields(value: &w::Task, limits: &Limits) -> Result<c::Task, w
         result: opt8,
         delegates: live_delegate_piece(value.delegates(), limits, limits.client.rows)?,
         context: opt9,
+        llm: crate::translate::llm::choice(value.llm().as_ref(), limits)?,
     })
 }
 

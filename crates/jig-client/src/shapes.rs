@@ -209,6 +209,7 @@ fn fill(
         tracked: priority(template.tracked, draft),
         label: template.label,
         flags: template.flags,
+        llm: None,
     })
 }
 #[must_use]

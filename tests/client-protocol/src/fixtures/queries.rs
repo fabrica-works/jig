@@ -75,6 +75,7 @@ pub fn tracked_rows(story: &crate::client::Story, handle: Handle) -> Vec<(u64, O
 #[must_use]
 pub fn tracked_amendment(priority: u32) -> c::Amendment {
     c::Amendment {
+        llm: None,
         addressed: None,
         spec: None,
         wake: None,

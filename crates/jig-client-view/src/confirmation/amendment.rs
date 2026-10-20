@@ -314,6 +314,7 @@ fn empty() -> Amendment {
         dependencies: None,
         authority: None,
         tracked: None,
+        llm: None,
     }
 }
 // Display/edit values come from the source unless the person selected a whole replacement.
@@ -327,6 +328,7 @@ fn values(before: &Amendment, change: &Amendment) -> Amendment {
         dependencies: change.dependencies.clone().or(before.dependencies.clone()),
         authority: change.authority.clone().or(before.authority.clone()),
         tracked: change.tracked.or(before.tracked),
+        llm: change.llm.clone().or(before.llm.clone()),
     }
 }
 fn input(
@@ -383,6 +385,7 @@ fn before(object: &Object) -> Option<Amendment> {
             dependencies: Some(doc.steering.dependencies.clone()),
             authority: doc.steering.authority.whole(),
             tracked: None,
+            llm: None,
         },
         Some(
             Body::Historical(_)
@@ -432,5 +435,6 @@ fn task_before(doc: &Task) -> Amendment {
         dependencies: if doc.cut { None } else { Some(numbers(&doc.dependencies)) },
         authority: doc.authority.whole(),
         tracked: None,
+        llm: doc.llm.clone(),
     }
 }

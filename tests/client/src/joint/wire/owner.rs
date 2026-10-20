@@ -71,6 +71,7 @@ pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Me, In
     }
     let projects = list(&value.projects, limits, |row| {
         Ok(client::MeProject {
+            models: skein_lib::List::with_capacity(0),
             templates: super::me::templates(&row.templates, limits)?,
             creating: row.creating.as_ref().map(|v| super::me::creating(v, limits)).transpose()?,
             project: row.project,

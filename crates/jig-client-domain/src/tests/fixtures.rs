@@ -218,6 +218,7 @@ fn document(number: u64) -> contract::Task {
         result: None,
         delegates: List::with_capacity(0),
         context: None,
+        llm: None,
     }
 }
 

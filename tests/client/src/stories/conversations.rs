@@ -6,6 +6,7 @@ use skein_lib::{List, Wall};
 #[must_use]
 pub fn templates() -> List<Template> {
     let chat = Template {
+        llm: None,
         number: jig_client::shapes::CHAT,
         name: DocumentText::complete(text(b"Chat")),
         executor: TemplateExecutor::Charter(1),

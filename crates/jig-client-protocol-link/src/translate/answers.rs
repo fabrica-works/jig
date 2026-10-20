@@ -451,6 +451,7 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
         },
         w::Refusal::Unknown => c::Refusal::Unknown,
         w::Refusal::NoEscalationHolder => c::Refusal::NoEscalationHolder,
+        w::Refusal::Llm(row) => super::llm::refusal(row, limits)?,
         w::Refusal::NotOffered => c::Refusal::NotOffered,
         w::Refusal::KeyConflict => c::Refusal::KeyConflict,
     })

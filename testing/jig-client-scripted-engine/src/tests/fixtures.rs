@@ -27,6 +27,7 @@ pub(super) fn proposed_amendment(bounded: bool, changed: bool) -> (Script, Ask, 
             task: row.chip.task,
             revision: row.spec_revision,
             change: Box::new(Amendment {
+                llm: None,
                 addressed: None,
                 spec: None,
                 wake: None,
@@ -65,6 +66,7 @@ pub(super) fn query(project: u32) -> TaskQuery {
 /// One root using the shared task's specification and authority.
 pub(super) fn new_task(words: Text) -> NewTask {
     NewTask {
+        llm: None,
         deadline: jig_client_domain::contract::NewDeadline::Named,
         executor: OwnerExecutor::Agent { charter: 1 },
         spec: Specification { words, parameters: list(vec![]), inputs: list(vec![]) },

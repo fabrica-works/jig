@@ -70,6 +70,7 @@ pub(crate) fn ask(domain: &Ui, object: &Object, target: u32, lent: &jig_client::
                         authority: None,
                         instructions: None,
                         tracked: Some(c::Tracking::Tracked { priority }),
+                        llm: None,
                     }),
                     reason: c::Text::new(Box::from([]), 0).expect("empty reason fits"),
                 })

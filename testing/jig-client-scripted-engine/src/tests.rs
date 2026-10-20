@@ -34,6 +34,7 @@ fn frame(number: u64) -> Me {
             name: DocumentText::complete(text(b"party")),
         },
         projects: list(vec![MeProject {
+            models: skein_lib::List::with_capacity(0),
             templates: skein_lib::List::with_capacity(0),
             creating: None,
             project: 1,
@@ -339,6 +340,7 @@ fn counts() -> PhaseCounts {
 }
 fn task() -> Task {
     Task {
+        llm: None,
         label: 0,
         flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
         last_activity: Wall::EPOCH,
@@ -938,6 +940,7 @@ fn bounded_offer_payloads_and_predictions() {
             task: 8,
             revision: Some(Revision { value: 1 }),
             change: Box::new(Amendment {
+                llm: None,
                 addressed: None,
                 spec: None,
                 wake: None,
@@ -1157,6 +1160,7 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
                     revision: Some(Revision { value: if stale_hold { 1 } else { 2 } }),
 
                     change: Box::new(Amendment {
+                        llm: None,
                         addressed: None,
                         spec: Some(specification(text(b"new spec")).whole().unwrap()),
                         wake: None,
@@ -2185,6 +2189,7 @@ fn task_subscription_capacity_is_priced_separately_from_whole_activation_replace
     assert_eq!(reserved.heap(&bounds).unwrap(), row.heap(&bounds).unwrap());
     for results in [ResultsWake::Never, ResultsWake::Each, ResultsWake::LastOrFailure] {
         let mut change = Amendment {
+            llm: None,
             addressed: None,
             spec: None,
             wake: Some(OwnerWakePolicy {

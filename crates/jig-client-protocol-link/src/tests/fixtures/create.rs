@@ -16,6 +16,7 @@ pub fn create_ask() -> c::Ask {
 }
 pub fn new_task(executor: c::OwnerExecutor, contract: c::NewContract) -> c::NewTask {
     c::NewTask {
+        llm: None,
         deadline: jig_client_domain::contract::NewDeadline::Named,
         executor,
         spec: c::Specification {

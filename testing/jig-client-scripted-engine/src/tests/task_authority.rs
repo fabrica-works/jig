@@ -42,6 +42,7 @@ fn task_authority_receiving_prices_whole_documents_replacements_and_reserved_nes
             task: 8,
             revision: Some(Revision { value: 1 }),
             change: Box::new(Amendment {
+                llm: None,
                 addressed: None,
                 spec: None,
                 wake: None,

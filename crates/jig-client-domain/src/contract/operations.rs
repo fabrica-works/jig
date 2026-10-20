@@ -75,6 +75,8 @@ pub struct NewTask {
     pub tracked: Option<u32>,
     pub label: u32,
     pub flags: TaskFlags,
+    /// The task's LLM choice; `None` is its charter's default.
+    pub llm: Option<super::LlmChoice>,
 }
 /// The engine's resolved budget for one task of a created batch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

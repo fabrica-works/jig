@@ -49,6 +49,7 @@ fn chat_project() -> List<MeProject> {
     let mut templates = List::with_capacity(1);
     templates
         .push(Template {
+            llm: None,
             number: jig_client::shapes::CHAT,
             name: DocumentText::complete(Text::new(b"Chat".as_slice().into(), TEXT).unwrap()),
             executor: TemplateExecutor::Charter(CHARTER),
@@ -65,6 +66,7 @@ fn chat_project() -> List<MeProject> {
     let mut projects = List::with_capacity(1);
     projects
         .push(MeProject {
+            models: List::with_capacity(0),
             project: PROJECT,
             name: None,
             role: HeldRole::Policy { role: 1 },

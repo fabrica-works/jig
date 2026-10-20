@@ -101,6 +101,7 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
         assert!(domain.confirmation().unwrap().choices.change.is_none());
         drive(&mut domain, Event::Act { action: input(&tree, b"New budget", b"25", &mut bindings) });
         let mut expected = Amendment {
+            llm: None,
             addressed: None,
             spec: None,
             instructions: None,
@@ -142,6 +143,7 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         let mut authority = row.steering.authority.whole().unwrap();
         authority.spend = 25;
         let mut expected = Amendment {
+            llm: None,
             addressed: None,
             spec: None,
             instructions: None,

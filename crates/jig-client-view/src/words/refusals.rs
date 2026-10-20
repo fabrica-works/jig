@@ -65,6 +65,9 @@ impl Words {
             }
             Refusal::NotOffered => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::NotOffered)), &[]),
             Refusal::KeyConflict => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::KeyConflict)), &[]),
+            Refusal::Llm { model, .. } => {
+                self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Llm)), &[super::name(model.bytes())]);
+            }
         }
     }
     pub(crate) fn held_role(&self, b: &mut Builder, held: Option<HeldRole>) {

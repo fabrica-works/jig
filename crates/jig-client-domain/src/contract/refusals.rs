@@ -175,6 +175,8 @@ pub enum Refusal {
     NotOffered,
     /// The key names another ask.
     KeyConflict,
+    /// An LLM choice names a model, by its configured name, that cannot be chosen, and why.
+    Llm { model: super::Text, why: super::LlmWhy },
 }
 
 /// The role the engine actually found held, when known.

@@ -10,6 +10,7 @@ pub fn empty_amendment(tracked: Option<w::Tracking>) -> w::Amendment {
     w::Amendment::new(
         &wire(),
         w::AmendmentParts {
+            llm: None,
             addressed: None,
             spec: None,
             wake: None,

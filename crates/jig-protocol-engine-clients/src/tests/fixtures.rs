@@ -85,6 +85,7 @@ pub fn amendment(release: Option<w::Revision>, reason: &[u8]) -> w::Ask {
                 change: w::Amendment::new(
                     &wire(),
                     w::AmendmentParts {
+                        llm: None,
                         tracked: None,
                         addressed: None,
                         spec: None,

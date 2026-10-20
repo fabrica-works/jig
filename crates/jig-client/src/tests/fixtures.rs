@@ -348,6 +348,7 @@ pub fn me() -> contract::Me {
     for number in [1, 2] {
         templates
             .push(contract::Template {
+                llm: None,
                 number,
                 name: contract::DocumentText {
                     bytes: contract::Text::new(b"template".as_slice().into(), 32).unwrap(),
@@ -379,6 +380,7 @@ pub fn me() -> contract::Me {
     }
     me.projects
         .push(contract::MeProject {
+            models: List::with_capacity(0),
             project: PROJECT,
             name: None,
             role: contract::HeldRole::Owner,

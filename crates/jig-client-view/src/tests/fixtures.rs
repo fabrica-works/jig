@@ -179,6 +179,7 @@ pub(crate) fn chat_templates() -> skein_lib::List<jig_client::contract::Template
     let mut values = skein_lib::List::with_capacity(2);
     values
         .push(c::Template {
+            llm: None,
             number: jig_client::shapes::CHAT,
             name: c::DocumentText::complete(Text::new(b"Chat".as_slice().into(), 32).unwrap()),
             executor: c::TemplateExecutor::Charter(1),
@@ -259,6 +260,7 @@ pub(crate) fn chat_request(project: u32, words: Text) -> jig_client::contract::A
     let mut tasks = skein_lib::List::with_capacity(1);
     tasks
         .push(NewTask {
+            llm: None,
             deadline: NewDeadline::Named,
             executor: OwnerExecutor::Agent { charter: 1 },
             spec: Specification {
@@ -287,6 +289,7 @@ pub(crate) fn goal_request(form: crate::page::project::goals::GoalForm, words: T
     let mut tasks = skein_lib::List::with_capacity(1);
     tasks
         .push(NewTask {
+            llm: None,
             deadline: NewDeadline::Named,
             executor: form.executor,
             spec: Specification {

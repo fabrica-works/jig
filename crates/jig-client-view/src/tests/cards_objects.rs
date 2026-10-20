@@ -511,6 +511,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crat
                 task: 8,
                 before: text(b"full before"),
                 change: Amendment {
+                    llm: None,
                     addressed: None,
                     spec: Some(specification(text(b"full after")).whole().unwrap()),
                     instructions: None,
@@ -837,6 +838,7 @@ fn dialog(d: &Fixture, words: &crate::words::Words, bindings: &mut JigBindings) 
 }
 pub(super) fn task_doc(acts: &[ActKind]) -> Task {
     Task {
+        llm: None,
         label: 0,
         flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
         last_activity: Wall::EPOCH,

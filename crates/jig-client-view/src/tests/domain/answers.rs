@@ -113,6 +113,7 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
         Refusal::Unknown,
         Refusal::NotOffered,
         Refusal::KeyConflict,
+        Refusal::Llm { model: Text::new(Box::from(*b"m"), 1).unwrap(), why: LlmWhy::Unconfigured },
     ];
     for refusal in refusals {
         let (mut domain, _) = live();
@@ -142,7 +143,7 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
                 assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Task(Box::new(current))));
                 assert_eq!(domain.objects().get(id).unwrap().card, Card::Refused { refusal });
             }
-            Refusal::Authority { .. } | Refusal::Limit { .. } => {
+            Refusal::Authority { .. } | Refusal::Limit { .. } | Refusal::Llm { .. } => {
                 assert!(recovery(&object).change_ask);
                 assert!(rows.is_empty());
             }

@@ -30,6 +30,8 @@ pub struct Amendment {
     pub authority: Option<super::OwnerAuthority>,
     pub instructions: Option<Text>,
     pub tracked: Option<Tracking>,
+    /// A new LLM choice for the task's next runs.
+    pub llm: Option<super::LlmChoice>,
 }
 
 /// The kinds of news that wake an agent.

@@ -81,6 +81,7 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
     let task = w::NewTask::new(
         &l,
         w::NewTaskParts {
+            llm: None,
             deadline: w::NewDeadline::Named,
             executor,
             spec,

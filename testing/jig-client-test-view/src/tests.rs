@@ -206,6 +206,7 @@ fn budget() -> Budget {
 }
 fn task() -> Task {
     Task {
+        llm: None,
         label: 0,
         flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
         last_activity: Wall::EPOCH,

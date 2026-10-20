@@ -53,6 +53,7 @@ impl Payload for jig_client_domain::contract::NewTask {
             tracked: _,
             label: _,
             flags: _,
+            llm,
         } = self;
         super::sum(&[
             spec.heap(bounds),
@@ -60,6 +61,7 @@ impl Payload for jig_client_domain::contract::NewTask {
             authority.heap(bounds),
             dependencies.heap(bounds),
             named.heap(bounds),
+            llm.heap(bounds),
         ])
     }
 }

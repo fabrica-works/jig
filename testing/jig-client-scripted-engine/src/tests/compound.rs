@@ -32,6 +32,7 @@ fn bounded_release() -> (Script, Ask, Answer) {
             task: row.chip.task,
             revision: Some(row.spec_revision),
             change: Box::new(Amendment {
+                llm: None,
                 addressed: None,
                 spec: None,
                 wake: None,

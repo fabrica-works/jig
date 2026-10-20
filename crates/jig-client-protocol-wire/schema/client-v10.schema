@@ -219,6 +219,8 @@ record ParameterBytes { name: u32 value: text 65536 }
 record ParameterResource { name: u32 connector: u16 resource: u64 }
 enum Parameter { number: ParameterNumber, bytes: ParameterBytes, resource: ParameterResource }
 record Specification { words: text 65536 parameters: list 32 Parameter inputs: list 32 u64 }
+record ModelEffort { model: text 4096 effort: option text 32 }
+record LlmChoice { main: ModelEffort subagents: list 64 ModelEffort }
 record OwnerPatternEndExact { value: bytes 65536 }
 record OwnerPatternEndOpen { value: bytes 65536 }
 enum OwnerPatternEnd { exact: OwnerPatternEndExact, open: OwnerPatternEndOpen }
@@ -233,7 +235,7 @@ record OwnerResourceScope { connector: u16 pattern: OwnerPattern }
 record OwnerAuthority { tools: u64 grants: bytes 16777216 delegation: OwnerDelegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 16777216 }
 record TrackingTracked { priority: u32 }
 enum Tracking { tracked: TrackingTracked, untracked }
-record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 tracked: option Tracking }
+record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 tracked: option Tracking llm: option LlmChoice }
 record SeenResults { through: u64 }
 record SeenConversation { task: u64 through: u64 }
 enum SeenThrough { results: SeenResults, conversation: SeenConversation }
@@ -305,7 +307,7 @@ enum Retention { kept, forgotten_once_read }
 record TaskFlags { conversation: bool listed: bool retention: Retention }
 record DeadlineSpan { value: duration }
 enum NewDeadline { named, span: DeadlineSpan }
-record NewTask { deadline: NewDeadline executor: OwnerExecutor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: option OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags }
+record NewTask { deadline: NewDeadline executor: OwnerExecutor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: option OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags llm: option LlmChoice }
 record Create { project: u32 tasks: bytes 1048576 }
 record ProposeBatch { tasks: bytes 1048576 }
 record ProposeAmendment { task: u64 revision: Revision change: Amendment }
@@ -383,7 +385,9 @@ record RefusalMoved { now: Revision what: Moved }
 record RefusalEnded { how: Ending }
 enum Malformed { project_mismatch, two_as_allowed, conversation_not_agent, cycle, proposed_as_allowed }
 record RefusalMalformed { at: u32 why: Malformed }
-enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder }
+enum LlmWhy { unconfigured, effort, charter, authority, procedure, repeated }
+record RefusalLlm { model: text 4096 why: LlmWhy }
+enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm }
 record Done { outcome: Outcome }
 record Refused { refusal: Refusal at: option u32 }
 enum Final { done: Done, refused: Refused }
@@ -616,8 +620,9 @@ record PoolLedger { source: Funder parent: option Funder numbers: OwnerNumbers l
 record MeParty { number: u64 kind: PartyKind login: DocumentText name: DocumentText }
 record Needs { questions: u32 proposals: u32 escalations: u32 person_tasks: u32 }
 record CreatingBounds { within: BoundsCreate beyond: Beyond }
-record Template { number: u32 name: DocumentText executor: TemplateExecutor contract: TaskContractDocument shallower: u32 budget: TemplateBudget deadline: TemplateDeadline tracked: option u32 flags: TaskFlags label: u32 grace: option duration }
-record MeProject { project: u32 name: option DocumentText role: HeldRole pool: option PoolLedger templates: bytes 16777216 creating: option CreatingBounds }
+record Template { number: u32 name: DocumentText executor: TemplateExecutor contract: TaskContractDocument shallower: u32 budget: TemplateBudget deadline: TemplateDeadline tracked: option u32 flags: TaskFlags label: u32 grace: option duration llm: option LlmChoice }
+record MeModel { name: text 4096 provider: option u32 window: u32 output: u32 efforts: list 16 text 32 }
+record MeProject { project: u32 name: option DocumentText role: HeldRole pool: option PoolLedger templates: bytes 16777216 creating: option CreatingBounds models: list 64 MeModel }
 record Me { party: MeParty projects: bytes 16777216 needs: Needs needs_total: u32 updates: Count results_seen: u64 cut: bool retention: duration deployment_role: option HeldRole }
 record WriterSlot { resource: Part task: u64 attempt: option u64 }
 record LiveDelegate { chip: Chip takeover_budget: u64 }
@@ -640,7 +645,7 @@ record SubscriptionKindTopic { connector: u16 topic: u64 }
 enum SubscriptionKind { task: SubscriptionKindTask, timer: SubscriptionKindTimer, topic: SubscriptionKindTopic }
 record Subscription { number: u64 kind: SubscriptionKind }
 record Subscriptions { entries: list 32 Subscription }
-record Task { label: u32 flags: TaskFlags last_activity: u64 waits_on: WaitsOn chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext }
+record Task { label: u32 flags: TaskFlags last_activity: u64 waits_on: WaitsOn chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext llm: option LlmChoice }
 record TreeNode { chip: Chip parent: option u64 dependencies: list 32 u64 proposals: list 32 ProposalKey spend: u64 folded: PhaseCounts held_below: u32 }
 record Tree { task: u64 nodes: bytes 16777216 folded: PhaseCounts held_below: u32 }
 record ReadPosition { task: u64 through: u64 }

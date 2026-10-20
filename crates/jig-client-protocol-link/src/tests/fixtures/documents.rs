@@ -49,6 +49,7 @@ pub fn task_record() -> w::Task {
 }
 pub fn task() -> c::Task {
     c::Task {
+        llm: None,
         label: 0,
         flags: c::TaskFlags { conversation: false, listed: false, retention: c::Retention::Kept },
         last_activity: Wall::EPOCH,

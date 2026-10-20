@@ -24,6 +24,7 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
         assert_eq!(
             selected,
             Amendment {
+                llm: None,
                 addressed: None,
                 spec: None,
                 instructions: Some(text(b"")),

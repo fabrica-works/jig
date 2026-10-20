@@ -366,6 +366,7 @@ pub(crate) fn wire_amendment(value: &c::Amendment, limits: &w::Limits) -> Result
                 Some(v) => Some(super::operations::tracking(v, limits)?),
                 None => None,
             },
+            llm: super::llm::wire_choice(value.llm.as_ref(), limits)?,
         },
     )
 }

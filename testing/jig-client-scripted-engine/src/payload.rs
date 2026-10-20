@@ -126,7 +126,7 @@ macro_rules! fields {
     };
 }
 fields!(AddressChange { revision, address });
-fields!(Amendment { addressed, spec, wake, dependencies, authority, instructions, tracked });
+fields!(Amendment { addressed, spec, wake, dependencies, authority, instructions, tracked, llm });
 fields!(WakePolicy { words, results, topics, subscriptions });
 impl Payload for PersonAnswer {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
@@ -363,7 +363,10 @@ fields!(Count { value, limited });
 fields!(Me { party, projects, needs, needs_total, updates, results_seen, cut, retention, deployment_role });
 fields!(MeParty { number, kind, login, name });
 fields!(Needs { questions, proposals, escalations, person_tasks });
-fields!(MeProject { templates, creating, project, name, role, pool });
+fields!(MeProject { templates, creating, project, name, role, pool, models });
+fields!(jig_client_domain::contract::MeModel { name, provider, window, output, efforts });
+fields!(jig_client_domain::contract::LlmChoice { main, subagents });
+fields!(jig_client_domain::contract::ModelEffort { model, effort });
 fields!(Budget { total, own, ended, reserved, left, funder });
 fields!(Chip { task, title, executor, phase, details });
 fields!(ActiveRun { stage, phase_since, attempt, placement, retry, observation });
@@ -425,7 +428,7 @@ impl Payload for ChipPhase {
     }
 }
 fields!(Task {
-    label, flags, last_activity, waits_on,
+    label, flags, last_activity, waits_on, llm,
     chip,
     goal,
     priority,
@@ -1036,6 +1039,7 @@ impl Payload for Refusal {
             | Self::NoEscalationHolder
             | Self::NotOffered
             | Self::KeyConflict => Some(0),
+            Self::Llm { model, why: _ } => model.heap(bounds),
         }
     }
 }
@@ -1319,7 +1323,8 @@ fields!(jig_client_domain::contract::Template {
     tracked,
     flags,
     label,
-    grace
+    grace,
+    llm
 });
 
 plain!(

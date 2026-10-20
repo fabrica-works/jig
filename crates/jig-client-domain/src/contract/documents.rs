@@ -140,6 +140,8 @@ pub struct Task {
     pub delegates: List<LiveDelegate>,
     /// Separately supplied context; the task owner document supplies none.
     pub context: Option<Box<TaskContext>>,
+    /// The task's LLM choice, when its executor runs a model.
+    pub llm: Option<super::LlmChoice>,
 }
 
 /// Whole separately supplied task context (client/domain/contract.md, 5.1).

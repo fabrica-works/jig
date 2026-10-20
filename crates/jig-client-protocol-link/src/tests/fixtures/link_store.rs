@@ -16,6 +16,7 @@ fn specification() -> c::Specification {
 }
 fn amendment() -> c::Amendment {
     c::Amendment {
+        llm: None,
         addressed: Some(c::AddressChange { revision: read_value_revision(), address: read_value_person_address() }),
         spec: Some(specification()),
         wake: Some(read_value_owner_wake_policy()),

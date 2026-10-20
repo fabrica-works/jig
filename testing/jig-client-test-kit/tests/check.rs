@@ -77,6 +77,7 @@ fn the_same_note_number_in_another_scope_is_not_delivered() {
 }
 fn unchanged() -> Box<Amendment> {
     Box::new(Amendment {
+        llm: None,
         addressed: None,
         spec: None,
         wake: None,

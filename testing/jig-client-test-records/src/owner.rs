@@ -23,6 +23,7 @@ pub fn frame_two_projects_record() -> w::Me {
                         name: None,
                         role,
                         pool: None,
+                        models: List::with_capacity(0),
                     },
                 )
                 .expect("literal fixture fits"),
