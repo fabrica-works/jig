@@ -10,7 +10,10 @@ fn list<T, const N: usize>(items: [T; N]) -> List<T> {
     out
 }
 fn source_lines() -> List<c::OwnerAccountSource> {
-    list([
+    list(source_rows())
+}
+fn source_rows() -> [c::OwnerAccountSource; 2] {
+    [
         c::OwnerAccountSource {
             place: 2,
             number: 11,
@@ -31,7 +34,7 @@ fn source_lines() -> List<c::OwnerAccountSource> {
             attention: false,
             spent_until: None,
         },
-    ])
+    ]
 }
 #[expect(clippy::manual_map, reason = "optional fixture facts follow the step crate lint configuration")]
 fn document(end: Option<c::OwnerAccountEnd>) -> c::OwnerAccounts {
@@ -113,6 +116,42 @@ fn ends() -> Box<[c::OwnerAccountEnd]> {
 fn bytes(end: Option<w::OwnerAccountEnd>) -> Box<[u8]> {
     delivery(jig_client_test_records::accounts_record(end))
 }
+/// A list's pieces written `times` over, one after another.
+fn repeated(pieces: &[u8], times: usize) -> Box<[u8]> {
+    let mut out = Writer::new(pieces.len().checked_mul(times).unwrap());
+    for _ in 0..times {
+        out.put(pieces).unwrap();
+    }
+    out.finish()
+}
+fn line_piece(line: &w::OwnerAccountLine) -> Box<[u8]> {
+    let mut out = Writer::new(usize::try_from(line.measure()).unwrap());
+    line.encode(&mut out).unwrap();
+    let bytes = out.finish();
+    let mut piece = Writer::new(bytes.len().checked_add(4).unwrap());
+    skein_codec::piece::write(&mut piece, &bytes).unwrap();
+    piece.finish()
+}
+/// The bytes `document(None)` holds once decoded: its record, its two accounts, the first's two uses,
+/// display and two sources, and its one sign-in.
+fn held() -> u64 {
+    let parts = [
+        size_of::<c::OwnerAccounts>(),
+        size_of::<c::OwnerAccountLine>(),
+        size_of::<c::OwnerAccountLine>(),
+        size_of::<c::OwnerAccountUse>(),
+        size_of::<c::OwnerAccountUse>(),
+        b"Personal".len(),
+        size_of::<c::OwnerAccountSource>(),
+        size_of::<c::OwnerAccountSource>(),
+        size_of::<c::OwnerAccountSignIn>(),
+    ];
+    let mut bytes = 0_usize;
+    for part in parts {
+        bytes = bytes.checked_add(part).unwrap();
+    }
+    u64::try_from(bytes).unwrap()
+}
 fn delivery(record: w::OwnerAccounts) -> Box<[u8]> {
     let value = w::DeliveryValue::OwnerAccounts(record);
     let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
@@ -132,10 +171,16 @@ fn accounts_delivery_preserves_every_field_and_terminal_outcome() {
     assert_eq!(watches::delivery(&bytes(None), &limits), Ok(c::Delivery::OwnerAccounts(Box::new(document(None)))));
 }
 #[test]
-fn accounts_delivery_at_the_receiving_byte_limit_is_admitted() {
-    let bytes = bytes(None);
-    let limits = fixtures::limits_for_document(u64::try_from(bytes.len()).unwrap());
-    assert_eq!(watches::delivery(&bytes, &limits), Ok(c::Delivery::OwnerAccounts(Box::new(document(None)))));
+fn an_accounts_document_filling_its_decoded_room_is_admitted() {
+    // A document's decoded room is twice its byte limit, the client domain's price for each it holds.
+    assert_eq!(held() % 2, 0, "the fixture's decoded bytes halve evenly");
+    let limits = fixtures::limits_for_document(held() / 2);
+    assert_eq!(watches::delivery(&bytes(None), &limits), Ok(c::Delivery::OwnerAccounts(Box::new(document(None)))));
+}
+#[test]
+fn an_accounts_document_past_its_decoded_room_is_refused() {
+    let limits = fixtures::limits_for_document((held() / 2).checked_sub(1).unwrap());
+    assert_eq!(watches::delivery(&bytes(None), &limits), Err(Undecodable::TooLarge));
 }
 #[test]
 fn accounts_delivery_one_byte_over_the_receiving_limit_is_refused() {
@@ -156,17 +201,46 @@ fn account_uses_keep_their_constant_bound_with_fewer_receiving_rows() {
         )
     })));
     let line = w::OwnerAccountLine::new(&limits.wire, line).unwrap();
-    let mut out = Writer::new(usize::try_from(line.measure()).unwrap());
-    line.encode(&mut out).unwrap();
-    let bytes = out.finish();
-    let mut pieces = Writer::new(bytes.len().checked_add(4).unwrap());
-    skein_codec::piece::write(&mut pieces, &bytes).unwrap();
     let mut record = jig_client_test_records::accounts_record(None).into_parts();
-    record.accounts = pieces.finish();
+    record.accounts = line_piece(&line);
     let record = w::OwnerAccounts::new(&limits.wire, record).unwrap();
     let mut expected = document(None);
     let mut line = expected.accounts.get(0).unwrap().clone();
     line.uses = Some(list([c::OwnerAccountUse::Party(23); USES]));
     expected.accounts = list([line]);
     assert_eq!(watches::delivery(&delivery(record), &limits), Ok(c::Delivery::OwnerAccounts(Box::new(expected))));
+}
+#[test]
+fn account_lists_longer_than_the_receiving_rows_are_kept() {
+    // Receiving rows are two; each list here holds more, and the document's bytes bound them.
+    let limits = fixtures::limits();
+    let mut line = jig_client_test_records::account_line_record().into_parts();
+    line.sources = repeated(&line.sources, 2);
+    let line = w::OwnerAccountLine::new(&limits.wire, line).unwrap();
+    let mut record = jig_client_test_records::accounts_record(None).into_parts();
+    record.accounts = repeated(&line_piece(&line), 3);
+    record.signing = repeated(&record.signing, 3);
+    let record = w::OwnerAccounts::new(&limits.wire, record).unwrap();
+    let mut expected = document(None);
+    let mut line = expected.accounts.get(0).unwrap().clone();
+    let [granted, later] = source_rows();
+    line.sources = list([granted.clone(), later.clone(), granted, later]);
+    expected.accounts = list([line.clone(), line.clone(), line]);
+    expected.signing = list([(); 3].map(|()| c::OwnerAccountSignIn {
+        source: 19,
+        provider: 3,
+        holder: c::OwnerAccountHolder::Party(23),
+    }));
+    assert_eq!(watches::delivery(&delivery(record), &limits), Ok(c::Delivery::OwnerAccounts(Box::new(expected))));
+}
+#[test]
+fn a_deployment_keeps_more_accounts_than_the_receiving_rows() {
+    let limits = fixtures::limits();
+    let mut record = fixtures::owner_with_account(Some(5)).into_parts();
+    record.accounts = repeated(&record.accounts, 3);
+    let record = w::OwnerDeployment::new(&limits.wire, record).unwrap();
+    let mut expected = fixtures::owner_account_expected(Some(5));
+    let account = expected.accounts.get(0).unwrap().clone();
+    expected.accounts = list([account.clone(), account.clone(), account]);
+    assert_eq!(crate::translate::documents::owner_deployment(record, &limits), Ok(expected));
 }

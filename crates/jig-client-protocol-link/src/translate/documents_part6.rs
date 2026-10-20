@@ -1,10 +1,19 @@
 //! Field-for-field document values (client/domain/contract.md, 5–7).
 use super::{
-    Limits, List, Reader, Wall, c, chip_piece, owner_account_state_fields, owner_host_piece, owner_host_run_piece,
-    piece_problem, store_fill_fields, too_large, w,
+    Limits, List, Reader, Wall, c, charge, chip_piece, owner_account_state_fields, owner_host_piece,
+    owner_host_run_piece, piece_count, store_fill_fields, too_large, w,
 };
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-pub(crate) fn owner_account_fields(value: &w::OwnerAccount, limits: &Limits) -> Result<c::OwnerAccount, w::Problem> {
+pub(crate) fn owner_account_fields(
+    value: &w::OwnerAccount,
+    limits: &Limits,
+    room: &mut u64,
+) -> Result<c::OwnerAccount, w::Problem> {
+    super::charge_account(value.uses().as_ref(), value.display(), room)?;
+    // An account's runs and its waiting tasks stay lists bounded by the rows.
+    let chips = List::<c::Chip>::worst_case(limits.client.rows);
+    charge(room, chips)?;
+    charge(room, chips)?;
     let opt0 = match value.generation() {
         Some(item) => Some(*item),
         None => None,
@@ -21,7 +30,7 @@ pub(crate) fn owner_account_fields(value: &w::OwnerAccount, limits: &Limits) -> 
         provider: *value.provider(),
         display: crate::translate::facts::document_text(value.display(), limits)?,
         holder: super::owner_account_holder(value.holder()),
-        sources: super::owner_account_source_piece(value.sources(), limits)?,
+        sources: super::owner_account_source_piece(value.sources(), limits, room)?,
         generation: opt0,
         state: owner_account_state_fields(value.state(), limits),
         usable: value.usable(),
@@ -37,34 +46,18 @@ pub(crate) fn owner_account_fields(value: &w::OwnerAccount, limits: &Limits) -> 
 pub(crate) fn owner_account_piece(
     bytes: &[u8],
     limits: &Limits,
-    bound: u32,
+    room: &mut u64,
 ) -> Result<List<c::OwnerAccount>, w::Problem> {
+    let count = piece_count(bytes)?;
+    charge(room, List::<c::OwnerAccount>::worst_case(count))?;
     let mut reader = Reader::new(bytes);
-    let mut rows = List::with_capacity(bound);
-    let mut sum = 0_u64;
-    for _ in 0..=bound {
-        let item = match skein_codec::piece::split(&mut reader) {
-            Ok(value) => value,
-            Err(reason) => return Err(piece_problem(reason)),
-        };
-        let Some(item) = item else {
-            return Ok(rows);
-        };
-        sum = sum
-            .checked_add(u64::try_from(item.len()).expect("piece fits u64"))
-            .ok_or(too_large())?
-            .checked_add(4)
-            .ok_or(too_large())?;
-        if sum > limits.client.document_bytes {
-            return Err(too_large());
-        }
+    let mut rows = List::with_capacity(count);
+    for _ in 0..count {
+        let Ok(Some(item)) = skein_codec::piece::split(&mut reader) else { unreachable!("counted pieces split") };
         let row = w::OwnerAccount::decode(&limits.wire, &mut Reader::new(&item))?;
-        let row = owner_account_fields(&row, limits)?;
-        if rows.push(row).is_err() {
-            return Err(too_large());
-        }
+        rows.push(owner_account_fields(&row, limits, room)?).expect("counted pieces fit");
     }
-    Err(too_large())
+    Ok(rows)
 }
 
 pub(crate) fn owner_capacity_fields(value: &w::OwnerCapacity, _limits: &Limits) -> c::OwnerCapacity {
@@ -343,7 +336,7 @@ pub(crate) fn owner_deployment_fields(
         store: store_fill_fields(value.store(), limits),
         hosts: owner_host_piece(value.hosts(), limits, limits.client.rows)?,
         attempts: owner_host_run_piece(value.attempts(), limits, limits.client.rows)?,
-        accounts: owner_account_piece(value.accounts(), limits, limits.client.rows)?,
+        accounts: owner_account_piece(value.accounts(), limits, &mut super::document_room(limits))?,
         tasks: owner_capacity_fields(value.tasks(), limits),
         workers: owner_capacity_fields(value.workers(), limits),
         attempts_capacity: owner_capacity_fields(value.attempts_capacity(), limits),

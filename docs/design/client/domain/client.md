@@ -903,7 +903,10 @@ the client's protocol designs (`../../protocol/client.md`):
   shows of a long one (view.md, section 7). An authority is held whole,
   within the client's bound on its entries, and a draft is made from it
   whole: only the view cuts what it shows of a long one (view.md,
-  section 7).
+  section 7). An account list is held whole, past the client's rows:
+  what its rows decode to is counted against the bytes the domain holds
+  for a document, twice the client's document limit (section 14), and a
+  document whose rows decode past them is refused as too large.
 
 ## 17. The world
 
