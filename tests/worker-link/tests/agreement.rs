@@ -88,24 +88,24 @@ mod agreement {
     fn a_fact_crosses_unchanged() {
         cross_up(fact(), &fact());
     }
-    fn rejected() -> host::LinkUp {
-        host::LinkUp::Rejected { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, generation: 3 }
+    fn unauthorized() -> host::LinkUp {
+        host::LinkUp::Unauthorized { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, generation: 3 }
     }
     #[test]
-    fn a_rejected_notice_crosses_unchanged() {
-        cross_up(rejected(), &rejected());
+    fn an_unauthorized_notice_crosses_unchanged() {
+        cross_up(unauthorized(), &unauthorized());
     }
-    fn exhausted() -> host::LinkUp {
-        host::LinkUp::Exhausted {
-            run: RUN_SEVEN,
-            attempt: ATTEMPT_TWO,
-            account: 1,
-            retry_after: Duration::from_secs(60),
-        }
+    fn limited(reset: Option<Duration>) -> host::LinkUp {
+        host::LinkUp::Limited { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, reset }
     }
     #[test]
-    fn an_exhausted_notice_crosses_unchanged() {
-        cross_up(exhausted(), &exhausted());
+    fn a_limited_notice_crosses_unchanged_with_its_reset_or_none() {
+        cross_up(limited(Some(Duration::from_secs(60))), &limited(Some(Duration::from_secs(60))));
+        cross_up(limited(None), &limited(None));
+    }
+    #[test]
+    fn an_account_refused_notice_crosses_unchanged() {
+        cross_up(fixtures::account_refused(), &fixtures::account_refused());
     }
     #[test]
     fn an_assignment_crosses_unchanged() {

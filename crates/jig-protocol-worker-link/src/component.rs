@@ -303,8 +303,9 @@ impl Component {
                 let relay = match &up {
                     host::LinkUp::Call { run, attempt, call, .. } => Some((*run, *attempt, bytes::copy_of(call))),
                     host::LinkUp::Activity { .. }
-                    | host::LinkUp::Rejected { .. }
-                    | host::LinkUp::Exhausted { .. }
+                    | host::LinkUp::Unauthorized { .. }
+                    | host::LinkUp::Limited { .. }
+                    | host::LinkUp::AccountRefused { .. }
                     | host::LinkUp::Turn { .. }
                     | host::LinkUp::Answer { .. } => None,
                 };

@@ -78,20 +78,47 @@ fn a_fact_record_becomes_the_hubs_activity() {
     );
 }
 #[test]
-fn rejected_and_exhausted_records_become_notices() {
+fn each_account_notice_record_becomes_its_link_notice() {
+    let (run, attempt) = (Token::new(7), Token::new(2));
     assert_eq!(
-        up(translate::Up::Rejected(fixtures::rejected_record())),
-        jig_domain_host::LinkUp::Rejected { run: Token::new(7), attempt: Token::new(2), account: 1, generation: 4 }
+        up(translate::Up::Unauthorized(fixtures::unauthorized_record())),
+        jig_domain_host::LinkUp::Unauthorized { run, attempt, account: 1, generation: 4 }
     );
+    for reset in [Some(Duration::from_secs(5)), None] {
+        assert_eq!(
+            up(translate::Up::Limited(fixtures::limited_record(reset))),
+            jig_domain_host::LinkUp::Limited { run, attempt, account: 1, reset }
+        );
+    }
     assert_eq!(
-        up(translate::Up::Exhausted(fixtures::exhausted_record())),
-        jig_domain_host::LinkUp::Exhausted {
-            run: Token::new(7),
-            attempt: Token::new(2),
+        up(translate::Up::AccountRefused(fixtures::account_refused_record())),
+        jig_domain_host::LinkUp::AccountRefused {
+            run,
+            attempt,
             account: 1,
-            retry_after: Duration::from_secs(5)
+            code: Box::from(b"forbidden".as_slice()),
+            reason: Box::from(b"suspended".as_slice()),
         }
     );
+}
+
+#[test]
+fn a_failed_answer_keeps_the_limited_or_refused_account_it_turned_on() {
+    use jig_domain_host::RunFailure;
+    for (record, failure) in [
+        (
+            fixtures::limited_account(Some(Duration::from_secs(5))),
+            RunFailure::Limited { account: 1, reset: Some(Duration::from_secs(5)) },
+        ),
+        (fixtures::limited_account(None), RunFailure::Limited { account: 1, reset: None }),
+        (fixtures::refused_account(), RunFailure::Refused { account: 1 }),
+    ] {
+        let (answer, _parts) = answer(fixtures::answer_failed_on(record));
+        let jig_domain_host::Ending::Failed { failure: found, .. } = answer.ending else {
+            panic!("failed");
+        };
+        assert_eq!(found, jig_domain_host::Failure::Run(failure));
+    }
 }
 
 #[test]
@@ -166,7 +193,7 @@ fn down(record: jig_domain_host::LinkDown) -> translate::Down {
     };
     translated.expect("complete output")
 }
-fn codec() -> jig_protocol_worker_wire::v2::Limits {
+fn codec() -> jig_protocol_worker_wire::v3::Limits {
     jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).expect("small codec")
 }
 fn assignment_output() -> jig_domain_host::LinkDown {

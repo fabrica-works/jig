@@ -17,16 +17,17 @@ fn the_engine_cap_for_one_slot_is_the_hand_summed_bytes() {
 
 #[test]
 fn the_worker_cap_for_one_slot_is_the_hand_summed_bytes() {
-    // Hello125 + turn71 + answer136 + call85 + rejected28 + exhausted28;
-    // six headers48 + fact reserve16 =537. Reserve16 fits no25-byte fact.
-    assert_eq!(worker_cap(&SIZES_ONE_SLOT), Some(WorkerCap { cap: Cap { bytes: 537, frames: 6 }, facts: 16 }));
+    // Hello125 + turn71 + answer136 + call85 + unauthorized28 + limited29
+    // + account refused60; seven headers56 + fact reserve16 =606.
+    // Reserve16 fits no25-byte fact.
+    assert_eq!(worker_cap(&SIZES_ONE_SLOT), Some(WorkerCap { cap: Cap { bytes: 606, frames: 7 }, facts: 16 }));
 }
 
 #[test]
 fn the_worker_cap_reserves_the_facts_share_last() {
     let sizes = Sizes { facts: 75, ..SIZES_ONE_SLOT };
-    // Mandatory frames521 bytes + reserve75 =596; three shortest facts25 each.
-    assert_eq!(worker_cap(&sizes), Some(WorkerCap { cap: Cap { bytes: 596, frames: 9 }, facts: 75 }));
+    // Mandatory frames590 bytes + reserve75 =665; three shortest facts25 each.
+    assert_eq!(worker_cap(&sizes), Some(WorkerCap { cap: Cap { bytes: 665, frames: 10 }, facts: 75 }));
 }
 
 #[test]
@@ -80,6 +81,14 @@ fn sizes_past_a_ceiling_give_no_codec_limits() {
     ] {
         assert_eq!(limits(&sizes), None, "{field}");
     }
+}
+
+#[test]
+fn a_refused_accounts_code_and_reason_take_the_details_bound_within_their_ceilings() {
+    let small = limits(&SIZES_ONE_SLOT).expect("small size bounds");
+    assert_eq!((small.account_refused_code, small.account_refused_reason), (16, 16));
+    let large = limits(&Sizes { detail: 4096, ..SIZES_ONE_SLOT }).expect("the detail's ceiling");
+    assert_eq!((large.account_refused_code, large.account_refused_reason), (128, 512));
 }
 
 #[test]

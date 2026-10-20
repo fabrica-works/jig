@@ -18,8 +18,9 @@ mod records {
         Call,
         Answer,
         Activity,
-        Rejected,
-        Exhausted,
+        Unauthorized,
+        Limited,
+        AccountRefused,
         Lost,
     }
     fn record(request: &Request) -> Record {
@@ -31,8 +32,9 @@ mod records {
                 LinkUp::Call { .. } => Record::Call,
                 LinkUp::Answer { .. } => Record::Answer,
                 LinkUp::Activity { .. } => Record::Activity,
-                LinkUp::Rejected { .. } => Record::Rejected,
-                LinkUp::Exhausted { .. } => Record::Exhausted,
+                LinkUp::Unauthorized { .. } => Record::Unauthorized,
+                LinkUp::Limited { .. } => Record::Limited,
+                LinkUp::AccountRefused { .. } => Record::AccountRefused,
             },
             Request::Lost { .. } => Record::Lost,
             Request::Take { .. }
@@ -64,8 +66,9 @@ mod records {
                 Record::Call,
                 Record::Answer,
                 Record::Activity,
-                Record::Rejected,
-                Record::Exhausted
+                Record::Unauthorized,
+                Record::Limited,
+                Record::AccountRefused
             ]
         );
     }

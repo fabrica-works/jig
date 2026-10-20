@@ -36,13 +36,14 @@ pub fn channel_limits(limits: &Limits) -> Result<channel::Limits, Unusable> {
     }
     let credential = wire::Credential::worst_case_bytes(&bodies).ok_or(Unusable::Limits)?;
     let Ok(credential) = u32::try_from(credential) else { return Err(Unusable::Limits) };
+    let Ok(kinds) = u32::try_from(wire::KINDS.len()) else { return Err(Unusable::Limits) };
     Ok(channel::Limits {
         chunk: limits.chunk,
         credential,
         skip,
         output_bytes: cap.cap.bytes,
         output_frames: cap.cap.frames,
-        kinds: 15,
+        kinds,
     })
 }
 #[must_use]

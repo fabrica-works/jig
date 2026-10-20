@@ -1,5 +1,5 @@
 //! Project record sizes into skein's schema (protocol/channel.md, 4.1).
-use crate::{MAGIC, VERSION, v2};
+use crate::{MAGIC, VERSION, v3};
 use skein_channel::{Direction, Kind as ChannelKind, Role, Schema, Term, Version};
 use skein_lib::List;
 
@@ -10,8 +10,9 @@ pub enum Kind {
     Call,
     Answer,
     Fact,
-    Rejected,
-    Exhausted,
+    Unauthorized,
+    Limited,
+    AccountRefused,
     Assignment,
     Message,
     Relayed,
@@ -37,8 +38,9 @@ pub const KINDS: &[KindRule] = &[
     KindRule { kind: 0x0102, direction: Direction::FromInitiator, body: Kind::Call },
     KindRule { kind: 0x0103, direction: Direction::FromInitiator, body: Kind::Answer },
     KindRule { kind: 0x0104, direction: Direction::FromInitiator, body: Kind::Fact },
-    KindRule { kind: 0x0105, direction: Direction::FromInitiator, body: Kind::Rejected },
-    KindRule { kind: 0x0106, direction: Direction::FromInitiator, body: Kind::Exhausted },
+    KindRule { kind: 0x0105, direction: Direction::FromInitiator, body: Kind::Unauthorized },
+    KindRule { kind: 0x0106, direction: Direction::FromInitiator, body: Kind::Limited },
+    KindRule { kind: 0x0107, direction: Direction::FromInitiator, body: Kind::AccountRefused },
     KindRule { kind: 0x0180, direction: Direction::FromResponder, body: Kind::Assignment },
     KindRule { kind: 0x0181, direction: Direction::FromResponder, body: Kind::Message },
     KindRule { kind: 0x0182, direction: Direction::FromResponder, body: Kind::Relayed },
@@ -55,25 +57,26 @@ pub enum Overflow {
     Frame,
 }
 
-pub fn schema(limits: &v2::Limits) -> Result<Schema, Overflow> {
+pub fn schema(limits: &v3::Limits) -> Result<Schema, Overflow> {
     let mut kinds = List::with_capacity(u32::try_from(KINDS.len()).expect("kind count fits"));
     for rule in KINDS {
         let largest = match rule.body {
-            Kind::Hello => v2::Hello::worst_case_bytes(limits),
-            Kind::Turn => v2::Turn::worst_case_bytes(limits),
-            Kind::Call => v2::Call::worst_case_bytes(limits),
-            Kind::Answer => v2::Answer::worst_case_bytes(limits),
-            Kind::Fact => v2::Fact::worst_case_bytes(limits),
-            Kind::Rejected => v2::Rejected::worst_case_bytes(limits),
-            Kind::Exhausted => v2::Exhausted::worst_case_bytes(limits),
-            Kind::Assignment => v2::Assignment::worst_case_bytes(limits),
-            Kind::Message => v2::Inbound::worst_case_bytes(limits),
-            Kind::Relayed => v2::Relayed::worst_case_bytes(limits),
-            Kind::TurnKept => v2::TurnKept::worst_case_bytes(limits),
-            Kind::TurnBusy => v2::TurnBusy::worst_case_bytes(limits),
-            Kind::Acknowledge => v2::Acknowledge::worst_case_bytes(limits),
-            Kind::Cancel => v2::Cancel::worst_case_bytes(limits),
-            Kind::Grant => v2::Granted::worst_case_bytes(limits),
+            Kind::Hello => v3::Hello::worst_case_bytes(limits),
+            Kind::Turn => v3::Turn::worst_case_bytes(limits),
+            Kind::Call => v3::Call::worst_case_bytes(limits),
+            Kind::Answer => v3::Answer::worst_case_bytes(limits),
+            Kind::Fact => v3::Fact::worst_case_bytes(limits),
+            Kind::Unauthorized => v3::Unauthorized::worst_case_bytes(limits),
+            Kind::Limited => v3::Limited::worst_case_bytes(limits),
+            Kind::AccountRefused => v3::AccountRefused::worst_case_bytes(limits),
+            Kind::Assignment => v3::Assignment::worst_case_bytes(limits),
+            Kind::Message => v3::Inbound::worst_case_bytes(limits),
+            Kind::Relayed => v3::Relayed::worst_case_bytes(limits),
+            Kind::TurnKept => v3::TurnKept::worst_case_bytes(limits),
+            Kind::TurnBusy => v3::TurnBusy::worst_case_bytes(limits),
+            Kind::Acknowledge => v3::Acknowledge::worst_case_bytes(limits),
+            Kind::Cancel => v3::Cancel::worst_case_bytes(limits),
+            Kind::Grant => v3::Granted::worst_case_bytes(limits),
         };
         let largest = largest.ok_or(Overflow::Body)?;
         let Ok(largest) = u32::try_from(largest) else { return Err(Overflow::Frame) };

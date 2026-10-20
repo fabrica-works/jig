@@ -195,23 +195,61 @@ pub fn fact_record() -> jig_protocol_worker_wire::Fact {
     wire::Fact::new(&codec, wire::FactParts { task: 7, attempt: 2, activity: wire::Activity::Count(count) })
         .expect("fact")
 }
-pub fn rejected_record() -> jig_protocol_worker_wire::Rejected {
+pub fn unauthorized_record() -> jig_protocol_worker_wire::Unauthorized {
     use jig_protocol_worker_wire as wire;
-    let codec = codec();
-    wire::Rejected::new(&codec, wire::RejectedParts { task: 7, attempt: 2, account: 1, generation: 4 })
-        .expect("rejected")
+    wire::Unauthorized::new(&codec(), wire::UnauthorizedParts { task: 7, attempt: 2, account: 1, generation: 4 })
+        .expect("unauthorized")
 }
-pub fn exhausted_record() -> jig_protocol_worker_wire::Exhausted {
+pub fn limited_record(reset: Option<Duration>) -> jig_protocol_worker_wire::Limited {
     use jig_protocol_worker_wire as wire;
+    wire::Limited::new(&codec(), wire::LimitedParts { task: 7, attempt: 2, account: 1, reset }).expect("limited")
+}
+pub fn account_refused_record() -> jig_protocol_worker_wire::AccountRefused {
+    use jig_protocol_worker_wire as wire;
+    let parts = wire::AccountRefusedParts {
+        task: 7,
+        attempt: 2,
+        account: 1,
+        code: Box::from(b"forbidden".as_slice()),
+        reason: Box::from(b"suspended".as_slice()),
+    };
+    wire::AccountRefused::new(&codec(), parts).expect("account refused")
+}
+/// The fixture answer, failed on its run with `failure`.
+pub fn answer_failed_on(failure: jig_protocol_worker_wire::RunFailure) -> jig_protocol_worker_wire::Answer {
+    use jig_protocol_worker_wire as wire;
+    let mut fields = answer_record().into_parts();
+    let wire::Ending::Ended(ended) = fields.ending else {
+        panic!("the fixture ended");
+    };
     let codec = codec();
-    wire::Exhausted::new(
+    let run = wire::RunFailureValue::new(&codec, wire::RunFailureValueParts { value: failure }).expect("run failure");
+    let failed = wire::Failed::new(
         &codec,
-        wire::ExhaustedParts { task: 7, attempt: 2, account: 1, retry_after: Duration::from_secs(5) },
+        wire::FailedParts {
+            failure: wire::Failure::Run(run),
+            detail: Box::from(b"detail".as_slice()),
+            work: ended.into_parts().work,
+        },
     )
-    .expect("exhausted")
+    .expect("failed");
+    fields.ending = wire::Ending::Failed(failed);
+    wire::Answer::new(&codec, fields).expect("answer")
+}
+pub fn limited_account(reset: Option<Duration>) -> jig_protocol_worker_wire::RunFailure {
+    use jig_protocol_worker_wire as wire;
+    let limited =
+        wire::LimitedAccount::new(&codec(), wire::LimitedAccountParts { account: 1, reset }).expect("limited account");
+    wire::RunFailure::Limited(limited)
+}
+pub fn refused_account() -> jig_protocol_worker_wire::RunFailure {
+    use jig_protocol_worker_wire as wire;
+    let refused =
+        wire::RefusedAccount::new(&codec(), wire::RefusedAccountParts { account: 1 }).expect("refused account");
+    wire::RunFailure::Refused(refused)
 }
 
-fn codec() -> jig_protocol_worker_wire::v2::Limits {
+fn codec() -> jig_protocol_worker_wire::v3::Limits {
     jig_protocol_worker_wire::sizes::limits(&SIZES).expect("small codec")
 }
 fn refused_messages() -> skein_lib::List<jig_protocol_worker_wire::Refused> {

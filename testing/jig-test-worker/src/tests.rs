@@ -140,3 +140,62 @@ fn a_stopping_worker_waits_on_its_agent_and_emits_stop_when_it_is_gone() {
     assert!(stopped, "the last agent releases the final stop");
     assert!(!worker.domain.work_pending(), "the one stop was emitted");
 }
+
+/// The one link notice an agent's account notice became.
+fn link_notice(worker: &mut Worker) -> Option<host::LinkUp> {
+    let mut found = None;
+    for _ in 0..worker.out.len() {
+        if let Some(Request::Link(up)) = worker.out.pop() {
+            assert!(found.is_none(), "one link notice");
+            found = Some(up);
+        }
+    }
+    found
+}
+
+#[test]
+fn each_account_notice_reaches_the_link_as_its_own_notice() {
+    let grant = smith::Grant { account: 0, generation: 1, valid: skein_lib::Duration::from_secs(60) };
+    let (run, attempt) = (fixtures::RUN, fixtures::ATTEMPT);
+    let reset = Some(skein_lib::Duration::from_secs(30));
+    let (code, reason) = (Box::<[u8]>::from(&b"forbidden"[..]), Box::<[u8]>::from(&b"suspended"[..]));
+    let notices = [
+        (
+            smith::Up::Unauthorized { account: 0, generation: 1 },
+            host::LinkUp::Unauthorized { run, attempt, account: 0, generation: 1 },
+        ),
+        (smith::Up::Limited { account: 0, reset }, host::LinkUp::Limited { run, attempt, account: 0, reset }),
+        (
+            smith::Up::Limited { account: 0, reset: None },
+            host::LinkUp::Limited { run, attempt, account: 0, reset: None },
+        ),
+        (
+            smith::Up::Refused { account: 0, code: code.clone(), reason: reason.clone() },
+            host::LinkUp::AccountRefused { run, attempt, account: 0, code, reason },
+        ),
+    ];
+    for (notice, expected) in notices {
+        let mut worker = Worker::lending(Box::new([grant]));
+        worker.receive(notice);
+        assert_eq!(link_notice(&mut worker), Some(expected));
+    }
+}
+
+#[test]
+fn a_run_failed_on_its_limited_or_refused_account_keeps_the_account() {
+    let reset = Some(skein_lib::Duration::from_secs(30));
+    let model = |fault| crate::translate::failure(&smith::RunFailure::Model(fault));
+    assert_eq!(
+        model(smith::ModelFault::Limited { account: 0, reset }),
+        host::RunFailure::Limited { account: 0, reset }
+    );
+    assert_eq!(
+        model(smith::ModelFault::Limited { account: 0, reset: None }),
+        host::RunFailure::Limited { account: 0, reset: None }
+    );
+    assert_eq!(
+        model(smith::ModelFault::Refused { account: 0, code: Box::from(&b"forbidden"[..]) }),
+        host::RunFailure::Refused { account: 0 }
+    );
+    assert_eq!(model(smith::ModelFault::Unauthorized { account: 0 }), host::RunFailure::Model);
+}

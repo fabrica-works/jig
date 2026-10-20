@@ -1,7 +1,7 @@
 //!  Worker host peers: engine commits, a lossy link, and an
 //! agent and workspace that settle through the host's requests.
 
-use jig_domain_host::{AnsweredCall, DeliveryOutcome, Ending, Failure, Reason, SettledAnswer};
+use jig_domain_host::{AnsweredCall, DeliveryOutcome, Ending, Failure, Reason, RunFailure, SettledAnswer};
 use jig_host_world::turn_world::World;
 use skein_lib::{Duration, Token};
 
@@ -374,6 +374,26 @@ fn refusals_beyond_the_inbox_are_dropped_and_counted() {
     assert_eq!(world.lost_refusals(), 1);
 }
 
+#[test]
+fn a_run_failed_on_its_limited_or_refused_account_answers_with_it() {
+    for failure in [
+        RunFailure::Limited { account: 7, reset: Some(Duration::from_secs(5)) },
+        RunFailure::Limited { account: 7, reset: None },
+        RunFailure::Refused { account: 7 },
+    ] {
+        let mut world = World::new();
+        world.assign(false);
+        world.fail(0, failure);
+        let Some(answer) = world.answer() else { panic!("the host answered") };
+        assert!(
+            matches!(answer.ending, Ending::Failed { failure: Failure::Run(run), .. } if run == failure),
+            "{failure:?}"
+        );
+        world.acknowledge_answer();
+        world.assert_settled();
+    }
+}
+
 fn live_world() -> World {
     let mut world = World::new();
     world.assign(false);
@@ -390,12 +410,12 @@ fn count(count: u64) -> jig_domain_host::Activity {
 }
 
 #[test]
-fn a_rejected_grant_reaches_the_link_for_a_live_run() {
+fn an_unauthorized_grant_reaches_the_link_for_a_live_run() {
     let mut world = live_world();
-    world.reject();
+    world.unauthorized();
     assert_eq!(
         world.reports,
-        [jig_domain_host::LinkUp::Rejected {
+        [jig_domain_host::LinkUp::Unauthorized {
             run: Token::new(31),
             attempt: Token::new(932),
             account: 7,
@@ -405,16 +425,36 @@ fn a_rejected_grant_reaches_the_link_for_a_live_run() {
 }
 
 #[test]
-fn an_exhausted_account_reaches_the_link_with_its_wait() {
+fn a_limited_account_reaches_the_link_with_its_reset_or_none() {
     let mut world = live_world();
-    world.exhaust();
+    world.limited(Some(Duration::from_secs(5)));
+    world.limited(None);
     assert_eq!(
         world.reports,
-        [jig_domain_host::LinkUp::Exhausted {
+        [
+            jig_domain_host::LinkUp::Limited {
+                run: Token::new(31),
+                attempt: Token::new(932),
+                account: 7,
+                reset: Some(Duration::from_secs(5)),
+            },
+            jig_domain_host::LinkUp::Limited { run: Token::new(31), attempt: Token::new(932), account: 7, reset: None },
+        ]
+    );
+}
+
+#[test]
+fn a_refused_account_reaches_the_link_with_its_code_and_reason() {
+    let mut world = live_world();
+    world.account_refused();
+    assert_eq!(
+        world.reports,
+        [jig_domain_host::LinkUp::AccountRefused {
             run: Token::new(31),
             attempt: Token::new(932),
             account: 7,
-            retry_after: Duration::from_secs(5),
+            code: Box::from(&b"forbidden"[..]),
+            reason: Box::from(&b"account suspended"[..]),
         }]
     );
 }
@@ -426,11 +466,13 @@ fn a_notice_of_a_fenced_attempt_is_dropped() {
     world.hold_stop();
     world.shutdown();
     world.reports.clear();
-    world.agent_report(jig_domain_host::FromAgent::Rejected { owner, account: 7, generation: 4 });
-    world.agent_report(jig_domain_host::FromAgent::Exhausted {
+    world.agent_report(jig_domain_host::FromAgent::Unauthorized { owner, account: 7, generation: 4 });
+    world.agent_report(jig_domain_host::FromAgent::Limited { owner, account: 7, reset: Some(Duration::from_secs(5)) });
+    world.agent_report(jig_domain_host::FromAgent::AccountRefused {
         owner,
         account: 7,
-        retry_after: Duration::from_secs(5),
+        code: Box::from(&b"forbidden"[..]),
+        reason: Box::from(&b"account suspended"[..]),
     });
     assert!(world.reports.is_empty());
     world.gone();

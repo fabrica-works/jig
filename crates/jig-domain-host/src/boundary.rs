@@ -31,15 +31,25 @@ pub enum Event {
         owner: Token,
         activity: crate::Activity,
     },
-    Rejected {
+    /// The provider rejected the account's credential of `generation`.
+    Unauthorized {
         owner: Token,
         account: u32,
         generation: u64,
     },
-    Exhausted {
+    /// The account reached its provider limit; `reset`, when the provider
+    /// gave one, is how long until it lifts.
+    Limited {
         owner: Token,
         account: u32,
-        retry_after: Duration,
+        reset: Option<Duration>,
+    },
+    /// The provider refused the account, with its code and reason.
+    AccountRefused {
+        owner: Token,
+        account: u32,
+        code: Box<[u8]>,
+        reason: Box<[u8]>,
     },
     /// Last word, with cumulative accounting.
     Finished {
@@ -265,15 +275,25 @@ pub enum FromAgent {
         owner: Token,
         activity: crate::Activity,
     },
-    Rejected {
+    /// The provider rejected the account's credential of `generation`.
+    Unauthorized {
         owner: Token,
         account: u32,
         generation: u64,
     },
-    Exhausted {
+    /// The account reached its provider limit; `reset`, when the provider
+    /// gave one, is how long until it lifts.
+    Limited {
         owner: Token,
         account: u32,
-        retry_after: Duration,
+        reset: Option<Duration>,
+    },
+    /// The provider refused the account, with its code and reason.
+    AccountRefused {
+        owner: Token,
+        account: u32,
+        code: Box<[u8]>,
+        reason: Box<[u8]>,
     },
     Finished {
         owner: Token,
@@ -318,8 +338,13 @@ impl Event {
             FromAgent::Withdrawn { owner, call } => Event::Withdrawn { owner, call },
             FromAgent::Turn { owner, turn } => Event::Turn { owner, turn },
             FromAgent::Activity { owner, activity } => Event::Activity { owner, activity },
-            FromAgent::Rejected { owner, account, generation } => Event::Rejected { owner, account, generation },
-            FromAgent::Exhausted { owner, account, retry_after } => Event::Exhausted { owner, account, retry_after },
+            FromAgent::Unauthorized { owner, account, generation } => {
+                Event::Unauthorized { owner, account, generation }
+            }
+            FromAgent::Limited { owner, account, reset } => Event::Limited { owner, account, reset },
+            FromAgent::AccountRefused { owner, account, code, reason } => {
+                Event::AccountRefused { owner, account, code, reason }
+            }
             FromAgent::Finished { owner, turns, spent, read, finish } => {
                 Event::Finished { owner, turns, spent, read, finish }
             }
@@ -634,8 +659,11 @@ pub enum RunFailure {
     Cancelled,
     /// The run's target changed since it started.
     Stale,
-    /// Provider quota was exhausted; a later attempt may succeed.
-    Exhausted,
+    /// The run's account reached its provider limit; `reset`, when the
+    /// provider gave one, is how long until it lifts.
+    Limited { account: u32, reset: Option<Duration> },
+    /// The provider refused the run's account.
+    Refused { account: u32 },
 }
 
 /// How an agent failed.

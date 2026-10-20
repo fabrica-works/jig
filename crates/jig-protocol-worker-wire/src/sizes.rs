@@ -1,5 +1,5 @@
 //! Channel bounds from the owners' numbers (protocol/channel.md, 9 and 11).
-use crate::{Kind, v2};
+use crate::{Kind, v3};
 
 /// Bounds supplied by the domains and the application's protocol layer.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -53,8 +53,8 @@ pub struct WorkerCap {
 
 /// Map field and count bounds without inspecting any payload or sum.
 #[must_use]
-pub fn limits(sizes: &Sizes) -> Option<v2::Limits> {
-    let limits = v2::Limits {
+pub fn limits(sizes: &Sizes) -> Option<v3::Limits> {
+    let limits = v3::Limits {
         credential_name: sizes.name,
         credential_secret: sizes.secret,
         model_bound_name: sizes.model_name,
@@ -72,6 +72,9 @@ pub fn limits(sizes: &Sizes) -> Option<v2::Limits> {
         resource_resource_some: sizes.resource,
         failed_detail: sizes.detail,
         invalid_start_why: sizes.detail,
+        // A provider's code and reason are smith's text, within the detail's bound.
+        account_refused_code: sizes.detail.min(v3::CEILINGS.account_refused_code),
+        account_refused_reason: sizes.detail.min(v3::CEILINGS.account_refused_reason),
         answer_refused: sizes.inbox,
         message_sender: sizes.sender,
         message_words: sizes.message,
@@ -92,7 +95,7 @@ pub fn limits(sizes: &Sizes) -> Option<v2::Limits> {
         relay_text_text: sizes.answer,
         relayed_name: sizes.call_name,
     };
-    v2::check_limits(&limits).ok()?;
+    v3::check_limits(&limits).ok()?;
     Some(limits)
 }
 
@@ -101,28 +104,29 @@ pub fn largest_body(sizes: &Sizes, kind: Kind) -> Option<u32> {
     body(&limits(sizes)?, kind)
 }
 
-fn body(limits: &v2::Limits, kind: Kind) -> Option<u32> {
+fn body(limits: &v3::Limits, kind: Kind) -> Option<u32> {
     let bytes = match kind {
-        Kind::Hello => v2::Hello::worst_case_bytes(limits),
-        Kind::Turn => v2::Turn::worst_case_bytes(limits),
-        Kind::Call => v2::Call::worst_case_bytes(limits),
-        Kind::Answer => v2::Answer::worst_case_bytes(limits),
-        Kind::Fact => v2::Fact::worst_case_bytes(limits),
-        Kind::Rejected => v2::Rejected::worst_case_bytes(limits),
-        Kind::Exhausted => v2::Exhausted::worst_case_bytes(limits),
-        Kind::Assignment => v2::Assignment::worst_case_bytes(limits),
-        Kind::Message => v2::Inbound::worst_case_bytes(limits),
-        Kind::Relayed => v2::Relayed::worst_case_bytes(limits),
-        Kind::TurnKept => v2::TurnKept::worst_case_bytes(limits),
-        Kind::TurnBusy => v2::TurnBusy::worst_case_bytes(limits),
-        Kind::Acknowledge => v2::Acknowledge::worst_case_bytes(limits),
-        Kind::Cancel => v2::Cancel::worst_case_bytes(limits),
-        Kind::Grant => v2::Granted::worst_case_bytes(limits),
+        Kind::Hello => v3::Hello::worst_case_bytes(limits),
+        Kind::Turn => v3::Turn::worst_case_bytes(limits),
+        Kind::Call => v3::Call::worst_case_bytes(limits),
+        Kind::Answer => v3::Answer::worst_case_bytes(limits),
+        Kind::Fact => v3::Fact::worst_case_bytes(limits),
+        Kind::Unauthorized => v3::Unauthorized::worst_case_bytes(limits),
+        Kind::Limited => v3::Limited::worst_case_bytes(limits),
+        Kind::AccountRefused => v3::AccountRefused::worst_case_bytes(limits),
+        Kind::Assignment => v3::Assignment::worst_case_bytes(limits),
+        Kind::Message => v3::Inbound::worst_case_bytes(limits),
+        Kind::Relayed => v3::Relayed::worst_case_bytes(limits),
+        Kind::TurnKept => v3::TurnKept::worst_case_bytes(limits),
+        Kind::TurnBusy => v3::TurnBusy::worst_case_bytes(limits),
+        Kind::Acknowledge => v3::Acknowledge::worst_case_bytes(limits),
+        Kind::Cancel => v3::Cancel::worst_case_bytes(limits),
+        Kind::Grant => v3::Granted::worst_case_bytes(limits),
     }?;
     u32::try_from(bytes).ok()
 }
 
-fn frame(limits: &v2::Limits, kind: Kind) -> Option<u32> {
+fn frame(limits: &v3::Limits, kind: Kind) -> Option<u32> {
     body(limits, kind)?.checked_add(8)
 }
 
@@ -148,13 +152,15 @@ pub fn worker_cap(sizes: &Sizes) -> Option<WorkerCap> {
     let mut run = sizes.turns.checked_mul(frame(&limits, Kind::Turn)?)?;
     run = run.checked_add(frame(&limits, Kind::Answer)?)?;
     run = run.checked_add(sizes.calls.checked_mul(frame(&limits, Kind::Call)?)?)?;
-    let notices = frame(&limits, Kind::Rejected)?.checked_add(frame(&limits, Kind::Exhausted)?)?;
+    let notices = frame(&limits, Kind::Unauthorized)?
+        .checked_add(frame(&limits, Kind::Limited)?)?
+        .checked_add(frame(&limits, Kind::AccountRefused)?)?;
     let mut bytes = frame(&limits, Kind::Hello)?.checked_add(sizes.slots.checked_mul(run)?)?;
     bytes = bytes.checked_add(sizes.accounts.checked_mul(notices)?)?;
     // LongDone is the shortest fact: task + attempt + activity tag + header.
     let fact_frames = sizes.facts / 25;
     let run_frames = sizes.turns.checked_add(1)?.checked_add(sizes.calls)?;
     let mut frames = 1_u32.checked_add(sizes.slots.checked_mul(run_frames)?)?;
-    frames = frames.checked_add(sizes.accounts.checked_mul(2)?)?.checked_add(fact_frames)?;
+    frames = frames.checked_add(sizes.accounts.checked_mul(3)?)?.checked_add(fact_frames)?;
     Some(WorkerCap { cap: Cap { bytes: bytes.checked_add(sizes.facts)?, frames }, facts: sizes.facts })
 }

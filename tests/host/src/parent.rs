@@ -282,8 +282,9 @@ impl Parent {
             Request::Grant { .. } => Vec::new(),
             Request::Up(
                 LinkUp::Activity { .. }
-                | LinkUp::Rejected { .. }
-                | LinkUp::Exhausted { .. }
+                | LinkUp::Unauthorized { .. }
+                | LinkUp::Limited { .. }
+                | LinkUp::AccountRefused { .. }
                 | LinkUp::Turn { .. }
                 | LinkUp::Answer { .. }
                 | LinkUp::Call { .. },
@@ -617,9 +618,11 @@ impl Parent {
                     RunFailure::Policy,
                     RunFailure::Cancelled,
                     RunFailure::Stale,
-                    RunFailure::Exhausted,
+                    RunFailure::Limited { account: 7, reset: Some(Duration::from_secs(5)) },
+                    RunFailure::Limited { account: 7, reset: None },
+                    RunFailure::Refused { account: 7 },
                 ];
-                Fate::Failed(kinds[usize::try_from(self.rng.below(6)).expect("fits")])
+                Fate::Failed(kinds[usize::try_from(self.rng.below(8)).expect("fits")])
             }
             3 => Fate::Exited,
             4 => Fate::Hung,

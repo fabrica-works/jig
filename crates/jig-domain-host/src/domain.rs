@@ -223,11 +223,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Withdrawn { owner, call } => hosted::withdrawn(domain, owner, call, out),
         Event::Turn { owner, turn } => hosted::turned(domain, env, owner, turn, out),
         Event::Activity { owner, activity } => crate::activity::reported(domain, owner, activity),
-        Event::Rejected { owner, account, generation } => {
-            crate::activity::rejected(domain, owner, account, generation, out);
+        Event::Unauthorized { owner, account, generation } => {
+            crate::activity::unauthorized(domain, owner, account, generation, out);
         }
-        Event::Exhausted { owner, account, retry_after } => {
-            crate::activity::exhausted(domain, owner, account, retry_after, out);
+        Event::Limited { owner, account, reset } => crate::activity::limited(domain, owner, account, reset, out),
+        Event::AccountRefused { owner, account, code, reason } => {
+            crate::activity::account_refused(domain, owner, account, code, reason, out);
         }
         Event::Finished { owner, turns, spent, read, finish } => {
             hosted::finished(domain, env, owner, turns, spent, finish, read, out);

@@ -261,7 +261,7 @@ pub(crate) fn peer_bounds() -> (skein_channel::Schema, skein_channel::Limits) {
         skip: 16_384,
         output_bytes: cap.bytes,
         output_frames: cap.frames,
-        kinds: 15,
+        kinds: u32::try_from(jig_protocol_worker_wire::KINDS.len()).expect("kinds fit"),
     };
     (jig_protocol_worker_wire::schema(&codec).expect("small schema"), limits)
 }

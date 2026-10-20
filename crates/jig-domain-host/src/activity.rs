@@ -1,5 +1,6 @@
 //! Content-free best-effort activity (domain/hosts.md, section 6.5).
 use crate::{Domain, LinkUp, Phase, Request};
+use alloc::boxed::Box;
 use skein_lib::{Duration, Queue, Token};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -45,14 +46,33 @@ pub(crate) fn live(domain: &Domain, owner: Token) -> Option<crate::Hosting> {
     }
 }
 
-pub(crate) fn rejected(domain: &Domain, owner: Token, account: u32, generation: u64, out: &mut Queue<Request>) {
+pub(crate) fn unauthorized(domain: &Domain, owner: Token, account: u32, generation: u64, out: &mut Queue<Request>) {
     if let Some(hosting) = live(domain, owner) {
-        out.push(Request::Up(LinkUp::Rejected { run: hosting.run, attempt: hosting.attempt, account, generation }));
+        out.push(Request::Up(LinkUp::Unauthorized { run: hosting.run, attempt: hosting.attempt, account, generation }));
     }
 }
 
-pub(crate) fn exhausted(domain: &Domain, owner: Token, account: u32, retry_after: Duration, out: &mut Queue<Request>) {
+pub(crate) fn limited(domain: &Domain, owner: Token, account: u32, reset: Option<Duration>, out: &mut Queue<Request>) {
     if let Some(hosting) = live(domain, owner) {
-        out.push(Request::Up(LinkUp::Exhausted { run: hosting.run, attempt: hosting.attempt, account, retry_after }));
+        out.push(Request::Up(LinkUp::Limited { run: hosting.run, attempt: hosting.attempt, account, reset }));
+    }
+}
+
+pub(crate) fn account_refused(
+    domain: &Domain,
+    owner: Token,
+    account: u32,
+    code: Box<[u8]>,
+    reason: Box<[u8]>,
+    out: &mut Queue<Request>,
+) {
+    if let Some(hosting) = live(domain, owner) {
+        out.push(Request::Up(LinkUp::AccountRefused {
+            run: hosting.run,
+            attempt: hosting.attempt,
+            account,
+            code,
+            reason,
+        }));
     }
 }

@@ -101,7 +101,7 @@ pub fn up(domain: &mut Domain, channel: Token, up: host::LinkUp) -> core::Event 
             let kind = match answer.ending {
                 host::Ending::Ended { .. } => fleet::Answer::Ended,
                 host::Ending::Parked { .. } => fleet::Answer::Parked,
-                host::Ending::Failed { .. } => fleet::Answer::Failed { turned: None },
+                host::Ending::Failed { failure, .. } => fleet::Answer::Failed { turned: turned(failure) },
                 host::Ending::Refused(host::Refusal::Busy) => fleet::Answer::Busy,
                 host::Ending::Refused(host::Refusal::Invalid(_)) => fleet::Answer::Invalid,
             };
@@ -124,17 +124,39 @@ pub fn up(domain: &mut Domain, channel: Token, up: host::LinkUp) -> core::Event 
             attempt,
             call: fleet::Call { name: call, tool, writes, input, deadline },
         },
-        host::LinkUp::Rejected { run, attempt, account, generation } => {
+        host::LinkUp::Unauthorized { run, attempt, account, generation } => {
             fleet::Event::Unauthorized { channel, run, attempt, account, generation }
         }
-        host::LinkUp::Exhausted { run, attempt, account, retry_after } => {
-            fleet::Event::Limited { channel, run, attempt, account, reset: Some(retry_after) }
+        host::LinkUp::Limited { run, attempt, account, reset } => {
+            fleet::Event::Limited { channel, run, attempt, account, reset }
+        }
+        host::LinkUp::AccountRefused { run, attempt, account, code, reason } => {
+            fleet::Event::AccountRefused { channel, run, attempt, account, code, reason }
         }
         host::LinkUp::Activity { run, attempt, activity } => {
             fleet::Event::Observe { channel, run, attempt, report: report(activity) }
         }
     };
     core::Event::Fleet(event)
+}
+/// The account a failed run turned on, as the fleet carries it.
+const fn turned(failure: host::Failure) -> Option<fleet::Turned> {
+    match failure {
+        host::Failure::Run(host::RunFailure::Limited { account, reset }) => {
+            Some(fleet::Turned::Limited { account, reset })
+        }
+        host::Failure::Run(host::RunFailure::Refused { account }) => Some(fleet::Turned::Refused { account }),
+        host::Failure::Run(
+            host::RunFailure::Model
+            | host::RunFailure::Budget
+            | host::RunFailure::Policy
+            | host::RunFailure::Cancelled
+            | host::RunFailure::Stale,
+        )
+        | host::Failure::Unprepared(_)
+        | host::Failure::Agent(_)
+        | host::Failure::Cancelled(_) => None,
+    }
 }
 fn read_name(name: Option<Token>) -> Option<u64> {
     Some(name?.raw())

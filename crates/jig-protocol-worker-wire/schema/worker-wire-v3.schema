@@ -1,4 +1,4 @@
-family jig-worker-wire 2
+family jig-worker-wire 3
 
 # The worker's credential (protocol/channel.md, 4.1).
 record Credential { name: text 256 secret: secret 1024 payload: u32 }
@@ -55,7 +55,12 @@ record Parked { work: Work }
 record Resource { resource: option bytes 1024 }
 enum Preparation { transient, permanent: Resource }
 record PreparationValue { value: Preparation }
-enum RunFailure { model, budget, policy, cancelled, stale, exhausted }
+record LimitedAccount { account: u32 reset: option duration }
+record RefusedAccount { account: u32 }
+enum RunFailure {
+    model, budget, policy, cancelled, stale,
+    limited: LimitedAccount, refused: RefusedAccount
+}
 record RunFailureValue { value: RunFailure }
 enum AgentFailure { unstarted, exited, rules, no_progress, wall_time }
 record AgentFailureValue { value: AgentFailure }
@@ -83,8 +88,9 @@ record Count { kind: CountKind elapsed: duration value: u64 }
 record PhaseValue { value: Phase }
 enum Activity { phase: PhaseValue, long: Long, long_done, count: Count }
 record Fact { task: u64 attempt: u64 activity: Activity }
-record Rejected { task: u64 attempt: u64 account: u32 generation: u64 }
-record Exhausted { task: u64 attempt: u64 account: u32 retry_after: duration }
+record Unauthorized { task: u64 attempt: u64 account: u32 generation: u64 }
+record Limited { task: u64 attempt: u64 account: u32 reset: option duration }
+record AccountRefused { task: u64 attempt: u64 account: u32 code: text 128 reason: text 512 }
 
 # Engine-to-worker records (protocol/channel.md, 5.2, 7 and 8).
 record Message { name: u64 sender: text 1024 words: text 1048576 }

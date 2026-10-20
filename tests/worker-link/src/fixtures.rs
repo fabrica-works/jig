@@ -116,7 +116,7 @@ pub const ACCOUNT_ONE: &[u8] = b"account";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
 #[must_use]
-pub fn codec() -> wire::v2::Limits {
+pub fn codec() -> wire::v3::Limits {
     wire::sizes::limits(&SIZES).expect("small codec limits")
 }
 #[must_use]
@@ -179,17 +179,28 @@ pub fn up_records() -> Vec<(host::LinkUp, Box<[Part]>)> {
             },
             Box::new([]),
         ),
-        (host::LinkUp::Rejected { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, generation: 3 }, Box::new([])),
+        (host::LinkUp::Unauthorized { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, generation: 3 }, Box::new([])),
         (
-            host::LinkUp::Exhausted {
+            host::LinkUp::Limited {
                 run: RUN_SEVEN,
                 attempt: ATTEMPT_TWO,
                 account: 1,
-                retry_after: Duration::from_secs(60),
+                reset: Some(Duration::from_secs(60)),
             },
             Box::new([]),
         ),
+        (account_refused(), Box::new([])),
     ]
+}
+#[must_use]
+pub fn account_refused() -> host::LinkUp {
+    host::LinkUp::AccountRefused {
+        run: RUN_SEVEN,
+        attempt: ATTEMPT_TWO,
+        account: 1,
+        code: b"forbidden".as_slice().into(),
+        reason: b"suspended".as_slice().into(),
+    }
 }
 #[must_use]
 pub fn answer() -> host::LinkUp {

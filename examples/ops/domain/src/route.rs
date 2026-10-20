@@ -1488,7 +1488,7 @@ pub(crate) fn host_out(
                         payload,
                     })));
                 }
-                host::Request::Up(host::LinkUp::Rejected { run, attempt, account, generation }) => {
+                host::Request::Up(host::LinkUp::Unauthorized { run, attempt, account, generation }) => {
                     work.push(Work::Core(core::Event::Fleet(fleet::Event::Unauthorized {
                         channel: Token::new(0),
                         run,
@@ -1497,13 +1497,23 @@ pub(crate) fn host_out(
                         generation,
                     })));
                 }
-                host::Request::Up(host::LinkUp::Exhausted { run, attempt, account, retry_after }) => {
+                host::Request::Up(host::LinkUp::Limited { run, attempt, account, reset }) => {
                     work.push(Work::Core(core::Event::Fleet(fleet::Event::Limited {
                         channel: Token::new(0),
                         run,
                         attempt,
                         account,
-                        reset: Some(retry_after),
+                        reset,
+                    })));
+                }
+                host::Request::Up(host::LinkUp::AccountRefused { run, attempt, account, code, reason }) => {
+                    work.push(Work::Core(core::Event::Fleet(fleet::Event::AccountRefused {
+                        channel: Token::new(0),
+                        run,
+                        attempt,
+                        account,
+                        code,
+                        reason,
                     })));
                 }
                 host::Request::Up(host::LinkUp::Activity { .. }) => unreachable!("activity is drained separately"),

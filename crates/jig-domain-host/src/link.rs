@@ -21,17 +21,24 @@ pub enum LinkUp {
         attempt: Token,
         activity: crate::Activity,
     },
-    Rejected {
+    Unauthorized {
         run: Token,
         attempt: Token,
         account: u32,
         generation: u64,
     },
-    Exhausted {
+    Limited {
         run: Token,
         attempt: Token,
         account: u32,
-        retry_after: Duration,
+        reset: Option<Duration>,
+    },
+    AccountRefused {
+        run: Token,
+        attempt: Token,
+        account: u32,
+        code: Box<[u8]>,
+        reason: Box<[u8]>,
     },
     Turn {
         run: Token,

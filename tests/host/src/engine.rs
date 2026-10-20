@@ -188,7 +188,12 @@ impl Engine {
     /// Takes the host's request `request`, which is for the engine.
     pub fn take(&mut self, request: Request) -> Vec<Act> {
         match request {
-            Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => Vec::new(),
+            Request::Up(
+                LinkUp::Activity { .. }
+                | LinkUp::Unauthorized { .. }
+                | LinkUp::Limited { .. }
+                | LinkUp::AccountRefused { .. },
+            ) => Vec::new(),
             Request::Up(LinkUp::Answer { run, attempt, answer }) => {
                 if self.open.contains_key(&(run, attempt)) {
                     self.refusals(&answer.refused);
@@ -429,7 +434,8 @@ pub fn failure_kind(failure: Failure) -> &'static str {
         Failure::Run(RunFailure::Policy) => "failed: run, policy",
         Failure::Run(RunFailure::Cancelled) => "failed: run, cancelled",
         Failure::Run(RunFailure::Stale) => "failed: run, stale",
-        Failure::Run(RunFailure::Exhausted) => "failed: run, exhausted",
+        Failure::Run(RunFailure::Limited { .. }) => "failed: run, limited",
+        Failure::Run(RunFailure::Refused { .. }) => "failed: run, refused",
         Failure::Agent(AgentFailure::Unstarted) => "failed: agent, unstarted",
         Failure::Agent(AgentFailure::Exited) => "failed: agent, exited",
         Failure::Agent(AgentFailure::Rules) => "failed: agent, rules",
@@ -442,7 +448,7 @@ pub fn failure_kind(failure: Failure) -> &'static str {
 }
 
 /// Every ending a hosted run can reach, refusals included.
-pub const ENDINGS: [&str; 20] = [
+pub const ENDINGS: [&str; 21] = [
     "refused: busy",
     "refused: invalid",
     "ended",
@@ -454,7 +460,8 @@ pub const ENDINGS: [&str; 20] = [
     "failed: run, policy",
     "failed: run, cancelled",
     "failed: run, stale",
-    "failed: run, exhausted",
+    "failed: run, limited",
+    "failed: run, refused",
     "failed: agent, unstarted",
     "failed: agent, exited",
     "failed: agent, rules",

@@ -385,19 +385,13 @@ fn up(domain: &mut Domain, env: &Env<Limits>, request: smith::parent::Request, o
             hub(domain, env, host::Event::Activity { owner: client, activity: host::Activity::LongDone });
         }
         smith::parent::Request::Unauthorized { client, account, generation } => {
-            hub(domain, env, host::Event::Rejected { owner: client, account, generation });
+            hub(domain, env, host::Event::Unauthorized { owner: client, account, generation });
         }
-        smith::parent::Request::Refused { .. } => {}
         smith::parent::Request::Limited { client, account, reset } => {
-            hub(
-                domain,
-                env,
-                host::Event::Exhausted {
-                    owner: client,
-                    account,
-                    retry_after: reset.unwrap_or(skein_lib::Duration::ZERO),
-                },
-            );
+            hub(domain, env, host::Event::Limited { owner: client, account, reset });
+        }
+        smith::parent::Request::Refused { client, account, code, reason } => {
+            hub(domain, env, host::Event::AccountRefused { owner: client, account, code, reason });
         }
         smith::parent::Request::Faulted { client, fault } => {
             if let Some(hosting) = domain.hub.hosting(client)

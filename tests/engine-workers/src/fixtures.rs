@@ -98,7 +98,7 @@ pub fn channel_limits() -> skein_channel::Limits {
         skip: 64,
         output_bytes: cap.bytes,
         output_frames: cap.frames,
-        kinds: 15,
+        kinds: u32::try_from(jig_protocol_worker_wire::KINDS.len()).expect("kinds fit"),
     }
 }
 #[must_use]
@@ -271,24 +271,40 @@ pub fn fact_record() -> jig_protocol_worker_wire::Fact {
         .expect("fact")
 }
 #[must_use]
-pub fn rejected_record() -> jig_protocol_worker_wire::Rejected {
+pub fn unauthorized_record() -> jig_protocol_worker_wire::Unauthorized {
     use jig_protocol_worker_wire as wire;
     let codec = codec();
-    wire::Rejected::new(&codec, wire::RejectedParts { task: 7, attempt: 2, account: 1, generation: 4 })
-        .expect("rejected")
+    wire::Unauthorized::new(&codec, wire::UnauthorizedParts { task: 7, attempt: 2, account: 1, generation: 4 })
+        .expect("unauthorized")
 }
 #[must_use]
-pub fn exhausted_record() -> jig_protocol_worker_wire::Exhausted {
+pub fn limited_record() -> jig_protocol_worker_wire::Limited {
     use jig_protocol_worker_wire as wire;
     let codec = codec();
-    wire::Exhausted::new(
+    wire::Limited::new(
         &codec,
-        wire::ExhaustedParts { task: 7, attempt: 2, account: 1, retry_after: Duration::from_secs(5) },
+        wire::LimitedParts { task: 7, attempt: 2, account: 1, reset: Some(Duration::from_secs(5)) },
     )
-    .expect("exhausted")
+    .expect("limited")
+}
+#[must_use]
+pub fn account_refused_record() -> jig_protocol_worker_wire::AccountRefused {
+    use jig_protocol_worker_wire as wire;
+    let codec = codec();
+    wire::AccountRefused::new(
+        &codec,
+        wire::AccountRefusedParts {
+            task: 7,
+            attempt: 2,
+            account: 1,
+            code: b"forbidden".as_slice().into(),
+            reason: b"suspended".as_slice().into(),
+        },
+    )
+    .expect("account refused")
 }
 
-fn codec() -> jig_protocol_worker_wire::v2::Limits {
+fn codec() -> jig_protocol_worker_wire::v3::Limits {
     jig_protocol_worker_wire::sizes::limits(&SIZES).expect("small codec")
 }
 fn refused_messages() -> skein_lib::List<jig_protocol_worker_wire::Refused> {
@@ -317,15 +333,17 @@ pub fn up_frames() -> Vec<skein_channel::Frame> {
     let call = call_record();
     let answer = answer_record();
     let fact = fact_record();
-    let rejected = rejected_record();
-    let exhausted = exhausted_record();
+    let unauthorized = unauthorized_record();
+    let limited = limited_record();
+    let refused = account_refused_record();
     vec![
         turn_frame(),
         encoded(0x0102, call.measure(), |writer| call.encode(writer)),
         encoded(0x0103, answer.measure(), |writer| answer.encode(writer)),
         encoded(0x0104, fact.measure(), |writer| fact.encode(writer)),
-        encoded(0x0105, rejected.measure(), |writer| rejected.encode(writer)),
-        encoded(0x0106, exhausted.measure(), |writer| exhausted.encode(writer)),
+        encoded(0x0105, unauthorized.measure(), |writer| unauthorized.encode(writer)),
+        encoded(0x0106, limited.measure(), |writer| limited.encode(writer)),
+        encoded(0x0107, refused.measure(), |writer| refused.encode(writer)),
     ]
 }
 

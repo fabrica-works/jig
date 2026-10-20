@@ -9,10 +9,13 @@ fn hello_schema() -> skein_channel::Schema {
 }
 
 fn hello_terms(largest: u32) -> List<Term> {
-    let mut terms = List::with_capacity(7);
+    let mut terms = List::with_capacity(8);
     terms.push(Term { kind: 0x0100, largest }).expect("hello term slot");
-    // Hand-counted bounds for Turn, Call, Answer, Fact and both notices.
-    for (kind, largest) in [(0x0101, 96), (0x0102, 101), (0x0103, 145), (0x0104, 34), (0x0105, 28), (0x0106, 28)] {
+    // Hand-counted bounds for Turn, Call, Answer, Fact and the three notices:
+    // a refusal's code and reason each take a length and sixteen bytes.
+    for (kind, largest) in
+        [(0x0101, 96), (0x0102, 101), (0x0103, 145), (0x0104, 34), (0x0105, 28), (0x0106, 29), (0x0107, 60)]
+    {
         terms.push(Term { kind, largest }).expect("one term per up kind");
     }
     terms
@@ -131,9 +134,9 @@ fn a_reason_below_256_reads_as_none() {
 #[test]
 fn the_schema_lists_the_hello_from_the_initiator() {
     let schema = hello_schema();
-    let version = schema.version(2).expect("one version");
+    let version = schema.version(3).expect("one version");
     assert_eq!(schema.magic, *b"jigw");
-    assert_eq!(version.kinds.len(), 15);
+    assert_eq!(version.kinds.len(), 16);
     assert_eq!(
         version.kind(0x0100),
         Some(skein_channel::Kind { kind: 0x0100, direction: Direction::FromInitiator, largest: 178 })
@@ -233,6 +236,110 @@ fn a_failed_answer_keeps_its_failure_kind_and_detail() {
     assert_eq!(decoded, answer);
 }
 
+fn failed_through_bytes(failure: crate::RunFailure) -> crate::RunFailure {
+    let mut parts = fixtures::answer_failed().into_parts();
+    let run = crate::RunFailureValue::new(&fixtures::LIMITS, crate::RunFailureValueParts { value: failure })
+        .expect("typed run failure");
+    let crate::Ending::Failed(failed) = parts.ending else { panic!("the fixture answer failed") };
+    let mut failed = failed.into_parts();
+    failed.failure = crate::Failure::Run(run);
+    parts.ending = crate::Ending::Failed(crate::Failed::new(&fixtures::LIMITS, failed).expect("failed answer"));
+    let answer = crate::Answer::new(&fixtures::LIMITS, parts).expect("answer within limits");
+    let decoded = answer_through_bytes(&answer);
+    assert_eq!(decoded, answer);
+    let crate::Ending::Failed(failed) = decoded.into_parts().ending else { panic!("a failed answer stays failed") };
+    let crate::Failure::Run(run) = failed.into_parts().failure else { panic!("a run failure stays one") };
+    run.into_parts().value
+}
+
+#[test]
+fn a_failed_answer_keeps_the_limited_or_refused_account_it_turned_on() {
+    for reset in [Some(Duration::from_secs(30)), None] {
+        let limited = crate::LimitedAccount::new(&fixtures::LIMITS, crate::LimitedAccountParts { account: 7, reset })
+            .expect("limited account");
+        let decoded = failed_through_bytes(crate::RunFailure::Limited(limited));
+        let crate::RunFailure::Limited(limited) = decoded else { panic!("limited stays limited: {decoded:?}") };
+        assert_eq!((limited.account(), limited.reset()), (7, &reset));
+    }
+    let refused = crate::RefusedAccount::new(&fixtures::LIMITS, crate::RefusedAccountParts { account: 7 })
+        .expect("refused account");
+    let decoded = failed_through_bytes(crate::RunFailure::Refused(refused));
+    let crate::RunFailure::Refused(refused) = decoded else { panic!("refused stays refused: {decoded:?}") };
+    assert_eq!(refused.account(), 7);
+}
+
+fn through_bytes<T>(
+    value: &T,
+    measure: fn(&T) -> u32,
+    encode: fn(&T, &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow>,
+    decode: fn(&crate::v3::Limits, &mut Reader<'_>) -> Result<T, crate::v3::Problem>,
+) -> T {
+    let mut writer = skein_lib::Writer::new(usize::try_from(measure(value)).expect("small notice"));
+    encode(value, &mut writer).expect("measured room");
+    decode(&fixtures::LIMITS, &mut Reader::new(&writer.finish())).expect("notice within limits")
+}
+
+#[test]
+fn an_unauthorized_notice_keeps_its_account_and_generation_through_bytes() {
+    let parts = crate::UnauthorizedParts { task: 3, attempt: 4, account: 7, generation: 2 };
+    let notice = crate::Unauthorized::new(&fixtures::LIMITS, parts).expect("unauthorized notice");
+    let decoded =
+        through_bytes(&notice, crate::Unauthorized::measure, crate::Unauthorized::encode, crate::Unauthorized::decode);
+    assert_eq!((decoded.task(), decoded.attempt(), decoded.account(), decoded.generation()), (3, 4, 7, 2));
+    assert_eq!(decoded, notice);
+}
+
+#[test]
+fn a_limited_notice_keeps_its_reset_or_none_through_bytes() {
+    for reset in [Some(Duration::from_secs(30)), None] {
+        let parts = crate::LimitedParts { task: 3, attempt: 4, account: 7, reset };
+        let notice = crate::Limited::new(&fixtures::LIMITS, parts).expect("limited notice");
+        let decoded = through_bytes(&notice, crate::Limited::measure, crate::Limited::encode, crate::Limited::decode);
+        assert_eq!((decoded.account(), decoded.reset()), (7, &reset));
+        assert_eq!(decoded, notice);
+    }
+}
+
+fn refused_parts(code: &[u8], reason: &[u8]) -> crate::AccountRefusedParts {
+    crate::AccountRefusedParts { task: 3, attempt: 4, account: 7, code: code.into(), reason: reason.into() }
+}
+
+#[test]
+fn an_account_refused_notice_keeps_its_code_and_reason_through_bytes() {
+    let notice = crate::AccountRefused::new(&fixtures::LIMITS, refused_parts(b"forbidden", b"suspended"))
+        .expect("refused notice");
+    let decoded = through_bytes(
+        &notice,
+        crate::AccountRefused::measure,
+        crate::AccountRefused::encode,
+        crate::AccountRefused::decode,
+    );
+    assert_eq!((decoded.account(), decoded.code(), decoded.reason()), (7, &b"forbidden"[..], &b"suspended"[..]));
+    assert_eq!(decoded, notice);
+}
+
+#[test]
+fn an_account_refused_code_or_reason_past_its_bound_or_not_text_is_refused() {
+    let full = [b'x'; 16];
+    let past = [b'x'; 17];
+    for (code, reason, problem) in [
+        (&past[..], &full[..], skein_codec::Reason::Bound),
+        (&full[..], &past[..], skein_codec::Reason::Bound),
+        (&b"\xff"[..], &full[..], skein_codec::Reason::Utf8),
+        (&full[..], &b"\xff"[..], skein_codec::Reason::Utf8),
+    ] {
+        let refused = crate::AccountRefused::new(&fixtures::LIMITS, refused_parts(code, reason));
+        assert_eq!(refused.expect_err("refused").reason, problem);
+    }
+    // The decoder holds the same bound: a seventeen-byte reason written under
+    // the ceilings reads back refused under the fixture's sixteen.
+    let wide = crate::AccountRefused::new(&crate::CEILINGS, refused_parts(&full, &past)).expect("within the ceilings");
+    let mut writer = skein_lib::Writer::new(usize::try_from(wide.measure()).expect("small notice"));
+    wide.encode(&mut writer).expect("measured room");
+    let decoded = crate::AccountRefused::decode(&fixtures::LIMITS, &mut Reader::new(&writer.finish()));
+    assert_eq!(decoded.expect_err("past the fixture bound").reason, skein_codec::Reason::Bound);
+}
+
 #[test]
 fn a_count_fact_carries_kind_time_and_count() {
     let fact = fixtures::fact_count();
@@ -271,8 +378,8 @@ fn the_schema_lists_every_up_kind_from_the_initiator() {
     let schema = hello_schema();
     assert_eq!(schema.versions.len(), 1);
     for version in &schema.versions {
-        assert_eq!(version.kinds.len(), 15);
-        for number in [0x0100, 0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106] {
+        assert_eq!(version.kinds.len(), 16);
+        for number in [0x0100, 0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106, 0x0107] {
             assert_eq!(version.kind(number).expect("every up kind").direction, Direction::FromInitiator);
         }
     }
@@ -394,8 +501,8 @@ fn an_assignment_past_its_grant_bound_is_refused() {
 #[test]
 fn the_schema_lists_every_down_kind_from_the_responder() {
     let schema = hello_schema();
-    let version = schema.version(2).expect("one version");
-    assert_eq!(version.kinds.len(), 15);
+    let version = schema.version(3).expect("one version");
+    assert_eq!(version.kinds.len(), 16);
     for term in &down_terms() {
         assert_eq!(
             version.kind(term.kind),

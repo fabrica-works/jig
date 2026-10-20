@@ -292,10 +292,17 @@ impl Worker {
     }
 
     pub fn started() -> Self {
+        Self::lending(Box::new([]))
+    }
+
+    /// A started agent lent `grants`, so its notices name known accounts.
+    pub fn lending(grants: Box<[smith::Grant]>) -> Self {
         let mut worker = Self::new(limits());
         worker.assign();
         let (owner, source) = worker.take_decode();
-        worker.step(Event::Decoded { agent: owner, start: Ok(Box::new(start(source))) });
+        let mut start = start(source);
+        start.grants = grants;
+        worker.step(Event::Decoded { agent: owner, start: Ok(Box::new(start)) });
         let mut process = None;
         for _ in 0..worker.out.len() {
             if let Some(Request::Process(request)) = worker.out.pop()

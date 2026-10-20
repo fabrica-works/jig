@@ -72,7 +72,7 @@ fn each_up_record_reaches_the_engine_in_order() {
     let limits = fixtures::codec();
     assert_eq!(
         records.iter().map(|record| record.kind).collect::<Vec<_>>(),
-        [0x0100, 0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106]
+        [0x0100, 0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106, 0x0107]
     );
     check_up_records(records, &limits);
 }
@@ -150,7 +150,7 @@ fn a_transcript_piece_that_does_not_split_is_refused_as_invalid() {
     }
 }
 
-fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v2::Limits) {
+fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v3::Limits) {
     let turn = wire::Turn::decode(limits, &mut Reader::new(&records[1].body)).expect("turn");
     assert_eq!(
         (turn.task(), turn.attempt(), turn.number(), turn.spent(), *turn.read(), turn.opens_window(), turn.body()),
@@ -178,12 +178,20 @@ fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v2:
         (fact.task(), fact.attempt(), long.operation(), long.span()),
         (7, 2, &wire::Operation::Command, Duration::from_secs(2))
     );
-    let rejected = wire::Rejected::decode(limits, &mut Reader::new(&records[5].body)).expect("rejected");
-    assert_eq!((rejected.task(), rejected.attempt(), rejected.account(), rejected.generation()), (7, 2, 1, 3));
-    let exhausted = wire::Exhausted::decode(limits, &mut Reader::new(&records[6].body)).expect("exhausted");
+    let unauthorized = wire::Unauthorized::decode(limits, &mut Reader::new(&records[5].body)).expect("unauthorized");
     assert_eq!(
-        (exhausted.task(), exhausted.attempt(), exhausted.account(), exhausted.retry_after()),
-        (7, 2, 1, Duration::from_secs(60))
+        (unauthorized.task(), unauthorized.attempt(), unauthorized.account(), unauthorized.generation()),
+        (7, 2, 1, 3)
+    );
+    let limited = wire::Limited::decode(limits, &mut Reader::new(&records[6].body)).expect("limited");
+    assert_eq!(
+        (limited.task(), limited.attempt(), limited.account(), *limited.reset()),
+        (7, 2, 1, Some(Duration::from_secs(60)))
+    );
+    let refused = wire::AccountRefused::decode(limits, &mut Reader::new(&records[7].body)).expect("account refused");
+    assert_eq!(
+        (refused.task(), refused.attempt(), refused.account(), refused.code(), refused.reason()),
+        (7, 2, 1, b"forbidden".as_slice(), b"suspended".as_slice())
     );
 }
 

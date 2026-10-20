@@ -2,7 +2,7 @@ use crate::{Request, tests::fixtures, translate};
 use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Queue, Reader, Time, Token};
-fn translated(kind: u16, bytes: &[u8], limits: &wire::v2::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
+fn translated(kind: u16, bytes: &[u8], limits: &wire::v3::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
     let mut parts = List::with_capacity(1);
     let mut values = Queue::with_capacity(4);
     let down =
@@ -164,4 +164,81 @@ fn a_hub_invalid_start_keeps_its_words_in_the_answer_record() {
     let wire::Refusal::Invalid(invalid) = refusal.value() else { panic!("invalid") };
     let wire::Invalid::Start(start) = invalid.value() else { panic!("start") };
     assert_eq!(start.why(), b"budget too small");
+}
+
+#[test]
+fn each_account_notice_becomes_its_record() {
+    let codec = fixtures::codec();
+    let (run, attempt) = (fixtures::RUN_SEVEN, fixtures::ATTEMPT_TWO);
+    let frame = translate::up(host::LinkUp::Unauthorized { run, attempt, account: 1, generation: 3 }, &[], &codec)
+        .expect("unauthorized");
+    let record = wire::Unauthorized::decode(&codec, &mut body(&frame)).expect("unauthorized");
+    assert_eq!(
+        (frame.kind(), record.task(), record.attempt(), record.account(), record.generation()),
+        (0x0105, 7, 2, 1, 3)
+    );
+    for reset in [Some(skein_lib::Duration::from_secs(60)), None] {
+        let frame =
+            translate::up(host::LinkUp::Limited { run, attempt, account: 1, reset }, &[], &codec).expect("limited");
+        let record = wire::Limited::decode(&codec, &mut body(&frame)).expect("limited");
+        assert_eq!(
+            (frame.kind(), record.task(), record.attempt(), record.account(), *record.reset()),
+            (0x0106, 7, 2, 1, reset)
+        );
+    }
+    let refused = host::LinkUp::AccountRefused {
+        run,
+        attempt,
+        account: 1,
+        code: b"forbidden".as_slice().into(),
+        reason: b"suspended".as_slice().into(),
+    };
+    let frame = translate::up(refused, &[], &codec).expect("account refused");
+    let record = wire::AccountRefused::decode(&codec, &mut body(&frame)).expect("account refused");
+    assert_eq!(
+        (frame.kind(), record.task(), record.account(), record.code(), record.reason()),
+        (0x0107, 7, 1, b"forbidden".as_slice(), b"suspended".as_slice())
+    );
+}
+
+#[test]
+fn an_account_refused_reason_past_its_bound_is_not_sent() {
+    let refused = host::LinkUp::AccountRefused {
+        run: fixtures::RUN_SEVEN,
+        attempt: fixtures::ATTEMPT_TWO,
+        account: 1,
+        code: b"forbidden".as_slice().into(),
+        reason: [b'r'; 17].as_slice().into(),
+    };
+    assert!(translate::up(refused, &[], &fixtures::codec()).is_none());
+}
+
+#[test]
+fn a_failed_answer_keeps_the_limited_or_refused_account_in_its_record() {
+    let reset = Some(skein_lib::Duration::from_secs(60));
+    for failure in [
+        host::RunFailure::Limited { account: 1, reset },
+        host::RunFailure::Limited { account: 1, reset: None },
+        host::RunFailure::Refused { account: 1 },
+    ] {
+        let host::LinkUp::Answer { run, attempt, mut answer } = fixtures::answer() else { panic!("answer") };
+        answer.ending = host::Ending::Failed {
+            failure: host::Failure::Run(failure),
+            detail: Box::new([]),
+            work: host::Work { left: None, saved: None },
+        };
+        let frame =
+            translate::up(host::LinkUp::Answer { run, attempt, answer }, &[], &fixtures::codec()).expect("answer");
+        let record = wire::Answer::decode(&fixtures::codec(), &mut body(&frame)).expect("answer");
+        let wire::Ending::Failed(failed) = record.ending() else { panic!("failed") };
+        let wire::Failure::Run(run_failure) = failed.failure() else { panic!("run failure") };
+        let kept = if let wire::RunFailure::Limited(limited) = run_failure.value() {
+            host::RunFailure::Limited { account: limited.account(), reset: *limited.reset() }
+        } else if let wire::RunFailure::Refused(refused) = run_failure.value() {
+            host::RunFailure::Refused { account: refused.account() }
+        } else {
+            panic!("not an account: {:?}", run_failure.value())
+        };
+        assert_eq!(kept, failure);
+    }
 }

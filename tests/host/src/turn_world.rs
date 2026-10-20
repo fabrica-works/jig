@@ -365,14 +365,18 @@ impl World {
     pub fn owner(&self) -> Token {
         self.owner.expect("assigned")
     }
-    pub fn reject(&mut self) {
-        self.agent_report(host::FromAgent::Rejected { owner: self.owner(), account: 7, generation: 4 });
+    pub fn unauthorized(&mut self) {
+        self.agent_report(host::FromAgent::Unauthorized { owner: self.owner(), account: 7, generation: 4 });
     }
-    pub fn exhaust(&mut self) {
-        self.agent_report(host::FromAgent::Exhausted {
+    pub fn limited(&mut self, reset: Option<Duration>) {
+        self.agent_report(host::FromAgent::Limited { owner: self.owner(), account: 7, reset });
+    }
+    pub fn account_refused(&mut self) {
+        self.agent_report(host::FromAgent::AccountRefused {
             owner: self.owner(),
             account: 7,
-            retry_after: Duration::from_secs(5),
+            code: Box::from(&b"forbidden"[..]),
+            reason: Box::from(&b"account suspended"[..]),
         });
     }
 
@@ -425,6 +429,15 @@ impl World {
             turns,
             spent: u64::from(turns) * 17,
             finish,
+        });
+    }
+    pub fn fail(&mut self, turns: u32, failure: host::RunFailure) {
+        self.send(Event::Finished {
+            read: self.last_read,
+            owner: self.owner.expect("assigned"),
+            turns,
+            spent: u64::from(turns) * 17,
+            finish: Finish::Failed { failure },
         });
     }
 
@@ -553,22 +566,17 @@ impl World {
     fn route(&mut self, request: Request) {
         self.refusals.request(&request);
         match request {
-            Request::Up(record @ (LinkUp::Rejected { .. } | LinkUp::Exhausted { .. } | LinkUp::Activity { .. })) => {
+            Request::Up(
+                record @ (LinkUp::Unauthorized { .. }
+                | LinkUp::Limited { .. }
+                | LinkUp::AccountRefused { .. }
+                | LinkUp::Activity { .. }),
+            ) => {
                 self.receive_report(record);
             }
             Request::Up(LinkUp::Call { run, attempt, call, tool, writes, input, deadline }) => {
                 assert_eq!((run, attempt), (RUN, ATTEMPT));
-                self.relayed_call = Some(RelayedCall { name: call.clone(), tool, writes, input, deadline });
-                self.stats.relays += 1;
-                self.events.push_back(Event::Down(LinkDown::Relayed {
-                    run,
-                    attempt,
-                    call,
-                    answer: self
-                        .next_relay
-                        .take()
-                        .unwrap_or(host::Relayed::Answer { error: false, text: Box::from(&b"reply"[..]) }),
-                }));
+                self.answer_relay(RelayedCall { name: call, tool, writes, input, deadline });
             }
             Request::Reply { agent, call, reply } => {
                 assert_eq!(agent, AGENT);
@@ -655,6 +663,16 @@ impl World {
                 panic!("unscripted request: {request:?}")
             }
         }
+    }
+
+    /// Answers a relayed call with the scripted answer, or a plain reply.
+    fn answer_relay(&mut self, relayed: RelayedCall) {
+        let call = relayed.name.clone();
+        self.relayed_call = Some(relayed);
+        self.stats.relays += 1;
+        let answer =
+            self.next_relay.take().unwrap_or(host::Relayed::Answer { error: false, text: Box::from(&b"reply"[..]) });
+        self.events.push_back(Event::Down(LinkDown::Relayed { run: RUN, attempt: ATTEMPT, call, answer }));
     }
 
     fn receive_grant(&mut self, agent: Token, grant: host::Grant) {

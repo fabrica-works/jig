@@ -44,7 +44,22 @@ pub const fn operation(value: smith::Operation) -> host::Operation {
 #[must_use]
 pub const fn failure(value: &smith::RunFailure) -> host::RunFailure {
     match value {
-        smith::RunFailure::Transcript(_) | smith::RunFailure::Model(_) => host::RunFailure::Model,
+        smith::RunFailure::Model(smith::ModelFault::Limited { account, reset }) => {
+            host::RunFailure::Limited { account: *account, reset: *reset }
+        }
+        smith::RunFailure::Model(smith::ModelFault::Refused { account, code: _ }) => {
+            host::RunFailure::Refused { account: *account }
+        }
+        smith::RunFailure::Transcript(_)
+        | smith::RunFailure::Model(
+            smith::ModelFault::Completion { .. }
+            | smith::ModelFault::Unauthorized { .. }
+            | smith::ModelFault::Program { .. }
+            | smith::ModelFault::Provider
+            | smith::ModelFault::Declined
+            | smith::ModelFault::Truncated
+            | smith::ModelFault::Malformed,
+        ) => host::RunFailure::Model,
         smith::RunFailure::Budget { exhausted: _, used: _, bound: _ } => host::RunFailure::Budget,
         smith::RunFailure::Policy(_) => host::RunFailure::Policy,
         smith::RunFailure::Cancelled => host::RunFailure::Cancelled,

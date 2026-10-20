@@ -54,9 +54,9 @@ mod opening {
     #[test]
     fn another_version_is_refused_by_skein_as_version() {
         let mut schema = fixtures::schema();
-        schema.versions.get_mut(0).expect("one version").version = 3;
+        schema.versions.get_mut(0).expect("one version").version = 4;
         let mut world = world();
-        let connection = world.connect(fixtures::peer(schema, 3, WORKER_A, SECRET_A, PAYLOAD));
+        let connection = world.connect(fixtures::peer(schema, 4, WORKER_A, SECRET_A, PAYLOAD));
         world.run();
         assert_eq!(refused(&world, connection), 1);
         assert!(world.root().is_empty());
@@ -64,7 +64,7 @@ mod opening {
     #[test]
     fn terms_below_the_largest_assignment_are_refused_as_limits() {
         let mut schema = fixtures::schema();
-        schema.versions.get_mut(0).expect("one version").kinds.get_mut(7).expect("assignment kind").largest = 1;
+        schema.versions.get_mut(0).expect("one version").kinds.get_mut(8).expect("assignment kind").largest = 1;
         let mut world = world();
         let connection =
             world.connect(fixtures::peer(schema, jig_protocol_worker_wire::VERSION, WORKER_A, SECRET_A, PAYLOAD));

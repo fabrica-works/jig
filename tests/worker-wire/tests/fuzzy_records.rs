@@ -27,8 +27,9 @@ fn fuzzy_up_decoders_never_panic_and_reencode_what_they_read() {
         check!(&bytes, Call);
         check!(&bytes, Answer);
         check!(&bytes, Fact);
-        check!(&bytes, Rejected);
-        check!(&bytes, Exhausted);
+        check!(&bytes, Unauthorized);
+        check!(&bytes, Limited);
+        check!(&bytes, AccountRefused);
     }
 }
 

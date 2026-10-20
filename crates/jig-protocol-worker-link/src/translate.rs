@@ -6,7 +6,7 @@ use jig_protocol_worker_wire::{self as wire, Part};
 use skein_channel::{Frame, frame_writer};
 use skein_lib::{List, Queue, Reader, Time, Token, Writer, bytes};
 
-pub(crate) fn hello(hello: host::Hello, limits: &wire::v2::Limits) -> Option<Frame> {
+pub(crate) fn hello(hello: host::Hello, limits: &wire::v3::Limits) -> Option<Frame> {
     let bounds = hello.bounds;
     let mut models = List::with_capacity(limits.bounds_models);
     for model in bounds.models {
@@ -54,7 +54,7 @@ pub(crate) fn hello(hello: host::Hello, limits: &wire::v2::Limits) -> Option<Fra
     frame(0x0100, body.finish())
 }
 
-pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v2::Limits) -> Option<Frame> {
+pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v3::Limits) -> Option<Frame> {
     match up {
         host::LinkUp::Activity { run, attempt, activity: value } => {
             let record = wire::Fact::new(
@@ -66,25 +66,35 @@ pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v2::Limits) ->
             record.encode(&mut body).ok()?;
             frame(0x0104, body.finish())
         }
-        host::LinkUp::Rejected { run, attempt, account, generation } => {
-            let record = wire::Rejected::new(
+        host::LinkUp::Unauthorized { run, attempt, account, generation } => {
+            let record = wire::Unauthorized::new(
                 limits,
-                wire::RejectedParts { task: run.raw(), attempt: attempt.raw(), account, generation },
+                wire::UnauthorizedParts { task: run.raw(), attempt: attempt.raw(), account, generation },
             )
             .ok()?;
             let mut body = Writer::new(usize::try_from(record.measure()).ok()?);
             record.encode(&mut body).ok()?;
             frame(0x0105, body.finish())
         }
-        host::LinkUp::Exhausted { run, attempt, account, retry_after } => {
-            let record = wire::Exhausted::new(
+        host::LinkUp::Limited { run, attempt, account, reset } => {
+            let record = wire::Limited::new(
                 limits,
-                wire::ExhaustedParts { task: run.raw(), attempt: attempt.raw(), account, retry_after },
+                wire::LimitedParts { task: run.raw(), attempt: attempt.raw(), account, reset },
             )
             .ok()?;
             let mut body = Writer::new(usize::try_from(record.measure()).ok()?);
             record.encode(&mut body).ok()?;
             frame(0x0106, body.finish())
+        }
+        host::LinkUp::AccountRefused { run, attempt, account, code, reason } => {
+            let record = wire::AccountRefused::new(
+                limits,
+                wire::AccountRefusedParts { task: run.raw(), attempt: attempt.raw(), account, code, reason },
+            )
+            .ok()?;
+            let mut body = Writer::new(usize::try_from(record.measure()).ok()?);
+            record.encode(&mut body).ok()?;
+            frame(0x0107, body.finish())
         }
         host::LinkUp::Turn { run, attempt, turn } => {
             let record = wire::Turn::new(
@@ -152,14 +162,14 @@ fn part(token: Option<Token>, parts: &[Part]) -> Result<Option<Box<[u8]>>, ()> {
 fn name(token: Option<Token>) -> Option<u64> {
     Some(token?.raw())
 }
-fn work(work: host::Work, parts: &[Part], limits: &wire::v2::Limits) -> Option<wire::Work> {
+fn work(work: host::Work, parts: &[Part], limits: &wire::v3::Limits) -> Option<wire::Work> {
     wire::Work::new(
         limits,
         wire::WorkParts { left: part(work.left, parts).ok()?, saved: part(work.saved, parts).ok()? },
     )
     .ok()
 }
-fn refused(items: Box<[host::Refused]>, limits: &wire::v2::Limits) -> Option<List<wire::Refused>> {
+fn refused(items: Box<[host::Refused]>, limits: &wire::v3::Limits) -> Option<List<wire::Refused>> {
     let mut list = List::with_capacity(limits.turn_refused);
     for item in items {
         let reason = match item.reason {
@@ -173,7 +183,7 @@ fn refused(items: Box<[host::Refused]>, limits: &wire::v2::Limits) -> Option<Lis
     }
     Some(list)
 }
-fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v2::Limits) -> Option<wire::Ending> {
+fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v3::Limits) -> Option<wire::Ending> {
     Some(match ending {
         host::Ending::Refused(refusal) => {
             let value = match refusal {
@@ -202,7 +212,7 @@ fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v2::Limits) -> Op
         }
     })
 }
-fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v2::Limits) -> Option<wire::Failure> {
+fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v3::Limits) -> Option<wire::Failure> {
     Some(match failure {
         host::Failure::Unprepared(preparation) => {
             let value = match preparation {
@@ -215,7 +225,7 @@ fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v2::Limits) ->
             wire::Failure::Unprepared(wire::PreparationValue::new(limits, wire::PreparationValueParts { value }).ok()?)
         }
         host::Failure::Run(failure) => {
-            let value = run_failure(failure);
+            let value = run_failure(failure, limits)?;
             wire::Failure::Run(wire::RunFailureValue::new(limits, wire::RunFailureValueParts { value }).ok()?)
         }
         host::Failure::Agent(failure) => {
@@ -228,7 +238,7 @@ fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v2::Limits) ->
         }
     })
 }
-fn activity(activity: host::Activity, limits: &wire::v2::Limits) -> Option<wire::Activity> {
+fn activity(activity: host::Activity, limits: &wire::v3::Limits) -> Option<wire::Activity> {
     Some(match activity {
         host::Activity::Phase(value) => {
             let value = phase(value);
@@ -255,7 +265,7 @@ fn phase(value: host::Phase) -> wire::Phase {
         host::Phase::Ending => wire::Phase::Ending,
     }
 }
-fn invalid_value(value: host::Invalid, limits: &wire::v2::Limits) -> Option<wire::Invalid> {
+fn invalid_value(value: host::Invalid, limits: &wire::v3::Limits) -> Option<wire::Invalid> {
     Some(match value {
         host::Invalid::Start { why } => {
             wire::Invalid::Start(wire::InvalidStart::new(limits, wire::InvalidStartParts { why }).ok()?)
@@ -266,15 +276,20 @@ fn invalid_value(value: host::Invalid, limits: &wire::v2::Limits) -> Option<wire
         host::Invalid::Messages => wire::Invalid::Messages,
     })
 }
-fn run_failure(value: host::RunFailure) -> wire::RunFailure {
-    match value {
+fn run_failure(value: host::RunFailure, limits: &wire::v3::Limits) -> Option<wire::RunFailure> {
+    Some(match value {
         host::RunFailure::Model => wire::RunFailure::Model,
         host::RunFailure::Budget => wire::RunFailure::Budget,
         host::RunFailure::Policy => wire::RunFailure::Policy,
         host::RunFailure::Cancelled => wire::RunFailure::Cancelled,
         host::RunFailure::Stale => wire::RunFailure::Stale,
-        host::RunFailure::Exhausted => wire::RunFailure::Exhausted,
-    }
+        host::RunFailure::Limited { account, reset } => wire::RunFailure::Limited(
+            wire::LimitedAccount::new(limits, wire::LimitedAccountParts { account, reset }).ok()?,
+        ),
+        host::RunFailure::Refused { account } => {
+            wire::RunFailure::Refused(wire::RefusedAccount::new(limits, wire::RefusedAccountParts { account }).ok()?)
+        }
+    })
 }
 fn agent_failure(value: host::AgentFailure) -> wire::AgentFailure {
     match value {
@@ -317,7 +332,7 @@ fn count_kind(value: host::CountKind) -> wire::CountKind {
 pub(crate) fn down(
     kind: u16,
     body: &[u8],
-    limits: &wire::v2::Limits,
+    limits: &wire::v3::Limits,
     now: Time,
     parts: &mut List<Part>,
     next: &mut u64,
@@ -389,8 +404,9 @@ pub(crate) fn down(
         | wire::Kind::Call
         | wire::Kind::Answer
         | wire::Kind::Fact
-        | wire::Kind::Rejected
-        | wire::Kind::Exhausted => return None,
+        | wire::Kind::Unauthorized
+        | wire::Kind::Limited
+        | wire::Kind::AccountRefused => return None,
     };
     Some(down)
 }

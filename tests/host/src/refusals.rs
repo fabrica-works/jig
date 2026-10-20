@@ -28,8 +28,9 @@ impl Referee {
             | Event::Called { .. }
             | Event::Withdrawn { .. }
             | Event::Activity { .. }
-            | Event::Rejected { .. }
-            | Event::Exhausted { .. }
+            | Event::Unauthorized { .. }
+            | Event::Limited { .. }
+            | Event::AccountRefused { .. }
             | Event::Finished { .. }
             | Event::RelayCancelled { .. }
             | Event::CancelAll { .. }

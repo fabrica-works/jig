@@ -59,10 +59,11 @@ pub(crate) enum Up {
     Call(wire::Call),
     Answer(wire::Answer),
     Fact(wire::Fact),
-    Rejected(wire::Rejected),
-    Exhausted(wire::Exhausted),
+    Unauthorized(wire::Unauthorized),
+    Limited(wire::Limited),
+    AccountRefused(wire::AccountRefused),
 }
-pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v2::Limits) -> Option<Up> {
+pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v3::Limits) -> Option<Up> {
     let mut found = None;
     for rule in wire::KINDS {
         if rule.kind == kind {
@@ -77,8 +78,9 @@ pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v2::Limits) -> Optio
         wire::Kind::Call => Some(Up::Call(wire::Call::decode(limits, reader).ok()?)),
         wire::Kind::Answer => Some(Up::Answer(wire::Answer::decode(limits, reader).ok()?)),
         wire::Kind::Fact => Some(Up::Fact(wire::Fact::decode(limits, reader).ok()?)),
-        wire::Kind::Rejected => Some(Up::Rejected(wire::Rejected::decode(limits, reader).ok()?)),
-        wire::Kind::Exhausted => Some(Up::Exhausted(wire::Exhausted::decode(limits, reader).ok()?)),
+        wire::Kind::Unauthorized => Some(Up::Unauthorized(wire::Unauthorized::decode(limits, reader).ok()?)),
+        wire::Kind::Limited => Some(Up::Limited(wire::Limited::decode(limits, reader).ok()?)),
+        wire::Kind::AccountRefused => Some(Up::AccountRefused(wire::AccountRefused::decode(limits, reader).ok()?)),
         wire::Kind::Hello
         | wire::Kind::Assignment
         | wire::Kind::Message
@@ -96,22 +98,32 @@ pub(crate) fn up(record: Up, parts: &mut Parts) -> host::LinkUp {
         Up::Call(record) => call(record),
         Up::Answer(record) => answer(record, parts),
         Up::Fact(record) => fact(record),
-        Up::Rejected(record) => {
+        Up::Unauthorized(record) => {
             let fields = record.into_parts();
-            host::LinkUp::Rejected {
+            host::LinkUp::Unauthorized {
                 run: Token::new(fields.task),
                 attempt: Token::new(fields.attempt),
                 account: fields.account,
                 generation: fields.generation,
             }
         }
-        Up::Exhausted(record) => {
+        Up::Limited(record) => {
             let fields = record.into_parts();
-            host::LinkUp::Exhausted {
+            host::LinkUp::Limited {
                 run: Token::new(fields.task),
                 attempt: Token::new(fields.attempt),
                 account: fields.account,
-                retry_after: fields.retry_after,
+                reset: fields.reset,
+            }
+        }
+        Up::AccountRefused(record) => {
+            let fields = record.into_parts();
+            host::LinkUp::AccountRefused {
+                run: Token::new(fields.task),
+                attempt: Token::new(fields.attempt),
+                account: fields.account,
+                code: fields.code,
+                reason: fields.reason,
             }
         }
     }
@@ -293,7 +305,11 @@ fn run_failure(value: wire::RunFailure) -> host::RunFailure {
         wire::RunFailure::Policy => host::RunFailure::Policy,
         wire::RunFailure::Cancelled => host::RunFailure::Cancelled,
         wire::RunFailure::Stale => host::RunFailure::Stale,
-        wire::RunFailure::Exhausted => host::RunFailure::Exhausted,
+        wire::RunFailure::Limited(record) => {
+            let fields = record.into_parts();
+            host::RunFailure::Limited { account: fields.account, reset: fields.reset }
+        }
+        wire::RunFailure::Refused(record) => host::RunFailure::Refused { account: record.into_parts().account },
     }
 }
 fn agent_failure(value: wire::AgentFailure) -> host::AgentFailure {
@@ -364,7 +380,7 @@ pub(crate) fn down(
     down: host::LinkDown,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v2::Limits,
+    limits: &wire::v3::Limits,
 ) -> Option<Down> {
     match down {
         host::LinkDown::Assign { assignment } => {
@@ -416,7 +432,7 @@ fn assignment_record(
     assignment: host::Assignment,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v2::Limits,
+    limits: &wire::v3::Limits,
 ) -> Option<wire::Assignment> {
     let run = assignment.assignment;
     let workspace = match run.workspace {
@@ -497,7 +513,7 @@ fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
     }
     Some(writer.finish())
 }
-fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v2::Limits) -> Option<wire::Grant> {
+fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v3::Limits) -> Option<wire::Grant> {
     let table = match grant.table {
         host::GrantTable::Accounts => wire::GrantTable::Accounts,
         host::GrantTable::Application => wire::GrantTable::Application,
@@ -515,7 +531,7 @@ fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v2:
     )
     .ok()
 }
-fn settled(answer: host::SettledAnswer, limits: &wire::v2::Limits) -> Option<wire::SettledAnswer> {
+fn settled(answer: host::SettledAnswer, limits: &wire::v3::Limits) -> Option<wire::SettledAnswer> {
     match answer {
         host::SettledAnswer::Host { error, body } => {
             Some(wire::SettledAnswer::Host(wire::HostAnswer::new(limits, wire::HostAnswerParts { error, body }).ok()?))
@@ -535,7 +551,7 @@ fn settled(answer: host::SettledAnswer, limits: &wire::v2::Limits) -> Option<wir
     }
 }
 
-pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v2::Limits) -> Down {
+pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v3::Limits) -> Down {
     Down::TurnBusy(
         wire::TurnBusy::new(limits, wire::TurnBusyParts { task: run.raw(), attempt: attempt.raw(), number: turn })
             .expect("fixed turn busy fields fit"),

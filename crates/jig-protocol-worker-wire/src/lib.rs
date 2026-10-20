@@ -7,30 +7,31 @@ use alloc::boxed::Box;
 use skein_lib::Token;
 
 #[rustfmt::skip]
-#[path = "generated/v2.rs"]
-pub mod v2;
+#[path = "generated/v3.rs"]
+pub mod v3;
 mod kinds;
 pub mod sizes;
 #[cfg(test)]
 mod tests;
 
 pub use kinds::{KINDS, Kind, KindRule, Overflow, schema, terms_gap};
-pub use v2::{
+pub use v3::{
+    AccountRefused, AccountRefusedParts, Activity, AgentFailure, AgentFailureValue, AgentFailureValueParts, Answer,
+    AnswerParts, Call, CallParts, CancelReason, CancelReasonValue, CancelReasonValueParts, Count, CountKind,
+    CountParts, Ended, EndedParts, Ending, Fact, FactParts, Failed, FailedParts, Failure, Invalid, InvalidStart,
+    InvalidStartParts, InvalidValue, InvalidValueParts, Limited, LimitedAccount, LimitedAccountParts, LimitedParts,
+    Long, LongParts, MessageRefusal, Operation, Parked, ParkedParts, PhaseValue, PhaseValueParts, Preparation,
+    PreparationValue, PreparationValueParts, Refusal, RefusalValue, RefusalValueParts, Refused, RefusedAccount,
+    RefusedAccountParts, RefusedParts, Resource, ResourceParts, RunFailure, RunFailureValue, RunFailureValueParts,
+    Turn, TurnParts, Unauthorized, UnauthorizedParts, Work, WorkParts,
+};
+pub use v3::{
     Acknowledge, AcknowledgeParts, AnsweredCall, AnsweredCallParts, Assignment, AssignmentParts, Cancel, CancelParts,
     DeliveryAnswer, DeliveryAnswerParts, DeliveryOutcome, Grant, GrantParts, GrantTable, Granted, GrantedParts,
     HostAnswer, HostAnswerParts, Inbound, InboundParts, Message, MessageParts, RelayAnswer, RelayText, RelayTextParts,
     Relayed, RelayedParts, SettledAnswer, TurnBusy, TurnBusyParts, TurnKept, TurnKeptParts, Workspace, WorkspaceParts,
 };
-pub use v2::{
-    Activity, AgentFailure, AgentFailureValue, AgentFailureValueParts, Answer, AnswerParts, Call, CallParts,
-    CancelReason, CancelReasonValue, CancelReasonValueParts, Count, CountKind, CountParts, Ended, EndedParts, Ending,
-    Exhausted, ExhaustedParts, Fact, FactParts, Failed, FailedParts, Failure, Invalid, InvalidStart, InvalidStartParts,
-    InvalidValue, InvalidValueParts, Long, LongParts, MessageRefusal, Operation, Parked, ParkedParts, PhaseValue,
-    PhaseValueParts, Preparation, PreparationValue, PreparationValueParts, Refusal, RefusalValue, RefusalValueParts,
-    Refused, RefusedParts, Rejected, RejectedParts, Resource, ResourceParts, RunFailure, RunFailureValue,
-    RunFailureValueParts, Turn, TurnParts, Work, WorkParts,
-};
-pub use v2::{
+pub use v3::{
     Bounds, BoundsParts, CEILINGS, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,
     ModelBoundParts, Phase,
 };
@@ -44,7 +45,7 @@ pub struct Part {
 
 /// The magic and one version this release speaks (protocol/channel.md, 4.1).
 pub const MAGIC: [u8; 4] = *b"jigw";
-pub const VERSION: u16 = 2;
+pub const VERSION: u16 = 3;
 
 /// Jig's refusal reasons, above skein's reserved range (protocol/channel.md, 4.1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

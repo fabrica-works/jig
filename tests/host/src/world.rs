@@ -642,8 +642,9 @@ impl World {
                 | LinkDown::TurnKept { .. },
             )
             | Event::Activity { .. }
-            | Event::Rejected { .. }
-            | Event::Exhausted { .. }
+            | Event::Unauthorized { .. }
+            | Event::Limited { .. }
+            | Event::AccountRefused { .. }
             | Event::RelayCancelled { .. }
             | Event::Withdrawn { .. }
             | Event::Refused { .. }
@@ -746,8 +747,9 @@ impl World {
             }
             Request::Up(
                 LinkUp::Activity { .. }
-                | LinkUp::Rejected { .. }
-                | LinkUp::Exhausted { .. }
+                | LinkUp::Unauthorized { .. }
+                | LinkUp::Limited { .. }
+                | LinkUp::AccountRefused { .. }
                 | LinkUp::Call { .. }
                 | LinkUp::Turn { .. },
             )
@@ -766,12 +768,33 @@ impl World {
         }
     }
 
+    /// Checks that a hello lists every run whose answer is not acknowledged,
+    /// then lets the engine catch up and sends the answers the host keeps.
+    fn hello(&mut self, hello: &host::Hello) {
+        let mut hosting = BTreeSet::new();
+        for entry in &hello.hosting {
+            hosting.insert((entry.run, entry.attempt));
+        }
+        let admitted: BTreeSet<(Token, Token)> = self.admitted.keys().copied().collect();
+        assert_eq!(hosting, admitted, "the hello lists every run whose answer is not acknowledged");
+        let acts = self.engine.reconnected(&hello.hosting);
+        self.acts(acts);
+        for index in 0..self.host.kept_answers() {
+            self.send_engine(Request::Up(self.host.answer_at(index).expect("kept answer")));
+        }
+    }
+
     /// Hands the host's `request` to whom it is for, checking it on the way.
     fn route(&mut self, request: Request) {
         self.refusals.request(&request);
         self.trace.log(self.now, format_args!("host -> {request:?}"));
         match request {
-            Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => {
+            Request::Up(
+                LinkUp::Activity { .. }
+                | LinkUp::Unauthorized { .. }
+                | LinkUp::Limited { .. }
+                | LinkUp::AccountRefused { .. },
+            ) => {
                 self.send_engine(request);
             }
             Request::Up(LinkUp::Answer { run, attempt, answer }) => {
@@ -801,19 +824,7 @@ impl World {
                     self.stage.push(Arrival { event, stale: false, duplicate: false });
                 }
             }
-            Request::Hello { hello } => {
-                let mut hosting = BTreeSet::new();
-                for entry in &hello.hosting {
-                    hosting.insert((entry.run, entry.attempt));
-                }
-                let admitted: BTreeSet<(Token, Token)> = self.admitted.keys().copied().collect();
-                assert_eq!(hosting, admitted, "the hello lists every run whose answer is not acknowledged");
-                let acts = self.engine.reconnected(&hello.hosting);
-                self.acts(acts);
-                for index in 0..self.host.kept_answers() {
-                    self.send_engine(Request::Up(self.host.answer_at(index).expect("kept answer")));
-                }
-            }
+            Request::Hello { hello } => self.hello(&hello),
             Request::Message { agent, ref words, .. } => {
                 let owner = *self.agents.get(&agent).expect("a delivery is to a started agent");
                 let len = u64::try_from(words.len()).expect("fits");

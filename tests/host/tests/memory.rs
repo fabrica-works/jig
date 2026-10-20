@@ -97,7 +97,12 @@ impl Measured {
         let mut cancelled = Vec::new();
         while let Some(request) = self.out.pop() {
             asked.push(match request {
-                Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => continue,
+                Request::Up(
+                    LinkUp::Activity { .. }
+                    | LinkUp::Unauthorized { .. }
+                    | LinkUp::Limited { .. }
+                    | LinkUp::AccountRefused { .. },
+                ) => continue,
                 Request::Up(LinkUp::Turn { .. }) => Asked::Turn,
                 Request::Deliver { owner, .. } => Asked::Delivery { owner },
                 Request::Up(LinkUp::Call { call, .. }) => Asked::Relay { call },
