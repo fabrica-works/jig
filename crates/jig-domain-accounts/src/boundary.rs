@@ -150,10 +150,19 @@ pub enum FromComponent {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Failure {
-    Later { after: Option<Duration> },
+    Later {
+        after: Option<Duration>,
+    },
     SignInAgain,
+    /// An LLM account sign-in omitted this configured must-grant scope.
+    MissingScope {
+        scope: u32,
+    },
     Misconfigured,
-    Unloaded { at: Place, why: Unread },
+    Unloaded {
+        at: Place,
+        why: Unread,
+    },
     Cancelled,
 }
 

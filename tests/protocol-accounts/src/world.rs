@@ -21,9 +21,14 @@ pub enum Story {
     RejectedClient,
     DamagedRecord,
     ClosedExchange,
-    /// A sign-in asked of the driver, its visit made by the visitor up to
-    /// the issuer's redirect, then cancelled.
+    /// A party's LLM account sign-in, from the child through its loopback redirect.
     SignIn,
+    AccountSignInMissingScope,
+    AccountSignInVaryingPort,
+    AccountSignOut {
+        confirmed: bool,
+    },
+    AccountSignInFull,
 }
 /// The installation's identifier at a start (configuration.md 8): the one
 /// this start drew, and the one an earlier start kept in the store, if any.
@@ -93,7 +98,7 @@ fn issuer(story: Story) -> Process {
         codes: 1,
         rotations: 2,
         // The registration's one parameter, `ext_agent_host_id`.
-        carried: 1,
+        carried: 5,
         plans: 2,
     };
     let response = peer::least_response(&limits).expect("issuer response bound");
@@ -106,16 +111,20 @@ fn issuer(story: Story) -> Process {
             queue: fixtures::ROOM,
             plaintext: 32_768,
             ciphertext: 32_768,
-            observations: 16,
+            observations: 64,
             observation_bytes: 4096,
         },
         fake::Config {
-            terms: None,
+            terms: fixtures::issuer_terms(story),
             authorization_url: bytes::copy_of(fixtures::AUTHORIZE),
             token_endpoint: bytes::copy_of(fixtures::TOKEN),
             client_id: bytes::copy_of(b"client"),
             client_secret: None,
-            redirect_uri: bytes::copy_of(fixtures::REDIRECT),
+            redirect_uri: bytes::copy_of(if fixtures::account_sign_in(story) {
+                fixtures::PARTY_REDIRECT
+            } else {
+                fixtures::REDIRECT
+            }),
             refresh_token: bytes::copy_of(b"seed"),
         },
         limits,
@@ -147,7 +156,7 @@ pub fn start(seed: u64, story: Story, held: Option<&[u8]>, installation: Install
     let mut world = World::new(seed, config, Judge::new(story), Memory::Checked);
     world.spawn(|| issuer(story));
     world.spawn(|| Process::Owner(Box::new(Owner::new(story, held, installation))));
-    if story == Story::SignIn {
+    if fixtures::account_sign_in(story) && story != Story::AccountSignInFull {
         world.spawn(|| Process::Visitor(Box::default()));
     }
     world.run()

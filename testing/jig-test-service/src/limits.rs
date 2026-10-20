@@ -63,8 +63,7 @@ pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
         Profile::Small => SMALL,
         Profile::Standard => STANDARD,
     };
-    let mut accounts = jig.driver;
-    accounts.accounts = jig.core.accounts.accounts.checked_add(1).expect("account zero slot");
+    let accounts = jig.driver;
     Limits {
         root: root::Limits { core: jig.core, connector, journal: jig.journal, routes: jig.routes },
         store: jig_protocol_store::Limits { core: jig.core, journal: jig.journal, ..jig.store },
@@ -101,7 +100,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(skein_oauth_accounts::worst_case(&limits.accounts)?)?
         .checked_add(jig_protocol_engine_workers::worst_case(&limits.workers)?.checked_mul(2)?)?
         .checked_add(jig_protocol_accounts::table::worst_case(
-            limits.root.core.accounts.accounts.checked_add(1)?,
+            limits.accounts.accounts,
             limits.accounts.client.document.token_bytes,
         )?)?
         .checked_add(skein_lib::Map::<(u32, u64), skein_lib::Secret>::worst_case(

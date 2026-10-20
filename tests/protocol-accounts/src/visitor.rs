@@ -1,6 +1,6 @@
 //! The person's browser, cut down to what a sign-in's visit needs here: one
 //! GET of the URL the driver asks to be visited, its answer's status kept.
-//! It follows no redirect and knows no OAuth.
+//! It follows the issuer's loopback redirect and knows no OAuth.
 use crate::fixtures::{self, ROOM};
 use skein_http::{Header, Method, client as http};
 use skein_io::{self as io, kernel};
@@ -33,6 +33,7 @@ pub struct Visitor {
     inbox_len: usize,
     handed: bool,
     status: Option<u16>,
+    account_redirect: Option<Box<[u8]>>,
 }
 impl std::fmt::Debug for Visitor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -59,6 +60,7 @@ impl Visitor {
             inbox_len: 0,
             handed: false,
             status: None,
+            account_redirect: None,
         }
     }
     /// Hands over `url` to visit, once: a plain `http://` URL with a
@@ -97,7 +99,17 @@ impl Visitor {
         while let Some(event) = self.answers.pop() {
             match event {
                 http::Event::Response(response) => {
-                    self.status = Some(response.status);
+                    if self.status.is_none() {
+                        self.status = Some(response.status);
+                    }
+                    if response.status == 302 {
+                        self.account_redirect = response
+                            .headers
+                            .iter()
+                            .find(|header| header.name.eq_ignore_ascii_case(b"location"))
+                            .map(|header| header.value.clone());
+                        assert!(self.account_redirect.is_some(), "account sign-in issuer redirect");
+                    }
                     self.calls.push(http::Request::Body(Down::Demand { read: Read::Arrived { max: BODY }, room: 0 }));
                 }
                 http::Event::Body(Up::Bytes(_)) => {
@@ -171,6 +183,10 @@ impl Host for Visitor {
                 io::Event::Closed { .. } => {
                     self.socket = None;
                     self.connected = false;
+                    if let Some(url) = self.account_redirect.take() {
+                        self.http = http::Client::new(&limits.http);
+                        self.visit(&url);
+                    }
                 }
                 other @ (io::Event::Listening { .. }
                 | io::Event::Accepted { .. }

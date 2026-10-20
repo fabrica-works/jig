@@ -1,6 +1,6 @@
 //! The two newest lent generations per account (protocol/llm.md, 5.3).
 //! A value is a credential with its scheme (protocol/channel.md, 8).
-use skein_lib::{List, Secret, Time};
+use skein_lib::{Map, Secret, Time};
 
 /// The withdrawn arm's provider account id bound.
 pub const ACCOUNT_ID_BYTES: u32 = 256;
@@ -20,7 +20,7 @@ pub enum Scheme {
 }
 #[derive(Debug)]
 pub struct Table {
-    accounts: List<Generations>,
+    accounts: Map<u32, Generations>,
     token_bytes: u32,
 }
 #[derive(Debug)]
@@ -41,11 +41,7 @@ pub struct Unfit;
 impl Table {
     #[must_use]
     pub fn new(accounts: u32, token_bytes: u32) -> Table {
-        let mut slots = List::with_capacity(accounts);
-        for _account in 0..accounts {
-            slots.push(Generations { newest: None, older: None }).expect("one slot per configured account");
-        }
-        Table { accounts: slots, token_bytes }
+        Table { accounts: Map::with_capacity(accounts), token_bytes }
     }
     pub fn granted(&mut self, account: u32, generation: u64, value: Value, expires: Time) -> Result<(), Unfit> {
         let id = match &value.scheme {
@@ -57,7 +53,10 @@ impl Table {
         {
             return Err(Unfit);
         }
-        let Some(slots) = self.accounts.get_mut(account) else { return Err(Unfit) };
+        if !self.accounts.contains_key(&account) {
+            self.accounts.insert(account, Generations { newest: None, older: None }).or(Err(Unfit))?;
+        }
+        let slots = self.accounts.get_mut(&account).expect("admitted account");
         let entry = Entry { generation, value, expires };
         match &slots.newest {
             Some(newest) if generation < newest.generation => match &slots.older {
@@ -74,7 +73,7 @@ impl Table {
     }
     #[must_use]
     pub fn value(&self, account: u32, generation: u64, now: Time) -> Option<&Value> {
-        let slots = self.accounts.get(account)?;
+        let slots = self.accounts.get(&account)?;
         for entry in [&slots.newest, &slots.older].into_iter().flatten() {
             if entry.generation == generation && now < entry.expires {
                 return Some(&entry.value);
@@ -82,20 +81,28 @@ impl Table {
         }
         None
     }
+    /// Frees a removed LLM account source's generations and its table place.
+    pub fn remove(&mut self, account: u32) {
+        let _removed = self.accounts.remove(&account);
+    }
     pub fn expire(&mut self, now: Time) {
-        for account in 0..self.accounts.len() {
-            let slots = self.accounts.get_mut(account).expect("configured account slot");
+        let mut after = 0;
+        for _ in 0..self.accounts.len() {
+            let Some((&number, _)) = self.accounts.range(after..).next() else { break };
+            let slots = self.accounts.get_mut(&number).expect("named account");
             expire(&mut slots.newest, now);
             expire(&mut slots.older, now);
             if slots.newest.is_none() {
                 slots.newest = slots.older.take();
             }
+            let Some(next) = number.checked_add(1) else { break };
+            after = next;
         }
     }
     #[must_use]
     pub fn next_expiry(&self) -> Option<Time> {
         let mut earliest: Option<Time> = None;
-        for slots in &self.accounts {
+        for (_, slots) in &self.accounts {
             for entry in [&slots.newest, &slots.older].into_iter().flatten() {
                 earliest = Some(match earliest {
                     Some(time) => time.min(entry.expires),
@@ -119,7 +126,7 @@ pub fn worst_case(accounts: u32, token_bytes: u32) -> Option<u64> {
     if accounts == 0 || token_bytes == 0 {
         return None;
     }
-    List::<Generations>::worst_case(accounts)?.checked_add(
+    Map::<u32, Generations>::worst_case(accounts)?.checked_add(
         u64::from(token_bytes)
             .checked_add(u64::from(ACCOUNT_ID_BYTES))?
             .checked_mul(2)?

@@ -56,3 +56,74 @@ fn a_value_never_reaches_the_childs_facts() {
         assert!(!trace.contains(value));
     }
 }
+
+#[test]
+fn a_partys_account_sign_in_is_made_with_an_issued_client_id() {
+    let outcome = world::run(1, Story::SignIn);
+    let owner = world::owner(&outcome);
+    assert!(matches!(
+        owner.account_sign_in_ended(),
+        [accounts::Ended { end: accounts::End::Made { declined: false, .. }, .. }]
+    ));
+    let record = oauth::decode_record(owner.last_kept().unwrap(), &fixtures::limits().client.document).unwrap();
+    assert_eq!(record.issued_client_id.as_deref(), Some(b"issued-client".as_slice()));
+    assert_eq!(record.subject.as_deref(), Some(b"subject".as_slice()));
+    assert!(
+        matches!(owner.account_answers(), [accounts::Answer::Started {address, ..}] if address.as_ref() == owner.visit().unwrap())
+    );
+}
+#[test]
+fn an_account_visit_address_carries_the_installation_id_and_the_name_hint() {
+    let outcome = world::run(1, Story::SignIn);
+    let url = world::owner(&outcome).visit().unwrap();
+    assert!(url.windows(b"ext_agent_host_id=urn%3Auuid%3A".len()).any(|w| w == b"ext_agent_host_id=urn%3Auuid%3A"));
+    assert!(url.windows(b"agent_name_hint=jig-test".len()).any(|w| w == b"agent_name_hint=jig-test"));
+}
+#[test]
+fn an_account_sign_in_on_a_varying_port_is_made() {
+    let outcome = world::run(2, Story::AccountSignInVaryingPort);
+    let owner = world::owner(&outcome);
+    assert!(matches!(owner.account_sign_in_ended(), [accounts::Ended { end: accounts::End::Made { .. }, .. }]));
+    assert!(!owner.visit().unwrap().windows(b"31234".len()).any(|w| w == b"31234"));
+    assert!(!owner.visit().unwrap().windows(b"%3A0%2F".len()).any(|w| w == b"%3A0%2F"));
+}
+#[test]
+fn an_account_sign_out_is_confirmed_when_the_issuer_revoked_and_the_record_is_erased() {
+    let outcome = world::run(3, Story::AccountSignOut { confirmed: true });
+    let owner = world::owner(&outcome);
+    assert!(owner.account_record_erased() && owner.account_removed());
+    assert!(matches!(owner.account_answers().last(), Some(accounts::Answer::SignedOut { confirmed: true })));
+    assert!(
+        world::issuer_saw(&outcome)
+            .iter()
+            .any(|event| matches!(event, skein_fake_peers::oauth::Observation::Revoke { .. }))
+    );
+}
+#[test]
+fn an_account_sign_out_the_issuer_did_not_confirm_is_answered_unconfirmed() {
+    let outcome = world::run(4, Story::AccountSignOut { confirmed: false });
+    let owner = world::owner(&outcome);
+    assert!(owner.account_record_erased() && owner.account_removed());
+    assert!(matches!(owner.account_answers().last(), Some(accounts::Answer::SignedOut { confirmed: false })));
+}
+#[test]
+fn a_missing_scope_ends_the_account_sign_in_refused_naming_it() {
+    let outcome = world::run(5, Story::AccountSignInMissingScope);
+    let owner = world::owner(&outcome);
+    assert!(matches!(
+        owner.account_sign_in_ended(),
+        [accounts::Ended { end: accounts::End::Failed { failure: accounts::Failure::MissingScope { scope: 1 } }, .. }]
+    ));
+    assert!(owner.account_record_erased() && owner.account_removed());
+}
+#[test]
+fn a_full_driver_refuses_a_new_account_sign_in_later() {
+    let outcome = world::run(6, Story::AccountSignInFull);
+    let owner = world::owner(&outcome);
+    assert!(matches!(
+        owner.account_sign_in_ended(),
+        [accounts::Ended { end: accounts::End::Failed { failure: accounts::Failure::Later { after: None } }, .. }]
+    ));
+    assert_eq!(owner.account_answers(), [accounts::Answer::Refused { refusal: accounts::Refusal::NotStarted }]);
+    assert!(owner.visit().is_none());
+}

@@ -6,13 +6,21 @@ use skein_oauth as oauth;
 use skein_oauth_accounts as driver;
 
 fn failure(failure: driver::Failure) -> Up {
-    translate::up(driver::Event::Failed { account: ACCOUNT_CHAT, ends: driver::Ends::Grant, failure }, fixtures::NOW)
+    translate::up(
+        driver::Event::Failed { account: ACCOUNT_CHAT, ends: driver::Ends::Grant, failure },
+        fixtures::NOW,
+        b"",
+    )
 }
 fn child_failure(failure: accounts::Failure) -> Up {
     Up::Child(accounts::FromComponent::Failed { account: ACCOUNT_CHAT, failure })
 }
 fn refused(why: driver::Refusal) -> Up {
-    translate::up(driver::Event::Refused { account: ACCOUNT_CHAT, asked: driver::Asked::Grant, why }, fixtures::NOW)
+    translate::up(
+        driver::Event::Refused { account: ACCOUNT_CHAT, asked: driver::Asked::Grant, why },
+        fixtures::NOW,
+        b"",
+    )
 }
 
 #[test]
@@ -36,7 +44,7 @@ fn release_and_close_pass_through() {
             == driver::Request::Release { account: ACCOUNT_CHAT }
     );
     assert!(translate::down(accounts::ToComponent::Close) == driver::Request::Close);
-    assert_eq!(translate::up(driver::Event::Closed, fixtures::NOW), Up::Child(accounts::FromComponent::Closed));
+    assert_eq!(translate::up(driver::Event::Closed, fixtures::NOW, b""), Up::Child(accounts::FromComponent::Closed));
 }
 #[test]
 fn a_rejected_generation_reaches_the_driver_unchanged() {
@@ -48,8 +56,11 @@ fn a_rejected_generation_reaches_the_driver_unchanged() {
 #[test]
 fn a_granted_token_is_handed_out_as_a_bearer_secret() {
     for (token, generation) in [(TOKEN_FIRST, 1_u64), (TOKEN_SECOND, 2_u64)] {
-        let up =
-            translate::up(fixtures::granted(ACCOUNT_CHAT, token, generation, Duration::from_nanos(10)), fixtures::NOW);
+        let up = translate::up(
+            fixtures::granted(ACCOUNT_CHAT, token, generation, Duration::from_nanos(10)),
+            fixtures::NOW,
+            b"",
+        );
         assert_eq!(
             up,
             Up::Granted {
@@ -92,7 +103,7 @@ fn refused_and_expired_fail_as_sign_in_again() {
 #[test]
 fn an_expiring_record_reaches_the_child_as_expiring() {
     assert_eq!(
-        translate::up(driver::Event::Expiring { account: ACCOUNT_CHAT, generation: 1 }, fixtures::NOW),
+        translate::up(driver::Event::Expiring { account: ACCOUNT_CHAT, generation: 1 }, fixtures::NOW, b""),
         Up::Child(accounts::FromComponent::Expiring { account: ACCOUNT_CHAT, generation: 1 })
     );
 }
@@ -119,14 +130,6 @@ fn a_grant_refused_as_closed_is_cancelled() {
     assert_eq!(refused(driver::Refusal::Closed), child_failure(accounts::Failure::Cancelled));
 }
 #[test]
-#[should_panic(expected = "the engine runs no sign-in")]
-fn a_sign_in_visit_is_asserted_never_to_come() {
-    drop(translate::up(
-        driver::Event::Visit { account: ACCOUNT_CHAT, url: bytes::copy_of(b"https://issuer.invalid") },
-        fixtures::NOW,
-    ));
-}
-#[test]
 fn a_record_to_keep_goes_to_the_store_not_the_child() {
     let record = crate::handed_in::record(
         ACCOUNT_CHAT,
@@ -136,7 +139,7 @@ fn a_record_to_keep_goes_to_the_store_not_the_child() {
         &fixtures::driver_limits().client.document,
     )
     .expect("record fits");
-    let up = translate::up(driver::Event::Keep { account: ACCOUNT_CHAT, record: record.clone() }, fixtures::NOW);
+    let up = translate::up(driver::Event::Keep { account: ACCOUNT_CHAT, record: record.clone() }, fixtures::NOW, b"");
     assert_eq!(up, Up::Keep { account: ACCOUNT_CHAT, record: translate::Candidate(record) });
 }
 

@@ -10,7 +10,7 @@ use crate::handed_in::Unfit;
 use crate::table::ACCOUNT_ID_BYTES;
 use crate::translate::{self, Candidate, Up};
 use jig_domain_accounts as accounts;
-use skein_lib::{List, Secret, Time, sha256};
+use skein_lib::{Map, Secret, Time, sha256};
 use skein_oauth as oauth;
 use skein_oauth_accounts as driver;
 
@@ -51,25 +51,33 @@ struct Slot {
 /// The records of a deployment's sources, by account number.
 #[derive(Debug)]
 pub struct Records {
-    slots: List<Slot>,
+    slots: Map<u32, Slot>,
 }
 
 impl Records {
     #[must_use]
     pub fn new(accounts: u32) -> Self {
-        let mut slots = List::with_capacity(accounts);
-        for _ in 0..accounts {
-            slots.push(Slot { held: None, waiting: None, unread: false }).expect("one slot per account");
-        }
-        Self { slots }
+        Self { slots: Map::with_capacity(accounts) }
     }
 
+    /// Reserves a named LLM account source's record place.
+    pub fn admit(&mut self, account: u32) -> Result<(), Unfit> {
+        if !self.slots.contains_key(&account) {
+            self.slots.insert(account, Slot { held: None, waiting: None, unread: false }).or(Err(Unfit))?;
+        }
+        Ok(())
+    }
+    /// Frees the record place once the LLM account source has been removed.
+    pub fn remove(&mut self, account: u32) {
+        let _removed = self.slots.remove(&account);
+    }
     /// The record the store holds for `account`, read at start: the record,
     /// when it is the account's and fits the driver's limits; otherwise
     /// none, and the source fails as unloaded until a new record replaces
     /// it (llm.md 5.4).
     pub fn load(&mut self, account: u32, value: &[u8], limits: &oauth::Limits) -> Option<oauth::SavedToken> {
-        let slot = self.slots.get_mut(account)?;
+        self.admit(account).ok()?;
+        let slot = self.slots.get_mut(&account)?;
         slot.held = Some(sha256::digest(value));
         let record = match oauth::decode_record(value, limits) {
             Ok(record) if fits(&record, account, limits) => Some(record),
@@ -85,7 +93,8 @@ impl Records {
     pub fn hand_in(&mut self, account: u32, record: oauth::SavedToken, limits: &oauth::Limits) -> Result<Next, Unfit> {
         let value = oauth::encode_record(&record, limits).or(Err(Unfit))?;
         let digest = sha256::digest(&value);
-        let slot = self.slots.get_mut(account).ok_or(Unfit)?;
+        self.admit(account)?;
+        let slot = self.slots.get_mut(&account).ok_or(Unfit)?;
         if slot.held == Some(digest) {
             return Ok(Next::Driver(driver::Request::HandIn { account, record }));
         }
@@ -98,7 +107,10 @@ impl Records {
     pub fn keep(&mut self, account: u32, record: oauth::SavedToken, limits: &oauth::Limits) -> Next {
         let generation = record.generation;
         let not_kept = Next::Driver(driver::Request::Kept { account, generation, keeping: driver::Keeping::NotKept });
-        let Some(slot) = self.slots.get_mut(account) else { return not_kept };
+        if self.admit(account).is_err() {
+            return not_kept;
+        }
+        let Some(slot) = self.slots.get_mut(&account) else { return not_kept };
         if slot.waiting.is_some() {
             return not_kept;
         }
@@ -111,7 +123,7 @@ impl Records {
     /// The store kept `account`'s record: the driver's answer, or the
     /// handed-in record now kept.
     pub fn kept(&mut self, account: u32) -> Option<driver::Request> {
-        let slot = self.slots.get_mut(account)?;
+        let slot = self.slots.get_mut(&account)?;
         let (request, digest) = match slot.waiting.take()? {
             Waiting::Candidate { generation, digest } => {
                 (driver::Request::Kept { account, generation, keeping: driver::Keeping::Kept }, digest)
@@ -127,7 +139,7 @@ impl Records {
     /// candidate is not kept; a handed-in record is not handed in, and its
     /// source has no record until the next start reads the store again.
     pub fn stale(&mut self, account: u32) -> Option<driver::Request> {
-        match self.slots.get_mut(account)?.waiting.take()? {
+        match self.slots.get_mut(&account)?.waiting.take()? {
             Waiting::Candidate { generation, digest: _ } => {
                 Some(driver::Request::Kept { account, generation, keeping: driver::Keeping::NotKept })
             }
@@ -140,9 +152,9 @@ impl Records {
     /// where the driver, holding no record for it, fails its grant as
     /// expired.
     #[must_use]
-    pub fn up(&self, event: driver::Event, now: Time) -> Up {
+    pub fn up(&self, event: driver::Event, now: Time, required: &[u8]) -> Up {
         if let driver::Event::Failed { account, ends: driver::Ends::Grant, failure: driver::Failure::Expired } = event
-            && let Some(slot) = self.slots.get(account)
+            && let Some(slot) = self.slots.get(&account)
             && slot.unread
         {
             return Up::Child(accounts::FromComponent::Failed {
@@ -150,13 +162,13 @@ impl Records {
                 failure: accounts::Failure::Unloaded { at: accounts::Place::File, why: accounts::Unread::Unreadable },
             });
         }
-        translate::up(event, now)
+        translate::up(event, now, required)
     }
 
     /// Whether a write is on its way to the store.
     #[must_use]
     pub fn keeping(&self) -> bool {
-        for slot in &self.slots {
+        for (_, slot) in &self.slots {
             if slot.waiting.is_some() {
                 return true;
             }
@@ -180,5 +192,6 @@ fn fits(record: &oauth::SavedToken, account: u32, limits: &oauth::Limits) -> boo
 /// while the store keeps it.
 #[must_use]
 pub fn worst_case(accounts: u32, limits: &oauth::Limits) -> Option<u64> {
-    List::<Slot>::worst_case(accounts)?.checked_add(u64::from(accounts).checked_mul(u64::from(limits.record_bytes))?)
+    Map::<u32, Slot>::worst_case(accounts)?
+        .checked_add(u64::from(accounts).checked_mul(u64::from(limits.record_bytes))?)
 }

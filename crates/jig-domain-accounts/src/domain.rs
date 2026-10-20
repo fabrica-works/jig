@@ -753,7 +753,7 @@ fn failed(entry: &mut Source, env: &Env<Limits>, failure: Failure) {
             entry.backoff = entry.backoff.saturating_mul(2).min(env.limits.backoff_max);
             State::Later { until }
         }
-        Failure::SignInAgain => {
+        Failure::SignInAgain | Failure::MissingScope { .. } => {
             entry.grant = None;
             entry.expiring = false;
             entry.retry = Some(env.now.saturating_add(env.limits.retry));

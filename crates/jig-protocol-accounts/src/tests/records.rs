@@ -129,15 +129,15 @@ fn a_stored_record_that_cannot_be_read_fails_its_source_as_unloaded() {
     });
     let mut records = Records::new(2);
     assert!(records.load(ACCOUNT_CHAT, b"damaged record", &limits()).is_none());
-    assert_eq!(records.up(no_record(), fixtures::NOW), unloaded);
+    assert_eq!(records.up(no_record(), fixtures::NOW, b""), unloaded);
     let another = encoded(&record(ACCOUNT_DELEGATE, TOKEN_FIRST, 1));
     assert!(records.load(ACCOUNT_CHAT, &another, &limits()).is_none(), "a record names its own source");
-    assert_eq!(records.up(no_record(), fixtures::NOW), unloaded);
+    assert_eq!(records.up(no_record(), fixtures::NOW, b""), unloaded);
     let replacing = keep(&mut records, record(ACCOUNT_CHAT, TOKEN_FIRST, 2));
     assert_eq!(replacing.replaces, Some(sha256::digest(&another)), "the unread record is still the one replaced");
     assert!(records.kept(ACCOUNT_CHAT).is_some());
     assert_eq!(
-        records.up(no_record(), fixtures::NOW),
+        records.up(no_record(), fixtures::NOW, b""),
         Up::Child(accounts::FromComponent::Failed { account: ACCOUNT_CHAT, failure: accounts::Failure::SignInAgain })
     );
 }

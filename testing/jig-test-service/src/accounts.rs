@@ -4,7 +4,7 @@ use crate::{Files, Seeds, values::Values};
 use alloc::boxed::Box;
 use jig_domain_accounts as domain;
 use jig_domain_core as core;
-use jig_protocol_accounts::{handed_in, installation, records, table, translate};
+use jig_protocol_accounts::{handed_in, installation, party, records, table, translate};
 use jig_protocol_config::{self as config, Path, Problems, Segment, What};
 use jig_protocol_store as store;
 use jig_test_domain as root;
@@ -23,6 +23,8 @@ const LOAD: Token = Token::new(PREFIX | (1_u64 << 32_u32));
 #[derive(Debug)]
 pub struct AccountsRuntime {
     pub issuers: List<(u32, driver::Endpoint)>,
+    /// LLM account sign-in endpoints and origins, keyed by provider number.
+    pub providers: List<(u32, driver::Endpoint, List<driver::Origin>)>,
     /// Bounds of all prepared trust roots, supplied by their shell owner.
     pub trust_roots: u32,
     pub trust_root_bytes: u32,
@@ -34,7 +36,7 @@ pub struct AccountsRuntime {
     reason = "one phase per service, and the sources it loads move once into the driver"
 )]
 enum Phase {
-    Loading { configured: List<driver::Account>, crypto: CryptoRng, after: Option<u64>, asked: bool },
+    Loading { configured: Map<u32, driver::Account>, crypto: CryptoRng, after: Option<u64>, asked: bool },
     HandingIn,
     Running,
 }
@@ -42,10 +44,13 @@ pub(super) struct Accounts {
     component: Option<driver::Component>,
     phase: Phase,
     env: Env<driver::Limits>,
-    ids: List<Secret>,
+    ids: Map<u32, Secret>,
+    providers: Map<u32, driver::Account>,
+    required: Map<u32, Box<[u8]>>,
+    erasing: Map<u32, Option<bool>>,
     records: records::Records,
     handed: Queue<(u32, oauth::SavedToken)>,
-    early: Queue<driver::Request>,
+    early: Queue<domain::Request>,
     pub(super) io: Queue<io::Request>,
     above: Queue<driver::Event>,
     /// Empty: each source's keeper is the owner, so the driver files nothing.
@@ -77,7 +82,10 @@ impl Files {
         None
     }
 }
-fn issuers(runtime: Option<AccountsRuntime>, limits: &driver::Limits) -> Result<Map<u32, driver::Endpoint>, Problems> {
+fn issuers(
+    runtime: Option<&mut AccountsRuntime>,
+    limits: &driver::Limits,
+) -> Result<Map<u32, driver::Endpoint>, Problems> {
     let mut issuers = Map::with_capacity(limits.accounts);
     let Some(runtime) = runtime else {
         return Ok(issuers);
@@ -92,17 +100,38 @@ fn issuers(runtime: Option<AccountsRuntime>, limits: &driver::Limits) -> Result<
             return Err(problem(0, What::Bound));
         }
     }
-    for (number, endpoint) in runtime.issuers.into_boxed() {
+    for (number, endpoint) in ::core::mem::replace(&mut runtime.issuers, List::with_capacity(0)).into_boxed() {
         issuers.insert(number, endpoint).or(Err(problem(0, What::Bound)))?;
     }
     Ok(issuers)
+}
+/// The host resolves transports; the component owns its public registration vocabulary.
+fn registration_input(configured: &config::llm::Registration, endpoint_transport: &driver::Transport) -> party::Registration {
+    party::Registration {
+        issuer: configured.issuer.clone(),
+        client: configured.client.clone(),
+        scopes: configured.scopes.clone(),
+        name_hint: configured.name_hint.clone(),
+        authorization: configured.authorization.clone(),
+        token: configured.token.clone(),
+        revocation: configured.revocation.clone(),
+        keys: configured.keys.clone(),
+        endpoint_transport: match endpoint_transport {
+            driver::Transport::Tls { server_name, trust } => driver::Transport::Tls { server_name: server_name.clone(), trust: trust.clone() },
+            driver::Transport::Plaintext => driver::Transport::Plaintext,
+        },
+        must_grant: configured.must_grant.clone(),
+        resource: configured.resource.clone(),
+        redirect_path: configured.redirect_path.clone(),
+        redirect_port: configured.redirect_port,
+    }
 }
 /// A copy of a configured source, without a record, for the check at
 /// start; configured sources name no origins.
 fn unkept(account: &driver::Account) -> driver::Account {
     match account {
         driver::Account::HandedIn => driver::Account::HandedIn,
-        driver::Account::SignIn { registration, endpoint, keeper: _, shared, origins: _ } => driver::Account::SignIn {
+        driver::Account::SignIn { registration, endpoint, keeper: _, shared, origins } => driver::Account::SignIn {
             registration: oauth::Registration {
                 authorization_url: registration.authorization_url.clone(),
                 token_endpoint: registration.token_endpoint.clone(),
@@ -126,7 +155,7 @@ fn unkept(account: &driver::Account) -> driver::Account {
             },
             keeper: driver::Keeper::Owner { kept: None },
             shared: *shared,
-            origins: List::with_capacity(0),
+            origins: copy_origins(origins),
         },
     }
 }
@@ -137,23 +166,18 @@ impl Accounts {
         config: &config::Engine,
         files: &Files,
         seeds: &Seeds,
-        runtime: Option<AccountsRuntime>,
+        mut runtime: Option<AccountsRuntime>,
         room: u32,
         secret_bytes: u32,
     ) -> Result<Self, Problems> {
-        let mut limits = config.limits.driver;
-        limits.accounts = config.limits.core.accounts.accounts.checked_add(1).expect("numbered account slots");
+        let limits = config.limits.driver;
         if limits.client.document.record_bytes > secret_bytes {
             return Err(problem(0, What::Bound));
         }
-        let mut issuers = issuers(runtime, &limits)?;
-        let mut configured = List::with_capacity(limits.accounts);
-        let mut ids = List::with_capacity(limits.accounts);
+        let mut issuers = issuers(runtime.as_mut(), &limits)?;
+        let mut configured = Map::with_capacity(limits.accounts);
+        let mut ids = Map::with_capacity(limits.accounts);
         let mut handed = Queue::with_capacity(limits.accounts);
-        for _ in 0..limits.accounts {
-            configured.push(driver::Account::HandedIn).or(Err(problem(0, What::Bound)))?;
-            ids.push(Secret::new(Box::default())).expect("account id slots");
-        }
         for (index, account) in config.llm.accounts.iter().enumerate() {
             let mut account_id = Secret::new(Box::default());
             let source = match &account.source {
@@ -211,21 +235,53 @@ impl Accounts {
                     }
                 }
             };
-            *configured.get_mut(account.number).ok_or(problem(index, What::Bound))? = source;
-            *ids.get_mut(account.number).expect("account id slot") = account_id;
+            configured.insert(account.number, source).or(Err(problem(index, What::Bound)))?;
+            ids.insert(account.number, account_id).expect("configured account id place");
         }
         let crypto = CryptoRng::new(&seeds.crypto, 1).ok_or(problem(0, What::Bound))?;
         let mut check = List::with_capacity(limits.accounts);
-        for account in &configured {
+        for (_, account) in &configured {
             check.push(unkept(account)).or(Err(problem(0, What::Bound)))?;
         }
         let checked = driver::Component::new(check, &limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
         drop(checked);
+        let mut providers = Map::with_capacity(u32::try_from(config.llm.providers.len()).expect("provider count"));
+        if let Some(runtime) = &mut runtime {
+            for (number, endpoint, origins) in
+                ::core::mem::replace(&mut runtime.providers, List::with_capacity(0)).into_boxed()
+            {
+                let mut registration = None;
+                for provider in &config.llm.providers {
+                    if provider.number == number {
+                        registration = provider.sign_in.as_ref();
+                        break;
+                    }
+                }
+                let registration = registration.ok_or(problem(0, What::Refers))?;
+                if (runtime.trust_roots == 0 || runtime.trust_root_bytes == 0) && has_tls(&endpoint, &origins) {
+                    return Err(problem(0, What::Bound));
+                }
+                let account = party::party_account(&registration_input(registration, &endpoint.transport), endpoint, origins, &seeds.installation);
+                let mut check = List::with_capacity(1);
+                check.push(unkept(&account)).or(Err(problem(0, What::Bound)))?;
+                let _checked =
+                    driver::Component::new(check, &limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
+                providers.insert(number, account).or(Err(problem(0, What::Bound)))?;
+            }
+        }
+        for provider in &config.llm.providers {
+            if provider.sign_in.is_some() && !providers.contains_key(&provider.number) {
+                return Err(problem(0, What::Refers));
+            }
+        }
         Ok(Self {
             component: None,
             phase: Phase::Loading { configured, crypto, after: None, asked: false },
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             ids,
+            providers,
+            required: Map::with_capacity(limits.accounts),
+            erasing: Map::with_capacity(limits.accounts),
             records: records::Records::new(limits.accounts),
             handed,
             early: Queue::with_capacity(room),
@@ -263,13 +319,52 @@ impl Accounts {
     }
     /// The domain's request: to the driver once it runs, held until then.
     pub fn request(&mut self, request: domain::Request) {
-        if let domain::Request::Component(request) = request {
-            let request = translate::down(request);
+        if matches!(request, domain::Request::Component(_) | domain::Request::Signing(_)) {
             if self.running() {
-                self.down(request);
+                self.dispatch(request);
             } else {
                 self.early.push(request);
             }
+        }
+    }
+    fn dispatch(&mut self, request: domain::Request) {
+        match request {
+            domain::Request::Component(request) => self.down(translate::down(request)),
+            domain::Request::Signing(signing) => match translate::down_signing(signing) {
+                translate::Down::SignOut { source } => self.down(driver::Request::SignOut { account: source }),
+                translate::Down::SignIn { source, provider } => {
+                    let Some(template) = self.providers.get(&provider) else {
+                        self.above.push(driver::Event::Refused {
+                            account: source,
+                            asked: driver::Asked::Add,
+                            why: driver::Refusal::Source,
+                        });
+                        return;
+                    };
+                    let account = unkept(template);
+                    let required = match &account {
+                        driver::Account::SignIn { registration, .. } => {
+                            registration.terms.as_ref().and_then(required_scopes)
+                        }
+                        driver::Account::HandedIn => None,
+                    }
+                    .unwrap_or_default();
+                    let before = self.above.len();
+                    self.component.as_mut().expect("running driver").add(&self.env, source, account, &mut self.above);
+                    if self.above.len() != before {
+                        return;
+                    }
+                    self.ids.insert(source, Secret::new(Box::default())).expect("driver admitted account");
+                    self.required.insert(source, required).expect("driver admitted account");
+                    self.records.admit(source).expect("driver admitted account");
+                    self.down(driver::Request::SignIn { account: source, subject: None });
+                }
+            },
+            domain::Request::Granted { .. }
+            | domain::Request::Save { .. }
+            | domain::Request::Erase { .. }
+            | domain::Request::Answer { .. }
+            | domain::Request::Closed => (),
         }
     }
     pub fn clock(&mut self, now: Time, wall: Wall) {
@@ -333,7 +428,7 @@ impl Accounts {
         store: &mut crate::store::Store,
     ) {
         self.clock(now, wall);
-        self.answers(store);
+        self.answers(store, events);
         self.start(store);
         if let Some(component) = &mut self.component
             && self.above.room() >= 3
@@ -347,11 +442,20 @@ impl Accounts {
                 break;
             }
             let event = self.above.pop().expect("account events");
-            let event = match self.records.up(event, now) {
+            let number = event_account(&event);
+            let required = match number {
+                Some(number) => self.required.get(&number),
+                None => None,
+            };
+            let required = match required {
+                Some(value) => &**value,
+                None => b"",
+            };
+            let event = match self.records.up(event, now, required) {
                 translate::Up::Granted { mut event, account, generation, value, expires } => {
                     // An account with a provider account id is jig's live test's
                     // (D2): its bearer goes out beside the id until JP13.
-                    let id = self.ids.get(account).expect("configured account id");
+                    let id = self.ids.get(&account).expect("configured account id");
                     let value = if id.expose().is_empty() {
                         value
                     } else {
@@ -367,6 +471,49 @@ impl Accounts {
                     event
                 }
                 translate::Up::Child(event) => event,
+                translate::Up::Visited { source, address } => {
+                    events.push(root::Event::Core(core::Event::Account(domain::Event::Visited { source, address })));
+                    continue;
+                }
+                translate::Up::SignedIn { source, subject, display } => {
+                    events.push(root::Event::Core(core::Event::Account(domain::Event::SignedIn {
+                        source,
+                        subject,
+                        display,
+                        declined: false,
+                    })));
+                    continue;
+                }
+                translate::Up::SignInFailed { source, failure } => {
+                    events
+                        .push(root::Event::Core(core::Event::Account(domain::Event::SignInFailed { source, failure })));
+                    // Every failed account sign-in gives its driver place back.
+                    if self.ids.contains_key(&source) {
+                        self.down(driver::Request::SignOut { account: source });
+                    }
+                    continue;
+                }
+                translate::Up::SignedOut { source, confirmed } => {
+                    if self.erasing.contains_key(&source) {
+                        continue;
+                    }
+                    self.erasing.insert(source, Some(confirmed)).expect("one erase per driver account");
+                    if let Some(store::Event::Erased { owner }) = store.secrets(
+                        Token::new(PREFIX | u64::from(source)),
+                        store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
+                    ) {
+                        self.erased(source, owner, events);
+                    }
+                    continue;
+                }
+                translate::Up::Removed { source } => {
+                    let _erase = self.erasing.remove(&source);
+                    let _id = self.ids.remove(&source);
+                    let _required = self.required.remove(&source);
+                    self.records.remove(source);
+                    values.accounts.remove(source);
+                    continue;
+                }
                 translate::Up::Keep { account, record } => {
                     if self.aborting {
                         continue;
@@ -392,11 +539,24 @@ impl Accounts {
             component.reclaim();
         }
     }
+    fn erased(&mut self, number: u32, _owner: Token, events: &mut Queue<root::Event>) {
+        if let Some(pending) = self.erasing.get_mut(&number)
+            && let Some(confirmed) = pending.take()
+        {
+            events
+                .push(root::Event::Core(core::Event::Account(domain::Event::SignedOut { source: number, confirmed })));
+            if self.ids.contains_key(&number) {
+                self.down(driver::Request::Remove { account: number });
+            } else {
+                let _erased = self.erasing.remove(&number);
+            }
+        }
+    }
     /// The store's answers: the records it holds, and whether each write was
     /// kept (store.md 9).
-    fn answers(&mut self, store: &mut crate::store::Store) {
+    fn answers(&mut self, store: &mut crate::store::Store, events: &mut Queue<root::Event>) {
         for _ in 0..store.sources.len() {
-            if !self.down_room() {
+            if !self.down_room() || events.room() == 0 {
                 break;
             }
             match store.sources.pop().expect("source answers") {
@@ -411,7 +571,8 @@ impl Accounts {
                         self.down(request);
                     }
                 }
-                store::Event::Erased { .. } | store::Event::Secret { .. } | store::Event::Carried { .. } => {
+                store::Event::Erased { owner } => self.erased(source(owner), owner, events),
+                store::Event::Secret { .. } | store::Event::Carried { .. } => {
                     unreachable!("the accounts only load and replace their records")
                 }
                 store::Event::Opened { .. }
@@ -444,15 +605,18 @@ impl Accounts {
             let Ok(account) = u32::try_from(row.number) else {
                 continue;
             };
+            if !configured.contains_key(&account) {
+                continue;
+            }
             let Some(record) = self.records.load(account, row.value.expose(), &self.env.limits.client.document) else {
                 continue;
             };
-            if let Some(driver::Account::SignIn { keeper, .. }) = configured.get_mut(account) {
+            if let Some(driver::Account::SignIn { keeper, .. }) = configured.get_mut(&account) {
                 let id = match &record.metadata {
                     Some(id) => Secret::new(id.clone()),
                     None => Secret::new(Box::default()),
                 };
-                *self.ids.get_mut(account).expect("configured account id slot") = id;
+                *self.ids.get_mut(&account).expect("configured account id slot") = id;
                 *keeper = driver::Keeper::Owner { kept: Some(record) };
             }
         }
@@ -465,14 +629,30 @@ impl Accounts {
         else {
             unreachable!("loading");
         };
-        for account in 0..configured.len() {
-            if let Some(driver::Account::SignIn { registration, .. }) = configured.get_mut(account) {
+        let mut component =
+            driver::Component::new(List::with_capacity(0), &self.env.limits, crypto).expect("startup checked driver");
+        for _ in 0..configured.len() {
+            let (&number, _) = configured.first().expect("configured sources");
+            let mut account = configured.remove(&number).expect("configured source");
+            if let driver::Account::SignIn { registration, .. } = &mut account {
                 registration.terms = Some(installation::terms(kept));
             }
+            component.add(&self.env, number, account, &mut self.above);
+            assert!(self.above.is_empty(), "startup checked configured source");
+            self.records.admit(number).expect("configured record place");
         }
-        let Ok(component) = driver::Component::new(configured, &self.env.limits, crypto) else {
-            unreachable!("startup checked the sources, and each record read encodes");
-        };
+        // The stored installation id, rather than this start's draw, goes on account sign-ins.
+        let mut after = 0;
+        for _ in 0..self.providers.len() {
+            let Some((&number, _)) = self.providers.range(after..).next() else { break };
+            if let Some(driver::Account::SignIn { registration, .. }) = self.providers.get_mut(&number)
+                && let Some(terms) = &mut registration.terms
+            {
+                terms.parameters.first_mut().expect("installation parameter").value = installation::urn(kept);
+            }
+            let Some(next) = number.checked_add(1) else { break };
+            after = next;
+        }
         self.component = Some(component);
     }
     /// Asks for the next page of records, hands in the handed-in records
@@ -510,7 +690,7 @@ impl Accounts {
                         break;
                     }
                     let request = self.early.pop().expect("early requests");
-                    self.down(request);
+                    self.dispatch(request);
                 }
             }
         }
@@ -649,14 +829,76 @@ pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32) ->
     Queue::<io::Request>::worst_case(room)?
         .checked_add(Queue::<driver::Event>::worst_case(room)?)?
         .checked_add(Queue::<driver::FileLower>::worst_case(room)?)?
-        .checked_add(Queue::<driver::Request>::worst_case(room)?)?
-        .checked_add(List::<driver::Account>::worst_case(limits.accounts)?)?
+        .checked_add(Queue::<domain::Request>::worst_case(room)?)?
+        .checked_add(Map::<u32, driver::Account>::worst_case(limits.accounts)?)?
         .checked_add(Queue::<(u32, oauth::SavedToken)>::worst_case(limits.accounts)?)?
         .checked_add(u64::from(limits.accounts).checked_mul(record)?)?
         .checked_add(records::worst_case(limits.accounts, &limits.client.document)?)?
-        .checked_add(List::<Secret>::worst_case(limits.accounts)?)?
+        .checked_add(Map::<u32, Secret>::worst_case(limits.accounts)?)?
+        .checked_add(Map::<u32, Box<[u8]>>::worst_case(limits.accounts)?)?
+        .checked_add(Map::<u32, Option<bool>>::worst_case(limits.accounts)?)?
+        .checked_add(u64::from(limits.accounts).checked_mul(u64::from(limits.client.scope_bytes))?)?
         .checked_add(u64::from(limits.accounts).checked_mul(u64::from(table::ACCOUNT_ID_BYTES))?)?
         .checked_add(u64::from(room).checked_mul(record.checked_add(4096)?)?)?
         .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(io::operations(io)?.checked_add(2)?)?)?
         .checked_add(Map::<Token, Token>::worst_case(io::operations(io)?.checked_add(2)?)?)
+}
+
+fn required_scopes(terms: &oauth::Terms) -> Option<Box<[u8]>> {
+    terms.required_scopes.clone()
+}
+fn copy_endpoint(endpoint: &driver::Endpoint) -> driver::Endpoint {
+    driver::Endpoint {
+        address: endpoint.address,
+        transport: match &endpoint.transport {
+            driver::Transport::Plaintext => driver::Transport::Plaintext,
+            driver::Transport::Tls { server_name, trust } => {
+                driver::Transport::Tls { server_name: server_name.clone(), trust: trust.clone() }
+            }
+        },
+    }
+}
+fn copy_origins(origins: &List<driver::Origin>) -> List<driver::Origin> {
+    let mut copy = List::with_capacity(origins.len());
+    for origin in origins {
+        copy.push(driver::Origin { uri: origin.uri.clone(), endpoint: copy_endpoint(&origin.endpoint) })
+            .expect("configured origins");
+    }
+    copy
+}
+fn has_tls(endpoint: &driver::Endpoint, origins: &List<driver::Origin>) -> bool {
+    if matches!(endpoint.transport, driver::Transport::Tls { .. }) {
+        return true;
+    }
+    for origin in origins {
+        if matches!(origin.endpoint.transport, driver::Transport::Tls { .. }) {
+            return true;
+        }
+    }
+    false
+}
+fn event_account(event: &driver::Event) -> Option<u32> {
+    match event {
+        driver::Event::Granted { account, .. }
+        | driver::Event::Expiring { account, .. }
+        | driver::Event::Failed { account, .. }
+        | driver::Event::Refused { account, .. }
+        | driver::Event::Visit { account, .. }
+        | driver::Event::SignedIn { account, .. }
+        | driver::Event::Keep { account, .. }
+        | driver::Event::Removed { account }
+        | driver::Event::SignedOut { account, .. }
+        | driver::Event::Lock { account }
+        | driver::Event::Unlock { account } => Some(*account),
+        driver::Event::Closed => None,
+    }
+}
+
+/// The public account sign-in templates retained beside the driver. Two
+/// one-account driver bounds include their origins and the temporary startup copy.
+pub(super) fn configured_bytes(config: &config::Engine) -> Option<u64> {
+    let count = u32::try_from(config.llm.providers.len()).ok()?;
+    let limits = driver::Limits { accounts: 1, exchanges: 1, listeners: 1, ..config.limits.driver };
+    Map::<u32, driver::Account>::worst_case(count)?
+        .checked_add(driver::worst_case(&limits)?.checked_mul(u64::from(count))?.checked_mul(2)?)
 }

@@ -415,6 +415,11 @@ pub(super) fn engine_startup(
     .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
     let configured = crate::workers::configured_bytes(&parsed.engine)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+    let account_configuration = crate::accounts::configured_bytes(&parsed.engine)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+    let configured = configured
+        .checked_add(account_configuration)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
     let bytes = limits::worst_case(&parsed.limits)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?
         .checked_add(trust)
@@ -458,7 +463,7 @@ pub(super) fn engine_startup(
     let values = crate::values::Values {
         application: application(&parsed, files)?,
         accounts: jig_protocol_accounts::table::Table::new(
-            parsed.limits.root.core.accounts.accounts.checked_add(1).expect("numbered accounts"),
+            parsed.limits.accounts.accounts,
             parsed.limits.accounts.client.document.token_bytes,
         ),
     };

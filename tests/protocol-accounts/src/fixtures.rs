@@ -44,16 +44,16 @@ pub fn limits() -> accounts::Limits {
         refresh_lead: Duration::from_secs(10),
         client: oauth::ClientLimits {
             document: oauth::Limits {
-                document_bytes: 1024,
-                string_bytes: 256,
+                document_bytes: 8192,
+                string_bytes: 2048,
                 token_bytes: 256,
                 client_bytes: 64,
                 detail_bytes: 64,
-                record_bytes: 1024,
-                issued_client_bytes: 0,
+                record_bytes: 8192,
+                issued_client_bytes: 256,
                 granted_bytes: 64,
-                subject_bytes: 0,
-                id_token_bytes: 256,
+                subject_bytes: 256,
+                id_token_bytes: 2048,
                 depth: 8,
                 tokens: 64,
             },
@@ -63,12 +63,12 @@ pub fn limits() -> accounts::Limits {
             code_bytes: 64,
             url_bytes: 1024,
             request_bytes: 1024,
-            parameter_bytes: jig_protocol_accounts::installation::PARAMETER_BYTES,
-            resource_bytes: 0,
-            nonce_bytes: 0,
-            metadata_bytes: 0,
-            key_set_bytes: 0,
-            keys: 0,
+            parameter_bytes: jig_protocol_accounts::installation::PARAMETER_BYTES + 15 + 256,
+            resource_bytes: 256,
+            nonce_bytes: 32,
+            metadata_bytes: 8192,
+            key_set_bytes: 8192,
+            keys: 2,
             modulus_bits: 2048,
             skew: Duration::ZERO,
             sign_in_time: Duration::from_secs(120),
@@ -176,7 +176,13 @@ pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
     use crate::world::Story;
     match story {
         Story::DamagedRecord => Some(bytes::copy_of(b"damaged record")),
-        Story::HandedIn { .. } | Story::HandedInRejected | Story::SignIn => None,
+        Story::HandedIn { .. }
+        | Story::HandedInRejected
+        | Story::SignIn
+        | Story::AccountSignInMissingScope
+        | Story::AccountSignInVaryingPort
+        | Story::AccountSignOut { .. }
+        | Story::AccountSignInFull => None,
         Story::Granted
         | Story::Refreshed
         | Story::Closed
@@ -202,7 +208,11 @@ pub fn handed_lapse(story: crate::world::Story) -> Option<Duration> {
         | crate::world::Story::RejectedClient
         | crate::world::Story::DamagedRecord
         | crate::world::Story::ClosedExchange
-        | crate::world::Story::SignIn => None,
+        | crate::world::Story::SignIn
+        | crate::world::Story::AccountSignInMissingScope
+        | crate::world::Story::AccountSignInVaryingPort
+        | crate::world::Story::AccountSignOut { .. }
+        | crate::world::Story::AccountSignInFull => None,
     }
 }
 #[must_use]
@@ -222,7 +232,11 @@ pub fn wanted(story: crate::world::Story) -> usize {
     match story {
         crate::world::Story::HandedIn { .. } => 3,
         // The visit's answer closes a sign-in's story.
-        crate::world::Story::SignIn => 0,
+        crate::world::Story::SignIn
+        | crate::world::Story::AccountSignInMissingScope
+        | crate::world::Story::AccountSignInVaryingPort
+        | crate::world::Story::AccountSignOut { .. }
+        | crate::world::Story::AccountSignInFull => 0,
         crate::world::Story::Granted | crate::world::Story::Closed | crate::world::Story::DamagedRecord => 1,
         crate::world::Story::Refreshed
         | crate::world::Story::HandedInRejected
@@ -271,7 +285,14 @@ pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
         Story::Granted | Story::Closed | Story::ClosedExchange => {
             vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]
         }
-        Story::SignIn => vec![],
+        Story::SignIn | Story::AccountSignInVaryingPort => {
+            vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]
+        }
+        Story::AccountSignOut { .. } => vec![
+            Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
+            Heard::Failed { account: ACCOUNT_CHAT, failure: child::Failure::Cancelled },
+        ],
+        Story::AccountSignInMissingScope | Story::AccountSignInFull => vec![],
     }
 }
 
@@ -293,7 +314,11 @@ pub fn issuer_plans(story: crate::world::Story) -> Vec<fake::Plan> {
         | Story::HandedIn { .. }
         | Story::HandedInRejected
         | Story::DamagedRecord => vec![rotate()],
-        Story::SignIn => vec![],
+        Story::SignIn
+        | Story::AccountSignInMissingScope
+        | Story::AccountSignInVaryingPort
+        | Story::AccountSignOut { .. }
+        | Story::AccountSignInFull => account_sign_in_plans(story),
     }
 }
 fn rate_limit() -> fake::Plan {
@@ -311,4 +336,66 @@ fn client_rejected() -> fake::Plan {
         delay: Duration::from_millis(5),
         retry_after: Duration::ZERO,
     }
+}
+
+pub const PARTY_REDIRECT: &[u8] = b"http://127.0.0.1:31234/callback";
+pub fn account_sign_in(story: crate::world::Story) -> bool {
+    matches!(
+        story,
+        crate::world::Story::SignIn
+            | crate::world::Story::AccountSignInMissingScope
+            | crate::world::Story::AccountSignInVaryingPort
+            | crate::world::Story::AccountSignOut { .. }
+            | crate::world::Story::AccountSignInFull
+    )
+}
+pub fn party_registration(story: crate::world::Story) -> jig_protocol_accounts::party::Registration {
+    jig_protocol_accounts::party::Registration {
+        issuer: bytes::copy_of(b"http://127.0.0.1:31000"),
+        client: bytes::copy_of(b"client"),
+        scopes: Box::new([bytes::copy_of(b"openid"), bytes::copy_of(b"read")]),
+        name_hint: Some(bytes::copy_of(b"jig-test")),
+        authorization: bytes::copy_of(AUTHORIZE),
+        token: bytes::copy_of(TOKEN),
+        revocation: Some(bytes::copy_of(b"http://127.0.0.1:31000/revoke")),
+        keys: bytes::copy_of(b"http://127.0.0.1:31000/keys"),
+        endpoint_transport: accounts::Transport::Plaintext,
+        must_grant: Box::new([bytes::copy_of(b"openid"), bytes::copy_of(b"read")]),
+        resource: Some(bytes::copy_of(b"api")),
+        redirect_path: bytes::copy_of(b"callback"),
+        redirect_port: (story != crate::world::Story::AccountSignInVaryingPort).then_some(31234),
+    }
+}
+pub fn issuer_terms(story: crate::world::Story) -> Option<fake::Terms> {
+    account_sign_in(story).then(|| fake::Terms {
+        issued: Box::new([bytes::copy_of(b"issued-client")]),
+        omit_issued: false,
+        varying_port: true,
+        revocation_endpoint: Some(bytes::copy_of(b"http://127.0.0.1:31000/revoke")),
+        openid: Some(fake::OpenId {
+            issuer: bytes::copy_of(b"http://127.0.0.1:31000"),
+            key_set_url: bytes::copy_of(b"http://127.0.0.1:31000/keys"),
+            subject: bytes::copy_of(b"subject"),
+            lifetime: Duration::from_secs(300),
+            header_kid: true,
+            fault: None,
+        }),
+    })
+}
+fn account_sign_in_plans(story: crate::world::Story) -> Vec<fake::Plan> {
+    let mut first = rotate();
+    if let fake::Body::Token(token) = &mut first.body {
+        token.scope = Some(bytes::copy_of(if story == crate::world::Story::AccountSignInMissingScope {
+            b"openid"
+        } else {
+            b"openid read"
+        }));
+    }
+    let revoke = fake::Plan {
+        status: if story == (crate::world::Story::AccountSignOut { confirmed: false }) { 400 } else { 200 },
+        body: fake::Body::Raw(bytes::copy_of(b"{}")),
+        delay: Duration::ZERO,
+        retry_after: Duration::ZERO,
+    };
+    vec![first, revoke]
 }

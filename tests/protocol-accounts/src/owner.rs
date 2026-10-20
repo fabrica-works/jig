@@ -6,7 +6,7 @@ use crate::world::{Installation, Story};
 use jig_domain_accounts as child;
 use jig_domain_core as core;
 use jig_protocol_accounts::{
-    handed_in, installation,
+    handed_in, installation, party,
     records::{self, Records},
     table::Table,
     translate::{self, Up},
@@ -113,6 +113,11 @@ pub struct Owner {
     installation: [u8; 16],
     /// The URL the driver asked to be visited.
     visit: Option<Box<[u8]>>,
+    ended: Vec<child::Ended>,
+    answers: Vec<child::Answer>,
+    removed: Vec<u32>,
+    erased: bool,
+    account_sign_out_asked: bool,
 }
 impl std::fmt::Debug for Owner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -128,7 +133,10 @@ impl Owner {
     /// record, as an earlier run left it, and `installation.kept` as the
     /// installation's identifier if an earlier start kept one.
     pub(crate) fn new(story: Story, held: Option<&[u8]>, installation: Installation) -> Self {
-        let limits = fixtures::limits();
+        let mut limits = fixtures::limits();
+        if story == Story::AccountSignInFull {
+            limits.accounts = 1;
+        }
         let child_limits = fixtures::child_limits();
         let account = if matches!(story, Story::HandedIn { .. } | Story::HandedInRejected) {
             fixtures::ACCOUNT_HANDED
@@ -141,8 +149,22 @@ impl Owner {
             component: None,
             child: child::Domain::new(
                 &child_limits,
-                child::Providers::none(),
-                Box::new([child::Configured { number: account, provider: None }]),
+                if fixtures::account_sign_in(story) {
+                    child::Providers {
+                        providers: Box::new([child::Provider {
+                            number: 1,
+                            models: Box::new([]),
+                            offers: child::Offers { sign_in: true, key: false, programs: Box::new([]) },
+                        }]),
+                    }
+                } else {
+                    child::Providers::none()
+                },
+                if fixtures::account_sign_in(story) {
+                    Box::new([])
+                } else {
+                    Box::new([child::Configured { number: account, provider: None }])
+                },
             ),
             child_out: Queue::with_capacity(ROOM),
             child_limits,
@@ -179,6 +201,11 @@ impl Owner {
             account,
             installation: [0; 16],
             visit: None,
+            ended: Vec::new(),
+            answers: Vec::new(),
+            removed: Vec::new(),
+            erased: false,
+            account_sign_out_asked: false,
         };
         if let Some(kept) = installation.kept {
             // An earlier start kept its draw with its first commit; this
@@ -282,12 +309,27 @@ impl Owner {
     pub fn last_kept(&self) -> Option<&[u8]> {
         self.last_kept.as_ref().map(Secret::expose)
     }
+    pub fn account_sign_in_ended(&self) -> &[child::Ended] {
+        &self.ended
+    }
+    pub fn account_answers(&self) -> &[child::Answer] {
+        &self.answers
+    }
+    pub fn account_record_erased(&self) -> bool {
+        self.erased
+    }
+    pub fn account_removed(&self) -> bool {
+        !self.removed.is_empty()
+    }
     pub(crate) fn unstarted(&self) -> bool {
         self.component.is_none()
     }
     fn child_event(&mut self, now: Time, wall: Wall, event: child::Event) {
         child::step(&mut self.child, &Env { now, wall, limits: self.child_limits }, event, &mut self.child_out);
-        self.usable |= self.child.usable(self.account);
+        self.usable |= self.child.source_grant(self.account, now).is_some();
+        while let Some(ended) = self.child.pop_ended() {
+            self.ended.push(ended);
+        }
         while let Some(fact) = self.child.pop_fact() {
             self.facts.push(fact);
         }
@@ -297,27 +339,33 @@ impl Owner {
     fn start(&mut self, env: &Env<driver::Limits>) {
         let handed = fixtures::handed_lapse(self.story);
         let mut configured = List::with_capacity(1);
-        assert!(
-            configured
-                .push(if handed.is_some() {
-                    driver::Account::HandedIn
-                } else {
-                    driver::Account::SignIn {
-                        shared: false,
-                        origins: List::with_capacity(0),
-                        registration: fixtures::registration(installation::terms(&self.installation)),
-                        endpoint: driver::Endpoint {
-                            address: self.address.expect("issuer address"),
-                            transport: driver::Transport::Plaintext,
-                        },
-                        keeper: driver::Keeper::Owner { kept: None },
-                    }
-                })
-                .is_ok()
-        );
+        if !fixtures::account_sign_in(self.story) {
+            assert!(
+                configured
+                    .push(if handed.is_some() {
+                        driver::Account::HandedIn
+                    } else {
+                        driver::Account::SignIn {
+                            shared: false,
+                            origins: List::with_capacity(0),
+                            registration: fixtures::registration(installation::terms(&self.installation)),
+                            endpoint: driver::Endpoint {
+                                address: self.address.expect("issuer address"),
+                                transport: driver::Transport::Plaintext,
+                            },
+                            keeper: driver::Keeper::Owner { kept: None },
+                        }
+                    })
+                    .is_ok()
+            );
+        }
         self.load(env, &mut configured);
         let crypto = skein_lib::CryptoRng::new(&skein_world::crypto_seed(17), 0).expect("world crypto seed");
         self.component = Some(driver::Component::new(configured, &self.limits, crypto).expect("configured driver"));
+        if self.story == Story::AccountSignInFull {
+            self.component.as_mut().unwrap().add(env, 999, driver::Account::HandedIn, &mut self.above);
+            assert!(self.above.is_empty());
+        }
         if let Some(lapses_in) = handed {
             // A handed-in file states when its token lapses, the same at
             // every start.
@@ -334,10 +382,13 @@ impl Owner {
                 records::Next::Store(keep) => self.replace(env, keep),
             }
         }
-        if self.story == Story::SignIn {
-            // The owner asks the driver itself: the child wants no source
-            // in this story.
-            self.driver(env, driver::Request::SignIn { account: self.account, subject: None });
+        if fixtures::account_sign_in(self.story) {
+            self.child_event(env.now, env.wall, child::Event::Want);
+            self.child_event(
+                env.now,
+                env.wall,
+                child::Event::SignIn { request: Token::new(80), holder: child::Holder::Party(7), provider: 1 },
+            );
         } else {
             self.child_event(env.now, env.wall, child::Event::Want);
         }
@@ -447,12 +498,39 @@ impl Owner {
                         &mut self.files,
                     );
                 }
-                // No party signs in or out here: JP6 carries those to the component.
-                child::Request::Granted { grant: _ }
-                | child::Request::Save { .. }
-                | child::Request::Erase { .. }
-                | child::Request::Signing(_)
-                | child::Request::Answer { .. } => (),
+                child::Request::Signing(signing) => match translate::down_signing(signing) {
+                    translate::Down::SignIn { source, provider: 1 } => {
+                        self.account = source;
+                        let registration = fixtures::party_registration(self.story);
+                        let endpoint = driver::Endpoint {
+                            address: self.address.expect("issuer"),
+                            transport: driver::Transport::Plaintext,
+                        };
+                        let mut origins = List::with_capacity(1);
+                        origins
+                            .push(driver::Origin {
+                                uri: registration.issuer.clone(),
+                                endpoint: driver::Endpoint {
+                                    address: self.address.expect("issuer"),
+                                    transport: driver::Transport::Plaintext,
+                                },
+                            })
+                            .unwrap();
+                        let account = party::party_account(&registration, endpoint, origins, &self.installation);
+                        let before = self.above.len();
+                        self.component.as_mut().unwrap().add(env, source, account, &mut self.above);
+                        if self.above.len() == before {
+                            self.records.admit(source).unwrap();
+                            self.driver(env, driver::Request::SignIn { account: source, subject: None });
+                        }
+                    }
+                    translate::Down::SignIn { .. } => panic!("known account sign-in provider"),
+                    translate::Down::SignOut { source } => {
+                        self.driver(env, driver::Request::SignOut { account: source })
+                    }
+                },
+                child::Request::Answer { answer, .. } => self.answers.push(answer),
+                child::Request::Granted { grant: _ } | child::Request::Save { .. } | child::Request::Erase { .. } => (),
                 child::Request::Closed => {
                     self.closed = true;
                     self.trace.push(Trace::Closed);
@@ -462,42 +540,62 @@ impl Owner {
     }
     fn observe(&mut self, env: &Env<driver::Limits>) {
         while let Some(event) = self.above.pop() {
-            // A sign-in's events stop here: the child asks for none.
-            let event = match event {
-                driver::Event::Visit { account, url } => {
-                    self.trace.push(Trace::Visit { account });
-                    self.visit = Some(url);
-                    continue;
-                }
-                driver::Event::Failed {
-                    account,
-                    ends: driver::Ends::SignIn,
-                    failure: driver::Failure::Exchange(skein_oauth::Failure::Cancelled),
-                } => {
-                    self.trace.push(Trace::SignInCancelled { account });
-                    continue;
-                }
-                driver::Event::Failed { ends: driver::Ends::SignIn, .. }
-                | driver::Event::Refused { asked: driver::Asked::SignIn, .. }
-                | driver::Event::SignedIn { .. } => panic!("a sign-in ends only cancelled here"),
-                other @ (driver::Event::Removed { .. }
-                | driver::Event::SignedOut { .. }
-                | driver::Event::Granted { .. }
-                | driver::Event::Expiring { .. }
-                | driver::Event::Keep { .. }
-                | driver::Event::Failed { .. }
-                | driver::Event::Refused { .. }
-                | driver::Event::Lock { .. }
-                | driver::Event::Unlock { .. }
-                | driver::Event::Closed) => other,
-            };
-            let event = match self.records.up(event, env.now) {
+            let failed_add = matches!(event, driver::Event::Refused { asked: driver::Asked::Add, .. });
+            let event = match self.records.up(event, env.now, b"openid read") {
                 Up::Granted { event, account, generation, value, expires } => {
                     self.lent.push(Lent { account, generation, digest: sha256::digest(value.token.expose()) });
                     self.table.granted(account, generation, value, expires).expect("configured value fits");
                     event
                 }
                 Up::Child(event) => event,
+                Up::Visited { source, address } => {
+                    self.trace.push(Trace::Visit { account: source });
+                    self.visit = Some(address.clone());
+                    self.child_event(env.now, env.wall, child::Event::Visited { source, address });
+                    continue;
+                }
+                Up::SignedIn { source, subject, display } => {
+                    self.child_event(
+                        env.now,
+                        env.wall,
+                        child::Event::SignedIn { source, subject, display, declined: false },
+                    );
+                    continue;
+                }
+                Up::SignInFailed { source, failure } => {
+                    self.child_event(env.now, env.wall, child::Event::SignInFailed { source, failure });
+                    if !failed_add {
+                        self.driver(env, driver::Request::SignOut { account: source });
+                    }
+                    continue;
+                }
+                Up::SignedOut { source, confirmed } => {
+                    self.secrets(
+                        env.now,
+                        env.wall,
+                        source_token(source),
+                        store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
+                    );
+                    assert!(matches!(self.store_above.pop(), Some(store::Event::Erased { .. })));
+                    self.secrets(
+                        env.now,
+                        env.wall,
+                        GET,
+                        store::Secrets::Get { owner: store::SecretOwner::Source, number: u64::from(source) },
+                    );
+                    assert!(matches!(self.store_above.pop(), Some(store::Event::Secret { value: None, .. })));
+                    self.erased = true;
+                    self.child_event(env.now, env.wall, child::Event::SignedOut { source, confirmed });
+                    self.driver(env, driver::Request::Remove { account: source });
+                    continue;
+                }
+                Up::Removed { source } => {
+                    self.records.remove(source);
+                    self.table.remove(source);
+                    self.removed.push(source);
+                    continue;
+                }
+
                 Up::Keep { account, record } => {
                     match self.records.keep(account, record.0, &self.limits.client.document) {
                         records::Next::Driver(request) => self.driver(env, request),
@@ -552,11 +650,20 @@ impl Host for Owner {
         if self.component.is_none() {
             return;
         }
+        if matches!(self.story, Story::AccountSignOut { .. }) && self.usable && !self.account_sign_out_asked {
+            self.account_sign_out_asked = true;
+            self.child_event(
+                now,
+                wall,
+                child::Event::SignOut {
+                    request: Token::new(81),
+                    holder: child::Holder::Party(7),
+                    source: self.account,
+                },
+            );
+        }
         if self.close_requested.take().is_some() && !self.closing {
             self.closing = true;
-            if self.story == Story::SignIn {
-                self.driver(&env, driver::Request::Cancel { account: self.account });
-            }
             self.child_event(now, wall, child::Event::Close);
         }
         if self.reject_requested.take().is_some() {
@@ -616,6 +723,7 @@ impl Host for Owner {
     }
     fn work_pending(&self, now: Time) -> bool {
         self.io.is_ready()
+            || (matches!(self.story, Story::AccountSignOut { .. }) && self.usable && !self.account_sign_out_asked)
             || !self.events.is_empty()
             || !self.requests.is_empty()
             || !self.above.is_empty()

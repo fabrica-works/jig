@@ -47,9 +47,13 @@ fn a_value_past_the_token_bound_is_refused() {
     assert!(table.value(ACCOUNT_CHAT, 1, Time::ZERO).is_none());
 }
 #[test]
-fn an_account_past_the_tables_bound_is_refused() {
+fn the_tables_take_account_numbers_beyond_the_configured_accounts() {
     let mut table = table();
-    assert_eq!(table.granted(2, 1, fixtures::value(TOKEN_FIRST), Time::from_nanos(1000)), Err(Unfit));
+    grant(&mut table, 20_000, 1, TOKEN_FIRST, 1000);
+    grant(&mut table, 40_000, 1, TOKEN_FIRST, 1000);
+    assert_eq!(table.granted(60_000, 1, fixtures::value(TOKEN_FIRST), Time::from_nanos(1000)), Err(Unfit));
+    table.remove(20_000);
+    grant(&mut table, 60_000, 1, TOKEN_FIRST, 1000);
 }
 #[test]
 fn the_tables_debug_never_shows_a_value() {

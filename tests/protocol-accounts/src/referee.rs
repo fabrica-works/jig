@@ -84,7 +84,7 @@ impl Referee<Process> for Judge {
                 && !matches!(owner.child_heard().last(), Some(Heard::Failed { .. }))
             {
                 assert!(
-                    owner.table_value(*account, *generation).is_some(),
+                    owner.account_removed() || owner.table_value(*account, *generation).is_some(),
                     "every granted generation is readable until expiry"
                 );
             }
@@ -93,15 +93,13 @@ impl Referee<Process> for Judge {
             assert_eq!(owner.trace().last(), Some(&Trace::Closed), "Closed is last");
             assert_eq!(
                 owner.became_usable(),
-                !matches!(self.story, Story::DamagedRecord | Story::SignIn),
-                "the real child accepted its grant only with a readable record"
+                !matches!(
+                    self.story,
+                    Story::DamagedRecord | Story::AccountSignInMissingScope | Story::AccountSignInFull
+                ),
+                "the real child accepted its grant only with a readable record; account sign-in ended {:?}",
+                owner.account_sign_in_ended()
             );
-            if self.story == Story::SignIn {
-                let account = fixtures::ACCOUNT_CHAT;
-                let visit = owner.trace().iter().position(|entry| *entry == Trace::Visit { account });
-                let cancelled = owner.trace().iter().position(|entry| *entry == Trace::SignInCancelled { account });
-                assert!(visit.is_some() && visit < cancelled, "the sign-in asked its visit, then ended cancelled");
-            }
             if self.story == Story::ClosedExchange {
                 assert!(crate::world::exchange_finished(processes), "Closed follows the exchange's successful answer");
             }
@@ -135,9 +133,18 @@ impl Referee<Process> for Judge {
 /// Whether the owner's story is done and it may close: a sign-in's once its
 /// visit is answered, an exchange's once it is seen, any other once the
 /// child heard what it wanted.
-fn ends(story: Story, owner: &Owner, exchange_seen: bool, answered: bool) -> bool {
+fn ends(story: Story, owner: &Owner, exchange_seen: bool, _answered: bool) -> bool {
     match story {
-        Story::SignIn => answered,
+        Story::SignIn | Story::AccountSignInVaryingPort => {
+            !owner.child_heard().is_empty()
+                || owner
+                    .account_sign_in_ended()
+                    .iter()
+                    .any(|end| matches!(end.end, jig_domain_accounts::End::Failed { .. }))
+        }
+        Story::AccountSignInMissingScope => !owner.account_sign_in_ended().is_empty() && owner.account_removed(),
+        Story::AccountSignInFull => !owner.account_sign_in_ended().is_empty(),
+        Story::AccountSignOut { .. } => owner.account_removed(),
         Story::ClosedExchange => exchange_seen || owner.child_heard().len() >= fixtures::wanted(story),
         Story::Granted
         | Story::Refreshed

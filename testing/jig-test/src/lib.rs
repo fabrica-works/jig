@@ -115,6 +115,90 @@ fn agent(worker: &config::Worker) -> Result<service::Agent, String> {
         },
     })
 }
+fn account_transport(
+    configured: &config::Transport,
+    trust_roots: &mut u32,
+    trust_root_bytes: &mut u32,
+) -> Result<skein_oauth_accounts::Transport, String> {
+    Ok(match configured {
+        config::Transport::Plaintext => skein_oauth_accounts::Transport::Plaintext,
+        config::Transport::Tls { server_name, trust } => {
+            let source = match trust {
+                Some(file) => skein_shell::Trust::Der(path(file).into()),
+                None => {
+                    skein_shell::Trust::Machine { ssl_cert_file: std::env::var_os("SSL_CERT_FILE").map(PathBuf::from) }
+                }
+            };
+            let roots = skein_shell::read_trust_roots(
+                &source,
+                &skein_shell::RootBounds { bundle_bytes: CONFIG_BYTES, certificates: 1024, certificate_bytes: 65_536 },
+            )
+            .map_err(|why| format!("account trust: {why:?}"))?;
+            *trust_roots = trust_roots
+                .checked_add(u32::try_from(roots.certificates.len()).expect("roots count"))
+                .ok_or("trust count")?;
+            for root in &roots.certificates {
+                *trust_root_bytes = (*trust_root_bytes).max(u32::try_from(root.len()).expect("root size"));
+            }
+            let (trust, parsed) = skein_tls::Config::from_der(&roots.certificates, &[])
+                .map_err(|why| format!("account trust: {why:?}"))?;
+            eprintln!(
+                "jig-test: trust roots taken {}, skipped {}, malformed {}, other {}",
+                roots.certificates.len(),
+                parsed.skipped,
+                roots.malformed,
+                roots.other_blocks
+            );
+            let name = std::str::from_utf8(server_name).map_err(|why| why.to_string())?;
+            let server_name = skein_tls::Name::new(name).ok_or("account server name")?;
+            skein_oauth_accounts::Transport::Tls { server_name, trust }
+        }
+    })
+}
+fn account_origin(uri: &[u8]) -> Result<Box<[u8]>, String> {
+    let uri = std::str::from_utf8(uri).map_err(|why| why.to_string())?;
+    let (scheme, rest) = uri.split_once("://").ok_or("account sign-in origin requires a URL")?;
+    let authority = rest.split('/').next().ok_or("account sign-in origin requires an authority")?;
+    Ok(format!("{scheme}://{authority}").into_bytes().into_boxed_slice())
+}
+fn account_endpoint(
+    uri: &[u8],
+    configured: &config::Transport,
+    trust_roots: &mut u32,
+    trust_root_bytes: &mut u32,
+) -> Result<skein_oauth_accounts::Endpoint, String> {
+    let uri = std::str::from_utf8(uri).map_err(|why| why.to_string())?;
+    let (scheme, rest) = uri.split_once("://").ok_or("account sign-in endpoint requires an HTTP URL")?;
+    let authority = rest.split('/').next().ok_or("account sign-in endpoint requires an authority")?;
+    let port = match scheme {
+        "http" => 80,
+        "https" => 443,
+        _ => return Err("account sign-in endpoint requires HTTP or HTTPS".into()),
+    };
+    let address = if let Ok(address) = authority.parse::<std::net::SocketAddr>() {
+        address
+    } else {
+        let (host, port) = match authority.rsplit_once(':') {
+            Some((host, port)) => (host, port.parse::<u16>().map_err(|why| why.to_string())?),
+            None => (authority, port),
+        };
+        (host, port)
+            .to_socket_addrs()
+            .map_err(|why| why.to_string())?
+            .next()
+            .ok_or("account sign-in endpoint has no address")?
+    };
+    if matches!(configured, config::Transport::Plaintext) && (scheme != "http" || !address.ip().is_loopback()) {
+        return Err("plaintext account sign-in endpoint must be HTTP on loopback".into());
+    }
+    if matches!(configured, config::Transport::Tls { .. }) && scheme != "https" {
+        return Err("TLS account sign-in endpoint must use HTTPS".into());
+    }
+    Ok(skein_oauth_accounts::Endpoint {
+        address,
+        transport: account_transport(configured, trust_roots, trust_root_bytes)?,
+    })
+}
 fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String> {
     let mut issuers = List::with_capacity(u32::try_from(engine.llm.accounts.len()).expect("account count"));
     let mut trust_roots = 0_u32;
@@ -134,50 +218,36 @@ fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String>
                         .ok_or("account endpoint has no address")?
                 }
             };
-            let transport = match &source.transport {
-                config::Transport::Plaintext => skein_oauth_accounts::Transport::Plaintext,
-                config::Transport::Tls { server_name, trust } => {
-                    let source = match trust {
-                        Some(file) => skein_shell::Trust::Der(path(file).into()),
-                        None => skein_shell::Trust::Machine {
-                            ssl_cert_file: std::env::var_os("SSL_CERT_FILE").map(PathBuf::from),
-                        },
-                    };
-                    let roots = skein_shell::read_trust_roots(
-                        &source,
-                        &skein_shell::RootBounds {
-                            bundle_bytes: CONFIG_BYTES,
-                            certificates: 1024,
-                            certificate_bytes: 65_536,
-                        },
-                    )
-                    .map_err(|why| format!("account trust: {why:?}"))?;
-                    trust_roots = trust_roots
-                        .checked_add(u32::try_from(roots.certificates.len()).expect("roots count"))
-                        .ok_or("trust count")?;
-                    for root in &roots.certificates {
-                        trust_root_bytes = trust_root_bytes.max(u32::try_from(root.len()).expect("root size"));
-                    }
-                    let (trust, parsed) = skein_tls::Config::from_der(&roots.certificates, &[])
-                        .map_err(|why| format!("account trust: {why:?}"))?;
-                    eprintln!(
-                        "jig-test: trust roots taken {}, skipped {}, malformed {}, other {}",
-                        roots.certificates.len(),
-                        parsed.skipped,
-                        roots.malformed,
-                        roots.other_blocks
-                    );
-                    let name = std::str::from_utf8(server_name).map_err(|why| why.to_string())?;
-                    let server_name = skein_tls::Name::new(name).ok_or("account server name")?;
-                    skein_oauth_accounts::Transport::Tls { server_name, trust }
-                }
-            };
+            let transport = account_transport(&source.transport, &mut trust_roots, &mut trust_root_bytes)?;
             issuers
                 .push((account.number, skein_oauth_accounts::Endpoint { address, transport }))
                 .expect("configured account count");
         }
     }
-    Ok(service::AccountsRuntime { issuers, trust_roots, trust_root_bytes })
+    let mut providers = List::with_capacity(u32::try_from(engine.llm.providers.len()).expect("provider count"));
+    for provider in &engine.llm.providers {
+        if let Some(registration) = &provider.sign_in {
+            let endpoint = account_endpoint(
+                &registration.token,
+                &registration.endpoint_transport,
+                &mut trust_roots,
+                &mut trust_root_bytes,
+            )?;
+            let mut origins = List::with_capacity(3);
+            for uri in [Some(&registration.authorization), Some(&registration.keys), registration.revocation.as_ref()]
+                .into_iter()
+                .flatten()
+            {
+                let endpoint =
+                    account_endpoint(uri, &registration.endpoint_transport, &mut trust_roots, &mut trust_root_bytes)?;
+                origins
+                    .push(skein_oauth_accounts::Origin { uri: account_origin(uri)?, endpoint })
+                    .expect("three account sign-in origins");
+            }
+            providers.push((provider.number, endpoint, origins)).expect("configured provider count");
+        }
+    }
+    Ok(service::AccountsRuntime { issuers, providers, trust_roots, trust_root_bytes })
 }
 fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
     let document =
