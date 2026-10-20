@@ -122,6 +122,16 @@ fn waiting_account(until: Option<Wall>) -> OwnerDeployment {
     value
         .accounts
         .push(OwnerAccount {
+            place: 0,
+            uses: None,
+            plan: false,
+            provider: None,
+            display: jig_client::contract::DocumentText {
+                bytes: jig_client::contract::Text::new(Box::from([]), 32).expect("empty display"),
+                cut: false,
+            },
+            holder: jig_client::contract::OwnerAccountHolder::Deployment,
+            sources: List::with_capacity(0),
             number: 1,
             generation: None,
             state: OwnerAccountState::Later { until },
@@ -189,6 +199,16 @@ fn deployment_view_all_attempt_account_hello_states_clocks_keys_and_independent_
         value
             .accounts
             .push(OwnerAccount {
+                place: 0,
+                uses: None,
+                plan: false,
+                provider: None,
+                display: jig_client::contract::DocumentText {
+                    bytes: jig_client::contract::Text::new(Box::from([]), 32).expect("empty display"),
+                    cut: false,
+                },
+                holder: jig_client::contract::OwnerAccountHolder::Deployment,
+                sources: List::with_capacity(0),
                 number: u32::MAX,
                 generation: Some(u64::MAX),
                 state,
@@ -305,7 +325,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 229);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 242);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -356,6 +376,16 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
         value
             .accounts
             .push(OwnerAccount {
+                place: 0,
+                uses: None,
+                plan: false,
+                provider: None,
+                display: jig_client::contract::DocumentText {
+                    bytes: jig_client::contract::Text::new(Box::from([]), 32).expect("empty display"),
+                    cut: false,
+                },
+                holder: jig_client::contract::OwnerAccountHolder::Deployment,
+                sources: List::with_capacity(0),
                 number: if n == 0 { 0 } else { u32::MAX },
                 generation: Some(n),
                 state: OwnerAccountState::Closing,
@@ -746,4 +776,87 @@ fn an_agent_shortfall_refusal_is_worded() {
     let tree = round_trip(value);
     assert!(contains(&tree, b"Agent window too small for charter 42"));
     assert!(contains(&tree, b"Model position 3"));
+}
+
+#[test]
+fn deployment_accounts_show_identity_sources_and_payers_in_order() {
+    let mut value = waiting_account(None);
+    value.cut = false;
+    let account = value.accounts.get_mut(0).unwrap();
+    account.provider = Some(2);
+    account.display = DocumentText { bytes: Text::new(copy_of(b"Personal"), CLIENT.text).unwrap(), cut: true };
+    account.holder = OwnerAccountHolder::Party(23);
+    account.plan = true;
+    account.uses = Some(list(vec![OwnerAccountUse::Party(23), OwnerAccountUse::Project(29)]));
+    account.sources = list(vec![
+        OwnerAccountSource {
+            place: 3,
+            number: 11,
+            kind: OwnerAccountKind::SignIn,
+            state: OwnerAccountState::Granted,
+            usable: true,
+            expiring: true,
+            attention: true,
+            spent_until: Some(Wall::from_nanos(46_920_000_000_000)),
+        },
+        OwnerAccountSource {
+            place: 5,
+            number: 12,
+            kind: OwnerAccountKind::Key,
+            state: OwnerAccountState::Later { until: None },
+            usable: false,
+            expiring: false,
+            attention: false,
+            spent_until: None,
+        },
+    ]);
+    let tree = round_trip(value);
+    let text: Vec<_> =
+        tree.nodes().iter().flat_map(|n| n.text.as_slice().iter().flat_map(|r| r.text.iter().copied())).collect();
+    let ordered = [
+        b"LLM provider 2".as_slice(),
+        b"Personal",
+        b"Some rows were omitted",
+        b"Held by party 23",
+        b"A plan's account",
+        b"Source 11",
+        b"Signed in",
+        b"Account State Granted",
+        b"Usable",
+        b"Expiring",
+        b"Needs attention",
+        b"14:02",
+        b"Source 12",
+        b"Key",
+        b"Asks again later",
+        b"Pays for party 23",
+        b"Pays for project 29",
+    ];
+    let mut after = 0;
+    for words in ordered {
+        let offset = text[after..]
+            .windows(words.len())
+            .position(|w| w == words)
+            .unwrap_or_else(|| panic!("missing ordered words {}", String::from_utf8_lossy(words)));
+        after += offset + words.len();
+    }
+}
+#[test]
+fn deployment_accounts_show_the_default_uses_and_deployment_holder() {
+    let tree = round_trip(waiting_account(None));
+    assert!(contains(&tree, b"Default uses"));
+    assert!(contains(&tree, b"Held by the deployment"));
+}
+#[test]
+fn account_uses_have_their_constant_bound_and_sources_have_rows() {
+    // domain/accounts.md, 4.2; the independent client wire constant is 16.
+    const USES: usize = 16;
+    let mut value = waiting_account(None);
+    value.accounts.get_mut(0).unwrap().uses = Some(list(vec![OwnerAccountUse::Party(23); USES]));
+    let _tree = round_trip(value.clone());
+    value.accounts.get_mut(0).unwrap().uses = Some(list(vec![OwnerAccountUse::Party(23); USES + 1]));
+    assert!(view::required(&value, &CLIENT, shared_words()).is_none());
+    value.accounts.get_mut(0).unwrap().uses = None;
+    value.accounts.get_mut(0).unwrap().sources = List::with_capacity(CLIENT.rows + 1);
+    assert!(view::required(&value, &CLIENT, shared_words()).is_none());
 }

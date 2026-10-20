@@ -785,7 +785,9 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
     assert_eq!(crate::conversation_nodes(&CLIENT, 0), Some(1_015_392));
     assert_eq!(crate::task_nodes(&CLIENT, 0), Some(1_172_239));
     assert_eq!(crate::project_nodes(&CLIENT, 0), Some(508_689));
-    assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(2729));
+    // Two account rows each add two 12-node sources and 48 identity/use nodes.
+    const DEPLOYMENT_NODES: u32 = 2873;
+    assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(DEPLOYMENT_NODES));
     assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(25));
     assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_172_239));
 }

@@ -296,6 +296,7 @@ pub(crate) fn uses(section: Section, subject: &jig_client::contract::Subject) ->
             Section::Inbox { .. } | Section::Task { .. } | Section::Project { .. } | Section::Deployment => false,
         },
         Subject::Deployment => section == Section::Deployment,
+        Subject::Accounts => false,
     }
 }
 

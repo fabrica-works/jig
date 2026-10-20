@@ -12,8 +12,48 @@ pub enum AccountPhrase {
     Failed,
     Stalled,
     TooLarge,
+    Provider,
+    HeldByDeployment,
+    HeldByParty,
+    Plan,
+    Sources,
+    Source,
+    SignIn,
+    Key,
+    Program,
+    None,
+    DefaultUses,
+    PaysParty,
+    PaysProject,
 }
 impl AccountPhrase {
+    pub(super) const fn hole(self) -> Option<skein_ui::phrases::HoleKind> {
+        use skein_ui::phrases::HoleKind;
+        match self {
+            Self::Later => Some(HoleKind::Wall),
+            Self::Provider | Self::HeldByParty | Self::Source | Self::PaysParty | Self::PaysProject => {
+                Some(HoleKind::Number)
+            }
+            Self::LaterUnknown
+            | Self::Unloaded
+            | Self::Cancelled
+            | Self::Directory
+            | Self::File
+            | Self::Unreadable
+            | Self::Refused
+            | Self::Failed
+            | Self::Stalled
+            | Self::TooLarge
+            | Self::HeldByDeployment
+            | Self::Plan
+            | Self::Sources
+            | Self::SignIn
+            | Self::Key
+            | Self::Program
+            | Self::None
+            | Self::DefaultUses => None,
+        }
+    }
     pub(super) const fn number(self) -> u16 {
         match self {
             Self::Later => 9400,
@@ -27,6 +67,19 @@ impl AccountPhrase {
             Self::Failed => 9407,
             Self::Stalled => 9408,
             Self::TooLarge => 9409,
+            Self::Provider => 9452,
+            Self::HeldByDeployment => 9453,
+            Self::HeldByParty => 9454,
+            Self::Plan => 9455,
+            Self::Sources => 9456,
+            Self::Source => 9457,
+            Self::SignIn => 9458,
+            Self::Key => 9459,
+            Self::Program => 9460,
+            Self::None => 9461,
+            Self::DefaultUses => 9462,
+            Self::PaysParty => 9463,
+            Self::PaysProject => 9464,
         }
     }
     pub(super) const fn label(self) -> &'static [u8] {
@@ -42,6 +95,19 @@ impl AccountPhrase {
             Self::Failed => b"Record failed",
             Self::Stalled => b"Record stalled",
             Self::TooLarge => b"Record too large",
+            Self::Provider => b"LLM provider ",
+            Self::HeldByDeployment => b"Held by the deployment",
+            Self::HeldByParty => b"Held by party ",
+            Self::Plan => b"A plan's account",
+            Self::Sources => b"Sources",
+            Self::Source => b"Source ",
+            Self::SignIn => b"Signed in",
+            Self::Key => b"Key",
+            Self::Program => b"Program",
+            Self::None => b"None",
+            Self::DefaultUses => b"Default uses",
+            Self::PaysParty => b"Pays for party ",
+            Self::PaysProject => b"Pays for project ",
         }
     }
 }

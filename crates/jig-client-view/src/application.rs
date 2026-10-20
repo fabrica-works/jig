@@ -136,7 +136,8 @@ pub(crate) fn delivery(
         | Delivery::Run(_)
         | Delivery::RunState(_)
         | Delivery::Deployment(_)
-        | Delivery::OwnerDeployment(_) => {}
+        | Delivery::OwnerDeployment(_)
+        | Delivery::OwnerAccounts(_) => {}
     }
 }
 pub(crate) fn read_result(

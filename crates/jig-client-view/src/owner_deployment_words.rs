@@ -222,7 +222,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 229] = [
+pub const ALL: [DeploymentPhrase; 242] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -346,6 +346,19 @@ pub const ALL: [DeploymentPhrase; 229] = [
     DeploymentPhrase::AccountDetail(AccountPhrase::Failed),
     DeploymentPhrase::AccountDetail(AccountPhrase::Stalled),
     DeploymentPhrase::AccountDetail(AccountPhrase::TooLarge),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Provider),
+    DeploymentPhrase::AccountDetail(AccountPhrase::HeldByDeployment),
+    DeploymentPhrase::AccountDetail(AccountPhrase::HeldByParty),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Plan),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Sources),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Source),
+    DeploymentPhrase::AccountDetail(AccountPhrase::SignIn),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Key),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Program),
+    DeploymentPhrase::AccountDetail(AccountPhrase::None),
+    DeploymentPhrase::AccountDetail(AccountPhrase::DefaultUses),
+    DeploymentPhrase::AccountDetail(AccountPhrase::PaysParty),
+    DeploymentPhrase::AccountDetail(AccountPhrase::PaysProject),
     DeploymentPhrase::AccountStateClosing,
     DeploymentPhrase::HelloRefusalReservedChannel,
     DeploymentPhrase::HelloRefusalWorkers,
@@ -676,11 +689,9 @@ impl DeploymentPhrase {
     fn hole(self) -> Option<HoleKind> {
         match self {
             Self::Agent(phrase) => phrase.hole(),
-            Self::AccountDetail(AccountPhrase::Later) | Self::At | Self::GraceUntil | Self::SpentUntil => {
-                Some(HoleKind::Wall)
-            }
-            Self::AccountDetail(..)
-            | Self::Deployment
+            Self::AccountDetail(phrase) => phrase.hole(),
+            Self::At | Self::GraceUntil | Self::SpentUntil => Some(HoleKind::Wall),
+            Self::Deployment
             | Self::Hosts
             | Self::Attempts
             | Self::Accounts

@@ -391,6 +391,7 @@ pub(crate) fn delivery(
                 crate::page::project::task_rows(domain, env, source, *tasks, out, lent);
             }
         }
+        Delivery::OwnerAccounts(_) => {}
         Delivery::Deployment(_) | Delivery::OwnerDeployment(_) => {
             crate::page::deployment::watched(domain, env, out, lent);
         }
@@ -900,6 +901,7 @@ fn owner_tree_delivery(
         | Subject::Inbox { .. }
         | Subject::Tasks { .. }
         | Subject::Run { .. }
+        | Subject::Accounts
         | Subject::Deployment => return,
     }
     let owner = &tree;

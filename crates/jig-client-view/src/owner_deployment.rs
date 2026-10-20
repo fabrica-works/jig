@@ -1,5 +1,6 @@
 //! Deployment facts and bounded live diagnostics (pages.md, 7; view.md, 7).
 //! Supplied clocks, loss counters and identities stay independent.
+mod accounts;
 mod hello;
 use crate::owner_deployment_words::{AccountPhrase as A, DeploymentPhrase as P};
 use crate::words::Words;
@@ -527,6 +528,7 @@ fn render_accounts(
         if let Some(generation) = account.generation {
             field_number(b, words, P::Generation, generation);
         }
+        accounts::details(b, words, account);
         account_state(b, words, account.state);
         text(b, words, if account.usable { P::Usable } else { P::Unusable }, &[]);
         text(b, words, if account.expiring { P::Expiring } else { P::NotExpiring }, &[]);
@@ -664,7 +666,12 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
     let run = link.checked_add(14)?;
     let hosts = run.checked_mul(l.rows)?.checked_add(16)?.checked_mul(l.rows)?;
     let attempts = run.checked_mul(l.rows)?;
-    let accounts = crate::chip_nodes(l)?.checked_mul(l.rows)?.checked_mul(2)?.checked_add(16)?.checked_mul(l.rows)?;
+    let accounts = crate::chip_nodes(l)?
+        .checked_mul(l.rows)?
+        .checked_mul(2)?
+        .checked_add(l.rows.checked_mul(12)?)?
+        .checked_add(64)?
+        .checked_mul(l.rows)?;
     hosts
         .checked_add(attempts)?
         .checked_add(accounts)?
@@ -771,7 +778,16 @@ pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<sk
         run_fits(value, l, words)?;
     }
     for account in &value.accounts {
-        if account.runs.capacity() > l.rows || account.waiting.capacity() > l.rows {
+        if account.runs.capacity() > l.rows
+            || account.waiting.capacity() > l.rows
+            || account.sources.capacity() > l.rows
+            || !account.display.bytes.fits(l.text)
+        {
+            return None;
+        }
+        if let Some(uses) = &account.uses
+            && uses.capacity() > 16
+        {
             return None;
         }
         for value in &account.runs {
