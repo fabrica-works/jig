@@ -1058,8 +1058,8 @@ impl Payload for Refusal {
             | Self::Provider
             | Self::NoEscalationHolder
             | Self::NotOffered
-            | Self::KeyConflict => Some(0),
-            Self::Account { .. } => Some(0),
+            | Self::KeyConflict
+            | Self::Account { .. } => Some(0),
             Self::Llm { model, why: _ } => model.heap(bounds),
         }
     }

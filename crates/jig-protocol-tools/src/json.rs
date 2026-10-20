@@ -252,6 +252,12 @@ impl Value {
 
 fn field_name(key: &[u8]) -> &'static [u8] {
     const NAMES: &[&[u8]] = &[
+        b"llm",
+        b"main",
+        b"model",
+        b"effort",
+        b"account",
+        b"subagents",
         b"action",
         b"age",
         b"amendment",

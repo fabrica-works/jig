@@ -72,8 +72,7 @@ pub(crate) fn delegate(value: &Value) -> Result<engine::Delegate, Problem> {
         spec,
         contract,
         authority,
-        // The tool names no LLM choice: the core resolves its charter's default (tasks.md, 3).
-        llm: None,
+        llm: llm(value.field(b"llm")?)?,
         symbolic_grants,
         dependencies,
         wake,
@@ -133,7 +132,7 @@ pub(crate) fn amendment(value: &Value) -> Result<tasks::Amendment, Problem> {
         wake,
         dependencies,
         authority,
-        llm: None,
+        llm: llm(value.field(b"llm")?)?,
         reason: value.required(b"reason")?.text()?,
     })
 }
@@ -397,4 +396,45 @@ fn flags(value: &Value) -> Result<tasks::Flags, Problem> {
             _ => return Err(Problem { field: b"retention", why: crate::Why::Range }),
         },
     })
+}
+
+// Host-tool JSON is described per declaration, inside the unchanged worker call envelope.
+// Model/effort indices are the core's configured order; account numbers are durable names.
+fn llm(value: Option<&Value>) -> Result<Option<tasks::LlmChoice>, Problem> {
+    let Some(value) = value else { return Ok(None) };
+    let mut subagents = List::with_capacity(0);
+    if let Some(values) = value.field(b"subagents")? {
+        let items = values.array()?;
+        let count = u32::try_from(items.len()).expect("JSON input count fits u32");
+        if count > tasks::MODELS {
+            return Err(Problem { field: b"subagents", why: crate::Why::TooLarge });
+        }
+        subagents = List::with_capacity(count);
+        for item in items {
+            subagents.push(model_effort(item)?).expect("bounded sub-agent choices");
+        }
+    }
+    Ok(Some(tasks::LlmChoice {
+        account: match value.field(b"account")? {
+            Some(value) => Some(value.small()?),
+            None => None,
+        },
+        main: model_effort(value.required(b"main")?)?,
+        subagents: subagents.into_boxed(),
+    }))
+}
+fn model_effort(value: &Value) -> Result<tasks::ModelEffort, Problem> {
+    Ok(tasks::ModelEffort {
+        model: model_index(value.required(b"model")?, b"model")?,
+        effort: match value.field(b"effort")? {
+            Some(value) => Some(model_index(value, b"effort")?),
+            None => None,
+        },
+    })
+}
+fn model_index(value: &Value, field: &'static [u8]) -> Result<u8, Problem> {
+    match u8::try_from(value.small()?) {
+        Ok(value) => Ok(value),
+        Err(_) => Err(Problem { field, why: crate::Why::Range }),
+    }
 }

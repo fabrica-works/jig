@@ -108,3 +108,27 @@ fn refunding_changes_the_payer_of_financial_descendants() {
     h.restart();
     assert_eq!(h.domain.payer(CHILD), Some(Payer::Party(OTHER)));
 }
+
+#[test]
+fn compound_payer_reads_a_move_before_the_live_financial_chain_changes() {
+    let h = funded_tree();
+    let before = h.stored.clone();
+    let mut admission = crate::CompoundAdmission::new(&h.domain, 1);
+    assert_eq!(admission.payer(CHILD), Some(Payer::Project(PROJECT)));
+    admission
+        .check(
+            &h.env,
+            crate::CompoundContext {
+                person: OTHER,
+                project: PROJECT,
+                period: 0,
+                pool_budget: 100,
+                period_budget: 10_000,
+            },
+            crate::Operation::Move { task: ROOT, reason: Box::new([]) },
+        )
+        .unwrap();
+    assert_eq!(admission.payer(CHILD), Some(Payer::Party(OTHER)));
+    assert_eq!(h.domain.payer(CHILD), Some(Payer::Project(PROJECT)));
+    assert_eq!(h.stored, before);
+}

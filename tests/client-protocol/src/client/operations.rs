@@ -48,7 +48,7 @@ impl Story {
     pub fn elapsed_since_answer(&self, key: Key) -> Duration {
         Duration::from_nanos(self.now.as_nanos().saturating_sub(self.front.told_at(key).as_nanos()))
     }
-    fn task_record(&self, task: u64) -> Option<&tasks::TaskRecord> {
+    pub(super) fn task_record(&self, task: u64) -> Option<&tasks::TaskRecord> {
         self.engine.driver.world.store.rows.values().find_map(|row| match row {
             jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(
                 tasks::Stored::Live(value) | tasks::Stored::Ended(value),

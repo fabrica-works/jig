@@ -292,8 +292,13 @@ development.md, section 3.3).
   and source per retained provider, and claims the main account and
   complete bindings atomically. A source-ending run waits without a
   failed try; an unknown reset has no polling timer. The next run keeps
-  its committed conversation and uses its selected source grants; the client's wire carries a party's choice at `Create` and
-  `Amend`, a task's choice and the models a party may choose in `me`; a
+  its committed conversation and uses its selected source grants. Client v10
+  carries account preferences at `Create` and `Amend`, typed account refusals,
+  and a task's separate kept account and typed next-run wait. Retained asks
+  distinguish preferences, and the core rechecks prospective funding at
+  acceptance. Delegate and Amend host tools carry the same optional choice
+  without widening model authority. The wire also carries the models a party
+  may choose in `me`; a
   run is placed only on its checked free host declaring all models
   retained for that run, with conservative program-login eligibility; and
   configuration names the LLM providers, the sources each offers, each

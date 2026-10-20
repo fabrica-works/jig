@@ -835,7 +835,7 @@ fn a_retained_create_distinguishes_its_account_preference() {
     world.commit_all();
     assert_eq!(expected, world.reply(replay));
     let Ask::Create { batch, .. } = &mut ask else { panic!("create") };
-    batch[0].llm.as_mut().unwrap().account = Some(42);
+    batch[0].llm.as_mut().expect("explicit choice").account = Some(42);
     let conflict = world.request(SIGN_IN, [CREATE; 16], ask);
     assert_eq!(world.reply(conflict), Some(Reply::Refused(Refusal::KeyConflict)));
     world.assert_settled();

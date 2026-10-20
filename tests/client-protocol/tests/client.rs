@@ -8,6 +8,8 @@ mod carried;
 mod llm;
 #[path = "client/named.rs"]
 mod named;
+#[path = "client/named_accounts.rs"]
+mod named_accounts;
 #[path = "client/words.rs"]
 mod words;
 use jig_client::{

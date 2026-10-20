@@ -633,6 +633,14 @@ are the protocol layer's (hosts.md, section 8). Each is checked against
 its task's authority (authority.md, section 8), decided, committed, and
 answered after the commit:
 
+`delegate` and `amend` may name an `llm` choice: a main model and optional
+effort, sub-agent model/effort pairs, and an optional account number. Host-tool
+JSON names models and efforts by their configured indices; account numbers
+are durable names. Omitting the choice keeps the delegate's charter default
+or the amended task's existing choice. A choice grants no additional models:
+the core checks inherited authority and the prospective financial payer.
+These per-tool declarations change within the existing call envelope.
+
 | Tool | What it does | Answers |
 |---|---|---|
 | `delegate` | makes a batch of tasks as its delegates, each with what a party's `Create` names, its label, flags and LLM choice among them (tasks.md, section 4) | their numbers and their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why; beyond authority, naming what it lacked and whether a proposal could be accepted |

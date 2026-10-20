@@ -195,7 +195,8 @@ fn amend(value: &json::Value) -> Result<core::NamedAction, Problem> {
             && amendment.wake.is_none()
             && amendment.dependencies.is_none()
             && amendment.authority.is_none()
-            && amendment.instructions.is_none() =>
+            && amendment.instructions.is_none()
+            && amendment.llm.is_none() =>
         {
             0
         }

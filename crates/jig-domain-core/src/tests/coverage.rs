@@ -158,13 +158,20 @@ fn acceptance_rechecks_a_preference_against_the_new_funder() {
     let (mut core, _) = prepared(false, accounts::Holder::Party(ALICE), None);
     with_model(&mut core);
     let alice = tasks::Funder::Pool { project: PROJECT, person: ALICE, period: 1 };
-    let bob = tasks::Funder::Pool { project: PROJECT, person: BOB, period: 1 };
     let mut new = new_row(&core, 2, alice, None);
     new.llm = Some(preferred(ACCOUNT));
     assert_eq!(core.funded_accounts(&[new.clone()], alice), Ok(()));
+    let proposal = tasks::PersonProposal {
+        number: 1,
+        proposer: ALICE,
+        project: PROJECT,
+        action: tasks::PersonAction::Batch(Box::new([new])),
+        reason: Box::new([]),
+        state: tasks::PersonProposalState::Pending { since: Wall::EPOCH },
+    };
     assert_eq!(
-        core.funded_accounts(&[new], bob),
-        Err(tasks::Refusal::Account { account: ACCOUNT, why: tasks::AccountWhy::Uses })
+        core.goal_accept_allowed(&proposal, PROJECT, BOB, people::Role::Owner, 1, Wall::EPOCH),
+        Err(people::Refusal::Account { account: ACCOUNT, why: people::AccountWhy::Uses })
     );
 }
 

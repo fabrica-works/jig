@@ -61,6 +61,7 @@ fn source_state(value: d::TaskSourceState, limits: &w::Limits) -> Result<w::Task
         )?),
     })
 }
+#[expect(clippy::manual_map, reason = "step code translates optional wall times without closures")]
 fn wall(value: Option<skein_lib::Wall>) -> Option<u64> {
     match value {
         Some(value) => Some(value.as_nanos()),

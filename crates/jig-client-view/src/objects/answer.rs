@@ -32,7 +32,7 @@ pub fn recovery(object: &Object) -> Recovery {
         Card::Refused { refusal } => match refusal {
             Refusal::Moved { .. } => recovery.look_again = true,
             Refusal::Authority { .. } | Refusal::Limit { .. } | Refusal::Llm { .. } | Refusal::Account { .. } => {
-                recovery.change_ask = true
+                recovery.change_ask = true;
             }
             Refusal::Malformed { .. }
             | Refusal::Taken { .. }

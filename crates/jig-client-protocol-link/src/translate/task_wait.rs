@@ -44,6 +44,7 @@ fn source_state(value: &w::TaskSourceState) -> c::TaskSourceState {
         },
     }
 }
+#[expect(clippy::manual_map, reason = "step code translates optional wall times without function pointers")]
 fn wall(value: Option<u64>) -> Option<skein_lib::Wall> {
     match value {
         Some(value) => Some(skein_lib::Wall::from_nanos(value)),

@@ -114,6 +114,7 @@ pub fn frame_record() -> w::Me {
     .expect("literal fixture fits")
 }
 #[must_use]
+#[expect(clippy::too_many_lines, reason = "one complete task wire fixture supplies all owner fields together")]
 pub fn task_record() -> w::Task {
     let lim = limits();
     w::Task::new(

@@ -311,6 +311,10 @@ fn task_problem(problem: &jig_domain_tasks::Problem) -> Rendered {
             jig_domain_tasks::LlmFault::Repeated => b"model repeated",
         },
     };
+    if let jig_domain_tasks::Refusal::Account { account, .. } = problem.why {
+        let account = Decimal::of(u64::from(account));
+        return text(&[b"Refused account ", account.as_bytes(), b": ", why], true);
+    }
     text(&[b"Refused: ", why], true)
 }
 

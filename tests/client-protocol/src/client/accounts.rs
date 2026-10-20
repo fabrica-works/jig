@@ -61,3 +61,80 @@ impl Story {
         self.engine.driver.world.send_all(events);
     }
 }
+
+impl Story {
+    /// Room for the deployment's account and two client-created own key accounts.
+    #[must_use]
+    pub fn named_accounts(seed: u64) -> Self {
+        let mut limits = fixtures::owner_limits();
+        limits.core.accounts.accounts = 3;
+        limits.core.accounts.holder_accounts = 2;
+        limits.core.people.sign_ins = 3;
+        // Two keys, Create, SetUses, Stop, Move, Stop and Release, retained together.
+        limits.core.people.requests = 8;
+        limits.core.people.projects = 2;
+        limits.core.tasks.batch = 2;
+        // The two public Create members and the later project-funded copy.
+        limits.core.tasks.project_tasks = 3;
+        limits.core.tasks.tasks = 3;
+        limits.core.authority.batch = 2;
+        let mut config = fixtures::batch_config(seed);
+        let mut policy = config.core.authority.policy(1).expect("story project policy").clone();
+        // Leave 100 in the project's period for the Move story's directly funded task.
+        policy.roles[0].period_spend = policy.period_spend - 100;
+        let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+        jig_domain_authority::step(
+            &mut config.core.authority,
+            jig_domain_authority::Event::Policy { project: 1, policy },
+            &mut out,
+        );
+        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Changed { project: 1 }));
+        let mut story = Self::configured(seed, &limits, config);
+        story.sign_in();
+        assert!(story.run_until(|s| s.client.link().state == client::Link::Live, Duration::from_secs(1)));
+        story.grant_deployment_role();
+        story
+    }
+    /// Script the lower account input; public Resume still crosses the real client path.
+    pub fn limit_account_source(&mut self, source: u32) {
+        self.engine.driver.world.send(jig_test_domain::Event::Core(jig_domain_core::Event::Account(
+            accounts::Event::Limited { account: source, reset: None },
+        )));
+    }
+    /// An application's project-funded task, copied from a client's ordinary bounded spec.
+    pub fn project_paid_copy(&mut self, task: u64, number: u64) {
+        use jig_domain_tasks as tasks;
+        let row = self.task_record(task).expect("source task").clone();
+        let period = match row.funder {
+            tasks::Funder::Pool { period, .. } | tasks::Funder::Period { period, .. } => period,
+            tasks::Funder::Task(_) | tasks::Funder::Recurring { .. } => panic!("direct source task"),
+        };
+        let mut authority = row.authority;
+        authority.budget.spend = 20;
+        self.engine.driver.world.send(jig_test_domain::Event::Core(jig_domain_core::Event::Tasks(
+            tasks::Event::Make {
+                reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(u64::MAX - 3)),
+                creator: tasks::Party::Deployment { project: row.project },
+                batch: Box::new([tasks::New {
+                    deadline: tasks::Deadline::Named,
+                    number,
+                    project: row.project,
+                    executor: row.executor,
+                    llm: None,
+                    spec: row.spec,
+                    contract: row.contract,
+                    authority,
+                    numbers: tasks::Numbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+                    funder: tasks::Funder::Period { project: row.project, period },
+                    dependencies: Box::new([]),
+                    holdings: Box::new([]),
+                    wake: row.wake,
+                    recurring: None,
+                    tracked: None,
+                    label: row.label,
+                    flags: row.flags,
+                }]),
+            },
+        )));
+    }
+}

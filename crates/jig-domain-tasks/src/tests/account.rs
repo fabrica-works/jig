@@ -97,7 +97,7 @@ fn an_account_wait_releases_reserve_and_charges_once_without_a_try() {
 
 fn amend_choice(h: &mut Harness, account: Option<u32>) {
     let row = h.domain.task(TASK).unwrap();
-    let message = row.last_message + 1;
+    let message = row.last_message.checked_add(1).expect("test message room");
     let mut choice = row.llm.clone().unwrap();
     choice.account = account;
     let out = h.send(Event::Amend {
@@ -120,7 +120,13 @@ fn amend_choice(h: &mut Harness, account: Option<u32>) {
             reason: Box::new([]),
         },
     });
-    assert!(out.iter().any(|request| matches!(request, crate::Request::Done { .. })), "{out:?}");
+    let mut done = false;
+    for request in &out {
+        if let crate::Request::Done { .. } = request {
+            done = true;
+        }
+    }
+    assert!(done, "{out:?}");
 }
 
 #[test]
@@ -132,7 +138,7 @@ fn an_explicit_different_account_clears_the_pin_in_the_amendment() {
     amend_choice(&mut h, Some(PREFERENCE));
     let row = h.domain.task(TASK).unwrap();
     assert_eq!(row.kept_account, None);
-    assert_eq!(row.revisions.spec, revision + 1);
+    assert_eq!(row.revisions.spec, revision.checked_add(1).expect("one amendment"));
     assert_eq!(row.run_reserved, 10, "the current claim retains its reservation");
     h.restart();
     assert_eq!(h.domain.task(TASK).unwrap().kept_account, None);

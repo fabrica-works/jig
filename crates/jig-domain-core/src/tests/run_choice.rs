@@ -339,13 +339,21 @@ fn a_task_document_exposes_an_account_wait_with_no_guessed_reset() {
     let (mut core, limits) = ready(false);
     account(&mut core, &limits, accounts::Event::Limited { account: 1, reset: None });
     let row = core.tasks.task(TASK).unwrap();
-    let document = documents::task_from_row(&core, &limits, 1, row, Wall::EPOCH).unwrap();
+    let document = task_from_row(&core, &limits, 1, row, Wall::EPOCH).unwrap();
     assert_eq!(
         document.run_wait,
-        Some(documents::TaskRunWait::Account {
+        Some(TaskRunWait::Account {
             account: Some(0),
             source: Some(1),
-            why: documents::TaskWaitWhy::Source(documents::TaskSourceState::Limited { until: None }),
+            why: TaskWaitWhy::Source(TaskSourceState::Limited { until: None }),
         })
     );
+}
+
+#[test]
+fn a_task_document_distinguishes_an_application_credential_wait() {
+    let (mut core, limits) = ready(false);
+    core.workspace_credentials.insert(TASK, Box::new([7])).unwrap();
+    let document = task_from_row(&core, &limits, 1, core.tasks.task(TASK).unwrap(), Wall::EPOCH).unwrap();
+    assert_eq!(document.run_wait, Some(TaskRunWait::Credential));
 }
