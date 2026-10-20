@@ -103,6 +103,7 @@ fn accounts_and_deployment_deliveries_require_their_own_subjects() {
     let accounts = documents::Document::Accounts(Box::new(documents::Accounts {
         readiness: skein_lib::List::with_capacity(0),
         readiness_cut: false,
+        program_hosts: skein_lib::List::with_capacity(0),
         accounts: skein_lib::List::with_capacity(0),
         signing: skein_lib::List::with_capacity(0),
         last_end: None,

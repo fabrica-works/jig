@@ -253,7 +253,11 @@ pub(crate) fn owner_host_run_piece(
 }
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-pub(crate) fn owner_host_fields(value: &w::OwnerHost, limits: &Limits) -> Result<c::OwnerHost, w::Problem> {
+pub(crate) fn owner_host_fields(
+    value: &w::OwnerHost,
+    limits: &Limits,
+    room: &mut u64,
+) -> Result<c::OwnerHost, w::Problem> {
     let opt0 = match value.grace_until() {
         Some(item) => Some(Wall::from_nanos(*item)),
         None => None,
@@ -262,7 +266,14 @@ pub(crate) fn owner_host_fields(value: &w::OwnerHost, limits: &Limits) -> Result
         Some(item) => Some(*item),
         None => None,
     };
+    let name = match value.name() {
+        Some(name) => Some(crate::translate::programs::name(name, room)?),
+        None => None,
+    };
     Ok(c::OwnerHost {
+        name,
+        awaiting_logins: value.awaiting_logins(),
+        programs: crate::translate::programs::logins(value.programs(), limits, room)?,
         channel: value.channel(),
         kind: owner_host_kind_fields(value.kind(), limits),
         slots: value.slots(),
@@ -277,33 +288,27 @@ pub(crate) fn owner_host_fields(value: &w::OwnerHost, limits: &Limits) -> Result
     })
 }
 
-pub(crate) fn owner_host_piece(bytes: &[u8], limits: &Limits, bound: u32) -> Result<List<c::OwnerHost>, w::Problem> {
-    let mut reader = Reader::new(bytes);
-    let mut rows = List::with_capacity(bound);
-    let mut sum = 0_u64;
-    for _ in 0..=bound {
-        let item = match skein_codec::piece::split(&mut reader) {
-            Ok(value) => value,
-            Err(reason) => return Err(piece_problem(reason)),
-        };
-        let Some(item) = item else {
-            return Ok(rows);
-        };
-        sum = sum
-            .checked_add(u64::try_from(item.len()).expect("piece fits u64"))
-            .ok_or(too_large())?
-            .checked_add(4)
-            .ok_or(too_large())?;
-        if sum > limits.client.document_bytes {
-            return Err(too_large());
-        }
-        let row = w::OwnerHost::decode(&limits.wire, &mut Reader::new(&item))?;
-        let row = owner_host_fields(&row, limits)?;
-        if rows.push(row).is_err() {
-            return Err(too_large());
-        }
+pub(crate) fn owner_host_piece(
+    bytes: &[u8],
+    limits: &Limits,
+    bound: u32,
+    room: &mut u64,
+) -> Result<List<c::OwnerHost>, w::Problem> {
+    let count = super::piece_count(bytes)?;
+    if count > bound {
+        return Err(too_large());
     }
-    Err(too_large())
+    super::charge(room, List::<c::OwnerHost>::worst_case(bound))?;
+    let mut rows = List::with_capacity(bound);
+    let mut reader = Reader::new(bytes);
+    for _ in 0..count {
+        let Ok(Some(item)) = skein_codec::piece::split(&mut reader) else {
+            return Err(piece_problem(skein_codec::Reason::Malformed));
+        };
+        let row = w::OwnerHost::decode(&limits.wire, &mut Reader::new(&item))?;
+        rows.push(owner_host_fields(&row, limits, room)?).expect("counted host pieces");
+    }
+    Ok(rows)
 }
 
 pub(crate) fn owner_account_place_fields(value: &w::OwnerAccountPlace, _limits: &Limits) -> c::OwnerAccountPlace {

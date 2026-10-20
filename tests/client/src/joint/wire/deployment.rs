@@ -64,6 +64,9 @@ fn capacity(value: documents::Capacity) -> client::OwnerCapacity {
 
 fn host(value: &documents::Host, limits: &Limits) -> Result<client::OwnerHost, owner::Invalid> {
     Ok(client::OwnerHost {
+        name: value.name.as_deref().map(super::programs::configured_name).transpose()?,
+        awaiting_logins: value.awaiting_logins,
+        programs: super::programs::logins(&value.programs, limits)?,
         channel: value.channel,
         kind: host_kind(value.kind),
         slots: value.slots,

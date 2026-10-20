@@ -786,7 +786,8 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
     // and four nodes for the provider name, its cut mark and manage link.
     // Two catalogue offers (two programs each), two readiness rows and six
     // list/heading/cut nodes add 2 * (2 * 2 + 12) + 2 * 5 + 6 = 48.
-    const DEPLOYMENT_NODES: u32 = 2_929;
+    // Program facts add 11 * 2 * 2 + 3 * 2 = 50 nodes at this profile.
+    const DEPLOYMENT_NODES: u32 = 2_979;
     assert_eq!(
         [
             crate::inbox_nodes(&CLIENT, 0),

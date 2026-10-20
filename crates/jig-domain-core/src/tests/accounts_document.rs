@@ -153,6 +153,7 @@ fn finish(core: &mut Core, env: &Env<Limits>, source: u32) {
 }
 fn line(place: u32, number: u32, kind: accounts::Kind) -> SourceLine {
     SourceLine {
+        name: None,
         place,
         number,
         kind,

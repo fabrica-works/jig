@@ -311,7 +311,14 @@ fn memory_below_the_components_sum_is_refused() {
     // 2,184 + 2,472 + 1,760 + 106,848 + 792 + 36 + 384 = 114,476.
     // Resuming one worker's deferred source commands preserves the small profile's
     // existing output/journal/KV envelopes; the engine has no program backend.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_463_427 });
+    // Facts add 416: 2 lost-history nodes * 11 slots * 8 bytes,
+    // plus 3 host-view copies * (2 connected + 8 history rows) * 8 bytes.
+    // Readiness's max(128 ranking, 768 facts, 4520 hosts/model) moves to
+    // max(128, 768, 4600): 10 HostViews * (48 - 40) = 80 of those bytes.
+    // Program documents have their own explicit bound but remain below the
+    // pre-existing largest document envelope; routed and journal caps are unchanged.
+    // Total y1b delta: 114,476 + 416 = 114,892 over main.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_463_843 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

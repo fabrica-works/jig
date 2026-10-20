@@ -280,6 +280,7 @@ fn an_accounts_document_is_watched_but_never_read() {
     let document = d::Document::Accounts(Box::new(d::Accounts {
         readiness: List::with_capacity(0),
         readiness_cut: false,
+        program_hosts: List::with_capacity(0),
         accounts: List::with_capacity(0),
         signing: List::with_capacity(0),
         last_end: None,
@@ -298,7 +299,8 @@ fn an_accounts_document_is_watched_but_never_read() {
                     readiness: Box::new([]),
                     accounts: Box::from([]),
                     signing: Box::from([]),
-                    last_end: None
+                    last_end: None,
+                    program_hosts: Box::new([]),
                 }
             )
             .unwrap()

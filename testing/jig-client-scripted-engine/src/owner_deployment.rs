@@ -35,7 +35,10 @@ impl Payload for OwnerProjectCapacity {
 }
 impl Payload for OwnerHost {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        self.runs.heap(bounds)
+        self.runs
+            .heap(bounds)?
+            .checked_add(self.name.heap(&Bounds { text: 4096, ..*bounds })?)?
+            .checked_add(self.programs.heap(bounds)?)
     }
 }
 impl Payload for OwnerHostRun {
@@ -234,8 +237,8 @@ impl Payload for jig_client_domain::contract::OwnerAccountUse {
     }
 }
 impl Payload for jig_client_domain::contract::OwnerAccountSource {
-    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
-        Some(0)
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.name.heap(&Bounds { text: 32, ..*bounds })
     }
 }
 impl Payload for jig_client_domain::contract::OwnerAccountSignIn {
@@ -255,7 +258,11 @@ impl Payload for jig_client_domain::contract::OwnerAccountLine {
 }
 impl Payload for jig_client_domain::contract::OwnerAccounts {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        self.accounts.heap(bounds)?.checked_add(self.signing.heap(bounds)?)?.checked_add(self.readiness.heap(bounds)?)
+        self.accounts
+            .heap(bounds)?
+            .checked_add(self.signing.heap(bounds)?)?
+            .checked_add(self.readiness.heap(bounds)?)?
+            .checked_add(self.program_hosts.heap(bounds)?)
     }
 }
 
@@ -270,5 +277,38 @@ impl Payload for jig_client_domain::contract::ProviderOffer {
 impl Payload for jig_client_domain::contract::PayerReadiness {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         Some(0)
+    }
+}
+
+impl Payload for jig_client_domain::contract::OwnerProgramState {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        use jig_client_domain::contract::OwnerProgramState as S;
+        match self {
+            S::Usable | S::NotSignedIn => Some(0),
+            S::SignedInOtherwise { method } => method.heap(&Bounds { text: 32, ..*bounds }),
+            S::Failed { detail, .. } => detail.heap(&Bounds { text: 4096, ..*bounds }),
+        }
+    }
+}
+impl Payload for jig_client_domain::contract::OwnerProgramSignOut {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        use jig_client_domain::contract::OwnerProgramSignOut as S;
+        match self {
+            S::SignedOut => Some(0),
+            S::Failed { detail, .. } => detail.heap(&Bounds { text: 4096, ..*bounds }),
+        }
+    }
+}
+impl Payload for jig_client_domain::contract::OwnerProgramLogin {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.name
+            .heap(&Bounds { text: 32, ..*bounds })?
+            .checked_add(self.state.heap(bounds)?)?
+            .checked_add(self.sign_out.heap(bounds)?)
+    }
+}
+impl Payload for jig_client_domain::contract::OwnerProgramHost {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.name.heap(&Bounds { text: 4096, ..*bounds })?.checked_add(self.programs.heap(bounds)?)
     }
 }

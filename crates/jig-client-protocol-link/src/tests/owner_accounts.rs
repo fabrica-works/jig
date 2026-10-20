@@ -15,6 +15,7 @@ fn source_lines() -> List<c::OwnerAccountSource> {
 fn source_rows() -> [c::OwnerAccountSource; 2] {
     [
         c::OwnerAccountSource {
+            name: None,
             place: 2,
             number: 11,
             kind: c::OwnerAccountKind::SignIn,
@@ -25,6 +26,7 @@ fn source_rows() -> [c::OwnerAccountSource; 2] {
             spent_until: Some(Wall::from_nanos(101)),
         },
         c::OwnerAccountSource {
+            name: None,
             place: 5,
             number: 12,
             kind: c::OwnerAccountKind::Key,
@@ -41,6 +43,7 @@ fn document(end: Option<c::OwnerAccountEnd>) -> c::OwnerAccounts {
     c::OwnerAccounts {
         readiness: List::with_capacity(0),
         readiness_cut: false,
+        program_hosts: List::with_capacity(0),
         accounts: list([
             c::OwnerAccountLine {
                 provider_name: None,

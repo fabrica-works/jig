@@ -10,6 +10,7 @@ use skein_lib::{Duration, List, Wall};
 fn source_lines() -> List<d::SourceLine> {
     list([
         d::SourceLine {
+            name: None,
             place: 2,
             number: 11,
             kind: a::Kind::SignIn,
@@ -20,6 +21,7 @@ fn source_lines() -> List<d::SourceLine> {
             spent_until: Some(Wall::from_nanos(101)),
         },
         d::SourceLine {
+            name: None,
             place: 5,
             number: 12,
             kind: a::Kind::Key,
@@ -36,6 +38,7 @@ fn document(end: Option<a::End>) -> d::Accounts {
     d::Accounts {
         readiness: List::with_capacity(0),
         readiness_cut: false,
+        program_hosts: List::with_capacity(0),
         accounts: list([
             d::AccountLine {
                 provider_name: None,

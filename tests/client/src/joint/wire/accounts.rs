@@ -102,6 +102,7 @@ pub(super) fn sources(
 ) -> Result<List<c::OwnerAccountSource>, owner::Invalid> {
     owner::list(value, limits, |row| {
         Ok(c::OwnerAccountSource {
+            name: row.name.as_deref().map(super::programs::program_name).transpose()?,
             place: row.place,
             number: row.number,
             kind: kind(row.kind),
@@ -119,6 +120,7 @@ pub(super) fn document(value: &d::Accounts, limits: &Limits) -> Result<c::OwnerA
     Ok(c::OwnerAccounts {
         readiness: super::catalogue::readiness(&value.readiness, limits)?,
         readiness_cut: value.readiness_cut,
+        program_hosts: super::programs::hosts(&value.program_hosts, limits)?,
         accounts: owner::list(&value.accounts, limits, |row| {
             Ok(c::OwnerAccountLine {
                 number: row.number,

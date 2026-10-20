@@ -78,6 +78,9 @@ pub(crate) fn tracked(limits: &Limits) -> Option<u32> {
 /// rest is its sender's to count.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    if limits.worker_name_bytes > crate::WORKER_NAME {
+        return None;
+    }
     let configured = skein_lib::List::<Box<[u8]>>::worst_case(limits.configured_workers)?
         .checked_add(u64::from(limits.configured_workers).checked_mul(u64::from(limits.worker_name_bytes))?)?;
     let count = limits.workers.checked_add(u32::from(limits.engine_slots > 0))?;

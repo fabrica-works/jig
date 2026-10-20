@@ -33,10 +33,12 @@ mod accounts;
 pub use accounts::{AccountLine, Accounts, LastEnd, SignInLine, SourceLine};
 pub use jig_domain_accounts::Use;
 mod deployment;
+mod programs;
 pub use deployment::{
     Account, AccountState, Capacity, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun, ProjectCapacity,
     RunLocation, StoreFill, make_with_clock,
 };
+pub use programs::{ProgramHost, ProgramLogin};
 mod inbox_selection;
 pub(crate) use inbox_selection::retained as inbox_selection_from_ancestry;
 pub use inbox_selection::{InboxSelection, inbox_selection_worst_case};

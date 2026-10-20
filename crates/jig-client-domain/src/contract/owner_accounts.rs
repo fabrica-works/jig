@@ -27,6 +27,7 @@ pub fn valid_manage_usage(value: &[u8]) -> bool {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[expect(clippy::struct_excessive_bools, reason = "independent aggregate and list loss facts")]
 pub struct OwnerAccounts {
+    pub program_hosts: List<super::OwnerProgramHost>,
     pub accounts: List<OwnerAccountLine>,
     pub signing: List<OwnerAccountSignIn>,
     pub last_end: Option<OwnerAccountLastEnd>,
@@ -54,6 +55,7 @@ pub struct OwnerAccountLine {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerAccountSource {
+    pub name: Option<Box<[u8]>>,
     pub place: u32,
     pub number: u32,
     pub kind: OwnerAccountKind,

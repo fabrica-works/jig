@@ -21,6 +21,7 @@ pub mod outcomes;
 pub mod owner;
 pub mod pages;
 pub mod person_tasks;
+mod programs;
 pub mod projects;
 pub mod proposals;
 pub mod reads;

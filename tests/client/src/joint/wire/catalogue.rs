@@ -189,6 +189,7 @@ mod tests {
     #[test]
     fn accounts_carry_payer_observations() {
         let source = d::Accounts {
+            program_hosts: List::with_capacity(0),
             accounts: List::with_capacity(0),
             signing: List::with_capacity(0),
             last_end: None,

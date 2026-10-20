@@ -9,6 +9,7 @@ use skein_lib::{List, Wall};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SourceLine {
+    pub name: Option<Box<[u8]>>,
     pub place: u32,
     pub number: u32,
     pub kind: accounts::Kind,
@@ -44,12 +45,13 @@ pub struct LastEnd {
     pub end: accounts::End,
 }
 /// Secret-free facts of the party's accounts, including configured provider terms.
-/// Program per-host state and checks await T12. Uses name explicit payers,
+/// Per-host program facts are joined from the current fleet inventory. Uses name explicit payers,
 /// or leave the default; `usable` follows those uses for this party;
 /// `settled` currently counts only sign-ins the party asked for.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent aggregate and list loss facts")]
 pub struct Accounts {
+    pub program_hosts: List<super::ProgramHost>,
     pub accounts: List<AccountLine>,
     pub signing: List<SignInLine>,
     pub last_end: Option<LastEnd>,
@@ -62,6 +64,7 @@ pub struct Accounts {
     pub readiness_cut: bool,
 }
 
+#[expect(clippy::manual_map, reason = "step code uses exhaustive options without closures")]
 pub(super) fn source_lines(
     core: &Core,
     limits: &Limits,
@@ -77,6 +80,10 @@ pub(super) fn source_lines(
         };
         sources
             .push(SourceLine {
+                name: match accounts::programs::name(&core.accounts, *number, account.holder()) {
+                    Some(name) => Some(skein_lib::bytes::copy_of(name)),
+                    None => None,
+                },
                 place: *place,
                 number: *number,
                 kind: fact.kind,
@@ -156,13 +163,15 @@ pub(super) fn make(
         None => None,
     };
     let (readiness, readiness_cut) = super::catalogue::rows(core, limits, party)?;
+    let (program_hosts, hosts_cut) = super::programs::hosts(core, limits, accounts::Holder::Party(party));
     Ok(Accounts {
+        program_hosts,
         accounts,
         signing,
         last_end,
         usable: serves_work(core, party),
         settled,
-        cut,
+        cut: cut || hosts_cut,
         readiness,
         readiness_cut,
     })
@@ -184,11 +193,13 @@ fn serves_work(core: &Core, party: u64) -> bool {
 
 pub(super) fn worst_case(limits: &DocumentLimits) -> Option<u64> {
     let account_heap = List::<SourceLine>::worst_case(limits.lines)?
+        .checked_add(u64::from(limits.lines).checked_mul(u64::from(accounts::NAME))?)?
         .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?
         .checked_add(u64::from(accounts::MANAGE_USAGE))?
         .checked_add(List::<accounts::Use>::worst_case(accounts::USES)?)?;
     u64::try_from(size_of::<Accounts>())
         .ok()?
+        .checked_add(super::programs::hosts_worst_case(limits)?)?
         .checked_add(List::<AccountLine>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(account_heap)?)?
         .checked_add(List::<SignInLine>::worst_case(limits.lines)?)?

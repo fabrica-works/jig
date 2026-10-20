@@ -29,6 +29,7 @@ pub struct HelloRefusalRecord {
 /// A lost channel's identity and admitted slots remain available for display.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) struct LostHost {
+    pub(crate) worker: Option<u32>,
     pub(crate) channel: Token,
     pub(crate) slots: u32,
     pub(crate) draining: bool,

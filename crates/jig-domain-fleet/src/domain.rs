@@ -80,6 +80,15 @@ pub struct Domain {
 }
 
 impl Domain {
+    #[must_use]
+    pub fn program_names(&self) -> &[crate::SourceName] {
+        &self.program_sources
+    }
+    #[must_use]
+    pub fn program_cleanup(&self, name: crate::SourceName) -> bool {
+        self.cleanup_programs.contains(&name)
+    }
+
     /// Supply the fixed configured membership before admitting channels.
     /// Returns false for names outside the startup bounds or a late replacement.
     pub fn configure_workers(&mut self, limits: &Limits, names: Box<[Box<[u8]>]>) -> bool {
@@ -254,6 +263,7 @@ impl Domain {
             result
                 .push(crate::HostView {
                     channel: value.token,
+                    worker: value.worker,
                     kind: value.kind,
                     slots: value.slots,
                     used: value.hosts.len(),
@@ -277,6 +287,7 @@ impl Domain {
             result
                 .push(crate::HostView {
                     channel: host.channel,
+                    worker: host.worker,
                     kind: HostKind::Worker,
                     slots: host.slots,
                     used,

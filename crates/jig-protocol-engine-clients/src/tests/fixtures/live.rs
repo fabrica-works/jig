@@ -152,6 +152,9 @@ pub fn deployment_document() -> d::Deployment {
         readiness_cut: false,
         store: d::StoreFill { bytes: 31, mark: 37 },
         hosts: list([d::Host {
+            name: None,
+            awaiting_logins: false,
+            programs: List::with_capacity(0),
             channel: 17,
             kind: fleet::HostKind::Engine,
             slots: 2,

@@ -1,10 +1,12 @@
 //! Deployment diagnostics sayings (client/domain/view.md, 7).
 mod accounts;
 mod agents;
+mod programs;
 use crate::Owner;
 pub use accounts::AccountPhrase;
 pub use agents::AgentPhrase;
 use alloc::boxed::Box;
+pub use programs::ProgramPhrase;
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit,
@@ -12,6 +14,7 @@ use skein_ui::phrases::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeploymentPhrase {
+    ProgramDetail(ProgramPhrase),
     Agent(AgentPhrase),
     Deployment,
     Hosts,
@@ -225,7 +228,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 257] = [
+pub const ALL: [DeploymentPhrase; 275] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -483,6 +486,24 @@ pub const ALL: [DeploymentPhrase; 257] = [
     DeploymentPhrase::ConnectorsEmpty,
     DeploymentPhrase::StoreBytes,
     DeploymentPhrase::StoreMark,
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Programs),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Awaiting),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Received),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Usable),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::NotSignedIn),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Otherwise),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Failed),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::SignedOut),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::SignOutFailed),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Cleanup),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Missing),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Deadline),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Unreadable),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Exited),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Unconfigured),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Unknown),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::Closed),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::StatusUnknown),
 ];
 impl DeploymentPhrase {
     #[must_use]
@@ -593,6 +614,7 @@ impl DeploymentPhrase {
                 Self::AccountStateMisconfigured => 9299,
                 Self::AccountDetail(phrase) => phrase.number(),
                 Self::Agent(phrase) => phrase.number(),
+                Self::ProgramDetail(phrase) => phrase.number(),
                 Self::AccountStateClosing => 9300,
                 Self::HelloRefusalReservedChannel => 9301,
                 Self::HelloRefusalWorkers => 9302,
@@ -710,6 +732,7 @@ impl DeploymentPhrase {
     fn hole(self) -> Option<HoleKind> {
         match self {
             Self::Agent(phrase) => phrase.hole(),
+            Self::ProgramDetail(phrase) => phrase.hole(),
             Self::AccountDetail(phrase) => phrase.hole(),
             Self::At | Self::GraceUntil | Self::SpentUntil => Some(HoleKind::Wall),
             Self::Deployment
@@ -1023,6 +1046,7 @@ impl DeploymentPhrase {
             Self::AccountStateMisconfigured => b"Account State Misconfigured",
             Self::AccountDetail(phrase) => phrase.label(),
             Self::Agent(phrase) => phrase.label(),
+            Self::ProgramDetail(phrase) => phrase.label(),
             Self::AccountStateClosing => b"Account State Closing",
             Self::HelloRefusalReservedChannel => b"Hello Refusal Reserved Channel",
             Self::HelloRefusalWorkers => b"Hello Refusal Workers",

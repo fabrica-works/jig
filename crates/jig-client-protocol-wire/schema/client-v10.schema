@@ -774,7 +774,14 @@ record OwnerRunLocationConnected { channel: u64 kind: OwnerHostKind }
 record OwnerRunLocationAdrift { channel: option u64 until: option u64 remaining: option duration }
 enum OwnerRunLocation { none, connected: OwnerRunLocationConnected, adrift: OwnerRunLocationAdrift }
 record OwnerHostRun { task: OwnerTaskLink attempt: u64 kept: u32 listed: bool state: OwnerAttemptState location: OwnerRunLocation grace_until: option u64 }
-record OwnerHost { channel: u64 kind: OwnerHostKind slots: u32 used: u32 free: u32 draining: bool connected: bool grace_until: option u64 grace_remaining: option duration runs: bytes 16777216 cut: bool }
+enum OwnerProgramFailure { missing, deadline, unreadable, exited, unconfigured, unknown, closed }
+record OwnerProgramFailed { reason: OwnerProgramFailure detail: bytes 4096 }
+record OwnerProgramOtherwise { method: bytes 32 }
+enum OwnerProgramState { usable, not_signed_in, signed_in_otherwise: OwnerProgramOtherwise, failed: OwnerProgramFailed }
+enum OwnerProgramSignOut { signed_out, failed: OwnerProgramFailed }
+record OwnerProgramLogin { name: bytes 32 state: option OwnerProgramState sign_out: option OwnerProgramSignOut cleanup: bool cut: bool }
+record OwnerProgramHost { name: bytes 4096 channel: u64 connected: bool awaiting_logins: bool programs: bytes 16777216 cut: bool }
+record OwnerHost { name: option bytes 4096 awaiting_logins: bool programs: bytes 16777216 channel: u64 kind: OwnerHostKind slots: u32 used: u32 free: u32 draining: bool connected: bool grace_until: option u64 grace_remaining: option duration runs: bytes 16777216 cut: bool }
 record OwnerAgentShortfallModel { charter: u32 model: u32 }
 record OwnerAgentShortfallWindow { charter: u32 model: u32 }
 record OwnerAgentShortfallOutput { charter: u32 model: u32 }

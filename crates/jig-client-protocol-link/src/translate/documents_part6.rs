@@ -305,6 +305,8 @@ pub(crate) fn owner_deployment_fields(
     value: &w::OwnerDeployment,
     limits: &Limits,
 ) -> Result<c::OwnerDeployment, w::Problem> {
+    let mut room = super::document_room(limits);
+    charge(&mut room, u64::try_from(size_of::<c::OwnerDeployment>()).ok())?;
     if value.projects().len() > limits.client.rows {
         return Err(too_large());
     }
@@ -348,7 +350,7 @@ pub(crate) fn owner_deployment_fields(
         readiness: super::catalogue::readiness(value.readiness(), limits, &mut room)?,
         readiness_cut: value.readiness_cut(),
         store: store_fill_fields(value.store(), limits),
-        hosts: owner_host_piece(value.hosts(), limits, limits.client.rows)?,
+        hosts: owner_host_piece(value.hosts(), limits, limits.client.rows, &mut room)?,
         attempts: owner_host_run_piece(value.attempts(), limits, limits.client.rows)?,
         accounts: owner_account_piece(value.accounts(), limits, &mut room)?,
         tasks: owner_capacity_fields(value.tasks(), limits),

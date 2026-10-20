@@ -41,6 +41,9 @@ pub(crate) fn source() -> documents::Deployment {
         hosts: rows(
             2,
             [documents::Host {
+                name: None,
+                awaiting_logins: false,
+                programs: skein_lib::List::with_capacity(0),
                 channel: u64::MAX,
                 kind: fleet::HostKind::Engine,
                 slots: u32::MAX,

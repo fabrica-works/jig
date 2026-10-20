@@ -29,7 +29,7 @@ impl SourceName {
     }
 }
 /// The program's bounded, printable payment method, without login contents.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct LoginMethod {
     length: u8,
     bytes: [u8; 32],
@@ -54,7 +54,7 @@ impl LoginMethod {
         self.bytes.get(..usize::from(self.length)).expect("validated method")
     }
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum SourceFailure {
     Missing,
     Deadline,
@@ -64,29 +64,32 @@ pub enum SourceFailure {
     Unknown,
     Closed,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum LoginState {
     Usable,
     NotSignedIn,
     SignedInOtherwise(LoginMethod),
     Failed { reason: SourceFailure, detail: Box<[u8]> },
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Login {
     pub name: SourceName,
     pub state: LoginState,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum SignOutResult {
     SignedOut,
     Failed { reason: SourceFailure, detail: Box<[u8]> },
 }
 
 /// Terminal status for one configured member, independent of its current channel.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum ProgramResult {
     SignedOut,
     NotInContact,
     Lost,
     Failed,
 }
+
+/// Whole configured worker names exposed in program facts and outcomes.
+pub const WORKER_NAME: u32 = 4_096;

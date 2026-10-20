@@ -239,6 +239,7 @@ pub(crate) fn lost(domain: &mut Domain, env: &Env<Limits>, channel: Token, out: 
     };
     let entry = domain.channels.get_mut(id).expect("a named channel is in contact");
     crate::sources::lost(&mut entry.sources, channel, out);
+    let worker = entry.worker;
     let slots = entry.slots;
     let draining = entry.draining;
     let hosts = mem::replace(&mut entry.hosts, Set::with_capacity(0));
@@ -247,7 +248,7 @@ pub(crate) fn lost(domain: &mut Domain, env: &Env<Limits>, channel: Token, out: 
         attempt::adrift(domain, attempt, channel, until);
     }
     domain.channels.retire(id);
-    crate::history::lost(domain, crate::history::LostHost { channel, slots, draining, until });
+    crate::history::lost(domain, crate::history::LostHost { worker, channel, slots, draining, until });
     domain.facts.push(Fact::Lost { adrift: hosts.len() });
 }
 

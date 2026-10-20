@@ -16,6 +16,7 @@ fn serving_records(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
         &mut core.fleet,
         &host_env,
         fleet::Event::Hello {
+            worker: 0,
             channel: Token::new(77),
             hello: fleet::Hello {
                 bounds: fixtures::bounds(),

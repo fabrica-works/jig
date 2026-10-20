@@ -41,7 +41,11 @@ pub struct HostRun {
     pub grace_until: Option<Wall>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[expect(clippy::struct_excessive_bools, reason = "independent host, inventory and document facts")]
 pub struct Host {
+    pub name: Option<Box<[u8]>>,
+    pub awaiting_logins: bool,
+    pub programs: List<super::ProgramLogin>,
     pub channel: u64,
     pub kind: fleet::HostKind,
     pub slots: u32,
@@ -252,8 +256,19 @@ pub(super) fn deployment(
                 fleet::Placement::None | fleet::Placement::Connected { .. } | fleet::Placement::Adrift { .. } => {}
             }
         }
+        let name = match value.worker {
+            Some(worker) => match core.fleet.worker_name(worker) {
+                Some(name) => Some(skein_lib::bytes::copy_of(name)),
+                None => None,
+            },
+            None => None,
+        };
+        let (programs, programs_cut) = super::programs::logins(core, &limits.documents, value.channel, None);
         hosts
             .push(Host {
+                name,
+                awaiting_logins: value.kind == fleet::HostKind::Worker && core.fleet.awaiting_logins(value.channel),
+                programs,
                 channel: value.channel.raw(),
                 kind: value.kind,
                 slots: value.slots,
@@ -273,7 +288,7 @@ pub(super) fn deployment(
                     None => None,
                 },
                 runs,
-                cut: host_cut,
+                cut: host_cut || programs_cut,
             })
             .expect("bounded hosts");
     }
@@ -545,11 +560,16 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     // One nested host-run/task/account carrier is smaller than a task page,
     // whose bound prices all its chip/part/list children. Hosts nest run lists.
     let account_heap = List::<super::SourceLine>::worst_case(limits.lines)?
+        .checked_add(u64::from(limits.lines).checked_mul(u64::from(accounts::NAME))?)?
         .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?
         .checked_add(u64::from(accounts::MANAGE_USAGE))?
         .checked_add(List::<accounts::Use>::worst_case(accounts::USES)?)?;
     super::task_tree::worst_case(limits)?
         .checked_mul(carriers)?
+        .checked_add(
+            u64::from(limits.lines)
+                .checked_mul(u64::from(fleet::WORKER_NAME).checked_add(super::programs::logins_worst_case(limits)?)?)?,
+        )?
         .checked_add(List::<Account>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(account_heap)?)?
         .checked_add(List::<HelloRefusalLine>::worst_case(limits.lines)?)?

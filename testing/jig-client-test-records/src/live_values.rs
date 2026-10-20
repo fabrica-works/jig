@@ -324,17 +324,17 @@ pub fn deployment_rows_record() -> w::OwnerDeployment {
     let host = w::OwnerHost::new(
         &l,
         w::OwnerHostParts {
+            skein_bools: [false, true, false, true],
+            name: None,
+            programs: Box::new([]),
             channel: 17,
             kind: w::OwnerHostKind::Engine,
             slots: 2,
             used: 1,
             free: 1,
-            draining: true,
-            connected: false,
             grace_until: Some(19),
             grace_remaining: Some(Duration::from_nanos(23)),
             runs: pieces([encoded(run.measure(), |w| run.encode(w))]),
-            cut: true,
         },
     )
     .expect("literal");

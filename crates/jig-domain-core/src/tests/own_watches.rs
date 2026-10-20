@@ -156,6 +156,7 @@ fn accounts_marked(core: &Core) -> bool {
 
 fn hello() -> fleet::Event {
     fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(77),
         hello: fleet::Hello {
             bounds: fixtures::bounds(),
@@ -244,10 +245,10 @@ fn an_attempt_acknowledgement_leaves_an_accounts_watch_unmarked() {
 }
 
 fn listed_host() -> fleet::Event {
-    let fleet::Event::Hello { channel, mut hello } = hello() else { panic!("hello fixture") };
+    let fleet::Event::Hello { channel, worker, mut hello } = hello() else { panic!("hello fixture") };
     hello.hosting =
         Box::new([fleet::Hosted { run: Token::new(90), attempt: Token::new(92), phase: fleet::Phase::Active }]);
-    fleet::Event::Hello { channel, hello }
+    fleet::Event::Hello { channel, worker, hello }
 }
 
 fn busy() -> fleet::Event {

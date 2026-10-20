@@ -58,7 +58,9 @@ mod channel;
 mod programs;
 mod source_values;
 mod sources;
-pub use source_values::{Login, LoginMethod, LoginState, ProgramResult, SignOutResult, SourceFailure, SourceName};
+pub use source_values::{
+    Login, LoginMethod, LoginState, ProgramResult, SignOutResult, SourceFailure, SourceName, WORKER_NAME,
+};
 mod domain;
 mod facts;
 mod grants;

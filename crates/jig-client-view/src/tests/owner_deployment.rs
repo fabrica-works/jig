@@ -328,7 +328,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 257);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 275);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -355,6 +355,9 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
         value
             .hosts
             .push(OwnerHost {
+                name: None,
+                awaiting_logins: false,
+                programs: List::with_capacity(0),
                 channel: n,
                 kind: OwnerHostKind::Worker,
                 slots: u32::MAX,
@@ -795,6 +798,7 @@ fn deployment_accounts_show_identity_sources_and_payers_in_order() {
     account.uses = Some(list(vec![OwnerAccountUse::Party(23), OwnerAccountUse::Project(29)]));
     account.sources = list(vec![
         OwnerAccountSource {
+            name: None,
             place: 3,
             number: 11,
             kind: OwnerAccountKind::SignIn,
@@ -805,6 +809,7 @@ fn deployment_accounts_show_identity_sources_and_payers_in_order() {
             spent_until: Some(Wall::from_nanos(46_920_000_000_000)),
         },
         OwnerAccountSource {
+            name: None,
             place: 5,
             number: 12,
             kind: OwnerAccountKind::Key,
@@ -1047,4 +1052,58 @@ fn catalogue_manage_targets_hold_at_the_address_bound() {
     address.push(b'a');
     value.providers.get_mut(0).unwrap().manage_usage = Some(address.into_boxed_slice());
     assert!(view::required(&value, &CLIENT, shared_words()).is_none());
+}
+
+fn program_host() -> OwnerHost {
+    OwnerHost {
+        name: Some(b"configured-worker".as_slice().into()),
+        awaiting_logins: false,
+        programs: List::with_capacity(2),
+        channel: 17,
+        kind: OwnerHostKind::Worker,
+        slots: 1,
+        used: 0,
+        free: 1,
+        draining: false,
+        connected: true,
+        grace_until: None,
+        grace_remaining: None,
+        runs: List::with_capacity(2),
+        cut: false,
+    }
+}
+#[test]
+fn deployment_names_the_configured_worker() {
+    let mut value = empty();
+    value.hosts.push(program_host()).expect("host");
+    assert!(contains(&round_trip(value), b"configured-worker"));
+}
+#[test]
+fn deployment_renders_the_program_observation() {
+    let mut host = program_host();
+    host.programs
+        .push(OwnerProgramLogin {
+            name: b"personal".as_slice().into(),
+            state: Some(OwnerProgramState::Usable),
+            sign_out: Some(OwnerProgramSignOut::Failed {
+                reason: OwnerProgramFailure::Deadline,
+                detail: b"bounded failure".as_slice().into(),
+            }),
+            cleanup: true,
+            cut: false,
+        })
+        .expect("program");
+    let mut value = empty();
+    value.hosts.push(host).expect("host");
+    let tree = round_trip(value);
+    for word in [
+        b"personal".as_slice(),
+        b"Login usable",
+        b"Last sign-out failed",
+        b"Program timed out",
+        b"bounded failure",
+        b"Keep signed out",
+    ] {
+        assert!(contains(&tree, word), "missing {word:?}");
+    }
 }

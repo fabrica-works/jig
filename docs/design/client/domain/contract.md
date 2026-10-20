@@ -538,6 +538,13 @@ served is held, kept and unsent, for its owner's version (client.md,
     check the party asked is in progress
     (`../../domain/accounts.md`, sections 3 and 5). It holds no value,
     and the words and screens are the application's.
+Program host facts use each worker's whole configured name. Inventory still awaited
+is unknown, including after a reconnect; a disconnected worker's earlier inventory
+is not a current login fact. The deployment lists all issued names, including
+retired names awaiting cleanup; a party's accounts watch lists only that holder's
+names. Each row distinguishes the login observation from the last sign-out's
+result and the desired cleanup state. Bounded diagnostics say when cut.
+
 - **What a task waits on** is the engine's to compute, since only it
   holds the tree and the inbox together: a party (who), for a question,
   a proposal or a person task in its tree; its delegates; news; or

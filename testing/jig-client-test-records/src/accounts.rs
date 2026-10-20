@@ -10,6 +10,7 @@ pub fn account_sources_record() -> Box<[u8]> {
         w::OwnerAccountSource::new(
             &l,
             w::OwnerAccountSourceParts {
+                name: None,
                 place: 2,
                 number: 11,
                 kind: w::OwnerAccountKind::SignIn,
@@ -24,6 +25,7 @@ pub fn account_sources_record() -> Box<[u8]> {
         w::OwnerAccountSource::new(
             &l,
             w::OwnerAccountSourceParts {
+                name: None,
                 place: 5,
                 number: 12,
                 kind: w::OwnerAccountKind::Key,
@@ -113,6 +115,7 @@ pub fn accounts_record(end: Option<w::OwnerAccountEnd>) -> w::OwnerAccounts {
         w::OwnerAccountsParts {
             skein_bools: [true, false, true, false],
             readiness: Box::new([]),
+            program_hosts: Box::new([]),
             accounts: pieces([
                 encoded(line.measure(), |w| line.encode(w)),
                 encoded(other.measure(), |w| other.encode(w)),

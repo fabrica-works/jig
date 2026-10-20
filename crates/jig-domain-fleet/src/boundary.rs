@@ -687,6 +687,7 @@ pub enum Refusal {
 /// Read-only connected and retained lost host facts; no reply right is retained.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct HostView {
+    pub worker: Option<u32>,
     pub channel: Token,
     pub kind: HostKind,
     pub slots: u32,

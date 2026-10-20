@@ -43,3 +43,6 @@ mod queries;
 
 #[path = "tests/limits.rs"]
 mod limits;
+
+#[path = "tests/programs.rs"]
+mod programs;

@@ -247,3 +247,132 @@ fn an_account_waiting_to_ask_again_has_no_wall_without_a_document_clock() {
     let (core, limits) = waiting_account();
     assert_eq!(deployment(&core, &limits).accounts.get(0).unwrap().state, AccountState::Later { until: None });
 }
+
+fn program_facts() -> (Core, Env<Limits>) {
+    let (mut core, limits) = source(&[], 4);
+    assert!(core.fleet.configure_workers(&limits.fleet, Box::new([b"alpha".as_slice().into()])));
+    core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    for record in [
+        accounts::Stored::Issued {
+            number: 11,
+            holder: accounts::Holder::Party(1),
+            name: b"personal".as_slice().into(),
+            signed_out: false,
+        },
+        accounts::Stored::Account {
+            number: 10,
+            provider: 1,
+            holder: accounts::Holder::Party(1),
+            place: 0,
+            uses: None,
+            subject: Box::new([]),
+            display: Box::new([]),
+        },
+        accounts::Stored::Source {
+            account: 10,
+            number: 11,
+            place: 0,
+            kind: accounts::Kind::Program,
+            name: b"personal".as_slice().into(),
+            held: None,
+        },
+    ] {
+        drop(step(&mut core, &env, Event::Account(accounts::Event::Restore { record })));
+    }
+    drop(step(&mut core, &env, Event::Account(accounts::Event::Want)));
+    drop(step(
+        &mut core,
+        &env,
+        Event::Fleet(fleet::Event::Hello {
+            channel: Token::new(17),
+            worker: 0,
+            hello: fleet::Hello {
+                bounds: fixtures::bounds(),
+                slots: 1,
+                stop_bound: Duration::ZERO,
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+            },
+        }),
+    ));
+    (core, env)
+}
+fn program_inventory(core: &mut Core, env: &Env<Limits>, state: fleet::LoginState) {
+    drop(step(
+        core,
+        env,
+        Event::Fleet(fleet::Event::Logins {
+            channel: Token::new(17),
+            logins: Box::new([fleet::Login { name: fleet::SourceName::new(b"personal").expect("source"), state }]),
+        }),
+    ));
+}
+#[test]
+fn lost_host_facts_keep_the_configured_name() {
+    let (mut core, env) = program_facts();
+    drop(step(&mut core, &env, Event::Fleet(fleet::Event::Lost { channel: Token::new(17) })));
+    let value = deployment(&core, &env.limits);
+    assert_eq!(value.hosts.get(0).expect("lost host").name.as_deref(), Some(b"alpha".as_slice()));
+}
+#[test]
+fn deployment_reports_the_current_program_inventory() {
+    let (mut core, env) = program_facts();
+    program_inventory(&mut core, &env, fleet::LoginState::Usable);
+    let value = deployment(&core, &env.limits);
+    let host = value.hosts.get(0).expect("worker");
+    assert!(!host.awaiting_logins);
+    assert_eq!(host.programs.get(0).expect("source").state, Some(fleet::LoginState::Usable));
+}
+#[test]
+fn an_accounts_watch_includes_its_holders_host_facts() {
+    let (mut core, env) = program_facts();
+    program_inventory(&mut core, &env, fleet::LoginState::Usable);
+    let Document::Accounts(value) =
+        make(&core, &env.limits, 1, &Subject::Accounts { party: 1 }, &window(), env.wall).expect("own accounts")
+    else {
+        panic!("accounts")
+    };
+    let host = value.program_hosts.get(0).expect("holder's host");
+    assert_eq!(host.name.as_ref(), b"alpha");
+    assert_eq!(host.programs.get(0).expect("source").state, Some(fleet::LoginState::Usable));
+}
+#[test]
+fn an_accounts_watch_excludes_other_holders_programs() {
+    let (mut core, env) = program_facts();
+    program_inventory(&mut core, &env, fleet::LoginState::Usable);
+    let Document::Accounts(value) =
+        make(&core, &env.limits, 2, &Subject::Accounts { party: 2 }, &window(), env.wall).expect("own accounts")
+    else {
+        panic!("accounts")
+    };
+    assert!(value.program_hosts.is_empty());
+}
+#[test]
+fn an_unanswered_inventory_stays_unknown_in_the_document() {
+    let (core, env) = program_facts();
+    let value = deployment(&core, &env.limits);
+    let host = value.hosts.get(0).expect("worker");
+    assert!(host.awaiting_logins);
+    assert_eq!(host.programs.get(0).expect("source").state, None);
+}
+#[test]
+fn program_diagnostics_report_their_cut() {
+    let (mut core, mut env) = program_facts();
+    env.limits.documents.text_bytes = 3;
+    program_inventory(
+        &mut core,
+        &env,
+        fleet::LoginState::Failed {
+            reason: fleet::SourceFailure::Exited,
+            detail: b"failure details".as_slice().into(),
+        },
+    );
+    let value = deployment(&core, &env.limits);
+    let row = value.hosts.get(0).expect("worker").programs.get(0).expect("source");
+    assert!(row.cut);
+    assert_eq!(
+        row.state,
+        Some(fleet::LoginState::Failed { reason: fleet::SourceFailure::Exited, detail: b"fai".as_slice().into() })
+    );
+}

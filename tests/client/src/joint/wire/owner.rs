@@ -14,6 +14,8 @@ pub enum Invalid {
     Llm,
     /// A provider catalogue or payer observation has inconsistent public facts.
     Catalogue,
+    /// A program name, method or configured host name is malformed.
+    Program,
     /// The whole offered-act allocation exceeds the receiving offer bound.
     OfferCapacity {
         allocated: u32,

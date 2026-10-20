@@ -7,6 +7,7 @@ pub mod live;
 mod llm;
 mod model_sets;
 mod operations;
+pub(crate) mod programs;
 mod task_wait;
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v10 as w;

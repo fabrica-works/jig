@@ -367,20 +367,25 @@ pub fn host(value: &d::Host, limits: &w::Limits) -> Result<w::OwnerHost, w::Prob
     w::OwnerHost::new(
         limits,
         w::OwnerHostParts {
+            skein_bools: [value.awaiting_logins, value.draining, value.connected, value.cut],
+            name: value.name.clone(),
+            programs: super::programs::logins(
+                &value.programs,
+                limits,
+                limits.owner_host_programs,
+                w::Path::OwnerHostPrograms,
+            )?,
             channel: value.channel,
             kind: host_kind(value.kind),
             slots: value.slots,
             used: value.used,
             free: value.free,
-            draining: value.draining,
-            connected: value.connected,
             grace_until: match value.grace_until {
                 Some(item) => Some(item.as_nanos()),
                 None => None,
             },
             grace_remaining: value.grace_remaining,
             runs,
-            cut: value.cut,
         },
     )
 }

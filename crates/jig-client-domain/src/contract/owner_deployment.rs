@@ -70,7 +70,11 @@ pub struct OwnerProjectCapacity {
 
 /// A connected or retained host and its supplied placement facts.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[expect(clippy::struct_excessive_bools, reason = "independent host, inventory and document facts")]
 pub struct OwnerHost {
+    pub name: Option<Box<[u8]>>,
+    pub awaiting_logins: bool,
+    pub programs: List<OwnerProgramLogin>,
     pub channel: u64,
     pub kind: OwnerHostKind,
     pub slots: u32,
@@ -398,4 +402,72 @@ pub enum OwnerAgentShortfall {
     Message,
     Inbox,
     Unacknowledged,
+}
+
+/// Names are whole; diagnostic details are bounded independently.
+pub const PROGRAM_HOST_NAME: u32 = 4_096;
+pub const PROGRAM_NAME: u32 = 32;
+pub const PROGRAM_DETAIL: u32 = 4_096;
+#[must_use]
+pub fn valid_program_name(name: &[u8]) -> bool {
+    if name.is_empty() || name.len() > 32 {
+        return false;
+    }
+    for byte in name {
+        if !byte.is_ascii_lowercase() && !byte.is_ascii_digit() && *byte != b'-' {
+            return false;
+        }
+    }
+    true
+}
+#[must_use]
+pub fn valid_program_method(method: &[u8]) -> bool {
+    if method.is_empty() || method.len() > 32 {
+        return false;
+    }
+    for byte in method {
+        if !(0x21..=0x7e).contains(byte) {
+            return false;
+        }
+    }
+    true
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum OwnerProgramFailure {
+    Missing,
+    Deadline,
+    Unreadable,
+    Exited,
+    Unconfigured,
+    Unknown,
+    Closed,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum OwnerProgramState {
+    Usable,
+    NotSignedIn,
+    SignedInOtherwise { method: Box<[u8]> },
+    Failed { reason: OwnerProgramFailure, detail: Box<[u8]> },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum OwnerProgramSignOut {
+    SignedOut,
+    Failed { reason: OwnerProgramFailure, detail: Box<[u8]> },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct OwnerProgramLogin {
+    pub name: Box<[u8]>,
+    pub state: Option<OwnerProgramState>,
+    pub sign_out: Option<OwnerProgramSignOut>,
+    pub cleanup: bool,
+    pub cut: bool,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct OwnerProgramHost {
+    pub name: Box<[u8]>,
+    pub channel: u64,
+    pub connected: bool,
+    pub awaiting_logins: bool,
+    pub programs: List<OwnerProgramLogin>,
+    pub cut: bool,
 }

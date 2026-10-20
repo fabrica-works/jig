@@ -133,6 +133,7 @@ pub fn source(value: &d::SourceLine, limits: &w::Limits) -> Result<w::OwnerAccou
     w::OwnerAccountSource::new(
         limits,
         w::OwnerAccountSourceParts {
+            name: value.name.clone(),
             place: value.place,
             number: value.number,
             kind: kind(value.kind),
@@ -224,6 +225,7 @@ pub fn document(value: &d::Accounts, limits: &w::Limits) -> Result<w::OwnerAccou
         w::OwnerAccountsParts {
             skein_bools: [value.usable, value.settled, value.cut, value.readiness_cut],
             readiness: super::catalogue::readiness(&value.readiness, limits.owner_accounts_readiness, limits)?,
+            program_hosts: super::programs::hosts(&value.program_hosts, limits)?,
             accounts,
             signing,
             last_end,

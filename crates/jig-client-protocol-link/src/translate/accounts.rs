@@ -101,8 +101,23 @@ pub(crate) fn owner_account_uses(value: Option<&List<w::OwnerAccountUse>>) -> Op
     }
     Some(uses)
 }
-pub(crate) fn owner_account_source(value: &w::OwnerAccountSource, limits: &Limits) -> c::OwnerAccountSource {
-    c::OwnerAccountSource {
+pub(crate) fn owner_account_source(
+    value: &w::OwnerAccountSource,
+    limits: &Limits,
+    room: &mut u64,
+) -> Result<c::OwnerAccountSource, w::Problem> {
+    let name = match value.name() {
+        Some(name) => {
+            if !c::valid_program_name(name) {
+                return Err(piece_problem(skein_codec::Reason::Malformed));
+            }
+            charge(room, u64::try_from(name.len()).ok())?;
+            Some(skein_lib::bytes::copy_of(name))
+        }
+        None => None,
+    };
+    Ok(c::OwnerAccountSource {
+        name,
         place: value.place(),
         number: value.number(),
         kind: owner_account_kind(value.kind()),
@@ -114,7 +129,7 @@ pub(crate) fn owner_account_source(value: &w::OwnerAccountSource, limits: &Limit
             Some(at) => Some(Wall::from_nanos(*at)),
             None => None,
         },
-    }
+    })
 }
 /// Charges an account's own heap, its uses and its display text, to the document's room.
 pub(crate) fn charge_account(
@@ -165,6 +180,7 @@ pub(crate) fn owner_accounts(value: w::OwnerAccounts, limits: &Limits) -> Result
     Ok(c::OwnerAccounts {
         readiness: super::catalogue::readiness(value.readiness(), limits, &mut room)?,
         readiness_cut: value.readiness_cut(),
+        program_hosts: super::super::programs::hosts(value.program_hosts(), limits, &mut room)?,
         accounts: owner_account_line_piece(value.accounts(), limits, &mut room)?,
         signing: owner_account_sign_in_piece(value.signing(), limits, &mut room)?,
         last_end: match value.last_end() {
@@ -225,7 +241,7 @@ pub(crate) fn owner_account_source_piece(
     for _ in 0..count {
         let Ok(Some(item)) = skein_codec::piece::split(&mut reader) else { unreachable!("counted pieces split") };
         let row = w::OwnerAccountSource::decode(&limits.wire, &mut Reader::new(&item))?;
-        rows.push(owner_account_source(&row, limits)).expect("counted pieces fit");
+        rows.push(owner_account_source(&row, limits, room)?).expect("counted pieces fit");
     }
     Ok(rows)
 }

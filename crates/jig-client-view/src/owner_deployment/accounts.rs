@@ -34,6 +34,9 @@ pub(super) fn details(b: &mut Builder, words: &Words, account: &OwnerAccount) {
     for source in &account.sources {
         b.open(Role::Item);
         field_number(b, words, P::AccountDetail(A::Source), u64::from(source.number));
+        if let Some(name) = &source.name {
+            crate::literal_segment::render(b, name);
+        }
         let kind = match source.kind {
             OwnerAccountKind::SignIn => A::SignIn,
             OwnerAccountKind::Key => A::Key,
