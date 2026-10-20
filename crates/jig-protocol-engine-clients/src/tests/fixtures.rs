@@ -586,6 +586,7 @@ fn expected_authority() -> people::Ask {
             decides: 14,
             authority: p::Authority {
                 tools: u64::MAX,
+                models: 0,
                 grants: Box::new([p::Grant {
                     connector: 5,
                     kind: 6,

@@ -80,7 +80,7 @@ pub fn header_put(deployment: [u8; 16], commits: u64) -> skein_kv::Op {
     let record = deployment_record(deployment, commits);
     skein_kv::Op::Put {
         key: keys::encode(&Key::Core(CoreKey::Deployment), KEY_LIMIT).expect("header key fits"),
-        value: codec::encode(&record, &codec::limits(&CORE_LIMITS).expect("fixture limits")).expect("header fits"),
+        value: codec::encode(&record, &codec::limits(&CORE_LIMITS).expect("fixture limits"), &[]).expect("header fits"),
     }
 }
 
@@ -99,7 +99,7 @@ fn deployment_record(deployment: [u8; 16], commits: u64) -> Record {
 }
 
 pub fn over(stores: Stores) -> Store {
-    Store::over(&limits(), APPLICATION, stores)
+    Store::over(&limits(), APPLICATION, &[], stores)
 }
 
 pub fn run(store: &mut Store, request: Request) -> Box<[Event]> {
@@ -122,7 +122,7 @@ pub fn opened() -> Store {
 pub fn opened_with_budget(budget: u64) -> Store {
     let mut limits = limits();
     limits.store.budget = budget;
-    let mut store = Store::over(&limits, APPLICATION, stores_with(&limits));
+    let mut store = Store::over(&limits, APPLICATION, &[], stores_with(&limits));
     let events = run(&mut store, Request::Open { owner: Token::new(1), root: ROOT, installation: INSTALLATION });
     let [Event::Opened { owner: _, last: 0, installation: _ }] = &*events else {
         panic!("empty store opens: {events:?}");
@@ -247,7 +247,7 @@ pub fn below() -> Below {
     }
 }
 pub fn directory() -> (Store, Below) {
-    let mut store = Store::on_directory(&limits(), APPLICATION);
+    let mut store = Store::on_directory(&limits(), APPLICATION, &[]);
     let mut below = below();
     let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
     crate::down(

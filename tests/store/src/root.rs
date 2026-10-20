@@ -195,7 +195,8 @@ pub fn limits() -> Limits {
     let journal = JournalLimits { commits: 2, writes: 2000, held: 2000, now: 4, release: 4 };
     let mut map = skein_kv::Limits {
         key: 1024,
-        value: 65_536,
+        // The people family's policy row keeps up to 64 model names (protocol/store.md, 5.1).
+        value: 524_288,
         ops: 4003,
         commit: 1_073_741_824,
         queued: 2,
@@ -203,8 +204,8 @@ pub fn limits() -> Limits {
         budget: 65_536,
         segment: 1_073_741_824,
         snapshot_after: 1_073_741_824,
-        chunk: 66_580,
-        page: skein_kv::Page { rows: 2, bytes: 66_560 },
+        chunk: 525_332,
+        page: skein_kv::Page { rows: 2, bytes: 525_312 },
         deadline: Duration::from_secs(1),
     };
     let sizes = sizes::check(&CORE_LIMITS, &APPLICATION, &journal, &map, 1).expect("scripted record bounds fit");

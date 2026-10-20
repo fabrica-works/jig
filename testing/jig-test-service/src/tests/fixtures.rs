@@ -183,6 +183,7 @@ pub fn memory_store(engine: &mut crate::Engine) {
     engine.store.component = jig_protocol_store::Store::over(
         &limits,
         jig_test_store::application(&engine.env.limits.connector),
+        &engine.store.models,
         jig_protocol_store::Stores {
             store: skein_kv::Store::memory(&limits.store),
             secrets: skein_kv::Store::memory(&limits.secrets),
@@ -668,6 +669,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         contract: people::Contract::Report { words: 16 },
         authority: people::Authority {
             tools: 0,
+            models: 0,
             grants: Box::new([]),
             delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             spend,

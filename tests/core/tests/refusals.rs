@@ -188,6 +188,7 @@ fn a_proposal_pending_when_the_policy_narrows_still_waits() {
         decides: 16,
         authority: people::Authority {
             tools: 1023,
+            models: 0,
             grants: Box::new([]),
             delegation: people::Delegation {
                 kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),

@@ -29,7 +29,8 @@ fn project_policy() -> authority::Policy {
 }
 
 fn edited(number: u32) -> authority::Policy {
-    let value = authority_to_people(&authority_value(400, Box::new([]))).unwrap();
+    let mut value = authority_to_people(&authority_value(400, Box::new([]))).unwrap();
+    value.models = 0;
     let change = people::PolicyChange::Role(people::PolicyRole {
         number,
         authority: value,

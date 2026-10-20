@@ -100,7 +100,7 @@ fn operation(store: &Store, write: Write) -> Option<skein_kv::Op> {
     match write {
         Write::Save(record) => Some(skein_kv::Op::Put {
             key: keys::encode(&record.key(), limit)?,
-            value: codec::encode(&record, &store.codec)?,
+            value: codec::encode(&record, &store.codec, &store.names)?,
         }),
         Write::Erase(key) => Some(skein_kv::Op::Erase { key: keys::encode(&key, limit)? }),
         Write::Put { key, value } => Some(skein_kv::Op::Put { key: keys::application(&key, limit)?, value }),

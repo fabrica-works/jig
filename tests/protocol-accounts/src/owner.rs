@@ -23,6 +23,7 @@ fn memory(limits: &store::Limits) -> store::Store {
     store::Store::over(
         limits,
         fixtures::APPLICATION,
+        &[],
         store::Stores {
             store: skein_kv::Store::memory(&limits.store),
             secrets: skein_kv::Store::memory(&limits.secrets),
@@ -184,7 +185,7 @@ impl Owner {
             // start opens the same stores again.
             assert_eq!(owner.open(kept), kept, "an empty store answers this start's draw");
             let stores = std::mem::replace(&mut owner.store, memory(&owner.store_limits)).into_stores();
-            owner.store = store::Store::over(&owner.store_limits, fixtures::APPLICATION, stores);
+            owner.store = store::Store::over(&owner.store_limits, fixtures::APPLICATION, &[], stores);
         }
         owner.installation = owner.open(installation.drawn);
         if let Some(held) = held {

@@ -204,10 +204,11 @@ impl World {
         let heap = crate::observations::Heap::new(limits);
         let creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
         let initial_ask = crate::fixtures::create_chat(&creating, 1, 0, b"make an effect".as_slice().into());
+        let store = Store::new(limits, &configuration.core.settings.models);
         World {
             bootstrap_owners: Vec::new(),
             domain: root::Domain::new(configuration, limits),
-            store: Store::new(limits),
+            store,
             systems: [System::new(), System::new()],
             protocol: crate::protocol::Stand::new(limits.core),
             host_calls: Vec::new(),

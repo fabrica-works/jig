@@ -16,7 +16,7 @@ fn a_repair_snapshot_preserves_the_durable_prefix_through_another_restart() {
         },
     }));
     let key = keys::encode(&row.key(), 1024).expect("fixture key");
-    let value = codec::encode(&row, &codec).expect("fixture row");
+    let value = codec::encode(&row, &codec, crate::fixtures::store_names()).expect("fixture row");
     let first = log_frame(1, &key, &value);
     let second = log_frame(2, &key, &value);
     let mut machine = Machine::for_user(1000);
@@ -32,7 +32,7 @@ fn a_repair_snapshot_preserves_the_durable_prefix_through_another_restart() {
     assert!(bytes.len() > first.len() && bytes.len() < first.len() + second.len(), "power loss tears second write");
     let mut store = Store::new();
     let mut events = vec![Observed::Bytes { path: log_path(), at: 0, bytes }, Observed::Recovered(log_path())];
-    assert_eq!(store.observe(&mut events, &codec, &limits.root.connector).len(), 1);
+    assert_eq!(store.observe(&mut events, &codec, crate::fixtures::store_names(), &limits.root.connector).len(), 1);
     assert_eq!(store.applied, 1);
     let snapshot = snapshot(&key, &value);
     let mut capture = Capture::default();
@@ -45,7 +45,9 @@ fn a_repair_snapshot_preserves_the_durable_prefix_through_another_restart() {
         result: Ok(Done::Count(u32::try_from(snapshot.len()).expect("fixture length"))),
     });
     capture.complete(&Complete { op: Token::new(2), kind: Op::Sync { fd: Fd::new(1) }, result: Ok(Done::Nothing) });
-    assert!(store.observe(&mut capture.events, &codec, &limits.root.connector).is_empty());
+    assert!(
+        store.observe(&mut capture.events, &codec, crate::fixtures::store_names(), &limits.root.connector).is_empty()
+    );
     assert_eq!(store.rows.get(&root::Record::Core(row.clone()).key()), Some(&root::Record::Core(row.clone())));
     store.recovering();
     capture.names.insert(1, b"store/snapshot".to_vec());
@@ -54,7 +56,10 @@ fn a_repair_snapshot_preserves_the_durable_prefix_through_another_restart() {
         kind: Op::Read { fd: Fd::new(1), buf: snapshot.clone().into(), at: 0 },
         result: Ok(Done::Count(u32::try_from(snapshot.len()).expect("fixture length"))),
     });
-    assert_eq!(store.observe(&mut capture.events, &codec, &limits.root.connector).len(), 1);
+    assert_eq!(
+        store.observe(&mut capture.events, &codec, crate::fixtures::store_names(), &limits.root.connector).len(),
+        1
+    );
     assert_eq!(store.applied, 1);
     assert_eq!(store.recovered, [1].into());
     assert_eq!(store.rows.get(&root::Record::Core(row.clone()).key()), Some(&root::Record::Core(row)));

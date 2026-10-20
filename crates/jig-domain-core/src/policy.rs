@@ -56,8 +56,7 @@ fn authority_to_authority(value: people::Authority) -> Option<authority::Authori
     }
     Some(authority::Authority {
         tools: authority::Tools(value.tools),
-        // A party's role keeps no models yet, so names no narrowing.
-        models: authority::Models::ALL,
+        models: authority::Models(value.models),
         grants: grants.into_boxed(),
         delegation: authority::Delegation {
             kinds: kinds.into_boxed(),
@@ -101,6 +100,7 @@ pub fn authority_to_people(value: &authority::Authority) -> Option<people::Autho
     }
     Some(people::Authority {
         tools: value.tools.0,
+        models: value.models.0,
         grants: grants.into_boxed(),
         delegation: people::Delegation {
             kinds: kinds.into_boxed(),

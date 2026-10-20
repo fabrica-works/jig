@@ -1205,6 +1205,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
     let mut change = amendment(b"widened task");
     let mut widened_authority = people::Authority {
         tools: 1023,
+        models: 0,
         grants: Box::new([people::Grant {
             connector: 1,
             kind: 5,
@@ -1345,6 +1346,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
                 number: 0,
                 authority: people::Authority {
                     tools: 1023,
+                    models: 0,
                     grants: Box::new([people::Grant {
                         connector: 1,
                         kind: 5,

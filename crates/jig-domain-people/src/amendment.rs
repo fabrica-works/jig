@@ -94,6 +94,9 @@ pub enum ResultsWake {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Authority {
     pub tools: u64,
+    /// One bit per configured model, in the configuration's order; the people domain keeps no
+    /// model names.
+    pub models: u64,
     pub grants: Box<[Grant]>,
     pub delegation: Delegation,
     pub spend: u64,

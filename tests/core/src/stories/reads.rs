@@ -50,6 +50,7 @@ pub fn conversation_member(forgettable: bool) -> people::Member {
         contract: people::Contract::Report { words: 128 },
         authority: people::Authority {
             tools: DELEGATE,
+            models: 0,
             grants: Box::new([]),
             delegation: people::Delegation {
                 kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),

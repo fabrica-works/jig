@@ -35,15 +35,22 @@ pub(crate) fn store_limits() -> jig_test_service::limits::Limits {
     static LIMITS: std::sync::OnceLock<jig_test_service::limits::Limits> = std::sync::OnceLock::new();
     *LIMITS.get_or_init(profile)
 }
+/// The deployment's configured model names, by which the store keeps a role's models.
+pub(crate) fn store_names() -> &'static [Box<[u8]>] {
+    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| jig_protocol_store::codec::names(&engine().llm.models))
+}
 fn profile() -> jig_test_service::limits::Limits {
+    jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine().limits)
+}
+fn engine() -> jig_protocol_config::Engine {
     let bytes = engine_document();
     let size = u32::try_from(bytes.len()).expect("fixture document size");
     let bounds = jig_protocol_config::DocumentLimits { bytes: size, tokens: size, depth: 32 };
     let document = jig_protocol_config::document(bytes.as_bytes(), &bounds).expect("fixture document");
     let mut whole = jig_protocol_config::read::Object::new(&document, 0).expect("fixture object");
     let at = whole.member(&document, b"engine").expect("fixture engine member");
-    let engine = jig_protocol_config::engine(&document, at).expect("fixture engine");
-    jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine.limits)
+    jig_protocol_config::engine(&document, at).expect("fixture engine")
 }
 
 pub(crate) fn files() -> jig_test_service::Files {

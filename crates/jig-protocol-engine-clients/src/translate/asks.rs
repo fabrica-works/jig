@@ -383,6 +383,9 @@ pub(super) fn authority(value: w::OwnerAuthority, limits: &w::Limits) -> Result<
     }
     Ok(p::Authority {
         tools: v.tools,
+        // The client wire names no models until JP10: the core fills a role's or a task's from
+        // the models it already keeps.
+        models: 0,
         grants: grants(&v.grants, limits.owner_authority_grants, w::Path::OwnerAuthorityGrants, limits)?,
         delegation: p::Delegation { kinds: kinds.into_boxed(), tasks: delegation.tasks, depth: delegation.depth },
         spend: v.spend,

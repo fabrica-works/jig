@@ -604,7 +604,7 @@ fn cut_open(length: Option<u64>, claimed: bool) -> (Store, Box<[Event]>, Below) 
         let record = fixtures::run_proof(LIVE);
         ops.push(skein_kv::Op::Put {
             key: crate::keys::encode(&record.key(), fixtures::KEY_LIMIT).expect("proof key"),
-            value: crate::codec::encode(&record, &store.codec).expect("proof"),
+            value: crate::codec::encode(&record, &store.codec, &store.names).expect("proof"),
         })
         .expect("proof slot");
     }

@@ -85,7 +85,7 @@ impl World {
             pid,
             root: Root { token: Token::new(1), fd },
             io: drivers(fd, &limits),
-            store: Store::on_directory(&limits, root::APPLICATION),
+            store: Store::on_directory(&limits, root::APPLICATION, &[]),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(QUEUE),
             below: below(),
@@ -145,7 +145,7 @@ impl World {
         let fd = self.sim.root(self.pid, Handle::new(handle.raw()));
         self.root = Root { token: Token::new(1), fd };
         self.io = drivers(fd, &self.env.limits);
-        self.store = Store::on_directory(&self.env.limits, root::APPLICATION);
+        self.store = Store::on_directory(&self.env.limits, root::APPLICATION, &[]);
         self.above = Queue::with_capacity(QUEUE);
         self.below = below();
         self.subs = Queue::with_capacity(QUEUE);

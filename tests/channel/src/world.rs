@@ -192,7 +192,9 @@ pub(crate) fn answer_store(
 ) {
     host.holding = hold;
     host.corrupt_transcript = matches!(scenario, crate::stories::Story::InvalidTranscript);
-    for commit in store.observe(&mut host.files.events, &host.codec, &host.store_limits.root.connector) {
+    for commit in
+        store.observe(&mut host.files.events, &host.codec, fixtures::store_names(), &host.store_limits.root.connector)
+    {
         for write in &commit.writes {
             if let root::Write::Save(row) = write {
                 match row {

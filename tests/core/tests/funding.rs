@@ -94,6 +94,7 @@ fn changed_role() -> people::PolicyRole {
         number: 0,
         authority: people::Authority {
             tools: 1023,
+            models: 0,
             grants: Box::new([]),
             delegation: people::Delegation {
                 kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),

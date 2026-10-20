@@ -128,7 +128,7 @@ pub(crate) fn decode(store: &Store, row: skein_kv::Row) -> Option<(Row, u64)> {
         return Some((Row::Application { key: Box::from(key), value: row.value }, size));
     }
     let key = keys::decode(&row.key)?;
-    let record = codec::decode(&key, &row.value, &store.codec)?;
+    let record = codec::decode(&key, &row.value, &store.codec, &store.names)?;
     if record.key() != key {
         return None;
     }

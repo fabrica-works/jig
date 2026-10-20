@@ -37,7 +37,7 @@ fn next(store: &mut Store, below: &mut Below) -> Result<bool, ()> {
     let Some(row) = page.rows.into_iter().next() else {
         return Ok(true);
     };
-    let record = codec::decode(&keys::decode(&row.key).ok_or(())?, &row.value, &store.codec).ok_or(())?;
+    let record = codec::decode(&keys::decode(&row.key).ok_or(())?, &row.value, &store.codec, &store.names).ok_or(())?;
     if keys::encode(&record.key(), store.limits.store.key).ok_or(())? != row.key {
         return Err(());
     }

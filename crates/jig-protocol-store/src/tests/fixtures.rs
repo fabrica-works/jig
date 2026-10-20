@@ -374,6 +374,7 @@ pub fn people_pattern() -> people::Pattern {
 pub fn people_authority() -> people::Authority {
     people::Authority {
         tools: 9,
+        models: 0b101,
         grants: Box::new([people::Grant { connector: 1, kind: 2, pattern: people_pattern() }]),
         delegation: people::Delegation {
             kinds: Box::new([people::Executor::Charter(3), people::Executor::Procedure(4), people::Executor::Role(5)]),
@@ -385,6 +386,15 @@ pub fn people_authority() -> people::Authority {
         notes: 3,
         note_resources: Box::new([people::ResourceScope { connector: 1, pattern: people_pattern() }]),
     }
+}
+
+/// Configured models' names, in the configuration's order.
+pub fn model_names(names: &[&[u8]]) -> Box<[Box<[u8]>]> {
+    let mut result = skein_lib::List::with_capacity(u64::BITS);
+    for name in names {
+        result.push(Box::from(*name)).expect("at most one name per model bit");
+    }
+    result.into_boxed()
 }
 
 pub fn people_policy() -> people::PolicyValue {

@@ -215,7 +215,8 @@ impl Application for Testing {
     type Delivery = Delivery;
 
     fn store(config: &Config) -> Store {
-        Store::new(&config.limits)
+        let (configuration, _) = config.root();
+        Store::new(&config.limits, &configuration.core.settings.models)
     }
     fn build(config: &Config) -> root::Domain {
         let (configuration, limits) = config.root();

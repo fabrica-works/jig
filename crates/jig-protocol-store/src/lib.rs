@@ -56,6 +56,8 @@ pub struct Store {
     limits: Limits,
     application: sizes::Application,
     codec: codec::Limits,
+    /// The configured models' names, which the people family keeps a role's models by.
+    names: Box<[Box<[u8]>]>,
     stores: Stores,
     phase: Phase,
     directory: directory::Directory,
@@ -67,8 +69,14 @@ pub struct Store {
 }
 
 impl Store {
+    /// A component over open stores; `models` are the configuration's, in its order.
     #[must_use]
-    pub fn over(limits: &Limits, application: sizes::Application, stores: Stores) -> Store {
+    pub fn over(
+        limits: &Limits,
+        application: sizes::Application,
+        models: &[jig_domain_core::Model],
+        stores: Stores,
+    ) -> Store {
         assert!(limits.store.is_usable() && limits.secrets.is_usable(), "both stores' limits are usable");
         assert!(
             limits.queue > 0 && limits.queue <= limits.store.queued && limits.files > 0,
@@ -84,6 +92,7 @@ impl Store {
             limits: *limits,
             application,
             codec,
+            names: codec::names(models),
             stores,
             phase: Phase::Closed,
             directory: directory::Directory::new(),
@@ -94,10 +103,10 @@ impl Store {
     }
 
     #[must_use]
-    pub fn on_directory(limits: &Limits, application: sizes::Application) -> Store {
+    pub fn on_directory(limits: &Limits, application: sizes::Application, models: &[jig_domain_core::Model]) -> Store {
         let stores =
             Stores { store: skein_kv::Store::new(&limits.store), secrets: skein_kv::Store::new(&limits.secrets) };
-        let mut store = Store::over(limits, application, stores);
+        let mut store = Store::over(limits, application, models, stores);
         store.directory.disk = true;
         store
     }
@@ -148,7 +157,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(commits::worst_case(limits)?)?
         .checked_add(secrets::worst_case(limits)?)?
         .checked_add(transcripts::worst_case(limits)?)?
-        .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)
+        .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)?
+        .checked_add(names_worst_case()?)
+}
+
+/// At most one configured model per `Models` bit, each name within its bound.
+fn names_worst_case() -> Option<u64> {
+    skein_lib::List::<Box<[u8]>>::worst_case(u64::BITS)?
+        .checked_add(u64::from(u64::BITS).checked_mul(u64::from(jig_domain_core::MODEL_NAME_BYTES))?)
 }
 
 /// The memory component's requests (store.md, section 10).

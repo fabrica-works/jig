@@ -45,7 +45,12 @@ impl Host for ServiceHost {
             self.capture.complete(complete);
             self.wire.complete(complete);
         }
-        let commits = self.store.borrow_mut().observe(&mut self.capture.events, &self.codec, &self.connector);
+        let commits = self.store.borrow_mut().observe(
+            &mut self.capture.events,
+            &self.codec,
+            crate::fixtures::store_names(),
+            &self.connector,
+        );
         self.commits.extend(commits);
         jig_test_service::iterate(&mut self.service, now, wall);
         for submit in self.service.submissions().iter() {

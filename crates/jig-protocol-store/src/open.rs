@@ -63,7 +63,7 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, be
         refuse(store, owner, OpenRefusal::Numbers { store: last, header: 0 }, above);
         return;
     };
-    let Some(header) = codec::decode(&Key::Core(CoreKey::Deployment), &header, &store.codec) else {
+    let Some(header) = codec::decode(&Key::Core(CoreKey::Deployment), &header, &store.codec, &store.names) else {
         corrupt(store, owner, above);
         return;
     };

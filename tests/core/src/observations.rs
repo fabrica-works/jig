@@ -1097,7 +1097,7 @@ mod activity_tests {
         for erased in [false, true] {
             let configuration = crate::effects::fixture(507, false).0;
             let mut observer = Observer::new(&configuration);
-            let mut store = Store::new(&crate::world::limits());
+            let mut store = Store::new(&crate::world::limits(), &configuration.core.settings.models);
             let row = root::Record::Core(core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
                 task: 1,
                 position: 1,

@@ -213,7 +213,7 @@ fn an_undecodable_get_value_is_corrupt() {
 #[test]
 fn a_get_value_stored_under_another_records_key_is_corrupt() {
     let limits = codec::limits(&fixtures::CORE_LIMITS).expect("fixture limits");
-    let value = codec::encode(&fixtures::notes_entry(19), &limits).expect("note fits");
+    let value = codec::encode(&fixtures::notes_entry(19), &limits, &[]).expect("note fits");
     let mut store = planted_note(value);
     let events = get(&mut store, note_key());
     assert_corrupt(&store, &events);

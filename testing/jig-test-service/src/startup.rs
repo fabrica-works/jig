@@ -461,13 +461,15 @@ pub(super) fn engine_startup(
             system.seed(resource, state).expect("configuration checked resource count");
         }
     }
+    let store =
+        crate::store::Store::new(&parsed.limits.root, &store_limits, &root.core.settings.models, seeds.installation);
     let mut engine = Engine::new(
         root,
         &parsed.limits.root,
         systems,
         crate::engine::Children { accounts, workers, clients },
         values,
-        crate::store::Store::new(&parsed.limits.root, &store_limits, seeds.installation),
+        store,
     );
     // configuration.md, 5: the smallest source opens only an empty deployment.
     for project in &parsed.engine.projects {

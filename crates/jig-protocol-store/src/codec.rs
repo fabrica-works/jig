@@ -24,24 +24,36 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
     Some(Limits { core, tasks, notes, people: people::limits(domain)? })
 }
 
-/// Encode a record through its owning family.
+/// The configured models' names in the configuration's order: the people family keeps a role's
+/// models by name (protocol/store.md, 5.1).
 #[must_use]
-pub fn encode(row: &domain::Record, limits: &Limits) -> Option<Box<[u8]>> {
+pub fn names(models: &[domain::Model]) -> Box<[Box<[u8]>]> {
+    let mut names = skein_lib::List::with_capacity(u32::try_from(models.len()).expect("configured models fit u32"));
+    for model in models {
+        names.push(model.name.clone()).expect("one name per model");
+    }
+    names.into_boxed()
+}
+
+/// Encode a record through its owning family; `names` are [`names`] of today's configuration.
+#[must_use]
+pub fn encode(row: &domain::Record, limits: &Limits, names: &[Box<[u8]>]) -> Option<Box<[u8]>> {
     match row {
         domain::Record::Core(row) => core::encode(row, &core_limits(limits)).ok(),
         domain::Record::Tasks(row) => tasks::encode(row, &limits.tasks).ok(),
-        domain::Record::People(row) => people::encode(row, &limits.people).ok(),
+        domain::Record::People(row) => people::encode(row, &limits.people, names).ok(),
         domain::Record::Notes(row) => notes::encode(row, &limits.notes).ok(),
     }
 }
 
-/// The key's child selects the one decoder for its value.
+/// The key's child selects the one decoder for its value; `names` are [`names`] of today's
+/// configuration.
 #[must_use]
-pub fn decode(key: &domain::Key, bytes: &[u8], limits: &Limits) -> Option<domain::Record> {
+pub fn decode(key: &domain::Key, bytes: &[u8], limits: &Limits, names: &[Box<[u8]>]) -> Option<domain::Record> {
     match key {
         domain::Key::Core(_) => Some(domain::Record::Core(core::decode(bytes, &core_limits(limits)).ok()?)),
         domain::Key::Tasks(_) => Some(domain::Record::Tasks(tasks::decode(bytes, &limits.tasks).ok()?)),
-        domain::Key::People(_) => Some(domain::Record::People(people::decode(bytes, &limits.people).ok()?)),
+        domain::Key::People(_) => Some(domain::Record::People(people::decode(bytes, &limits.people, names).ok()?)),
         domain::Key::Notes(_) => Some(domain::Record::Notes(notes::decode(bytes, &limits.notes).ok()?)),
     }
 }

@@ -6,6 +6,11 @@ fn people_rows_read_back_as_written() {
     table([
         ("a_person_reads_back_with_its_identity", a_person_reads_back_with_its_identity),
         ("a_projects_policy_reads_back", a_projects_policy_reads_back),
+        (
+            "a_roles_models_follow_their_names_to_todays_configuration",
+            a_roles_models_follow_their_names_to_todays_configuration,
+        ),
+        ("a_role_naming_every_model_keeps_every_model", a_role_naming_every_model_keeps_every_model),
         ("a_policy_larger_than_one_amendment_reads_back", a_policy_larger_than_one_amendment_reads_back),
         ("a_read_conversation_position_reads_back", a_read_conversation_position_reads_back),
         ("a_sign_in_reads_back_with_its_wall_expiry", a_sign_in_reads_back_with_its_wall_expiry),

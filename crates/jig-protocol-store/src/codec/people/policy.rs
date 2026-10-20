@@ -133,11 +133,12 @@ pub(super) fn encode_authority(
     value: &domain::Authority,
     limits: &wire::Limits,
 ) -> Result<wire::Authority, wire::Problem> {
-    let domain::Authority { tools, grants, delegation, spend, deadline, notes, note_resources } = value;
+    let domain::Authority { tools, models, grants, delegation, spend, deadline, notes, note_resources } = value;
     wire::Authority::new(
         limits,
         wire::AuthorityParts {
             tools: *tools,
+            models: *models,
             grants: encode_grant_piece(grants, limits, shared_sum(limits), limits.authority_grants)?,
             delegation: encode_delegation(delegation, limits)?,
             spend: *spend,
@@ -160,9 +161,11 @@ pub(super) fn decode_authority(
     value: wire::Authority,
     limits: &wire::Limits,
 ) -> Result<domain::Authority, wire::Problem> {
-    let wire::AuthorityParts { tools, grants, delegation, spend, deadline, notes, note_resources } = value.into_parts();
+    let wire::AuthorityParts { tools, models, grants, delegation, spend, deadline, notes, note_resources } =
+        value.into_parts();
     Ok(domain::Authority {
         tools,
+        models,
         grants: decode_grant_piece(grants, limits, shared_sum(limits))?,
         delegation: decode_delegation(delegation, limits)?,
         spend,

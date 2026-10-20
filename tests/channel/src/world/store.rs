@@ -144,6 +144,7 @@ impl Store {
         &mut self,
         events: &mut Vec<Observed>,
         limits: &codec::Limits,
+        names: &[Box<[u8]>],
         connector: &jig_test_connector::Limits,
     ) -> Vec<Commit> {
         let mut committed = Vec::new();
@@ -158,35 +159,41 @@ impl Store {
                     self.pending = frames(&bytes, self.applied)
                         .into_iter()
                         .filter(|(number, _)| *number > self.applied)
-                        .map(|(number, ops)| self.commit(number, ops, limits, connector))
+                        .map(|(number, ops)| self.commit(number, ops, limits, names, connector))
                         .collect();
                 }
                 Observed::Recovered(path) if is_log(&path) => {
                     if let Some(bytes) = self.files.get(&path) {
                         self.recovered.extend(frames(bytes, 0).into_iter().map(|(number, _)| number));
                     }
-                    committed.extend(self.durable(&path, limits, connector));
+                    committed.extend(self.durable(&path, limits, names, connector));
                 }
                 Observed::Snapshot(path) => {
                     if let Some(bytes) = self.files.get(&path)
                         && let Some((number, ops)) = snapshots::read(bytes)
                         && self.applied < number
                     {
-                        let commit = self.commit(number, ops, limits, connector);
+                        let commit = self.commit(number, ops, limits, names, connector);
                         self.apply(&commit, limits);
                         self.recovered.extend(1..=number);
                         committed.push(commit);
                     }
                 }
                 Observed::Sync(path) if is_log(&path) => {
-                    committed.extend(self.durable(&path, limits, connector));
+                    committed.extend(self.durable(&path, limits, names, connector));
                 }
                 Observed::Sync(_) | Observed::Recovered(_) => {}
             }
         }
         committed
     }
-    fn durable(&mut self, path: &[u8], limits: &codec::Limits, connector: &jig_test_connector::Limits) -> Vec<Commit> {
+    fn durable(
+        &mut self,
+        path: &[u8],
+        limits: &codec::Limits,
+        names: &[Box<[u8]>],
+        connector: &jig_test_connector::Limits,
+    ) -> Vec<Commit> {
         let mut committed = Vec::new();
         let Some(bytes) = self.files.get(path) else { return committed };
         let frames = frames(bytes, self.applied);
@@ -194,7 +201,7 @@ impl Store {
             if number <= self.applied {
                 continue;
             }
-            let commit = self.commit(number, ops, limits, connector);
+            let commit = self.commit(number, ops, limits, names, connector);
             self.apply(&commit, limits);
             self.pending.retain(|pending| pending.number > number);
             committed.push(commit);
@@ -223,6 +230,7 @@ impl Store {
         number: u64,
         ops: Box<[skein_kv::Op]>,
         limits: &codec::Limits,
+        names: &[Box<[u8]>],
         connector: &jig_test_connector::Limits,
     ) -> Commit {
         let mut writes = Vec::new();
@@ -230,7 +238,7 @@ impl Store {
             match op {
                 skein_kv::Op::Put { key, value } => {
                     if let Some(key) = keys::decode(&key) {
-                        let row = codec::decode(&key, &value, limits).expect("real stored row decodes");
+                        let row = codec::decode(&key, &value, limits, names).expect("real stored row decodes");
                         writes.push(root::Write::Save(root::Record::Core(row)));
                     } else if let Some(keys::Own::Transcript { task }) = keys::decode_own(&key) {
                         let place = codec::component::Transcript::decode(&value).expect("real transcript place");

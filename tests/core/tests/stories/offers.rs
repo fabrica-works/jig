@@ -159,6 +159,7 @@ fn a_policy_narrowed_withdraws_an_offer_in_the_next_delivery() {
         number: role.number,
         authority: people::Authority {
             tools: role.authority.tools.0,
+            models: role.authority.models.0,
             grants: Box::new([people::Grant {
                 connector: 1,
                 kind: 5,

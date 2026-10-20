@@ -473,8 +473,9 @@ fn people_limits() -> crate::people_v5::Limits {
 
 fn people_round_trip(row: jig_domain_people::Stored) {
     let limits = people_limits();
-    let bytes = crate::codec::people::encode(&row, &limits).expect("within people's bounds");
-    assert_eq!(crate::codec::people::decode(&bytes, &limits), Ok(row));
+    let names = fixtures::model_names(&[b"first", b"second", b"third"]);
+    let bytes = crate::codec::people::encode(&row, &limits, &names).expect("within people's bounds");
+    assert_eq!(crate::codec::people::decode(&bytes, &limits, &names), Ok(row));
 }
 
 fn ask_round_trip(ask: jig_domain_people::Ask) {
@@ -493,6 +494,32 @@ fn a_person_reads_back_with_its_identity() {
 
 fn a_projects_policy_reads_back() {
     people_round_trip(jig_domain_people::Stored::Policy { project: 3, value: fixtures::people_policy() });
+}
+
+fn a_roles_models_follow_their_names_to_todays_configuration() {
+    let limits = people_limits();
+    let mut value = fixtures::people_policy();
+    value.roles[0].authority.models = 0b111;
+    let row = jig_domain_people::Stored::Policy { project: 3, value: value.clone() };
+    let then = fixtures::model_names(&[b"first", b"second", b"third"]);
+    let bytes = crate::codec::people::encode(&row, &limits, &then).expect("within people's bounds");
+    // "third" moved to the front, "second" is no longer configured, "fourth" is new.
+    let now = fixtures::model_names(&[b"third", b"fourth", b"first"]);
+    value.roles[0].authority.models = 0b101;
+    assert_eq!(
+        crate::codec::people::decode(&bytes, &limits, &now),
+        Ok(jig_domain_people::Stored::Policy { project: 3, value })
+    );
+}
+
+fn a_role_naming_every_model_keeps_every_model() {
+    let limits = people_limits();
+    let mut value = fixtures::people_policy();
+    value.roles[0].authority.models = u64::MAX;
+    let row = jig_domain_people::Stored::Policy { project: 3, value };
+    let bytes = crate::codec::people::encode(&row, &limits, &fixtures::model_names(&[b"first"])).expect("bounded");
+    let now = fixtures::model_names(&[b"second", b"first"]);
+    assert_eq!(crate::codec::people::decode(&bytes, &limits, &now), Ok(row));
 }
 
 fn a_policy_larger_than_one_amendment_reads_back() {
@@ -556,7 +583,11 @@ fn a_person_identity_field_past_its_limit_is_refused() {
     let mut identity = fixtures::identity();
     identity.key.subject = Box::new([0; 33]);
     assert_eq!(
-        crate::codec::people::encode(&jig_domain_people::Stored::Person { number: 1, identity }, &people_limits()),
+        crate::codec::people::encode(
+            &jig_domain_people::Stored::Person { number: 1, identity },
+            &people_limits(),
+            &fixtures::model_names(&[])
+        ),
         Err(crate::people_v5::Problem {
             path: crate::people_v5::Path::IdentityKeySubject,
             reason: skein_codec::Reason::Bound
@@ -567,10 +598,11 @@ fn a_person_identity_field_past_its_limit_is_refused() {
 fn a_people_row_of_another_version_does_not_decode() {
     let limits = people_limits();
     let row = jig_domain_people::Stored::ReadResults { party: 1, through: 2 };
-    let mut bytes = crate::codec::people::encode(&row, &limits).expect("fixed row");
+    let names = fixtures::model_names(&[]);
+    let mut bytes = crate::codec::people::encode(&row, &limits, &names).expect("fixed row");
     *bytes.get_mut(1).expect("version prefix") = 6;
     assert_eq!(
-        crate::codec::people::decode(&bytes, &limits),
+        crate::codec::people::decode(&bytes, &limits, &names),
         Err(crate::people_v5::Problem {
             path: crate::people_v5::Path::RowVersion,
             reason: skein_codec::Reason::Version

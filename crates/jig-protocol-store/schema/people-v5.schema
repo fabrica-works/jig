@@ -19,7 +19,7 @@ record ExecutorProcedure { value: u32 }
 record ExecutorRole { value: u32 }
 enum Executor { charter: ExecutorCharter, procedure: ExecutorProcedure, role: ExecutorRole }
 record Delegation { kinds: bytes 65536 tasks: u32 depth: u32 }
-record Authority { tools: u64 grants: bytes 65536 delegation: Delegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 65536 }
+record Authority { tools: u64 models: u64 grants: bytes 65536 delegation: Delegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 65536 }
 record Judge { connector: u16 requirement: u16 parameters: u32 }
 record GuardObserved { freshness: u64 }
 enum Guard { guarded, observed: GuardObserved }
@@ -145,7 +145,8 @@ record StoredReadConversation { party: u64 task: u64 through: u64 }
 record EndedRead { task: u64 party: u64 through: u64 }
 record StoredSignIn { number: u64 person: u64 expires: u64 }
 record StoredRoles { project: u32 holdings: list 1024 Holding }
-record StoredPolicy { project: u32 value: PolicyValue }
+record ModelName { name: bytes 4096 }
+record StoredPolicy { project: u32 value: PolicyValue models: list 64 ModelName }
 enum Again { busy, not_ready }
 enum FailureClass { transient, permanent, run, agent, lost, invalid }
 record HoldReasonFailures { class: FailureClass }

@@ -232,6 +232,17 @@ secrets' store (section 9).
   So a family's limits, made from the domain's (5.4), are never past
   its ceilings for a count the domain does not have, and a record's
   worst case is the sum, not a count times its largest item.
+- **A role's models are kept by name** (`../domain/authority.md`,
+  section 3): their bits follow configuration's order, which a later
+  start may change. So the people family (version 5) keeps, in a
+  project's policy row, the names of the models configured when it was
+  written, and each role's bits against them; a restore maps each name
+  to its bit in today's order, and a name no longer configured drops
+  out of the role, without an error. A role naming every model (no
+  narrowing, every bit set) keeps naming every model, today's included;
+  a model configured later joins no other role a policy row already
+  holds. The row holds no ceiling: each start restores the policy under
+  configuration's.
 - **Golden bytes** per family and version; a fuzz target per family's
   decoder; bounds at their limit and one past it.
 

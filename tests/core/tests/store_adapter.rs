@@ -8,7 +8,7 @@ use jig_test_store_files::{Fault, Store};
 use skein_lib::Wall;
 const LIVE: u64 = 21;
 fn fresh() -> Store {
-    Store::new(&jig_core_world::world::limits())
+    Store::new(&jig_core_world::world::limits(), &[])
 }
 fn save(row: core::CoreRecord) -> root::Write {
     root::Write::Save(root::Record::Core(core::Record::Core(row)))

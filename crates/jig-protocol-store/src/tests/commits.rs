@@ -27,7 +27,7 @@ fn commit(store: &mut Store, number: u64, writes: Box<[Write]>) -> Box<[Event]> 
 fn jig_row(store: &mut Store, key: &Key) -> Option<Record> {
     let encoded = keys::encode(key, fixtures::KEY_LIMIT).expect("fixture key fits");
     let bytes = fixtures::get_kv(store, &encoded)?;
-    codec::decode(key, &bytes, &store.codec)
+    codec::decode(key, &bytes, &store.codec, &store.names)
 }
 
 fn format_row(store: &mut Store) -> codec::component::Format {

@@ -66,6 +66,7 @@ pub(super) fn poll(peers: &mut Peers, store: &Store) -> Vec<Input<root::Event, r
                 number: 0,
                 authority: people::Authority {
                     tools: value.tools.0,
+                    models: value.models.0,
                     grants,
                     delegation: people::Delegation {
                         kinds,

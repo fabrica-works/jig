@@ -421,20 +421,30 @@ pub(crate) fn engine_message_document() -> Vec<u8> {
     engine_document()
 }
 
+fn engine_configuration() -> jig_protocol_config::Engine {
+    let bounds = jig_protocol_config::DocumentLimits {
+        bytes: u32::try_from(ENGINE.len()).expect("fixture document size"),
+        tokens: u32::try_from(ENGINE.len()).expect("fixture document size"),
+        depth: 32,
+    };
+    let document = jig_protocol_config::document(ENGINE, &bounds).expect("fixture document");
+    jig_protocol_config::engine(&document, 0).expect("fixture engine")
+}
+
 /// Match the fixture's final admitted core bounds, parsed once per test process.
 #[must_use]
 pub fn store_limits() -> jig_test_service::limits::Limits {
     static LIMITS: std::sync::OnceLock<jig_test_service::limits::Limits> = std::sync::OnceLock::new();
     *LIMITS.get_or_init(|| {
-        let bounds = jig_protocol_config::DocumentLimits {
-            bytes: u32::try_from(ENGINE.len()).expect("fixture document size"),
-            tokens: u32::try_from(ENGINE.len()).expect("fixture document size"),
-            depth: 32,
-        };
-        let document = jig_protocol_config::document(ENGINE, &bounds).expect("fixture document");
-        let engine = jig_protocol_config::engine(&document, 0).expect("fixture engine");
-        jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine.limits)
+        jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine_configuration().limits)
     })
+}
+
+/// The fixture's configured model names, by which the store keeps a role's models.
+#[must_use]
+pub fn store_names() -> &'static [Box<[u8]>] {
+    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| jig_protocol_store::codec::names(&engine_configuration().llm.models))
 }
 
 #[must_use]
@@ -451,6 +461,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         contract: people::Contract::Report { words: 16 },
         authority: people::Authority {
             tools: 0,
+            models: 0,
             grants: Box::new([]),
             delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             spend,

@@ -87,6 +87,9 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         ask_answer_question_words: people.words,
         ask_set_roles_holdings: people.holdings,
         stored_roles_holdings: people.holdings,
+        // A policy row names each configured model a role's bit stands for.
+        stored_policy_models: u64::BITS,
+        model_name_name: core::MODEL_NAME_BYTES,
         segment_bytes: people.amendment_bytes.max(authority.segment_bytes),
     };
     derive_shared(domain, &mut limits)?;
@@ -111,7 +114,9 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     Some(limits)
 }
 
-pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, wire::Problem> {
+/// Encode a people row; `names` are the configured models' names in configuration's order, which
+/// a policy row keeps beside its roles' models (protocol/store.md, 5.1).
+pub fn encode(row: &domain::Stored, limits: &wire::Limits, names: &[Box<[u8]>]) -> Result<Box<[u8]>, wire::Problem> {
     let value = match row {
         domain::Stored::Person { number, identity } => wire::Value::Person(wire::StoredPerson::new(
             limits,
@@ -141,7 +146,11 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
         )?),
         domain::Stored::Policy { project, value } => wire::Value::Policy(wire::StoredPolicy::new(
             limits,
-            wire::StoredPolicyParts { project: *project, value: encode_policy_value(value, limits)? },
+            wire::StoredPolicyParts {
+                project: *project,
+                value: encode_policy_value(value, limits)?,
+                models: encode_model_names(names, limits)?,
+            },
         )?),
         domain::Stored::Answer { key, ask, outcome, at } => wire::Value::Answer(wire::StoredAnswer::new(
             limits,
@@ -158,7 +167,9 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
     row.encode(&mut writer).expect("measured room");
     Ok(writer.finish())
 }
-pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wire::Problem> {
+/// Decode a people row; a policy row's roles' models move to today's `names`, and a name no
+/// longer configured drops out (protocol/store.md, 5.1).
+pub fn decode(bytes: &[u8], limits: &wire::Limits, names: &[Box<[u8]>]) -> Result<domain::Stored, wire::Problem> {
     let wire::RowParts { value } = wire::Row::decode(limits, &mut Reader::new(bytes))?.into_parts();
     let row = match value {
         wire::Value::Person(value) => {
@@ -186,8 +197,13 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
             domain::Stored::Roles { project, holdings: decode_holdings(holdings) }
         }
         wire::Value::Policy(value) => {
-            let wire::StoredPolicyParts { project, value } = value.into_parts();
-            domain::Stored::Policy { project, value: decode_policy_value(value, limits)? }
+            let wire::StoredPolicyParts { project, value, models } = value.into_parts();
+            let mut value = decode_policy_value(value, limits)?;
+            let moved = model_moves(&models, names);
+            for role in &mut value.roles {
+                role.authority.models = move_models(role.authority.models, &moved);
+            }
+            domain::Stored::Policy { project, value }
         }
         wire::Value::Answer(value) => {
             let wire::StoredAnswerParts { key, ask, outcome, at } = value.into_parts();
@@ -202,6 +218,43 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
     Ok(row)
 }
 
+fn encode_model_names(names: &[Box<[u8]>], limits: &wire::Limits) -> Result<List<wire::ModelName>, wire::Problem> {
+    let mut result = List::with_capacity(count(names.len())?);
+    for name in names {
+        let name = wire::ModelName::new(limits, wire::ModelNameParts { name: name.clone() })?;
+        result.push(name).expect("same number of names");
+    }
+    Ok(result)
+}
+/// For each name the row kept, the bit of today's model of that name, or none.
+fn model_moves(kept: &List<wire::ModelName>, names: &[Box<[u8]>]) -> [u64; 64] {
+    let mut moved = [0; 64];
+    for (bit, name) in kept.iter().enumerate() {
+        for (today, configured) in names.iter().enumerate() {
+            if configured.as_ref() == name.name() {
+                if let (Some(slot), Ok(today)) = (moved.get_mut(bit), u32::try_from(today)) {
+                    *slot = 1_u64.checked_shl(today).unwrap_or(0);
+                }
+                break;
+            }
+        }
+    }
+    moved
+}
+/// A role's models in today's order. Every bit set is every model, the authority domain's
+/// `Models::ALL`, which names no narrowing: it stays every model, today's included.
+fn move_models(bits: u64, moved: &[u64; 64]) -> u64 {
+    if bits == u64::MAX {
+        return bits;
+    }
+    let mut result = 0;
+    for (bit, today) in moved.iter().enumerate() {
+        if bits >> bit & 1 == 1 {
+            result |= today;
+        }
+    }
+    result
+}
 fn problem() -> wire::Problem {
     wire::Problem { path: wire::Path::RowValue, reason: skein_codec::Reason::Bound }
 }

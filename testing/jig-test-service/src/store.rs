@@ -39,6 +39,9 @@ pub(super) struct Store {
     adopted: bool,
     root: Option<Fd>,
     closing: bool,
+    /// The configured models the component names a role's models by, for a test's memory store.
+    #[cfg(test)]
+    pub(super) models: Box<[jig_domain_core::Model]>,
 }
 
 pub(super) fn limits(root: &root::Limits, profile: &protocol::Limits) -> Option<protocol::Limits> {
@@ -73,12 +76,21 @@ pub(super) fn limits(root: &root::Limits, profile: &protocol::Limits) -> Option<
     })
 }
 impl Store {
-    pub(super) fn new(application: &root::Limits, limits: &protocol::Limits, installation: [u8; 16]) -> Self {
+    pub(super) fn new(
+        application: &root::Limits,
+        limits: &protocol::Limits,
+        models: &[jig_domain_core::Model],
+        installation: [u8; 16],
+    ) -> Self {
         let room = root::max_out(application).checked_mul(2).expect("store route room");
         let mut routes = route::Routes::new(room);
         routes.configure(application);
         Self {
-            component: protocol::Store::on_directory(limits, jig_test_store::application(&application.connector)),
+            component: protocol::Store::on_directory(
+                limits,
+                jig_test_store::application(&application.connector),
+                models,
+            ),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             routes,
             above: Queue::with_capacity(room),
@@ -97,6 +109,8 @@ impl Store {
             adopted: false,
             root: None,
             closing: false,
+            #[cfg(test)]
+            models: models.into(),
         }
     }
     pub(super) fn adopt(&mut self, fd: Fd, user: u32) -> Result<(), Fd> {

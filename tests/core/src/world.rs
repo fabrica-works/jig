@@ -484,7 +484,7 @@ impl World {
         World {
             creating: crate::fixtures::Creating::new(&config(seed).core, limits.core.tasks.tree_tasks),
             domain: root::Domain::new(config(seed), &limits),
-            store: Store::new(&limits),
+            store: Store::new(&limits, &config(seed).core.settings.models),
             events,
             trace: Vec::new(),
             sign_in: None,

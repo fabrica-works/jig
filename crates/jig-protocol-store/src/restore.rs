@@ -104,7 +104,7 @@ fn decode(store: &mut Store, row: skein_kv::Row) -> Option<(Row, Option<Row>, u6
     );
     assert!(below.is_empty(), "memory census joins issue no files");
     let Some(skein_kv::Event::Got { value: Some(value), .. }) = above.pop() else { return None };
-    let record = codec::decode(&key, &value, &store.codec)?;
+    let record = codec::decode(&key, &value, &store.codec, &store.names)?;
     if record.key() != key {
         return None;
     }

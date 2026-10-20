@@ -40,6 +40,8 @@ pub struct Store {
     routes: route::Routes,
     limits: root::Limits,
     component_limits: Limits,
+    /// The configured models the component names a role's models by.
+    models: Box<[jig_domain_core::Model]>,
     inflight: BTreeMap<u64, Box<[root::Write]>>,
     durable: Vec<(u64, Box<[root::Write]>)>,
     replies: Vec<Up>,
@@ -62,15 +64,16 @@ impl fmt::Debug for Store {
     }
 }
 impl Store {
+    /// The component under a configuration's `models`, in its order.
     #[must_use]
-    pub fn new(limits: &root::Limits) -> Store {
+    pub fn new(limits: &root::Limits, models: &[jig_domain_core::Model]) -> Store {
         let component_limits = component_limits(limits);
         let stores = Stores {
             store: skein_kv::Store::memory(&component_limits.store),
             secrets: skein_kv::Store::memory(&component_limits.secrets),
         };
         let component =
-            protocol::Store::over(&component_limits, jig_test_store::application(&limits.connector), stores);
+            protocol::Store::over(&component_limits, jig_test_store::application(&limits.connector), models, stores);
         let mut routes = route::Routes::new(limits.routes);
         routes.configure(limits);
         let mut store = Store {
@@ -83,6 +86,7 @@ impl Store {
             routes,
             limits: *limits,
             component_limits,
+            models: models.into(),
             inflight: BTreeMap::new(),
             durable: Vec::new(),
             replies: Vec::new(),
@@ -149,12 +153,18 @@ impl Store {
     pub fn release_held(&mut self) -> Option<u64> {
         if self.failed { None } else { self.held.pop_front() }
     }
+    /// Crash and reopen under a configuration whose models may differ from the last.
+    pub fn reconfigure(&mut self, seed: u64, models: &[jig_domain_core::Model]) {
+        self.models = models.into();
+        self.crash(seed);
+    }
     pub fn crash(&mut self, seed: u64) {
         let stores = self.component.take().expect("component exists").into_stores();
         self.files.crash(seed);
         self.component = Some(protocol::Store::over(
             &self.component_limits,
             jig_test_store::application(&self.limits.connector),
+            &self.models,
             stores,
         ));
         self.routes = route::Routes::new(self.limits.routes);
@@ -173,7 +183,7 @@ impl Store {
     /// Replay durable commits into fresh stores and a fresh filesystem.
     #[must_use]
     pub fn fork(&self) -> Store {
-        let mut fresh = Store::new(&self.limits);
+        let mut fresh = Store::new(&self.limits, &self.models);
         for (number, writes) in &self.durable {
             fresh.submit(*number, writes.clone(), 0);
             assert_eq!(fresh.tick(false), Ok(Some(*number)));

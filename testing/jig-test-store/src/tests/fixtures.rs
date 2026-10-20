@@ -169,7 +169,7 @@ pub fn component() -> Component {
     };
     let stores =
         jig_protocol_store::Stores { store: skein_kv::Store::memory(&kv), secrets: skein_kv::Store::memory(&kv) };
-    let store = jig_protocol_store::Store::over(&limits, crate::application(&root.connector), stores);
+    let store = jig_protocol_store::Store::over(&limits, crate::application(&root.connector), &[], stores);
     let mut component = Component { store, files: jig_test_store_files::Files::new(), limits };
     let root = component.files.root();
     let mut above = skein_lib::Queue::with_capacity(jig_protocol_store::MAX_OUT_DOWN);

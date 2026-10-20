@@ -68,6 +68,7 @@ fn member_decides(world: &mut World, owner: u64, key: u8, decides: authority::Pr
         number: people::Role::Member.number(),
         authority: people::Authority {
             tools: 1023,
+            models: 0,
             grants: Box::new([]),
             delegation: people::Delegation {
                 kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),

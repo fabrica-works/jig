@@ -587,6 +587,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance() {
     let mut amendment = edit();
     amendment.authority = Some(jig_domain_people::Authority {
         tools: 0,
+        models: 0,
         grants: Box::new([]),
         delegation: jig_domain_people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
         spend: 1,
