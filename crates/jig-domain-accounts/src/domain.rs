@@ -264,6 +264,11 @@ impl Domain {
     pub fn account(&self, number: u32) -> Option<&Account> {
         self.accounts.get(&number)
     }
+    /// Borrow the bounded accounts in number order, without copying their state.
+    #[must_use]
+    pub const fn accounts_by_number(&self) -> &Map<u32, Account> {
+        &self.accounts
+    }
     /// A source's state, by the source's number.
     #[must_use]
     pub fn source(&self, number: u32) -> Option<Fact> {

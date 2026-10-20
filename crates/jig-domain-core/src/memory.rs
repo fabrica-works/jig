@@ -293,6 +293,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(bytes(limits.fleet.grants, sizeof(size_of::<fleet::GrantName>())?)?)?;
     total = total.checked_add(bytes(limits.tasks.tasks.checked_mul(2)?, grants)?)?;
 
+    // One run check's transient people/account coverage proofs; selection itself allocates nothing.
+    total = total.checked_add(List::<accounts::Coverage>::worst_case(limits.accounts.accounts)?)?;
     let task = &limits.tasks;
     let new_task = task_carrier(limits)?;
     let context = context_carrier(limits)?;

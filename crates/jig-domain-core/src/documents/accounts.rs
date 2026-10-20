@@ -156,21 +156,8 @@ fn serves_work(core: &Core, party: u64) -> bool {
         if !fact.usable {
             continue;
         }
-        match account.uses() {
-            Some(uses) => {
-                for payer in uses {
-                    if *payer == accounts::Use::Party(party) {
-                        return true;
-                    }
-                }
-            }
-            None => {
-                if account.holder() == accounts::Holder::Party(party)
-                    || account.holder() == accounts::Holder::Deployment
-                {
-                    return true;
-                }
-            }
+        if crate::coverage::serves(&core.people, account, accounts::Use::Party(party)) {
+            return true;
         }
     }
     false

@@ -3027,3 +3027,5 @@ mod escalation_holder;
 mod templates;
 
 mod forget;
+
+mod coverage;

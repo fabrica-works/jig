@@ -16,6 +16,7 @@ mod ordering;
 mod providers;
 mod records;
 mod restore;
+mod selection;
 mod signing;
 pub use boundary::{
     ADDRESS, Answer, Change, End, Ended, Event, Fact, Failure, Form, FromComponent, Grant, GrantTable, KeyFailure,
@@ -27,3 +28,4 @@ pub use keys::KEY_VALID;
 pub use limits::{Limits, worst_case};
 pub use providers::{Offers, Provider, Providers};
 pub use records::{Configured, DISPLAY, Held, Holder, Key, Kind, NAME, SUBJECT, Stored, USES, Use};
+pub use selection::{Coverage, Excluded, HostSource, Selection, WaitWhy};

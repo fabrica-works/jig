@@ -38,6 +38,7 @@ mod funding;
 mod goal_of;
 mod goals;
 pub use goals::CreateStart;
+mod coverage;
 mod historical;
 mod inbox;
 mod indexes;

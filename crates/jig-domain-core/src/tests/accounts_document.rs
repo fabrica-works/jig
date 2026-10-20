@@ -22,7 +22,7 @@ const LAST_SOURCE: u32 = 22;
 const MADE_ACCOUNT: u32 = 1;
 const UNKNOWN: u64 = 99;
 
-fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
+pub(super) fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
     let mut limits = limits();
     // Three holders, plus a second own account for the cut test.
     limits.accounts.accounts = 4;
@@ -80,7 +80,7 @@ fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
     drop(step(&mut core, &env, Event::Account(accounts::Event::Want)));
     (core, env)
 }
-fn account(number: u32, holder: accounts::Holder) -> accounts::Stored {
+pub(super) fn account(number: u32, holder: accounts::Holder) -> accounts::Stored {
     accounts::Stored::Account {
         place: 0,
         uses: None,
@@ -91,7 +91,7 @@ fn account(number: u32, holder: accounts::Holder) -> accounts::Stored {
         display: b"Name".as_slice().into(),
     }
 }
-fn source(account: u32, number: u32, place: u32, kind: accounts::Kind) -> accounts::Stored {
+pub(super) fn source(account: u32, number: u32, place: u32, kind: accounts::Kind) -> accounts::Stored {
     accounts::Stored::Source { account, number, place, kind, name: Box::new([]), held: None }
 }
 fn own_records() -> Vec<accounts::Stored> {
