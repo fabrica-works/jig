@@ -208,16 +208,17 @@ pub const fn form(scheme: &table::Scheme) -> accounts::Form {
 /// A child's LLM account sign-in asks for an add before its driver request.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Down {
+    Keep { source: u32, carried: u64, replaces: bool },
+    Forget { source: u32 },
     SignIn { source: u32, provider: u32 },
     SignOut { source: u32 },
 }
 #[must_use]
 pub fn down_signing(signing: accounts::Signing) -> Down {
     match signing {
-        accounts::Signing::Keep { .. }
-        | accounts::Signing::Forget { .. }
-        | accounts::Signing::Restore { .. }
-        | accounts::Signing::Restored => {
+        accounts::Signing::Keep { source, carried, replaces } => Down::Keep { source, carried, replaces },
+        accounts::Signing::Forget { source } => Down::Forget { source },
+        accounts::Signing::Restore { .. } | accounts::Signing::Restored => {
             unreachable!("the host holds the LLM-key and restart paths until their component is wired")
         }
         accounts::Signing::SignIn { source, provider } => Down::SignIn { source, provider },

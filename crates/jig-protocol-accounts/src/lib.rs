@@ -4,6 +4,7 @@
 extern crate alloc;
 pub mod handed_in;
 pub mod installation;
+pub mod keys;
 pub mod party;
 pub mod records;
 pub mod table;

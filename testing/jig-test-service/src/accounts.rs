@@ -4,7 +4,7 @@ use crate::{Files, Seeds, values::Values};
 use alloc::boxed::Box;
 use jig_domain_accounts as domain;
 use jig_domain_core as core;
-use jig_protocol_accounts::{handed_in, installation, party, records, table, translate};
+use jig_protocol_accounts::{handed_in, installation, keys, party, records, table, translate};
 use jig_protocol_config::{self as config, Path, Problems, Segment, What};
 use jig_protocol_store as store;
 use jig_test_domain as root;
@@ -19,6 +19,7 @@ use skein_oauth_accounts as driver;
 pub(super) const PREFIX: u64 = 3_u64 << 60;
 /// The store's answer to the load of the sources' records; a replace is
 /// answered under its source's number.
+const KEY_EXCHANGE: u64 = PREFIX | (1_u64 << 33);
 const LOAD: Token = Token::new(PREFIX | (1_u64 << 32_u32));
 #[derive(Debug)]
 pub struct AccountsRuntime {
@@ -56,6 +57,10 @@ pub(super) struct Accounts {
     required: Map<u32, Box<[u8]>>,
     erasing: Map<u32, Erasing>,
     records: records::Records,
+    keys: keys::Keys,
+    key_out: Queue<keys::Next>,
+    key_events: Queue<domain::FromComponent>,
+    forgotten: Queue<u32>,
     handed: Queue<(u32, oauth::SavedToken)>,
     early: Queue<domain::Request>,
     pub(super) io: Queue<io::Request>,
@@ -309,6 +314,10 @@ impl Accounts {
             required: Map::with_capacity(limits.accounts),
             erasing: Map::with_capacity(limits.accounts),
             records: records::Records::new(limits.accounts),
+            keys: keys::Keys::new(limits.accounts, limits.client.document.token_bytes),
+            key_out: Queue::with_capacity(room),
+            key_events: Queue::with_capacity(room),
+            forgotten: Queue::with_capacity(room),
             handed,
             early: Queue::with_capacity(room),
             io: Queue::with_capacity(room),
@@ -341,6 +350,9 @@ impl Accounts {
         self.above.room() >= batch.checked_mul(driver::MAX_OUT_DOWN.above).expect("account above room")
             && self.io.room() >= batch.checked_mul(driver::MAX_OUT_DOWN.io).expect("account io room")
             && self.files.room() >= batch.checked_mul(driver::MAX_OUT_DOWN.files).expect("account files room")
+            && self.key_out.room() >= batch
+            && self.key_events.room() >= batch
+            && self.forgotten.room() >= batch
             && (self.running() || self.early.room() >= batch)
     }
     /// The domain's request: to the driver once it runs, held until then.
@@ -362,19 +374,37 @@ impl Accounts {
     }
     fn dispatch(&mut self, request: domain::Request) {
         match request {
-            domain::Request::Component(request) => self.down(translate::down(request)),
+            domain::Request::Component(request) => match request {
+                domain::ToComponent::Want { account } if self.keys.contains(account) => {
+                    if let Some(event) = self.keys.want(account, self.env.now) {
+                        self.key_events.push(event);
+                    }
+                }
+                domain::ToComponent::Rejected { account, .. } | domain::ToComponent::Release { account }
+                    if self.keys.contains(account) => {}
+                other @ (domain::ToComponent::Want { .. }
+                | domain::ToComponent::Rejected { .. }
+                | domain::ToComponent::Release { .. }
+                | domain::ToComponent::Close) => self.down(translate::down(other)),
+            },
             domain::Request::Signing(signing) => {
-                // w1c wires LLM-key keeps and the restart inventory into the component.
                 match signing {
+                    domain::Signing::Restore { .. } | domain::Signing::Restored => return,
                     domain::Signing::Keep { .. }
                     | domain::Signing::Forget { .. }
-                    | domain::Signing::Restore { .. }
-                    | domain::Signing::Restored => return,
-                    domain::Signing::SignIn { .. }
+                    | domain::Signing::SignIn { .. }
                     | domain::Signing::SignOut { .. }
                     | domain::Signing::Replaced { .. } => {}
                 }
                 match translate::down_signing(signing) {
+                    translate::Down::Keep { source, carried, replaces } => {
+                        let next = self.keys.keep(source, carried, replaces);
+                        self.key_out.push(next);
+                    }
+                    translate::Down::Forget { source } => {
+                        self.keys.forget(source);
+                        self.forgotten.push(source);
+                    }
                     translate::Down::SignOut { source } => self.down(driver::Request::SignOut { account: source }),
                     translate::Down::SignIn { source, provider } => {
                         let Some(template) = self.providers.get(&provider) else {
@@ -428,7 +458,14 @@ impl Accounts {
         }
     }
     pub fn is_empty(&self) -> bool {
-        self.closed && self.io.is_empty() && self.above.is_empty() && self.files.is_empty() && self.early.is_empty()
+        self.key_out.is_empty()
+            && self.key_events.is_empty()
+            && self.forgotten.is_empty()
+            && self.closed
+            && self.io.is_empty()
+            && self.above.is_empty()
+            && self.files.is_empty()
+            && self.early.is_empty()
     }
     pub fn next_deadline(&self) -> Option<Time> {
         match &self.component {
@@ -443,6 +480,9 @@ impl Accounts {
             Phase::Running => !self.early.is_empty(),
         };
         starting
+            || !self.key_out.is_empty()
+            || !self.key_events.is_empty()
+            || !self.forgotten.is_empty()
             || !self.above.is_empty()
             || !self.io.is_empty()
             || !self.files.is_empty()
@@ -481,6 +521,7 @@ impl Accounts {
         self.clock(now, wall);
         self.answers(store, events);
         self.start(store);
+        self.key_steps(values, events, store);
         if let Some(component) = &mut self.component
             && self.above.room() >= 3
             && self.io.room() >= 3
@@ -580,6 +621,62 @@ impl Accounts {
             component.reclaim();
         }
     }
+    fn key_steps(&mut self, values: &mut Values, events: &mut Queue<root::Event>, store: &mut crate::store::Store) {
+        for _ in 0..self.forgotten.len() {
+            if !store.room() {
+                break;
+            }
+            let source = self.forgotten.pop().expect("forgotten LLM key");
+            values.accounts.remove(source);
+            let _later = store.secrets(
+                Token::new(PREFIX | u64::from(source)),
+                store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
+            );
+        }
+        for _ in 0..self.key_out.len() {
+            if !store.room() || events.room() == 0 {
+                break;
+            }
+            match self.key_out.pop().expect("LLM key steps") {
+                keys::Next::Store { exchange, request } => {
+                    let owner = Token::new(KEY_EXCHANGE | exchange.raw());
+                    let request = match request {
+                        keys::Store::Get { carried } => {
+                            store::Secrets::Get { owner: store::SecretOwner::Application, number: carried }
+                        }
+                        keys::Store::Adopt { carried, source, replaces } => store::Secrets::Adopt {
+                            carried,
+                            owner: store::SecretOwner::Source,
+                            number: u64::from(source),
+                            replaces,
+                        },
+                    };
+                    if let Some(store::Event::Secret { value, .. }) = store.secrets(owner, request)
+                        && let Some(next) = self.keys.read(exchange, value)
+                    {
+                        self.key_out.push(next);
+                    }
+                }
+                keys::Next::Child(event) => {
+                    events.push(root::Event::Core(core::Event::Account(domain::Event::Component(event))))
+                }
+                keys::Next::Granted { event, source, generation, value } => {
+                    values
+                        .accounts
+                        .granted(source, generation, value, Time::from_nanos(u64::MAX))
+                        .expect("admitted LLM key fits table");
+                    events.push(root::Event::Core(core::Event::Account(domain::Event::Component(event))));
+                }
+            }
+        }
+        for _ in 0..self.key_events.len() {
+            if events.room() == 0 {
+                break;
+            }
+            let event = self.key_events.pop().expect("LLM key grant events");
+            events.push(root::Event::Core(core::Event::Account(domain::Event::Component(event))));
+        }
+    }
     fn granted(
         &self,
         account: u32,
@@ -652,11 +749,21 @@ impl Accounts {
     /// kept (store.md 9).
     fn answers(&mut self, store: &mut crate::store::Store, events: &mut Queue<root::Event>) {
         for _ in 0..store.sources.len() {
-            if !self.down_room() || events.room() == 0 {
+            if !self.down_room() || events.room() == 0 || self.key_out.room() == 0 {
                 break;
             }
             match store.sources.pop().expect("source answers") {
                 store::Event::SecretsLoaded { owner: _, rows, next } => self.loaded(rows, next, &store.installation),
+                store::Event::Kept { owner } if owner.raw() & KEY_EXCHANGE == KEY_EXCHANGE => {
+                    if let Some(next) = self.keys.kept(Token::new(owner.raw() & !KEY_EXCHANGE), true, self.env.now) {
+                        self.key_out.push(next);
+                    }
+                }
+                store::Event::Stale { owner } if owner.raw() & KEY_EXCHANGE == KEY_EXCHANGE => {
+                    if let Some(next) = self.keys.kept(Token::new(owner.raw() & !KEY_EXCHANGE), false, self.env.now) {
+                        self.key_out.push(next);
+                    }
+                }
                 store::Event::Kept { owner } => {
                     if let Some(request) = self.records.kept(source(owner)) {
                         self.down(request);
@@ -930,6 +1037,10 @@ pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32) ->
         .checked_add(Queue::<(u32, oauth::SavedToken)>::worst_case(limits.accounts)?)?
         .checked_add(u64::from(limits.accounts).checked_mul(record)?)?
         .checked_add(records::worst_case(limits.accounts, &limits.client.document)?)?
+        .checked_add(keys::worst_case(limits.accounts, limits.client.document.token_bytes)?)?
+        .checked_add(Queue::<keys::Next>::worst_case(room)?)?
+        .checked_add(Queue::<domain::FromComponent>::worst_case(room)?)?
+        .checked_add(Queue::<u32>::worst_case(room)?)?
         .checked_add(Map::<u32, Secret>::worst_case(limits.accounts)?)?
         .checked_add(Map::<u32, Box<[u8]>>::worst_case(limits.accounts)?)?
         .checked_add(Map::<u32, Erasing>::worst_case(limits.accounts)?)?

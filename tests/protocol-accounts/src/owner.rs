@@ -597,6 +597,9 @@ impl Owner {
                         | child::Signing::Replaced { .. } => {}
                     }
                     match translate::down_signing(signing) {
+                        translate::Down::Keep { .. } | translate::Down::Forget { .. } => {
+                            unreachable!("LLM key tests use their component harness")
+                        }
                         translate::Down::SignIn { source, provider: 1 } => {
                             self.account = source;
                             let registration = fixtures::party_registration(self.story);
