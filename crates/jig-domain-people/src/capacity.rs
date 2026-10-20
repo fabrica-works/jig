@@ -215,6 +215,7 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
         | Refusal::NotWaiting
         | Refusal::NoFurther
         | Refusal::Unknown
+        | Refusal::Provider
         | Refusal::NotOffered
         | Refusal::NoEscalationHolder
         | Refusal::Llm { .. }

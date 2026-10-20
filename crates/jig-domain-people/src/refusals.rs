@@ -42,6 +42,9 @@ pub enum Refusal {
     Unknown,
     /// The deployment does not offer this operation.
     NotOffered,
+    /// A plan's uses name another person, directly or through a project
+    /// (domain/accounts.md, 4.2; domain/providers.md, 2.6 and 3.4).
+    Provider,
     /// This party's key names another ask.
     KeyConflict,
     /// The root's requester has nobody to hold its escalations (domain/people.md, 5.1).

@@ -36,7 +36,9 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
         people::Refusal::NotWaiting => application::Refusal::NotWaiting,
         people::Refusal::NoFurther => application::Refusal::NoFurther,
         people::Refusal::Unknown => application::Refusal::Unknown,
-        people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => application::Refusal::NotOffered,
+        people::Refusal::Provider | people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => {
+            application::Refusal::NotOffered
+        }
         people::Refusal::KeyConflict => application::Refusal::KeyConflict,
         // The application connector names no model: a refused choice is its models' lack.
         people::Refusal::Llm { .. } => {

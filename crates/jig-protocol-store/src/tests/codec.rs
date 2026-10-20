@@ -914,3 +914,10 @@ fn every_account_change_and_answer_round_trips() {
         }
     }
 }
+
+#[test]
+fn the_providers_rule_refusal_round_trips() {
+    people_round_trip(fixtures::people_outcomes::answered(jig_domain_people::Outcome::Refused(
+        jig_domain_people::Refusal::Provider,
+    )));
+}

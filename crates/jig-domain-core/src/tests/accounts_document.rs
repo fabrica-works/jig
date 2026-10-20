@@ -492,3 +492,93 @@ fn needs_sign_in_retains_party_and_deployment_source_lines() {
     assert_eq!(party.accounts.len(), 1);
     assert_eq!(deployment.accounts.len(), 1);
 }
+
+#[test]
+fn the_providers_uses_rule_checks_people_and_projects_for_plans_and_llm_keys() {
+    const SERVICE: u64 = 3;
+    for kind in [accounts::Kind::SignIn, accounts::Kind::Key] {
+        let (mut core, env) =
+            fixture(vec![account(OWN, accounts::Holder::Party(ALICE)), source(OWN, FIRST_SOURCE, 0, kind)]);
+        let mut limits = env.limits.people;
+        limits.people = 3;
+        limits.projects = 3;
+        limits.holdings = 3;
+        core.people = people::Domain::new(&limits, Box::new([]), core.settings.deployment_provider);
+        let penv = Env { now: env.now, wall: env.wall, limits };
+        let mut out = Queue::with_capacity(people::max_out(&limits));
+        for (party, provider) in [(ALICE, 0), (BOB, 0), (SERVICE, core.settings.deployment_provider)] {
+            people::step(
+                &mut core.people,
+                &penv,
+                people::Event::Restore {
+                    record: people::Stored::Person {
+                        number: party,
+                        identity: people::Identity {
+                            key: people::IdentityKey { provider, subject: party.to_be_bytes().into() },
+                            login: Box::new([]),
+                            name: Box::new([]),
+                        },
+                    },
+                },
+                &mut out,
+            );
+        }
+        for (project, parties) in [(0, vec![ALICE, SERVICE]), (1, vec![ALICE, BOB]), (2, vec![])] {
+            people::step(
+                &mut core.people,
+                &penv,
+                people::Event::Restore {
+                    record: people::Stored::Roles {
+                        project,
+                        holdings: parties
+                            .into_iter()
+                            .map(|person| people::Holding { person, role: people::Role::Member })
+                            .collect(),
+                    },
+                },
+                &mut out,
+            );
+        }
+        people::step(&mut core.people, &penv, people::Event::Restored, &mut out);
+        assert!(core.people.ready());
+        let plan = kind == accounts::Kind::SignIn;
+        for (payer, expected) in [
+            (people::Use::Party(ALICE), Ok(())),
+            (people::Use::Party(SERVICE), Ok(())),
+            (people::Use::Party(BOB), if plan { Err(people::Refusal::Provider) } else { Ok(()) }),
+            (people::Use::Project(0), Ok(())),
+            (people::Use::Project(1), if plan { Err(people::Refusal::Provider) } else { Ok(()) }),
+            (people::Use::Project(2), Ok(())),
+            (people::Use::Party(UNKNOWN), Err(people::Refusal::Unknown)),
+            (people::Use::Project(99), Err(people::Refusal::Unknown)),
+        ] {
+            let result = routing::account_requests::change(
+                &core,
+                accounts::Holder::Party(ALICE),
+                people::AccountChange::SetUses { account: OWN, uses: Some(Box::new([payer])) },
+            );
+            assert_eq!(result.map(|_| ()), expected, "{kind:?}, {payer:?}");
+        }
+        let empty: Box<[people::Use]> = Box::new([]);
+        for uses in [None, Some(empty)] {
+            assert!(
+                routing::account_requests::change(
+                    &core,
+                    accounts::Holder::Party(ALICE),
+                    people::AccountChange::SetUses { account: OWN, uses }
+                )
+                .is_ok()
+            );
+        }
+        assert_eq!(
+            routing::account_requests::change(
+                &core,
+                accounts::Holder::Party(BOB),
+                people::AccountChange::SetUses { account: OWN, uses: None }
+            )
+            .err(),
+            Some(people::Refusal::Unknown)
+        );
+    }
+    assert_eq!(people::USES, accounts::USES);
+}

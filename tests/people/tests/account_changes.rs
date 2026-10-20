@@ -114,9 +114,6 @@ fn account_uses_are_bounded_before_admission() {
         ),
     );
     world.commit_all();
-    assert_eq!(
-        world.reply(call),
-        Some(Reply::Refused(Refusal::Limit { which: jig_domain_people::LimitKind::Words }))
-    );
+    assert_eq!(world.reply(call), Some(Reply::Refused(Refusal::Limit { which: jig_domain_people::LimitKind::Words })));
     world.assert_settled();
 }

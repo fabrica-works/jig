@@ -48,7 +48,7 @@ pub use vocabulary::{
 };
 pub(crate) use watch_marks::finish_watches;
 
-mod account_requests;
+pub(crate) mod account_requests;
 mod children;
 mod first_start;
 mod historical;

@@ -548,6 +548,7 @@ pub(super) fn named_action(
                         | jig_domain_people::Refusal::Taken { .. }
                         | jig_domain_people::Refusal::NotWaiting
                         | jig_domain_people::Refusal::NoFurther
+                        | jig_domain_people::Refusal::Provider
                         | jig_domain_people::Refusal::NotOffered
                         | jig_domain_people::Refusal::NotWellFormed { .. }
                         | jig_domain_people::Refusal::NoEscalationHolder

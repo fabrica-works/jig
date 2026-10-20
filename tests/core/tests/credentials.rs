@@ -327,3 +327,37 @@ fn a_sources_form_reaches_the_fleet_as_the_component_named_it() {
     hello(&mut world);
     assert_eq!(received(&world).1.form, fleet::Form::Credential(fleet::Scheme::Key));
 }
+
+fn party(world: &World, sign_in: u64) -> u64 {
+    world
+        .store
+        .rows
+        .values()
+        .find_map(|record| match record {
+            root::Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. }))
+                if *number == sign_in =>
+            {
+                Some(*person)
+            }
+            _ => None,
+        })
+        .expect("a signed-in party")
+}
+#[test]
+fn a_plans_uses_naming_another_person_are_refused_naming_the_providers_rule() {
+    let mut world = signing(167);
+    let first = world.sign_in.expect("signed in");
+    let second = jig_core_world::fixtures::second_party(&mut world, b"account-payer", people::Role::Member);
+    let other = party(&world, second);
+    world.sign_in = Some(first);
+    let (account, _) = signed_in(&mut world);
+    let answer = ask(
+        &mut world,
+        41,
+        people::Ask::AccountChange {
+            holder: people::AccountHolder::Own,
+            change: people::AccountChange::SetUses { account, uses: Some(Box::new([people::Use::Party(other)])) },
+        },
+    );
+    assert_eq!(answer, Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Provider))));
+}

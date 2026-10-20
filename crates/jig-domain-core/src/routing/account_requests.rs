@@ -21,9 +21,9 @@ pub(super) fn outcome(answer: accounts::Answer) -> people::Outcome {
         }
         accounts::Answer::SignedOut { confirmed } => return people::Outcome::AccountSignedOut { confirmed },
         accounts::Answer::Refused { refusal } => refusal,
-        accounts::Answer::KeyKept { .. } | accounts::Answer::Done | accounts::Answer::Removed { .. } => {
-            unreachable!("account change asks are routed in w1b")
-        }
+        accounts::Answer::KeyKept { source } => return people::Outcome::AccountKeyKept { source },
+        accounts::Answer::Done => return people::Outcome::AccountChanged,
+        accounts::Answer::Removed { confirmed } => return people::Outcome::AccountRemoved { confirmed },
     };
     let refusal = match refusal {
         // Account sign-in ended before its visit, not wanted yet, or closing: the key may ask again.
@@ -57,4 +57,63 @@ const fn limit(bound: accounts::Bound) -> people::LimitKind {
         accounts::Bound::Sources => people::LimitKind::Sources,
         accounts::Bound::SignIns => people::LimitKind::SignIns,
     }
+}
+
+/// Convert the holder's account change and check the provider's uses rule. LLM key
+/// changes need the carried envelope and are dispatched by key_routes instead.
+pub(crate) fn change(
+    core: &crate::Core,
+    holder: accounts::Holder,
+    change: people::AccountChange,
+) -> Result<accounts::Change, people::Refusal> {
+    Ok(match change {
+        people::AccountChange::AddKey { .. } | people::AccountChange::ReplaceKey { .. } => {
+            return Err(people::Refusal::NotOffered);
+        }
+        people::AccountChange::RemoveKey { source } => accounts::Change::RemoveKey { source },
+        people::AccountChange::Resume { source } => accounts::Change::Resume { source },
+        people::AccountChange::Remove { account } => accounts::Change::Remove { account },
+        people::AccountChange::MoveAccount { account, place } => accounts::Change::MoveAccount { account, place },
+        people::AccountChange::MoveSource { account, source, place } => {
+            accounts::Change::MoveSource { account, source, place }
+        }
+        people::AccountChange::SetUses { account, uses } => {
+            let row = core.accounts.account(account).ok_or(people::Refusal::Unknown)?;
+            if row.holder() != holder {
+                return Err(people::Refusal::Unknown);
+            }
+            let uses = match uses {
+                None => None,
+                Some(uses) => {
+                    let mut converted =
+                        skein_lib::List::with_capacity(u32::try_from(uses.len()).expect("admitted account uses"));
+                    for value in &*uses {
+                        let value = match *value {
+                            people::Use::Party(party) => {
+                                payer(core, holder, row.plan(), party)?;
+                                accounts::Use::Party(party)
+                            }
+                            people::Use::Project(project) => {
+                                let members = core.people.project_members(project).ok_or(people::Refusal::Unknown)?;
+                                for member in members {
+                                    payer(core, holder, row.plan(), member.person)?;
+                                }
+                                accounts::Use::Project(project)
+                            }
+                        };
+                        converted.push(value).expect("one converted account use");
+                    }
+                    Some(converted.into_boxed())
+                }
+            };
+            accounts::Change::SetUses { account, uses }
+        }
+    })
+}
+fn payer(core: &crate::Core, holder: accounts::Holder, plan: bool, party: u64) -> Result<(), people::Refusal> {
+    let kind = core.people.kind(party).ok_or(people::Refusal::Unknown)?;
+    if plan && holder != accounts::Holder::Party(party) && kind != people::Kind::Service {
+        return Err(people::Refusal::Provider);
+    }
+    Ok(())
 }
