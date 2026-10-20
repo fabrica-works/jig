@@ -1,3 +1,4 @@
+use crate::{Kind, Stored};
 use alloc::boxed::Box;
 use skein_lib::{Duration, Time};
 
@@ -8,7 +9,8 @@ pub enum GrantTable {
     Application,
 }
 
-/// A name and the time its token has left; never the token itself.
+/// A name and the time its token has left; never the token itself. An account's grant is
+/// named by its source's number.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Grant {
     pub table: GrantTable,
@@ -18,13 +20,15 @@ pub struct Grant {
 }
 
 /// Accounts on the component's terms (protocol/llm.md, 5.2), and what runs' agents
-/// notice (domain/accounts.md, 3.5): a generation unauthorized; an account limited until
-/// its reset, or, with none, until its holder resumes it; an account refused, with the
-/// provider's code and reason; a run failed because its account turned limited or
-/// refused. A notice names its account by the grant's number, which, with one source
-/// per account, is the account's.
+/// notice (domain/accounts.md, 3.5): a generation unauthorized; a source limited until
+/// its reset, or, with none, until its holder resumes it; a source refused, with the
+/// provider's code and reason; a run failed because its source turned limited or
+/// refused. The component and a notice name a source by its number, the grant's, in
+/// the field named `account`; the child finds its account. The store's records are
+/// restored before `Want`, which starts the child.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    Restore { record: Stored },
     Want,
     Component(FromComponent),
     Unauthorized { account: u32, generation: u64 },
@@ -90,7 +94,7 @@ pub enum Request {
     Closed,
 }
 
-/// Secret-free account state (domain/engine.md, section 12; domain/accounts.md, 3.5):
+/// Secret-free source state (domain/engine.md, section 12; domain/accounts.md, 3.5):
 /// limited until a time, or, with none, until its holder resumes it; refused until its
 /// holder acts.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -107,9 +111,12 @@ pub enum State {
     Closing,
 }
 
+/// A source's state, with its account; an account's view is the source deciding it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Fact {
     pub account: u32,
+    pub source: u32,
+    pub kind: Kind,
     pub state: State,
     pub generation: Option<u64>,
     pub usable: bool,

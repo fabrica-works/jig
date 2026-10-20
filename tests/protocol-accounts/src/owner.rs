@@ -112,7 +112,11 @@ impl Owner {
         let mut owner = Self {
             io: io::Io::new(&limits.io),
             component: None,
-            child: child::Domain::new(&child_limits, Box::new([account])),
+            child: child::Domain::new(
+                &child_limits,
+                child::Providers::none(),
+                Box::new([child::Configured { number: account, provider: None }]),
+            ),
             child_out: Queue::with_capacity(ROOM),
             child_limits,
             table: Table::new(limits.accounts, limits.client.document.token_bytes),

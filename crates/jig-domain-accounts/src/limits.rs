@@ -1,7 +1,7 @@
 use skein_lib::{Deadlines, Duration, List, Map, Queue};
 
-use crate::Fact;
-use crate::domain::{Account, Granted};
+use crate::domain::{Account, Granted, Source};
+use crate::{DISPLAY, Fact, NAME, SUBJECT};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
@@ -20,8 +20,9 @@ pub struct Limits {
     pub facts: u32,
 }
 
-/// Accounts hold fixed-sized names and times; every secret is below them. Each bound is at least
-/// one, and a holder's accounts are within the deployment's.
+/// Accounts hold bounded names and times; every secret is below them. Each bound is at least
+/// one, and a holder's accounts are within the deployment's. The configured providers are the
+/// configuration's, outside this bound.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.accounts == 0
@@ -36,10 +37,19 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     {
         return None;
     }
+    let accounts = u64::from(limits.accounts);
+    let sources = limits.accounts.checked_mul(limits.sources)?;
+    let names = u64::from(SUBJECT).checked_add(u64::from(DISPLAY))?.checked_mul(accounts)?;
+    let places = Map::<u32, u32>::worst_case(limits.sources)?.checked_mul(accounts)?;
+    let programs = u64::from(NAME).checked_mul(u64::from(sources))?;
     Map::<u32, Account>::worst_case(limits.accounts)?
+        .checked_add(names)?
+        .checked_add(places)?
+        .checked_add(Map::<u32, Source>::worst_case(sources)?)?
+        .checked_add(programs)?
         .checked_add(Map::<u32, Granted>::worst_case(limits.credentials)?)?
         .checked_add(Deadlines::<u32>::worst_case(limits.credentials)?)?
-        .checked_add(List::<u32>::worst_case(limits.accounts)?)?
-        .checked_add(Deadlines::<u32>::worst_case(limits.accounts)?)?
+        .checked_add(List::<u32>::worst_case(sources)?)?
+        .checked_add(Deadlines::<u32>::worst_case(sources)?)?
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)
 }

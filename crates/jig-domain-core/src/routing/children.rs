@@ -424,7 +424,7 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
         for grant in &mut **grants {
             match grant.table {
                 fleet::GrantTable::Accounts => {
-                    if let Some(current) = core.accounts.grant(grant.account, env.now) {
+                    if let Some(current) = core.accounts.source_grant(grant.account, env.now) {
                         *grant = crate::sibling_routes::fleet_grant(current);
                     }
                 }
