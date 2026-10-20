@@ -128,6 +128,7 @@ pub fn member(world: &crate::effects::World, executor: tasks::Executor, words: &
         spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
         authority,
+        llm: None,
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,
@@ -175,6 +176,7 @@ pub fn unchanged(reason: &[u8]) -> tasks::Amendment {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: reason.into(),
     }
 }

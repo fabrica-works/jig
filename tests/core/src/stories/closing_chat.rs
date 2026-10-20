@@ -70,6 +70,7 @@ fn fixture_with_delegates() -> (World, root::Config, u64, [u64; 2]) {
         spec: tasks::Spec { words: Box::from(&b"delegate"[..]), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
         authority,
+        llm: None,
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,

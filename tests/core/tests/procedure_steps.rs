@@ -94,6 +94,7 @@ fn a_step_naming_a_moved_revision_is_refused_and_told_what_it_is_now() {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: b"changed".as_slice().into(),
     };
     world.send(root::Event::Core(core::Event::NamedAction {
@@ -181,6 +182,7 @@ fn a_procedure_steps_again_after_its_amendment_is_refused_as_moved() {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: Box::new([]),
     };
     world.send(root::Event::Core(core::Event::NamedAction {

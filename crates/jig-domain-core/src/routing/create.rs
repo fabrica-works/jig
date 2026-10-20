@@ -197,6 +197,7 @@ fn new_task(
         number,
         project: *project,
         executor,
+        llm: None,
         spec,
         contract: contract(&member.contract),
         authority: given,

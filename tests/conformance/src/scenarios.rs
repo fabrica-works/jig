@@ -344,6 +344,7 @@ impl Continuation {
                                 },
                                 contract: tasks::Contract::Report { words: 128 },
                                 authority,
+                                llm: None,
                                 symbolic_grants: Box::new([]),
                                 dependencies: Box::new([]),
                                 wake: tasks::WakePolicy::DEFAULT,
@@ -468,6 +469,7 @@ impl Continuation {
                                 number: 1,
                                 project: 1,
                                 executor: tasks::Executor::Agent { charter: 1 },
+                                llm: None,
                                 spec: tasks::Spec {
                                     words: b"period work".as_slice().into(),
                                     parameters: Box::new([]),

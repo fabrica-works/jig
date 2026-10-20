@@ -160,6 +160,7 @@ pub(crate) fn valid_template(limits: &Limits, project: u32, budget: u64, batch: 
             || !crate::batch::valid_contract(limits, &member.contract)
             || !crate::batch::valid_authority(limits, &member.authority)
             || !crate::wake::valid(&member.wake)
+            || !crate::llm::valid_member(member)
         {
             return false;
         }

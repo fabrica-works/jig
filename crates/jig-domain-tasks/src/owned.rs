@@ -111,9 +111,18 @@ fn batch_bytes(batch: &[crate::New]) -> Option<u64> {
             .checked_add(authority_bytes(&member.authority)?)?
             .checked_add(contract_bytes(&member.contract)?)?
             .checked_add(bytes(size_of_val(&*member.dependencies))?)?
-            .checked_add(holdings_bytes(&member.holdings)?)?;
+            .checked_add(holdings_bytes(&member.holdings)?)?
+            .checked_add(llm_bytes(member.llm.as_ref())?)?;
     }
     Some(total)
+}
+
+/// The sub-agents' array an LLM choice owns.
+fn llm_bytes(llm: Option<&crate::LlmChoice>) -> Option<u64> {
+    match llm {
+        Some(choice) => bytes(size_of_val(&*choice.subagents)),
+        None => Some(0),
+    }
 }
 
 fn bytes(length: usize) -> Option<u64> {
@@ -377,7 +386,8 @@ pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
                         .checked_add(authority_bytes(&member.authority)?)?
                         .checked_add(contract_bytes(&member.contract)?)?
                         .checked_add(bytes(size_of_val(&*member.dependencies))?)?
-                        .checked_add(holdings_bytes(&member.holdings)?)?;
+                        .checked_add(holdings_bytes(&member.holdings)?)?
+                        .checked_add(llm_bytes(member.llm.as_ref())?)?;
                 }
                 total
             }
@@ -388,6 +398,7 @@ pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
             Some(instructions) => bytes(instructions.len())?,
             None => 0,
         })?
+        .checked_add(llm_bytes(task.llm.as_ref())?)?
         .checked_add(authority_bytes(&task.authority)?)?
         .checked_add(contract_bytes(&task.contract)?)?
         .checked_add(phase_bytes(&task.phase)?)?
@@ -423,7 +434,8 @@ fn settings_bytes(value: &crate::Settings) -> Option<u64> {
             None => 0,
         })?
         .checked_add(authority_bytes(&value.authority)?)?
-        .checked_add(bytes(size_of_val(&*value.dependencies))?)
+        .checked_add(bytes(size_of_val(&*value.dependencies))?)?
+        .checked_add(llm_bytes(value.llm.as_ref())?)
 }
 
 fn amendment_bytes(amendment: &crate::Amendment) -> Option<u64> {
@@ -440,5 +452,6 @@ fn amendment_bytes(amendment: &crate::Amendment) -> Option<u64> {
     if let Some(dependencies) = &amendment.dependencies {
         total = total.checked_add(bytes(size_of_val(&**dependencies))?)?;
     }
+    total = total.checked_add(llm_bytes(amendment.llm.as_ref())?)?;
     Some(total)
 }

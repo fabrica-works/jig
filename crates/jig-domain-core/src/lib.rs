@@ -136,6 +136,9 @@ pub struct Settings {
     pub templates: Box<[Template]>,
     /// Provider number for the application's services.
     pub deployment_provider: u16,
+    /// Configured models in configuration's order: model `i` is bit `i` of an authority's
+    /// models and the `i` a task's LLM choice names (authority.md, 3; tasks.md, 3).
+    pub models: Box<[Model]>,
     /// Numbered charters offered by this deployment.
     pub charters: Box<[Charter]>,
     /// Maximum committed conversation bytes resumed whole.
@@ -632,7 +635,12 @@ impl Core {
             claiming: Map::with_capacity(limits.tasks.tasks),
             due: Queue::with_capacity(limits.tasks.tasks),
             adopted: Queue::with_capacity(limits.tasks.tasks.checked_mul(2).expect("adoption room representable")),
-            tasks: tasks::Domain::new(&limits.tasks, config.seed, charters::numbers(&config.settings, limits)),
+            tasks: tasks::Domain::new(
+                &limits.tasks,
+                config.seed,
+                charters::models(&config.settings, limits),
+                charters::efforts(&config.settings),
+            ),
             authority: config.authority,
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
             fleet: fleet::Domain::new(&limits.fleet, fleet_needs),

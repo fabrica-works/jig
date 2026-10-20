@@ -50,6 +50,7 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
         verdict_fields: rules,
         approval_state: domain.result_bytes,
         choices_choices: domain.contract_choices,
+        llm_choice_subagents: domain::MODELS,
         authority_segment_bytes: domain.authority_bytes,
         pattern_segments: domain.authority_segments,
         authority_grants: domain.authority_grants,

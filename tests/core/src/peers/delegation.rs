@@ -11,6 +11,7 @@ pub(super) fn delegate(words: Box<[u8]>, executor: tasks::Executor, budget: u64)
         spec: tasks::Spec { words, parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
         authority: authority(budget, true),
+        llm: None,
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,

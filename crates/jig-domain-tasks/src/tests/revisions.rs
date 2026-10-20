@@ -88,6 +88,7 @@ pub(super) fn task(number: u64, dependencies: &[u64]) -> New {
         number,
         project: 1,
         executor: Executor::Agent { charter: 1 },
+        llm: None,
         spec: Spec { words: Box::new([1]), parameters: Box::new([]), inputs: Box::new([]) },
         contract: Contract::Report { words: 32 },
         authority: authority(),
@@ -114,7 +115,7 @@ pub(super) fn to() -> ReplyTo {
 impl Harness {
     pub(super) fn new() -> Self {
         let mut test = Self {
-            domain: Domain::new(&LIMITS, 91, Box::new([1])),
+            domain: Domain::new(&LIMITS, 91, crate::tests::charters(), Box::new([0])),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS },
             stored: BTreeMap::new(),
         };
@@ -183,7 +184,7 @@ impl Harness {
     }
 
     pub(super) fn restart(&mut self) {
-        self.domain = Domain::new(&LIMITS, 91, Box::new([1]));
+        self.domain = Domain::new(&LIMITS, 91, crate::tests::charters(), Box::new([0]));
         let rows: Vec<_> = self
             .stored
             .values()
@@ -228,6 +229,7 @@ fn amendment() -> Amendment {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: Box::new([1]),
     }
 }
@@ -719,7 +721,7 @@ fn capacity_history_distinguishes_project_shape_from_room_and_survives_diagnosti
     assert_eq!(h.domain.capacity_refusals(), rows);
     assert!(h.domain.task(4).is_none());
     let mut cold = Harness::new();
-    cold.domain = Domain::new(&LIMITS, 91, Box::new([1]));
+    cold.domain = Domain::new(&LIMITS, 91, crate::tests::charters(), Box::new([0]));
     for row in h.stored.values() {
         match row {
             Stored::Live(_) | Stored::Ledger(_) => {
@@ -800,7 +802,7 @@ fn pending_task_proposal_room_keeps_original_action_and_excludes_wrong_project()
 fn zero_capacity_history_counts_real_source_room_without_retaining_payloads() {
     let limits = Limits { funders: 0, room_refusals: 0, ..LIMITS };
     let env = Env { now: Time::ZERO, wall: Wall::from_nanos(21), limits };
-    let mut domain = Domain::new(&limits, 1, Box::new([1]));
+    let mut domain = Domain::new(&limits, 1, crate::tests::charters(), Box::new([0]));
     let mut out = Queue::with_capacity(max_out(&limits));
     step(&mut domain, &env, Event::Restored, &mut out);
     while out.pop().is_some() {}

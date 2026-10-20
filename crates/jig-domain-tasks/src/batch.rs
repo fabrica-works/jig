@@ -259,7 +259,7 @@ fn check_members(
             Executor::Agent { charter } => {
                 let mut known = false;
                 for configured in &domain.charters {
-                    if *configured == charter {
+                    if configured.number == charter {
                         known = true;
                     }
                 }
@@ -291,6 +291,11 @@ fn check_members(
         }
         if !valid_authority(limits, &new.authority) {
             return Err(problem(number, Refusal::AuthorityShape));
+        }
+        if let Some(choice) = &new.llm
+            && let Err(why) = crate::llm::check(domain, new.executor, &new.authority, choice)
+        {
+            return Err(problem(number, why));
         }
         if new.dependencies.len() > usize::try_from(limits.dependencies).expect("u32 fits usize") {
             return Err(problem(number, Refusal::Dependencies));

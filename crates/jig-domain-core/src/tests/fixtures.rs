@@ -72,8 +72,18 @@ pub(crate) fn query_fixture() -> (Core, Limits) {
     (core, limits)
 }
 
+/// A fresh tasks domain over `core`'s configured charters and models, as a restart builds one.
+pub(crate) fn fresh_tasks(core: &Core, limits: &Limits) -> tasks::Domain {
+    tasks::Domain::new(
+        &limits.tasks,
+        17,
+        crate::charters::models(&core.settings, limits),
+        crate::charters::efforts(&core.settings),
+    )
+}
+
 pub(crate) fn restore(core: &mut Core, limits: &Limits, rows: Box<[tasks::TaskRecord]>) {
-    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    core.tasks = fresh_tasks(core, limits);
     for row in rows {
         let number = row.number;
         send_task(core, limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(row)) });
@@ -106,6 +116,7 @@ pub(crate) fn unchanged(reason: &[u8]) -> tasks::Amendment {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         release: None,
         reason: reason.into(),
     }

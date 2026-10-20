@@ -55,6 +55,7 @@ fn delegate(world: &mut World) {
         spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
         authority: authority.clone(),
+        llm: None,
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,

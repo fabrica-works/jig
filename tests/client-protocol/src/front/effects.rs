@@ -55,6 +55,7 @@ impl Protocol {
                     },
                     contract: tasks::Contract::Report { words: 32 },
                     authority,
+                    llm: None,
                     symbolic_grants: Box::new([]),
                     dependencies: Box::new([]),
                     wake: tasks::WakePolicy::DEFAULT,

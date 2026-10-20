@@ -135,6 +135,7 @@ fn propose_member_batch(world: &mut World) -> u64 {
         spec: tasks::Spec { words: b"proposed root".as_slice().into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
         authority: given,
+        llm: None,
         symbolic_grants: Box::new([]),
         dependencies: Box::new([]),
         wake: tasks::WakePolicy::DEFAULT,

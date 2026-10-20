@@ -26,12 +26,21 @@ impl Charter {
 
 pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
     assert!(settings.charters.len() <= usize::try_from(limits.tasks.charters).expect("charter count"), "charter count");
+    assert!(settings.models.len() <= usize::try_from(tasks::MODELS).expect("model count"), "model count");
+    for (at, model) in settings.models.iter().enumerate() {
+        for earlier in settings.models.iter().take(at) {
+            assert!(earlier.name != model.name, "unique configured model names");
+        }
+        assert!(u8::try_from(model.efforts.len()).is_ok(), "efforts named by a byte");
+    }
     let mut seen = List::with_capacity(limits.tasks.charters);
     for charter in &settings.charters {
         assert!(charter.number != 0 && !seen.as_slice().contains(&charter.number), "unique nonzero charter number");
         seen.push(charter.number).expect("configured charter count");
+        assert!(configured(settings, &charter.policy.model).is_some(), "charter model configured");
         for model in &charter.policy.alternatives {
             assert_eq!(model.account, charter.account(), "one account per charter");
+            assert!(configured(settings, model).is_some(), "charter model configured");
         }
         let policy = &charter.policy;
         assert!(
@@ -55,12 +64,44 @@ pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
     }
 }
 
-pub(crate) fn numbers(settings: &Settings, limits: &Limits) -> Box<[u32]> {
-    let mut numbers = List::with_capacity(limits.tasks.charters);
+/// Each charter's models as tasks checks an LLM choice against them: its main model, then its
+/// alternatives, each once, by its index in configuration's order (tasks.md, 3).
+pub(crate) fn models(settings: &Settings, limits: &Limits) -> Box<[tasks::CharterModels]> {
+    let mut charters = List::with_capacity(limits.tasks.charters);
     for charter in &settings.charters {
-        numbers.push(charter.number).expect("configured charter count");
+        let count = charter.policy.alternatives.len().checked_add(1).expect("charter model count");
+        let mut models = List::with_capacity(u32::try_from(count).expect("charter model count"));
+        let main = configured(settings, &charter.policy.model).expect("charter model configured");
+        models.push(main).expect("charter model count");
+        for model in &charter.policy.alternatives {
+            let index = configured(settings, model).expect("charter model configured");
+            if !models.as_slice().contains(&index) {
+                models.push(index).expect("charter model count");
+            }
+        }
+        let value = tasks::CharterModels { number: charter.number, models: models.into_boxed() };
+        charters.push(value).expect("configured charter count");
     }
-    numbers.into_boxed()
+    charters.into_boxed()
+}
+
+/// How many efforts each configured model declares, in configuration's order (tasks.md, 3).
+pub(crate) fn efforts(settings: &Settings) -> Box<[u8]> {
+    let mut efforts = List::with_capacity(u32::try_from(settings.models.len()).expect("model count"));
+    for model in &settings.models {
+        efforts.push(u8::try_from(model.efforts.len()).expect("efforts named by a byte")).expect("model count");
+    }
+    efforts.into_boxed()
+}
+
+/// A model's index in configuration's order, matched by name.
+pub(crate) fn configured(settings: &Settings, model: &crate::Model) -> Option<u8> {
+    for (index, configured) in settings.models.iter().enumerate() {
+        if configured.name == model.name {
+            return u8::try_from(index).ok();
+        }
+    }
+    None
 }
 
 impl Core {

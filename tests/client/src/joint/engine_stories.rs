@@ -183,6 +183,7 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
                 },
                 contract: tasks::Contract::Report { words: 128 },
                 authority,
+                llm: None,
                 symbolic_grants: Box::new([]),
                 dependencies: Box::new([]),
                 wake: tasks::WakePolicy::DEFAULT,

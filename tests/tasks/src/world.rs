@@ -5,9 +5,9 @@ use crate::referee::{Seen, Stimulus, Tasks};
 use crate::stories::{ChildResult, Restart, RetryEnd, Story, TurnState};
 use crate::trace::Trace;
 use jig_domain_tasks::{
-    self as tasks, Accepted, Authority, Budget, Cause, Contract, Delegation, Domain, End, Ending, Event, Executor,
-    Fact, Funder, Key, Limits, MessageKind, Models, New, Numbers, Party, Problem, Request, ResultKind, Retries, Retry,
-    RunContext, Scopes, Spec, Stored, TaskResult, Tools, Word,
+    self as tasks, Accepted, Authority, Budget, Cause, CharterModels, Contract, Delegation, Domain, End, Ending, Event,
+    Executor, Fact, Funder, Key, Limits, MessageKind, Models, New, Numbers, Party, Problem, Request, ResultKind,
+    Retries, Retry, RunContext, Scopes, Spec, Stored, TaskResult, Tools, Word,
 };
 use skein_lib::{Duration, Env, Queue, ReplyTo, Rng, Time, Token, Wall};
 use skein_world::domain::Referee;
@@ -72,6 +72,26 @@ pub fn authority() -> Authority {
     }
 }
 
+/// The configured models' declared efforts, in configuration's order: model 0 declares two,
+/// model 1 none, model 2 one and model 3 none (domain/tasks.md, section 3).
+pub const EFFORTS: [u8; 4] = [2, 0, 1, 0];
+
+/// The configured charters and their models: charter 1 lists models 0, 1 and 2, in that order,
+/// and charter 2 model 3.
+#[must_use]
+pub fn charters() -> Box<[CharterModels]> {
+    Box::new([
+        CharterModels { number: 1, models: Box::new([0, 1, 2]) },
+        CharterModels { number: 2, models: Box::new([3]) },
+    ])
+}
+
+/// A tasks domain configured with `charters` and `EFFORTS`.
+#[must_use]
+pub fn domain(limits: &Limits, seed: u64) -> Domain {
+    Domain::new(limits, seed, charters(), Box::new(EFFORTS))
+}
+
 #[must_use]
 pub fn task(number: u64, dependencies: &[u64]) -> New {
     New {
@@ -81,6 +101,7 @@ pub fn task(number: u64, dependencies: &[u64]) -> New {
         number,
         project: 1,
         executor: Executor::Agent { charter: 1 },
+        llm: None,
         spec: Spec { words: Box::new([1]), parameters: Box::new([]), inputs: Box::new([]) },
         contract: Contract::Report { words: 32 },
         authority: authority(),
@@ -200,7 +221,7 @@ impl World {
     fn start(seed: u64, limits: &Limits, trace: Trace) -> World {
         let mut world = World {
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
-            domain: Domain::new(limits, seed, Box::new([1])),
+            domain: domain(limits, seed),
             out: Queue::with_capacity(tasks::max_out(limits)),
             pending: Vec::new(),
             records: BTreeMap::new(),
@@ -1036,7 +1057,7 @@ impl World {
         self.restoring = true;
         self.deadlines.clear();
         self.accounting_referee.reset(&self.records);
-        self.domain = Domain::new(&self.env.limits, self.seed, Box::new([1]));
+        self.domain = domain(&self.env.limits, self.seed);
         let kinds = self.kinds.clone();
         for configured in kinds {
             self.send(Event::Kinds { connector: configured.connector, kinds: Box::new([configured]) });

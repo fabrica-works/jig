@@ -158,8 +158,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let approval_contract = u64::from(limits.result_bytes)
         .checked_add(u64::from(limits.hold_bytes))?
         .checked_add(List::<Box<[u8]>>::worst_case(limits.hold_segments)?)?;
+    // An LLM choice's sub-agents, at most one per configured model.
+    let choice = u64::from(crate::MODELS).checked_mul(u64::try_from(size_of::<crate::ModelEffort>()).ok()?)?;
     let payload = u64::from(limits.result_bytes)
         .checked_mul(2)?
+        .checked_add(choice)?
         .checked_add(u64::try_from(size_of::<crate::Word>()).ok()?)?
         .checked_add(u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<u64>()).ok()?)?)?
         .checked_add(u64::from(limits.spec_bytes))?
@@ -236,6 +239,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         )?;
     let proposed_member = u64::try_from(size_of::<crate::New>())
         .ok()?
+        .checked_add(choice)?
         .checked_add(u64::from(limits.spec_bytes))?
         .checked_add(u64::from(limits.authority_bytes))?
         .checked_add(u64::from(limits.dependencies).checked_mul(8)?)?
@@ -319,7 +323,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .checked_add(u64::try_from(size_of::<crate::TaskRecord>()).ok()?)?,
             )?,
         )?
-        .checked_add(u64::from(limits.charters).checked_mul(4)?)?
+        // Each charter and its models, and each configured model's count of efforts.
+        .checked_add(u64::from(limits.charters).checked_mul(
+            u64::try_from(size_of::<crate::CharterModels>()).ok()?.checked_add(u64::from(crate::MODELS))?,
+        )?)?
+        .checked_add(u64::from(crate::MODELS))?
         // Atomic procedure admission saves every live row and finite balance.
         .checked_add(List::<crate::TaskRecord>::worst_case(limits.tasks)?)?
         .checked_add(List::<(crate::Funder, crate::Numbers)>::worst_case(limits.funders)?)?

@@ -39,7 +39,9 @@ pub fn two_charters(seed: u64) -> (root::Config, root::Limits) {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut config.core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    config.core.settings.charters = Box::new([config.core.settings.charters[0].clone(), research_charter()]);
+    let research = research_charter();
+    config.core.settings.models = Box::new([config.core.settings.models[0].clone(), research.policy.model.clone()]);
+    config.core.settings.charters = Box::new([config.core.settings.charters[0].clone(), research]);
     let room = core::room_max(&limits.core).expect("charter room");
     let connectors = jig_test_connector::MAX_OUT * 2;
     limits.journal.writes = limits.journal.writes.max(room.writes + connectors);
@@ -72,6 +74,7 @@ impl World {
                 spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
                 contract: tasks::Contract::Report { words: 128 },
                 authority,
+                llm: None,
                 symbolic_grants: Box::new([]),
                 dependencies: Box::new([]),
                 wake: tasks::WakePolicy::DEFAULT,

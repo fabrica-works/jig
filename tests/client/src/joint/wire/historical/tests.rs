@@ -12,6 +12,7 @@ fn raw_goal() -> tasks::New {
         number: u64::MAX,
         project: u32::MAX,
         executor: tasks::Executor::Procedure { connector: u16::MAX, code: u32::MAX },
+        llm: None,
         spec: tasks::Spec {
             words: Box::from(UTF8_TEXTS[0]),
             parameters: Box::new([

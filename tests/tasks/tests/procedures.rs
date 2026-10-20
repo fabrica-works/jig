@@ -100,6 +100,7 @@ fn amendment() -> tasks::ProcedureAmendment {
             wake: None,
             dependencies: None,
             authority: None,
+            llm: None,
             reason: b"evidence".as_slice().into(),
         },
     }

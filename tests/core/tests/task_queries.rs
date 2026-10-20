@@ -42,6 +42,7 @@ fn delegate_question(world: &mut jig_core_world::effects::World, parent: u64) {
             },
             contract: tasks::Contract::Report { words: 64 },
             authority,
+            llm: None,
             symbolic_grants: Box::new([]),
             dependencies: Box::new([]),
             wake: tasks::WakePolicy::DEFAULT,

@@ -14,7 +14,7 @@ fn fixture() -> (Core, Limits) {
     limits.people.requests = 4;
     limits.people.inbox_entries = 16;
     limits.documents.rows = 16;
-    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    core.tasks = fixtures::fresh_tasks(&core, &limits);
     for (number, requester) in [
         (1, tasks::Party::Person(1)),
         (2, tasks::Party::Task(1)),

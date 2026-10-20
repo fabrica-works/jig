@@ -58,6 +58,7 @@ fn change(core: &Core, spend: u64) -> tasks::Amendment {
         wake: None,
         dependencies: None,
         authority: Some(after),
+        llm: None,
         release: None,
         reason: Box::new([]),
     }

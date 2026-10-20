@@ -227,6 +227,7 @@ fn an_amendment_without_replacements_reads_back() {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: Box::new([]),
     };
     let encoded = proposals::amendment(&source, &tasks_limits()).expect("absent replacements fit");

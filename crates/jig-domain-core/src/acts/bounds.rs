@@ -117,6 +117,7 @@ pub(crate) fn amend_preflight_in(
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         release: None,
         reason: Box::new([]),
     };

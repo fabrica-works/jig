@@ -86,6 +86,7 @@ pub(crate) fn prepare_racing_decisions(world: &mut World) {
             },
             contract: tasks::Contract::Report { words: 128 },
             authority,
+            llm: None,
             symbolic_grants: Box::new([]),
             dependencies: Box::new([]),
             wake: tasks::WakePolicy::DEFAULT,
@@ -111,6 +112,7 @@ pub(crate) fn run_racing_amendment(world: &mut World) {
                 wake: None,
                 dependencies: None,
                 authority: None,
+                llm: None,
                 reason: b"run evidence".as_slice().into(),
                 spec: Some(tasks::Spec {
                     words: b"run choice".as_slice().into(),

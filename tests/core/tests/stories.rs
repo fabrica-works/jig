@@ -84,6 +84,7 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
                 wake: None,
                 dependencies: None,
                 authority: None,
+                llm: None,
                 reason: b"new evidence".as_slice().into(),
             },
         },
@@ -153,6 +154,7 @@ fn a_recurring_task_creates_one_batch_per_period_after_the_reset() {
                 number: 1,
                 project: 1,
                 executor: tasks::Executor::Agent { charter: 1 },
+                llm: None,
                 spec: tasks::Spec {
                     words: b"period work".as_slice().into(),
                     parameters: Box::new([]),
@@ -736,6 +738,7 @@ fn a_batch_waits_without_creating_a_task_or_reserving_funding_until_its_resource
             number: 100,
             project: 1,
             executor: member.executor,
+            llm: None,
             spec: member.spec,
             contract: member.contract,
             numbers: tasks::Numbers { budget: 10, spent: 0, spent_below: 0, reserved: 0 },

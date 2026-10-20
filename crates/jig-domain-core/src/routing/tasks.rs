@@ -1449,6 +1449,7 @@ pub(super) fn route_connector_repair(
             number: seed.number,
             project: seed.project,
             executor,
+            llm: None,
             spec,
             contract,
             numbers: tasks::Numbers { budget: seed.budget, spent: 0, spent_below: 0, reserved: 0 },

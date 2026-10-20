@@ -601,13 +601,23 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             return false;
         }
     }
+    if let Some(choice) = &task.llm {
+        // Restore checks the choice's shape; configuration is checked as a choice is given.
+        let agent = match task.executor {
+            Executor::Agent { .. } => true,
+            Executor::Procedure { .. } | Executor::Person(_) => false,
+        };
+        if !agent || !crate::llm::valid_shape(choice) {
+            return false;
+        }
+    }
     match task.executor {
         Executor::Agent { charter } => {
             if task.recurring.is_some() || task.taken_by.is_some() || task.person_wait.is_some() {
                 return false;
             }
             for configured in &domain.charters {
-                if *configured == charter {
+                if configured.number == charter {
                     return true;
                 }
             }

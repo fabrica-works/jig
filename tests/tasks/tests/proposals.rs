@@ -174,6 +174,7 @@ fn propose_amendment(world: &mut World) {
                     wake: None,
                     dependencies: None,
                     authority: Some(authority),
+                    llm: None,
                     reason: b"more work".as_slice().into(),
                 }),
             },

@@ -41,6 +41,9 @@ pub struct Amendment {
     pub wake: Option<WakePolicy>,
     pub dependencies: Option<Box<[u64]>>,
     pub authority: Option<Authority>,
+    /// A new LLM choice for an agent task's next run; `None` keeps its choice (domain/tasks.md,
+    /// section 7).
+    pub llm: Option<crate::LlmChoice>,
     pub reason: Box<[u8]>,
 }
 
@@ -125,6 +128,8 @@ pub struct Settings {
     pub wake: WakePolicy,
     pub dependencies: Box<[u64]>,
     pub authority: Authority,
+    /// The agent task's LLM choice before or after the amendment.
+    pub llm: Option<crate::LlmChoice>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -146,6 +151,7 @@ fn settings(task: &crate::TaskRecord) -> Settings {
         wake: task.wake,
         dependencies: task.dependencies.clone(),
         authority: task.authority.clone(),
+        llm: task.llm.clone(),
     }
 }
 
@@ -337,6 +343,7 @@ pub(crate) fn check_amend(
     } else if stop_run {
         return Err(Refusal::State);
     }
+    check_llm(domain, &old, &amendment)?;
     let funding = match funder {
         Some(destination) if destination != old.funder => {
             let budget = match &amendment.authority {
@@ -368,6 +375,10 @@ pub(crate) fn check_amend(
         }
         || match &amendment.authority {
             Some(authority) => authority != old.authority,
+            None => false,
+        }
+        || match &amendment.llm {
+            Some(llm) => old.llm.as_ref() != Some(llm),
             None => false,
         };
     let address_changed = match amendment.addressed {
@@ -401,6 +412,25 @@ pub(crate) fn check_amend(
         crate::inbox::prepare_staged(domain, staged, &env.limits, number, word, crate::inbox::Admission::Merged)
             .expect("authenticated amendment has a merged inbox slot");
     Ok(AmendPlan { funding, number, message, amendment, changed, person_changed, attempt, before, prepared, release })
+}
+
+/// A new choice is checked as a batch's is, against the task's resulting authority; a kept one
+/// again when the amendment changes the authority's models (domain/tasks.md, section 7). It is for
+/// the next run: the run in flight keeps its own models.
+fn check_llm(domain: &Domain, old: &crate::CompoundTask<'_>, amendment: &Amendment) -> Result<(), Refusal> {
+    let authority = match &amendment.authority {
+        Some(authority) => authority,
+        None => old.authority,
+    };
+    let choice = match &amendment.llm {
+        Some(choice) => Some(choice),
+        None if authority.models != old.authority.models => old.llm.as_ref(),
+        None => None,
+    };
+    match choice {
+        Some(choice) => crate::llm::check(domain, old.executor, authority, choice),
+        None => Ok(()),
+    }
 }
 
 pub(crate) fn apply_amend(
@@ -446,6 +476,9 @@ pub(crate) fn apply_amend(
     }
     if let Some(instructions) = amendment.instructions {
         task.record.instructions = Some(instructions);
+    }
+    if let Some(llm) = amendment.llm {
+        task.record.llm = Some(llm);
     }
     if let Some(spec) = amendment.spec {
         task.record.spec = spec;
@@ -857,6 +890,9 @@ pub(crate) fn preview_amend(
     }
     if let Some(instructions) = &amendment.instructions {
         row.instructions = Some(instructions.clone());
+    }
+    if let Some(llm) = &amendment.llm {
+        row.llm = Some(llm.clone());
     }
     if let Some(spec) = &amendment.spec {
         row.spec = spec.clone();

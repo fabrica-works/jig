@@ -119,6 +119,7 @@ pub fn domain() -> Domain {
                 settings: core::Settings {
                     templates: Box::new([]),
                     deployment_provider: 3,
+                    models: Box::new([run().policy.model]),
                     charters: Box::new([core::Charter {
                         number: 1,
                         hosts: fleet::Kinds::Workers,
@@ -167,6 +168,7 @@ pub fn run() -> Box<core::RunCharter> {
                 cache_write_price: None,
                 output_price: 1,
                 price_unit: 1_000_000,
+                efforts: Box::new([]),
             },
             alternatives: Box::new([]),
             inspect: true,

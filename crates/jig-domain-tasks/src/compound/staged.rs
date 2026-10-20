@@ -26,6 +26,7 @@ pub struct CompoundTask<'a> {
     pub wake: crate::WakePolicy,
     pub dependencies: &'a [u64],
     pub authority: &'a crate::Authority,
+    pub llm: &'a Option<crate::LlmChoice>,
     pub grace: Option<Grace>,
 }
 
@@ -66,6 +67,7 @@ impl CompoundTask<'_> {
             wake: self.wake,
             dependencies: self.dependencies.into(),
             authority: self.authority.clone(),
+            llm: self.llm.clone(),
         }
     }
     fn wake(&mut self, word: &crate::Word) {
@@ -116,6 +118,7 @@ impl Staged {
             wake: base.wake,
             dependencies: &base.dependencies,
             authority: &base.authority,
+            llm: &base.llm,
             grace: base.grace.clone(),
         };
         for plan in &self.plans {
@@ -327,6 +330,9 @@ fn project_amend<'a>(row: &mut CompoundTask<'a>, plan: &'a crate::control::Amend
     }
     if amendment.instructions.is_some() {
         row.instructions = &amendment.instructions;
+    }
+    if amendment.llm.is_some() {
+        row.llm = &amendment.llm;
     }
     if let Some(value) = &amendment.spec {
         row.spec = value;

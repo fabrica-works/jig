@@ -101,6 +101,7 @@ impl World {
                             },
                             contract: tasks::Contract::Report { words: 0 },
                             authority,
+                            llm: None,
                             symbolic_grants: Box::new([]),
                             dependencies: Box::new([]),
                             wake: tasks::WakePolicy::DEFAULT,

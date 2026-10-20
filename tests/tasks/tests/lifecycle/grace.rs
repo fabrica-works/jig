@@ -54,6 +54,7 @@ fn amend(world: &mut World) {
             wake: None,
             dependencies: None,
             authority: None,
+            llm: None,
             reason: b"ordinary amendment".as_slice().into(),
         },
     });

@@ -44,9 +44,21 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
             },
             None => people::Refusal::Unknown,
         },
-        tasks::Refusal::Executor => {
+        // A choice for a procedure's or a person's task is the task kind's lack.
+        tasks::Refusal::Executor | tasks::Refusal::Llm { why: tasks::LlmFault::Procedure, .. } => {
             people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind { executor: None } }
         }
+        // A model absent from configuration, the charter or the authority, or an effort the model
+        // lacks: the party's wire names no model until it carries the choice (tasks.md, 3).
+        tasks::Refusal::Llm {
+            why:
+                tasks::LlmFault::Unconfigured
+                | tasks::LlmFault::Effort
+                | tasks::LlmFault::Charter
+                | tasks::LlmFault::Authority
+                | tasks::LlmFault::Repeated,
+            ..
+        } => people::Refusal::Authority { proposable: None, lacking: people::Lack::Models },
         tasks::Refusal::Reference => people::Refusal::Authority { proposable: None, lacking: people::Lack::Reference },
         tasks::Refusal::Funding => people::Refusal::Authority { proposable: None, lacking: people::Lack::Funding },
         tasks::Refusal::AuthorityShape => people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape },

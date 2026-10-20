@@ -817,6 +817,10 @@ pub struct New {
     pub project: u32,
     /// `Agent` charter executor, checked against admitted configuration.
     pub executor: Executor,
+    /// An agent task's LLM choice, checked against the configured models, its charter and its
+    /// authority; absent for a procedure's or a person's task, and where the root resolves the
+    /// default (domain/tasks.md, sections 3 and 4).
+    pub llm: Option<crate::LlmChoice>,
     /// Owned specification within configured counts/bytes, with empty historical inputs.
     pub spec: Spec,
     /// Admitted bounded result contract.
@@ -912,6 +916,9 @@ pub struct TaskRecord {
     pub proposal_rows: Box<[crate::ProposalRow]>,
     /// Agent instruction replacement; absent uses the configured charter default.
     pub instructions: Option<Box<[u8]>>,
+    /// An agent task's LLM choice, kept as given and changed only by an amendment
+    /// (domain/tasks.md, sections 3 and 7).
+    pub llm: Option<crate::LlmChoice>,
     /// Messages the current attempt's run refused; untaken by later fences of that attempt.
     pub refused: Box<[u64]>,
     /// A cancel asked this task to finish by a durable deadline.
@@ -1198,6 +1205,8 @@ pub enum Refusal {
     HoldTaken,
     /// A task's hold list or a resource's waiting queue exceeds its bound.
     Holds,
+    /// An LLM choice names `model`, which it may not, and why (domain/tasks.md, sections 3 and 4).
+    Llm { model: u8, why: crate::LlmFault },
 }
 
 /// `Refusal` location and reason returned to the root; batch-wide failures may have no single task

@@ -19,6 +19,10 @@ fn call_rows_read_back_as_written() {
     table([
         ("a_call_record_of_each_part_reads_back", a_call_record_of_each_part_reads_back),
         ("a_refused_delegation_reads_back_with_its_problem", a_refused_delegation_reads_back_with_its_problem),
+        (
+            "a_refused_llm_choice_reads_back_with_its_model_and_fault",
+            a_refused_llm_choice_reads_back_with_its_model_and_fault,
+        ),
         ("a_recalled_notes_page_reads_back", a_recalled_notes_page_reads_back),
         ("a_settled_call_reads_back", a_settled_call_reads_back),
     ]);

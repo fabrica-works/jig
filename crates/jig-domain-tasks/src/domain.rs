@@ -58,7 +58,9 @@ pub struct Domain {
     pub(crate) next_writer: u64,
     pub(crate) funding: Map<crate::Funder, crate::FundingRecord>,
     pub(crate) person_proposals: Map<u64, crate::PersonProposal>,
-    pub(crate) charters: Box<[u32]>,
+    pub(crate) charters: Box<[crate::CharterModels]>,
+    /// Each configured model's count of declared efforts, in configuration's order.
+    pub(crate) efforts: Box<[u8]>,
     pub(crate) rng: Rng,
     facts: Queue<Fact>,
     lost: u64,
@@ -140,17 +142,28 @@ impl Domain {
         }
         rows.into_boxed()
     }
-    /// Create restoring state from validated `limits`, deterministic `seed` and unique configured
-    /// `charters` bounded by `limits.charters`. Panics on invalid/unrepresentable limits or
+    /// Create restoring state from validated `limits`, deterministic `seed`, unique configured
+    /// `charters` bounded by `limits.charters`, each with its models, and `efforts`, each
+    /// configured model's count of declared efforts in configuration's order, at most
+    /// `MODELS` (domain/tasks.md, section 3). Panics on invalid/unrepresentable limits or
     /// malformed charter configuration; no task becomes active until `Restore`/`Restored`
     /// completes.
     #[must_use]
-    pub fn new(limits: &Limits, seed: u64, charters: Box<[u32]>) -> Domain {
+    pub fn new(limits: &Limits, seed: u64, charters: Box<[crate::CharterModels]>, efforts: Box<[u8]>) -> Domain {
         assert!(crate::worst_case(limits).is_some(), "task limits are valid");
         assert!(charters.len() <= usize::try_from(limits.charters).expect("u32 fits usize"), "configured charters fit");
+        let models = usize::try_from(crate::MODELS).expect("u32 fits usize");
+        assert!(efforts.len() <= models, "configured models fit");
         for (at, charter) in charters.iter().enumerate() {
             for earlier in charters.iter().take(at) {
-                assert!(earlier != charter, "charters are unique");
+                assert!(earlier.number != charter.number, "charters are unique");
+            }
+            assert!(charter.models.len() <= models, "a charter's models fit");
+            for (index, model) in charter.models.iter().enumerate() {
+                assert!(usize::from(*model) < efforts.len(), "a charter's models are configured");
+                for earlier in charter.models.iter().take(index) {
+                    assert!(earlier != model, "a charter lists each model once");
+                }
             }
         }
         Domain {
@@ -176,6 +189,7 @@ impl Domain {
             funding: Map::with_capacity(limits.funders),
             person_proposals: Map::with_capacity(limits.tasks),
             charters,
+            efforts,
             rng: Rng::new(seed),
             facts: Queue::with_capacity(limits.facts),
             lost: 0,
@@ -185,9 +199,9 @@ impl Domain {
         }
     }
 
-    /// Borrow the configured charter numbers admitted by this task hub.
+    /// Borrow the configured charters and their models admitted by this task hub.
     #[must_use]
-    pub fn charters(&self) -> &[u32] {
+    pub fn charters(&self) -> &[crate::CharterModels] {
         &self.charters
     }
 
@@ -1170,6 +1184,7 @@ pub(crate) fn make_admitted(
                 hold: 0,
                 proposal_rows: Box::new([]),
                 instructions: None,
+                llm: new.llm,
                 refused: Box::new([]),
                 grace: None,
                 created_at: env.wall,

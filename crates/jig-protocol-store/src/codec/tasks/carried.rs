@@ -278,6 +278,10 @@ pub(super) fn encode_refusal(value: &tasks::Refusal, limits: &Limits) -> Result<
         tasks::Refusal::HoldKind => wire::Refusal::HoldKind,
         tasks::Refusal::HoldTaken => wire::Refusal::HoldTaken,
         tasks::Refusal::Holds => wire::Refusal::Holds,
+        tasks::Refusal::Llm { model, why } => wire::Refusal::Llm(wire::RefusalLlm::new(
+            limits,
+            wire::RefusalLlmParts { model: *model, why: encode_llm_fault(*why) },
+        )?),
     })
 }
 pub(super) fn decode_refusal(value: wire::Refusal, _limits: &Limits) -> tasks::Refusal {
@@ -320,6 +324,30 @@ pub(super) fn decode_refusal(value: wire::Refusal, _limits: &Limits) -> tasks::R
         wire::Refusal::HoldKind => tasks::Refusal::HoldKind,
         wire::Refusal::HoldTaken => tasks::Refusal::HoldTaken,
         wire::Refusal::Holds => tasks::Refusal::Holds,
+        wire::Refusal::Llm(value) => {
+            let wire::RefusalLlmParts { model, why } = value.into_parts();
+            tasks::Refusal::Llm { model, why: decode_llm_fault(why) }
+        }
+    }
+}
+fn encode_llm_fault(value: tasks::LlmFault) -> wire::LlmFault {
+    match value {
+        tasks::LlmFault::Unconfigured => wire::LlmFault::Unconfigured,
+        tasks::LlmFault::Effort => wire::LlmFault::Effort,
+        tasks::LlmFault::Charter => wire::LlmFault::Charter,
+        tasks::LlmFault::Authority => wire::LlmFault::Authority,
+        tasks::LlmFault::Procedure => wire::LlmFault::Procedure,
+        tasks::LlmFault::Repeated => wire::LlmFault::Repeated,
+    }
+}
+fn decode_llm_fault(value: wire::LlmFault) -> tasks::LlmFault {
+    match value {
+        wire::LlmFault::Unconfigured => tasks::LlmFault::Unconfigured,
+        wire::LlmFault::Effort => tasks::LlmFault::Effort,
+        wire::LlmFault::Charter => tasks::LlmFault::Charter,
+        wire::LlmFault::Authority => tasks::LlmFault::Authority,
+        wire::LlmFault::Procedure => tasks::LlmFault::Procedure,
+        wire::LlmFault::Repeated => tasks::LlmFault::Repeated,
     }
 }
 

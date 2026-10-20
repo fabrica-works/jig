@@ -28,6 +28,9 @@ pub struct Delegate {
     pub spec: tasks::Spec,
     pub contract: tasks::Contract,
     pub authority: tasks::Authority,
+    /// An agent child's LLM choice; none for the core to resolve its charter's default within
+    /// the child's authority, as at Create (tasks.md, 3).
+    pub llm: Option<tasks::LlmChoice>,
     /// Open connector grants narrowed with the allocated task number.
     pub symbolic_grants: Box<[tasks::Grant]>,
     pub dependencies: Box<[Dependency]>,

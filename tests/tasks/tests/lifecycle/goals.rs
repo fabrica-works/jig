@@ -57,6 +57,7 @@ fn goals_per_project_count_only_live_tracked_tasks_after_a_restart() {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: Box::new([]),
     };
     let call = world.to().into_token().raw();

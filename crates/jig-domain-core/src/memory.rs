@@ -21,10 +21,21 @@ use crate::{CallKey, Event, HistoricalResult, Limits, Request};
 pub fn policy_owned_bytes(policy: &crate::RunPolicy) -> Option<u64> {
     let mut bytes = sizeof(size_of::<crate::RunPolicy>())?
         .checked_add(u64::try_from(policy.instructions.len()).ok()?)?
-        .checked_add(u64::try_from(policy.model.name.len()).ok()?)?
+        .checked_add(model_owned_bytes(&policy.model)?)?
         .checked_add(u64::try_from(policy.alternatives.len()).ok()?.checked_mul(sizeof(size_of::<crate::Model>())?)?)?;
     for model in &policy.alternatives {
-        bytes = bytes.checked_add(u64::try_from(model.name.len()).ok()?)?;
+        bytes = bytes.checked_add(model_owned_bytes(model)?)?;
+    }
+    Some(bytes)
+}
+
+/// A model's name and its efforts' names (tasks.md, 3).
+fn model_owned_bytes(model: &crate::Model) -> Option<u64> {
+    let mut bytes = u64::try_from(model.name.len())
+        .ok()?
+        .checked_add(u64::try_from(model.efforts.len()).ok()?.checked_mul(sizeof(size_of::<Box<[u8]>>())?)?)?;
+    for effort in &model.efforts {
+        bytes = bytes.checked_add(u64::try_from(effort.len()).ok()?)?;
     }
     Some(bytes)
 }
@@ -68,7 +79,8 @@ fn task_carrier(limits: &Limits) -> Option<u64> {
         .checked_add(List::<Box<[u8]>>::worst_case(task.hold_segments)?)?
         .checked_add(u64::from(task.hold_bytes))?
         .checked_add(names)?
-        .checked_add(authority)
+        .checked_add(authority)?
+        .checked_add(bytes(tasks::MODELS, sizeof(size_of::<tasks::ModelEffort>())?)?)
 }
 
 fn context_carrier(limits: &Limits) -> Option<u64> {

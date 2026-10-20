@@ -657,6 +657,42 @@ pub fn read_authority(value: wire::Authority, limits: &wire::Limits) -> Result<d
     check_authority(&value, limits)?;
     Ok(value)
 }
+/// Translate an agent task's LLM choice, if any (domain/tasks.md, section 3).
+pub(super) fn llm(
+    source: Option<&domain::LlmChoice>,
+    limits: &wire::Limits,
+) -> Result<Option<wire::LlmChoice>, wire::Problem> {
+    let Some(domain::LlmChoice { main, subagents }) = source else {
+        return Ok(None);
+    };
+    let mut chosen = List::with_capacity(limits.llm_choice_subagents);
+    for subagent in subagents {
+        if chosen.push(model_effort(*subagent, limits)?).is_err() {
+            return Err(problem(wire::Path::LlmChoiceSubagents));
+        }
+    }
+    Ok(Some(wire::LlmChoice::new(
+        limits,
+        wire::LlmChoiceParts { main: model_effort(*main, limits)?, subagents: chosen },
+    )?))
+}
+fn model_effort(source: domain::ModelEffort, limits: &wire::Limits) -> Result<wire::ModelEffort, wire::Problem> {
+    let domain::ModelEffort { model, effort } = source;
+    wire::ModelEffort::new(limits, wire::ModelEffortParts { model, effort })
+}
+/// Read an agent task's LLM choice, if any; its decode bounds its sub-agents.
+pub(super) fn read_llm(source: Option<wire::LlmChoice>) -> Option<domain::LlmChoice> {
+    let wire::LlmChoiceParts { main, subagents } = source?.into_parts();
+    let mut chosen = List::with_capacity(subagents.len());
+    for subagent in subagents.into_boxed() {
+        chosen.push(read_model_effort(subagent)).expect("same number of sub-agents");
+    }
+    Some(domain::LlmChoice { main: read_model_effort(main), subagents: chosen.into_boxed() })
+}
+fn read_model_effort(source: wire::ModelEffort) -> domain::ModelEffort {
+    let wire::ModelEffortParts { model, effort } = source.into_parts();
+    domain::ModelEffort { model, effort }
+}
 fn check_authority(value: &domain::Authority, limits: &wire::Limits) -> Result<(), wire::Problem> {
     let mut bytes = 0_usize;
     for grant in &value.grants {

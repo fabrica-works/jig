@@ -79,6 +79,7 @@ fn random_pool_sizes_shrink_and_grow_while_finishes_wait_for_their_commits() {
                         },
                         contract: tasks::Contract::Report { words: 128 },
                         authority,
+                        llm: None,
                         symbolic_grants: Box::new([]),
                         dependencies: Box::new([]),
                         wake: tasks::WakePolicy::DEFAULT,
@@ -139,6 +140,7 @@ fn random_period_budgets_reset_before_a_standing_template_creates_its_next_batch
                         number: 1,
                         project: 1,
                         executor: tasks::Executor::Agent { charter: 1 },
+                        llm: None,
                         spec: tasks::Spec {
                             words: b"period work".as_slice().into(),
                             parameters: Box::new([]),

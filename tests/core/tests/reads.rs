@@ -450,6 +450,7 @@ fn question_world(seed: u64, bound: Option<u32>) -> (jig_core_world::effects::Wo
             },
             contract: tasks::Contract::Report { words: 128 },
             authority,
+            llm: None,
             symbolic_grants: Box::new([]),
             dependencies: Box::new([]),
             wake: tasks::WakePolicy::DEFAULT,

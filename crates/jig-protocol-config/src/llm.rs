@@ -354,6 +354,8 @@ fn price(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         cache_write_price,
         output_price: output_price?,
         price_unit: price_unit?,
+        // k1 reads each model's declared efforts (domain/tasks.md, section 3).
+        efforts: Box::default(),
     })
 }
 

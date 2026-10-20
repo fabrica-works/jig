@@ -4,6 +4,24 @@ use jig_domain_core as core;
 use jig_domain_people as people;
 use skein_lib::{Duration, Env, List, Map, ReplyTo, Time, Token, Wall};
 
+/// The one configured model, which the charter names.
+fn model() -> core::Model {
+    core::Model {
+        dialect: 1,
+        account: 1,
+        endpoint: 1,
+        name: Box::from(b"scripted".as_slice()),
+        window: 8192,
+        output: 1024,
+        input_price: 1,
+        cached_price: 1,
+        cache_write_price: None,
+        output_price: 1,
+        price_unit: 1_000_000,
+        efforts: Box::default(),
+    }
+}
+
 fn configuration(limits: &core::Limits) -> core::Config {
     let rules = authority::Rules {
         ceiling: authority::Authority {
@@ -35,6 +53,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
         settings: core::Settings {
             templates: Box::new([]),
             deployment_provider: 2,
+            models: Box::new([model()]),
             resume_bytes: 256,
             tools: core::ToolFamilies::JIG,
             llm_providers: jig_domain_accounts::Providers::none(),
@@ -50,19 +69,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
                     time: Duration::from_secs(60),
                     reserve_turns: 1,
                     reserve_time: Duration::from_secs(10),
-                    model: core::Model {
-                        dialect: 1,
-                        account: 1,
-                        endpoint: 1,
-                        name: Box::from(b"scripted".as_slice()),
-                        window: 8192,
-                        output: 1024,
-                        input_price: 1,
-                        cached_price: 1,
-                        cache_write_price: None,
-                        output_price: 1,
-                        price_unit: 1_000_000,
-                    },
+                    model: model(),
                     alternatives: Box::new([]),
                     inspect: true,
                     modify: true,

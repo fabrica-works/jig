@@ -200,6 +200,7 @@ fn an_amendment_uses_live_pool_and_remaining_task_facts_and_preserves_narrowing(
         wake: None,
         dependencies: None,
         authority: Some(after),
+        llm: None,
         release: None,
         reason: Box::new([]),
     };

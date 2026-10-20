@@ -196,6 +196,14 @@ pub fn creation_spec() -> jig_domain_tasks::Spec {
     spec.inputs = Box::new([]);
     spec
 }
+/// A full LLM choice: a main model with an effort, and sub-agents with and without one.
+pub fn task_llm() -> jig_domain_tasks::LlmChoice {
+    use jig_domain_tasks::ModelEffort;
+    jig_domain_tasks::LlmChoice {
+        main: ModelEffort { model: 63, effort: Some(u8::MAX) },
+        subagents: Box::new([ModelEffort { model: 0, effort: None }, ModelEffort { model: 7, effort: Some(1) }]),
+    }
+}
 pub fn task_creation(number: u64) -> jig_domain_tasks::New {
     use jig_domain_tasks::{Executor, Funder, Holding, New, Numbers};
     New {
@@ -205,6 +213,7 @@ pub fn task_creation(number: u64) -> jig_domain_tasks::New {
         number,
         project: 3,
         executor: Executor::Agent { charter: 11 },
+        llm: Some(task_llm()),
         spec: creation_spec(),
         contract: jig_domain_tasks::Contract::Report { words: TASKS_LIMITS.result_bytes },
         authority: task_authority(),
@@ -247,6 +256,7 @@ pub fn task_settings() -> jig_domain_tasks::Settings {
         wake: task_wake(),
         dependencies: Box::new([17]),
         authority: task_authority(),
+        llm: Some(task_llm()),
     }
 }
 pub fn task_amendment() -> jig_domain_tasks::Amendment {
@@ -262,6 +272,7 @@ pub fn task_amendment() -> jig_domain_tasks::Amendment {
         wake: Some(task_wake()),
         dependencies: Some(Box::new([17])),
         authority: Some(task_authority()),
+        llm: Some(task_llm()),
         reason: Box::from(b"amend".as_slice()),
     }
 }

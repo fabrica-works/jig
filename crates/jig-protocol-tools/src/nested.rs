@@ -72,6 +72,8 @@ pub(crate) fn delegate(value: &Value) -> Result<engine::Delegate, Problem> {
         spec,
         contract,
         authority,
+        // The tool names no LLM choice: the core resolves its charter's default (tasks.md, 3).
+        llm: None,
         symbolic_grants,
         dependencies,
         wake,
@@ -131,6 +133,7 @@ pub(crate) fn amendment(value: &Value) -> Result<tasks::Amendment, Problem> {
         wake,
         dependencies,
         authority,
+        llm: None,
         reason: value.required(b"reason")?.text()?,
     })
 }

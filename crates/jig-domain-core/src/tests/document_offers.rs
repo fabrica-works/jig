@@ -96,7 +96,7 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
     for number in 1..=4 {
         rows.push(core.tasks.task(number).unwrap().clone()).unwrap();
     }
-    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    core.tasks = fixtures::fresh_tasks(&core, &limits);
     for row in &funders {
         send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Ledger(*row) });
     }

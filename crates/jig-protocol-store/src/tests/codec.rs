@@ -578,6 +578,21 @@ fn a_call_record_of_each_part_reads_back() {
 fn a_refused_delegation_reads_back_with_its_problem() {
     core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::DelegationRefused(fixtures::calls::problem())));
 }
+fn a_refused_llm_choice_reads_back_with_its_model_and_fault() {
+    use jig_domain_tasks::LlmFault;
+    for why in [
+        LlmFault::Unconfigured,
+        LlmFault::Effort,
+        LlmFault::Charter,
+        LlmFault::Authority,
+        LlmFault::Procedure,
+        LlmFault::Repeated,
+    ] {
+        let mut problem = fixtures::calls::problem();
+        problem.why = jig_domain_tasks::Refusal::Llm { model: 63, why };
+        core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::DelegationRefused(problem)));
+    }
+}
 fn a_recalled_notes_page_reads_back() {
     core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::NoteRecalled {
         entries: Box::new([fixtures::note_entry()]),

@@ -342,6 +342,7 @@ pub(super) fn person_proposal_accept(
                     wake: None,
                     dependencies: None,
                     authority: Some(authority),
+                    llm: None,
                     reason: proposal.reason,
                 },
             }

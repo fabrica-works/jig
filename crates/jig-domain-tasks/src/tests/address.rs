@@ -21,6 +21,7 @@ fn change(revision: u64, address: PersonAddress) -> Amendment {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: b"new addressee".as_slice().into(),
     }
 }

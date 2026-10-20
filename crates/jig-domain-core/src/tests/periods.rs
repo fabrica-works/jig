@@ -61,7 +61,7 @@ fn recurring_lines_join_the_supplied_period_and_its_durable_opening_fact() {
     assert_eq!(line.began, Some(Wall::EPOCH));
     assert_eq!(line.next, next);
     // Restore only the owner's durable live rows and ledgers at a different wall.
-    let mut restored = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    let mut restored = fixtures::fresh_tasks(&core, &limits);
     let env = Env { now: Time::ZERO, wall: Wall::from_nanos(9000), limits: limits.tasks };
     let mut requests = Queue::with_capacity(tasks::max_out(&limits.tasks));
     for (_, ledger) in core.tasks.funding_records() {

@@ -24,7 +24,7 @@ impl Measured {
         let limits = *limits;
         let out = Queue::with_capacity(tasks::max_out(&limits));
         let meter = Meter::new();
-        let d = Domain::new(&limits, 1, Box::new([1]));
+        let d = jig_tasks_world::domain(&limits, 1);
         Measured {
             d,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },

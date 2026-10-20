@@ -312,6 +312,9 @@ pub struct Model {
     pub cache_write_price: Option<u64>,
     pub output_price: u64,
     pub price_unit: u32,
+    /// The efforts the model declares, by name in its order; a task's LLM choice names one by
+    /// index, and none for a model that declares none (domain/tasks.md, 3).
+    pub efforts: Box<[Box<[u8]>]>,
 }
 
 /// Root-owned charter policy, independent of Smith's run vocabulary.

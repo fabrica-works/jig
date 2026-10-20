@@ -202,6 +202,7 @@ fn generated_event(core: &Core, draw: u64, iteration: u64) -> Event {
                 wake: None,
                 dependencies: None,
                 authority: None,
+                llm: None,
                 reason: Box::new([]),
             },
         }),

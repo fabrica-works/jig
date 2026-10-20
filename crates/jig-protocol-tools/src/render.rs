@@ -296,6 +296,14 @@ fn task_problem(problem: &jig_domain_tasks::Problem) -> Rendered {
         jig_domain_tasks::Refusal::HoldKind => b"hold kind",
         jig_domain_tasks::Refusal::HoldTaken => b"hold taken",
         jig_domain_tasks::Refusal::Holds => b"holds",
+        jig_domain_tasks::Refusal::Llm { why, .. } => match why {
+            jig_domain_tasks::LlmFault::Unconfigured => b"model not configured",
+            jig_domain_tasks::LlmFault::Effort => b"effort not declared",
+            jig_domain_tasks::LlmFault::Charter => b"model outside the charter",
+            jig_domain_tasks::LlmFault::Authority => b"model outside authority",
+            jig_domain_tasks::LlmFault::Procedure => b"no model runs this task",
+            jig_domain_tasks::LlmFault::Repeated => b"model repeated",
+        },
     };
     text(&[b"Refused: ", why], true)
 }

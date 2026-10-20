@@ -137,7 +137,7 @@ fn limits() -> Limits {
         },
         connectors: 2,
         resume_bytes: 256,
-        run_bytes: 256,
+        run_bytes: 384,
         policy_bytes: 8192,
         escalation_reason_bytes: 128,
         load_slots: 2,
@@ -211,6 +211,24 @@ fn authority_value(spend: u64, kinds: Box<[authority::Executor]>) -> authority::
         note_resources: Box::new([]),
     }
 }
+/// The one configured model, its charter's, which declares two efforts (tasks.md, 3).
+fn scripted_model() -> Model {
+    Model {
+        dialect: 1,
+        account: 1,
+        endpoint: 1,
+        name: b"scripted".as_slice().into(),
+        window: 8192,
+        output: 1024,
+        input_price: 1,
+        cached_price: 1,
+        cache_write_price: None,
+        output_price: 1,
+        price_unit: 1_000_000,
+        efforts: Box::new([b"low".as_slice().into(), b"high".as_slice().into()]),
+    }
+}
+
 fn config(seed: u64) -> Config {
     let ceiling = authority_value(1000, Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]));
     let rules = authority::Rules {
@@ -281,6 +299,7 @@ fn config(seed: u64) -> Config {
         settings: Settings {
             templates: Box::new([]),
             deployment_provider: 3,
+            models: Box::new([scripted_model()]),
             charters: Box::new([Charter {
                 number: 1,
                 hosts: fleet::Kinds::Workers,
@@ -293,19 +312,7 @@ fn config(seed: u64) -> Config {
                     time: Duration::from_secs(60),
                     reserve_turns: 1,
                     reserve_time: Duration::from_secs(10),
-                    model: Model {
-                        dialect: 1,
-                        account: 1,
-                        endpoint: 1,
-                        name: b"scripted".as_slice().into(),
-                        window: 8192,
-                        output: 1024,
-                        input_price: 1,
-                        cached_price: 1,
-                        cache_write_price: None,
-                        output_price: 1,
-                        price_unit: 1_000_000,
-                    },
+                    model: scripted_model(),
                     alternatives: Box::new([]),
                     inspect: true,
                     modify: true,
@@ -378,6 +385,7 @@ pub(crate) fn make_task(core: &mut Core, limits: &Limits, number: u64) {
         number,
         project: 1,
         executor: tasks::Executor::Agent { charter: 1 },
+        llm: None,
         spec: tasks::Spec {
             words: b"A task title\nThe specification".as_slice().into(),
             parameters: Box::new([]),
@@ -587,6 +595,7 @@ fn new_row(core: &Core, number: u64, funder: tasks::Funder, tracked: Option<u32>
         number,
         project: 1,
         executor: tasks::Executor::Agent { charter: 1 },
+        llm: None,
         spec: tasks::Spec {
             words: b"Work\nDetailed instructions".as_slice().into(),
             parameters: Box::new([]),
@@ -649,7 +658,7 @@ fn amendment_acceptance_reserves_its_terminal_proposal_revision() {
         since: Wall::EPOCH,
     };
     source.revision = u64::MAX;
-    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    core.tasks = fixtures::fresh_tasks(&core, &limits);
     send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(source)) });
     send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(target.clone())) });
     let arithmetic = Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
@@ -659,7 +668,7 @@ fn amendment_acceptance_reserves_its_terminal_proposal_revision() {
     assert_eq!(core.tasks.task(3), Some(&target));
     assert_eq!(core.tasks.task(3).unwrap().spec, original.spec);
     target.revision = u64::MAX - 3;
-    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    core.tasks = fixtures::fresh_tasks(&core, &limits);
     send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(target.clone())) });
     assert_eq!(core.amendment_accept_revision(3, 3, Some(target.revisions.hold)), Ok(()));
     assert_eq!(core.tasks.task(3), Some(&target));
@@ -841,6 +850,7 @@ fn person_address_proposals_keep_the_named_revision_and_actual_beforefacts() {
         wake: None,
         dependencies: None,
         authority: Some(wider),
+        llm: None,
         reason: b"new address".as_slice().into(),
     };
     let action = tasks::ProposalAction::Amend { task: 2, revision: 0, amendment: edit.clone() };
@@ -937,6 +947,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
                 wake: None,
                 dependencies: None,
                 authority: Some(wider.clone()),
+                llm: None,
                 reason: Box::from(&b"Reconsider"[..]),
             },
         },

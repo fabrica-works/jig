@@ -26,6 +26,7 @@ fn change(instructions: &[u8]) -> Amendment {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: b"new evidence".as_slice().into(),
     }
 }

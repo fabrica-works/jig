@@ -121,8 +121,18 @@ pub fn read_address_change(
 
 /// Translate `Amendment` to its store record.
 pub fn amendment(source: &domain::Amendment, limits: &wire::Limits) -> Result<wire::Amendment, wire::Problem> {
-    let domain::Amendment { tracked, addressed, instructions, release, spec, wake, dependencies, authority, reason } =
-        source;
+    let domain::Amendment {
+        tracked,
+        addressed,
+        instructions,
+        release,
+        spec,
+        wake,
+        dependencies,
+        authority,
+        llm,
+        reason,
+    } = source;
     wire::Amendment::new(
         limits,
         wire::AmendmentParts {
@@ -134,14 +144,25 @@ pub fn amendment(source: &domain::Amendment, limits: &wire::Limits) -> Result<wi
             wake: optional_wake(wake.as_ref(), limits)?,
             dependencies: optional_dependencies(dependencies.as_deref(), limits)?,
             authority: optional_authority(authority.as_ref(), limits)?,
+            llm: value::llm(llm.as_ref(), limits)?,
             reason: reason.clone(),
         },
     )
 }
 /// Read `Amendment` from its store record.
 pub fn read_amendment(source: wire::Amendment, limits: &wire::Limits) -> Result<domain::Amendment, wire::Problem> {
-    let wire::AmendmentParts { tracked, addressed, instructions, release, spec, wake, dependencies, authority, reason } =
-        source.into_parts();
+    let wire::AmendmentParts {
+        tracked,
+        addressed,
+        instructions,
+        release,
+        spec,
+        wake,
+        dependencies,
+        authority,
+        llm,
+        reason,
+    } = source.into_parts();
     Ok(domain::Amendment {
         tracked: read_tracking(tracked),
         addressed: read_optional_address_change(addressed, limits)?,
@@ -151,6 +172,7 @@ pub fn read_amendment(source: wire::Amendment, limits: &wire::Limits) -> Result<
         wake: read_optional_wake(wake, limits)?,
         dependencies: read_optional_dependencies(dependencies),
         authority: read_optional_authority(authority, limits)?,
+        llm: value::read_llm(llm),
         reason,
     })
 }
@@ -312,7 +334,8 @@ pub fn read_change(source: wire::Change, _limits: &wire::Limits) -> Result<domai
 
 /// Translate `Settings` to its store record.
 pub fn settings(source: &domain::Settings, limits: &wire::Limits) -> Result<wire::Settings, wire::Problem> {
-    let domain::Settings { tracked, addressed, taken_by, instructions, spec, wake, dependencies, authority } = source;
+    let domain::Settings { tracked, addressed, taken_by, instructions, spec, wake, dependencies, authority, llm } =
+        source;
     wire::Settings::new(
         limits,
         wire::SettingsParts {
@@ -324,12 +347,13 @@ pub fn settings(source: &domain::Settings, limits: &wire::Limits) -> Result<wire
             wake: phase::wake(wake, limits)?,
             dependencies: self::dependencies(dependencies, limits)?,
             authority: value::authority(authority, limits)?,
+            llm: value::llm(llm.as_ref(), limits)?,
         },
     )
 }
 /// Read `Settings` from its store record.
 pub fn read_settings(source: wire::Settings, limits: &wire::Limits) -> Result<domain::Settings, wire::Problem> {
-    let wire::SettingsParts { tracked, addressed, taken_by, instructions, spec, wake, dependencies, authority } =
+    let wire::SettingsParts { tracked, addressed, taken_by, instructions, spec, wake, dependencies, authority, llm } =
         source.into_parts();
     Ok(domain::Settings {
         tracked,
@@ -340,6 +364,7 @@ pub fn read_settings(source: wire::Settings, limits: &wire::Limits) -> Result<do
         wake: phase::read_wake(wake, limits)?,
         dependencies: phase::read_references(dependencies),
         authority: value::read_authority(authority, limits)?,
+        llm: value::read_llm(llm),
     })
 }
 

@@ -255,6 +255,7 @@ pub fn live_task(number: u64) -> core::Record {
         hold: 0,
         proposal_rows: Box::new([]),
         instructions: None,
+        llm: None,
         refused: Box::new([]),
         grace: None,
         revisions: tasks::Revisions { hold: 0, spec: 1, person: 0 },

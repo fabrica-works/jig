@@ -68,6 +68,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
         settings: domain::Settings {
             templates: engine.templates.clone(),
             deployment_provider: deployment_provider.expect("one checked deployment provider"),
+            models: engine.llm.models.clone(),
             charters: engine.charters.clone(),
             resume_bytes: limits.resume_bytes,
             tools: domain::ToolFamilies::JIG,

@@ -29,6 +29,7 @@ pub fn task_record() -> jig_domain_tasks::TaskRecord {
         hold: 13,
         proposal_rows: Box::new([task::ProposalRow { proposal: 43, revision: 3 }]),
         instructions: Some(Box::from(b"instructions".as_slice())),
+        llm: new.llm.clone(),
         refused: Box::new([5]),
         grace: Some(task_grace()),
         revisions: task::Revisions { hold: 3, spec: 5, person: 7 },

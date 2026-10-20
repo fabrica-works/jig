@@ -232,6 +232,7 @@ fn each_subscription_kind_reads_back() {
 fn a_task_record_without_optional_values_reads_back() {
     let mut record = fixtures::task_record();
     record.instructions = None;
+    record.llm = None;
     record.grace = None;
     record.run_since = None;
     record.retry_notice = None;

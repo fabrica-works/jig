@@ -884,6 +884,7 @@ pub fn night(seed: u64, cut: jig_conformance::Cut) -> jig_conformance::Harness<O
                 number: 1,
                 project: 1,
                 executor: tasks::Executor::Procedure { connector: 2, code: 1 },
+                llm: None,
                 spec: tasks::Spec {
                     words: b"night scale staging".as_slice().into(),
                     parameters: Box::new([

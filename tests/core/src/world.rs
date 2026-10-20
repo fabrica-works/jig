@@ -232,6 +232,25 @@ fn authority_value(spend: u64, kinds: Box<[authority::Executor]>) -> authority::
     }
 }
 
+/// The one configured model, which the charter names (`../protocol/configuration.md`, section 3).
+#[must_use]
+pub fn scripted_model() -> core::Model {
+    core::Model {
+        dialect: 1,
+        account: 1,
+        endpoint: 1,
+        name: b"scripted".as_slice().into(),
+        window: 8192,
+        output: 1024,
+        input_price: 1,
+        cached_price: 1,
+        cache_write_price: None,
+        output_price: 1,
+        price_unit: 1_000_000,
+        efforts: Box::default(),
+    }
+}
+
 /// Authority policy and an authenticated owner.
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "the walking fixture states the whole deployment")]
@@ -320,6 +339,7 @@ pub fn config(seed: u64) -> root::Config {
             settings: core::Settings {
                 templates: crate::fixtures::templates(),
                 deployment_provider: 3,
+                models: Box::new([scripted_model()]),
 
                 charters: Box::new([core::Charter {
                     number: 1,
@@ -333,19 +353,7 @@ pub fn config(seed: u64) -> root::Config {
                         time: Duration::from_secs(60),
                         reserve_turns: 1,
                         reserve_time: Duration::from_secs(10),
-                        model: core::Model {
-                            dialect: 1,
-                            account: 1,
-                            endpoint: 1,
-                            name: b"scripted".as_slice().into(),
-                            window: 8192,
-                            output: 1024,
-                            input_price: 1,
-                            cached_price: 1,
-                            cache_write_price: None,
-                            output_price: 1,
-                            price_unit: 1_000_000,
-                        },
+                        model: scripted_model(),
                         alternatives: Box::new([]),
                         inspect: true,
                         modify: true,

@@ -367,6 +367,7 @@ fn accepted_amendment(world: &mut World, funder: Funder, budget: u64) -> Reply {
             wake: None,
             dependencies: None,
             authority: Some(authority),
+            llm: None,
             reason: b"more work".as_slice().into(),
         },
     })
