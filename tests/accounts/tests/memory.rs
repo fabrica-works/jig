@@ -1,7 +1,6 @@
-use jig_accounts_world::LIMITS;
+use jig_accounts_world::{LIMITS, provider, providers};
 use jig_domain_accounts::{
-    DISPLAY, Domain, Event, FromComponent, Held, Holder, Kind, NAME, Providers, SUBJECT, Stored, max_out, step,
-    worst_case,
+    DISPLAY, Domain, Event, FromComponent, Held, Holder, Kind, NAME, SUBJECT, Stored, max_out, step, worst_case,
 };
 use skein_lib::{Duration, Env, Queue, Time, Wall};
 use skein_world::domain::heap::{self, Meter};
@@ -31,7 +30,7 @@ fn kind(place: u32) -> Kind {
 #[test]
 fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
     let mut out = Queue::with_capacity(max_out(&LIMITS));
-    let providers = Providers::none();
+    let providers = providers(vec![provider(1, true, true)]);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
     let bound = worst_case(&LIMITS).expect("world limits fit");
     let meter = Meter::new();

@@ -372,7 +372,7 @@ impl Owner {
                         &mut self.files,
                     );
                 }
-                child::Request::Granted { grant: _ } => (),
+                child::Request::Granted { grant: _ } | child::Request::Save { .. } | child::Request::Erase { .. } => (),
                 child::Request::Closed => {
                     self.closed = true;
                     self.trace.push(Trace::Closed);

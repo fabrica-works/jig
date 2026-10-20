@@ -19,7 +19,11 @@ fn respond(world: &mut World, rng: &mut Rng, requests: Vec<Request>, trace: &mut
                 Some(FromComponent::Expiring { account, generation })
             }
             Request::Component(ToComponent::Close) => Some(FromComponent::Closed),
-            Request::Component(ToComponent::Release { .. }) | Request::Granted { .. } | Request::Closed => None,
+            Request::Component(ToComponent::Release { .. })
+            | Request::Granted { .. }
+            | Request::Save { .. }
+            | Request::Erase { .. }
+            | Request::Closed => None,
         };
         if let Some(event) = response {
             trace.extend(world.step(Event::Component(event)));

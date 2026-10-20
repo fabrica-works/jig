@@ -1,6 +1,9 @@
 //! The store's records, restored before the child starts (engine.md, 5.4). A record that keeps
-//! the accounts' rules is taken; any other is counted and left, never trusted. Every number a
-//! record carries moves the counter past it, taken or not, so that no number is given twice.
+//! the accounts' rules is taken; any other is counted and left, never trusted, so that a provider
+//! configured again finds its accounts. Every number a record carries moves the counter past it,
+//! taken or not, so that no number is given twice. A configured account (D1) is the
+//! configuration's: a stored account of its number is left, and so is any stored source of it
+//! but its one signed-in source's record, which gives that source its hold alone.
 use crate::domain::{Account, Domain, Hold, Source, settle};
 use crate::records::{program_name, within};
 use crate::{DISPLAY, Fact, Held, Kind, Limits, SUBJECT, Stored};
@@ -10,22 +13,34 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored) {
     let taken = match record {
         Stored::Next { number } => {
             domain.next = domain.next.max(number);
+            domain.kept = number;
             true
         }
         Stored::Account { number, provider, holder, subject, display } => {
             domain.past(number);
-            account(
-                domain,
-                env,
-                number,
-                Account { provider: Some(provider), holder, subject, display, sources: Map::with_capacity(0) },
-            )
+            // An account of a provider no longer configured waits for it.
+            domain.providers.get(provider).is_some()
+                && account(
+                    domain,
+                    env,
+                    number,
+                    Account { provider: Some(provider), holder, subject, display, sources: Map::with_capacity(0) },
+                )
         }
         Stored::Source { account, number, place, kind, name, held } => {
             domain.past(number);
-            let mut entry = Source::new(account, kind, name, &env.limits);
-            hold(&mut entry, env, held);
-            source(domain, env, number, place, entry)
+            if configured(domain, account) {
+                let kept = number == account && place == 0 && kind == Kind::SignIn && name.is_empty();
+                if kept {
+                    hold(domain.sources.get_mut(&number).expect("a configured source"), env, held);
+                    let _: Fact = settle(domain, env, number);
+                }
+                kept
+            } else {
+                let mut entry = Source::new(account, kind, name, &env.limits);
+                hold(&mut entry, env, held);
+                source(domain, env, number, place, entry)
+            }
         }
     };
     if !taken {
@@ -112,6 +127,15 @@ fn source(domain: &mut Domain, env: &Env<Limits>, number: u32, place: u32, entry
     assert!(places.insert(place, number) == Ok(None), "a free place with room, checked above");
     let _: Fact = settle(domain, env, number);
     true
+}
+
+/// A configured account: its one source is numbered as it is, which the counter never gives an
+/// account and a source alike.
+fn configured(domain: &Domain, account: u32) -> bool {
+    match domain.sources.get(&account) {
+        Some(entry) => entry.account == account,
+        None => false,
+    }
 }
 
 /// A number neither an account nor a source holds; the counter never gives `u32::MAX`.

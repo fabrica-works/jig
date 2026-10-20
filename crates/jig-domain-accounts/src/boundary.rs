@@ -1,4 +1,4 @@
-use crate::{Kind, Stored};
+use crate::{Key, Kind, Stored};
 use alloc::boxed::Box;
 use skein_lib::{Duration, Time};
 
@@ -87,10 +87,23 @@ pub enum ToComponent {
     Close,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// What the child asks of its parent. A save or an erase is part of the decision that makes
+/// the change (engine.md, 5.6): each account and source the child makes or whose hold changes,
+/// and the counter whenever it moves.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
     Component(ToComponent),
-    Granted { grant: Grant },
+    Granted {
+        grant: Grant,
+    },
+    /// Keep the record under its own key in this decision.
+    Save {
+        record: Stored,
+    },
+    /// Remove the record under this key in this decision.
+    Erase {
+        key: Key,
+    },
     Closed,
 }
 

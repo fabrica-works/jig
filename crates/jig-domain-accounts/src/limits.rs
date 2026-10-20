@@ -26,7 +26,7 @@ pub struct Limits {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.accounts == 0
-        || limits.accounts.checked_add(2).is_none()
+        || crate::domain::out_bound(limits.accounts).is_none()
         || limits.holder_accounts == 0
         || limits.holder_accounts > limits.accounts
         || limits.sources == 0

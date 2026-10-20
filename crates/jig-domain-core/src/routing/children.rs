@@ -381,6 +381,9 @@ pub(super) fn tag_account(core: &mut Core, env: &Env<Limits>, mut child: Queue<a
             request @ (accounts::Request::Component(_) | accounts::Request::Closed) => {
                 out.push(Request::Now(Box::new(Now::Account(request))));
             }
+            // The store keeps no accounts family yet (protocol/store.md, 4.4 item 9): until it
+            // does, the core commits none of the child's records and a restart restores none.
+            accounts::Request::Save { .. } | accounts::Request::Erase { .. } => {}
         }
     }
     out.push(Request::Decided);

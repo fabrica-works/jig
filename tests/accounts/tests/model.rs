@@ -1,16 +1,21 @@
-//! Accounts as accounts.md, 3 has them: numbered, held, with sources each in its own state.
+//! Accounts as accounts.md, 3 has them: numbered, held, with sources each in its own state, and
+//! kept by the store: each change saved in the step that makes it, and restored at the start.
 use jig_accounts_world::{LIMITS, World, account, provider, providers, source};
 use jig_domain_accounts::{
-    Bound, Configured, Event, FromComponent, Held, Holder, Kind, Refusal, Request, SignIn, State, Stored, ToComponent,
-    room_for_sign_in,
+    Bound, Configured, Event, FromComponent, Held, Holder, Key, Kind, Refusal, Request, SignIn, State, Stored,
+    ToComponent, room_for_sign_in,
 };
 use skein_lib::{Duration, Time, Wall};
+use std::collections::BTreeMap;
 
 const ALICE: Holder = Holder::Party(9);
 const BOB: Holder = Holder::Party(4);
 
 fn want(source: u32) -> Request {
     Request::Component(ToComponent::Want { account: source })
+}
+fn save(record: Stored) -> Request {
+    Request::Save { record }
 }
 fn granted(source: u32) -> Event {
     Event::Component(FromComponent::Granted { account: source, generation: 1, valid: Duration::from_secs(100) })
@@ -38,7 +43,11 @@ fn configured_accounts_are_the_deployments_with_one_signed_in_source() {
     assert_eq!(world.domain.account(8).expect("configured").provider(), None);
     assert_eq!(world.domain.source(8).expect("its source").kind, Kind::SignIn);
     assert_eq!(world.domain.next_number(), 9);
-    assert_eq!(world.step(Event::Want), vec![want(7), want(8)]);
+    assert_eq!(
+        world.step(Event::Want),
+        vec![save(Stored::Next { number: 9 }), want(7), want(8)],
+        "the counter is kept past the configured numbers, so that none is given again once dropped"
+    );
 }
 
 #[test]
@@ -65,7 +74,8 @@ fn numbers_are_never_given_twice() {
 fn the_none_account_is_made_at_the_first_start_alone() {
     let mut world = fresh();
     assert_eq!(world.domain.accounts(), 0);
-    assert_eq!(world.step(Event::Want), vec![]);
+    let made = vec![account(0, 3, Holder::Deployment, b""), source(0, 1, 0, Kind::None), Stored::Next { number: 2 }];
+    assert_eq!(world.step(Event::Want), made.iter().cloned().map(save).collect::<Vec<_>>());
     assert_eq!(world.domain.accounts(), 1);
     let none = world.domain.account(0).expect("made at the start");
     assert_eq!((none.holder(), none.provider()), (Holder::Deployment, Some(3)));
@@ -74,12 +84,8 @@ fn the_none_account_is_made_at_the_first_start_alone() {
     assert!(world.domain.usable(0));
     assert_eq!(world.domain.grant(0, world.now), None, "a none source holds nothing to grant");
     let mut again = fresh();
-    again.restore(vec![
-        account(0, 3, Holder::Deployment, b""),
-        source(0, 1, 0, Kind::None),
-        Stored::Next { number: 2 },
-    ]);
-    again.step(Event::Want);
+    again.restore(made);
+    assert_eq!(again.step(Event::Want), vec![], "nothing made, nothing saved");
     assert_eq!((again.domain.accounts(), again.domain.next_number()), (1, 2));
 }
 
@@ -132,7 +138,8 @@ fn a_sources_state_is_its_own() {
     let mut world = fresh();
     world.restore(vec![account(1, 1, Holder::Deployment, b"team"), source(1, 2, 0, Kind::SignIn)]);
     world.restore(vec![source(1, 3, 1, Kind::Key)]);
-    assert_eq!(world.step(Event::Want), vec![want(2)], "the component serves signed-in sources alone");
+    let wants = world.step(Event::Want).into_iter().filter(|request| matches!(request, Request::Component(_)));
+    assert_eq!(wants.collect::<Vec<_>>(), vec![want(2)], "the component serves signed-in sources alone");
     world.step(granted(2));
     world.facts();
     world.step(Event::Limited { account: 3, reset: None });
@@ -210,4 +217,112 @@ fn records_that_break_the_rules_are_counted_not_restored() {
     assert_eq!(world.domain.unrestored(), 9, "an account with no source is dropped at the start");
     assert_eq!(world.domain.accounts(), 2, "alice's and the none account");
     assert_eq!(world.domain.account(0).expect("kept").sources().len(), 2);
+}
+
+/// The store's family as the core commits it: each save under its record's key, each erase
+/// removing its key; a restart gives the rows in key order.
+fn commit(store: &mut BTreeMap<Key, Stored>, requests: Vec<Request>) {
+    for request in requests {
+        match request {
+            Request::Save { record } => drop(store.insert(record.key(), record)),
+            Request::Erase { key } => drop(store.remove(&key)),
+            Request::Component(_) | Request::Granted { .. } | Request::Closed => {}
+        }
+    }
+}
+
+#[test]
+fn each_record_restores_to_the_same_model() {
+    let configured = [Configured { number: 7, provider: Some(1) }];
+    let start = |store: &BTreeMap<Key, Stored>| {
+        let mut world = World::with(
+            providers(vec![provider(1, true, true), provider(2, true, false), provider(3, false, false)]),
+            &configured,
+        );
+        world.wall = Wall::from_nanos(1_000_000_000_000);
+        world.restore(store.values().cloned().collect());
+        world
+    };
+    let mut store = BTreeMap::new();
+    for record in [
+        account(20, 1, ALICE, b"alice"),
+        source(20, 21, 0, Kind::SignIn),
+        source(20, 22, 1, Kind::Key),
+        Stored::Next { number: 23 },
+    ] {
+        store.insert(record.key(), record);
+    }
+    let mut world = start(&store);
+    let wanted = world.step(Event::Want);
+    assert_eq!(
+        wanted[..3],
+        [
+            save(account(23, 3, Holder::Deployment, b"")),
+            save(source(23, 24, 0, Kind::None)),
+            save(Stored::Next { number: 25 })
+        ]
+    );
+    commit(&mut store, wanted);
+    let reset = Some(Time::ZERO.saturating_add(Duration::from_secs(90)));
+    for event in [
+        Event::Limited { account: 21, reset },
+        Event::Refused { account: 22, code: Box::new([]), reason: Box::new([]) },
+        Event::Limited { account: 7, reset: None },
+    ] {
+        let saved = world.step(event);
+        assert_eq!(saved.len(), 1, "a changed hold saves its source's record");
+        commit(&mut store, saved);
+    }
+    assert_eq!(
+        store.len(),
+        7,
+        "the counter, two accounts and four sources: a configured account is the configuration's, its source's record its hold"
+    );
+    let mut again = start(&store);
+    assert_eq!(again.domain.unrestored(), 0);
+    assert_eq!(again.step(Event::Want), vec![want(7), want(21)], "a restart makes nothing and saves nothing");
+    assert_eq!(again.domain.next_number(), world.domain.next_number());
+    assert_eq!(again.domain.source_views().as_slice(), world.domain.source_views().as_slice());
+    assert_eq!(again.domain.source(21).expect("kept").state, State::Limited { until: reset });
+    for number in [7, 20, 23] {
+        let (was, is) = (world.domain.account(number).expect("kept"), again.domain.account(number).expect("restored"));
+        assert_eq!(
+            (was.provider(), was.holder(), was.subject(), was.display(), was.sources().iter().collect::<Vec<_>>()),
+            (is.provider(), is.holder(), is.subject(), is.display(), is.sources().iter().collect::<Vec<_>>())
+        );
+    }
+    let closed = world.step(Event::Close);
+    assert!(!closed.iter().any(|request| matches!(request, Request::Save { .. })), "a close keeps every hold");
+}
+
+#[test]
+fn a_record_breaking_a_rule_is_counted_and_dropped() {
+    let records = vec![
+        account(7, 1, ALICE, b"alice"),
+        source(7, 8, 1, Kind::Key),
+        Stored::Source {
+            account: 7,
+            number: 7,
+            place: 0,
+            kind: Kind::SignIn,
+            name: Box::new([]),
+            held: Some(Held::Refused),
+        },
+        account(9, 5, BOB, b"bob"),
+        source(9, 10, 0, Kind::SignIn),
+    ];
+    let configured = [Configured { number: 7, provider: Some(1) }];
+    let mut world = World::with(providers(vec![provider(1, true, true)]), &configured);
+    world.restore(records.clone());
+    assert_eq!(world.domain.unrestored(), 4, "a configured number's account and source; an unknown provider's");
+    let analyst = world.domain.account(7).expect("configured");
+    assert_eq!((analyst.holder(), analyst.subject()), (Holder::Deployment, &b""[..]), "the configured one is kept");
+    assert_eq!(analyst.sources().iter().collect::<Vec<_>>(), vec![(&0, &7)]);
+    assert_eq!(world.domain.source(7).expect("configured").state, State::Refused, "its own record gives its hold");
+    assert!(world.domain.account(9).is_none());
+    assert_eq!(world.domain.next_number(), 11, "a record dropped still passes its numbers");
+    let mut again = World::with(providers(vec![provider(1, true, true), provider(5, true, false)]), &configured);
+    again.restore(records);
+    assert_eq!(again.domain.unrestored(), 2, "an account waits for its provider to be configured again");
+    assert_eq!(again.domain.account(9).expect("restored").sources().len(), 1);
 }

@@ -65,8 +65,11 @@ impl World {
         accounts::step(&mut self.domain, &Env { now: self.now, wall: self.wall, limits: LIMITS }, event, &mut out);
         drain(&mut out)
     }
+    /// Fires at a time, the wall clock moving with the monotonic one.
     pub fn fire_at(&mut self, seconds: u64) -> Vec<Request> {
-        self.now = Time::ZERO.saturating_add(Duration::from_secs(seconds));
+        let now = Time::ZERO.saturating_add(Duration::from_secs(seconds));
+        self.wall = Wall::from_nanos(self.wall.as_nanos().saturating_add(now.saturating_since(self.now).as_nanos()));
+        self.now = now;
         let mut out = Queue::with_capacity(accounts::max_out(&LIMITS));
         accounts::fire(&mut self.domain, &Env { now: self.now, wall: self.wall, limits: LIMITS }, &mut out);
         drain(&mut out)

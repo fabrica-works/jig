@@ -1,14 +1,21 @@
 use crate::{
-    Configured, Event, Fact, Failure, FromComponent, Grant, GrantTable, Holder, Kind, Limits, Providers, Request,
-    State, ToComponent, Turned,
+    Configured, Event, Fact, Failure, FromComponent, Grant, GrantTable, Held, Holder, Kind, Limits, Providers, Request,
+    State, Stored, ToComponent, Turned,
 };
 use alloc::boxed::Box;
-use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time};
+use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Wall};
 
-/// Want or release every signed-in source, at most one an account, with the component's close.
+/// The most one step asks: at the start, an account's want or its `none` account's two saves,
+/// each account's, and the counter's save; at close, a release an account and the close.
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
-    limits.accounts.checked_add(2).expect("account output bound")
+    out_bound(limits.accounts).expect("account output bound")
+}
+pub(crate) const fn out_bound(accounts: u32) -> Option<u32> {
+    match accounts.checked_mul(2) {
+        Some(both) => both.checked_add(1),
+        None => None,
+    }
 }
 
 /// An account (accounts.md, 3.1): its provider, its holder, the subject a signed-in source gave
@@ -121,6 +128,8 @@ pub struct Domain {
     pub(crate) sources: Map<u32, Source>,
     /// The number the counter gives next: accounts and sources alike, never twice.
     pub(crate) next: u32,
+    /// The counter's number the store keeps; the start saves the counter when it has moved.
+    pub(crate) kept: u32,
     /// The configuration's, sized by it and outside the child's bound, as the core's settings are.
     pub(crate) providers: Providers,
     credentials: Map<u32, Granted>,
@@ -143,6 +152,7 @@ impl Domain {
             accounts: Map::with_capacity(limits.accounts),
             sources: Map::with_capacity(sources),
             next: 0,
+            kept: 0,
             providers,
             credentials: Map::with_capacity(limits.credentials),
             credential_alarms: Deadlines::with_capacity(limits.credentials),
@@ -360,7 +370,11 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
             domain.phase = Phase::Wanted;
             crate::restore::finish(domain, env);
-            none_accounts(domain, env);
+            none_accounts(domain, env, out);
+            if domain.next != domain.kept {
+                domain.kept = domain.next;
+                out.push(Request::Save { record: Stored::Next { number: domain.next } });
+            }
             for (number, source) in &domain.sources {
                 if source.kind == Kind::SignIn {
                     out.push(Request::Component(ToComponent::Want { account: *number }));
@@ -404,12 +418,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         Event::Limited { account, reset } => {
             if domain.phase == Phase::Wanted {
-                limited(domain, env, account, reset);
+                limited(domain, env, account, reset, out);
             }
         }
         Event::Refused { account, code: _, reason: _ } => {
             if domain.phase == Phase::Wanted {
-                refused(domain, env, account);
+                refused(domain, env, account, out);
             }
         }
         Event::RunFailed { account, turned } => {
@@ -417,20 +431,21 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 return;
             }
             match turned {
-                Turned::Limited { reset } => limited(domain, env, account, reset),
-                Turned::Refused => refused(domain, env, account),
+                Turned::Limited { reset } => limited(domain, env, account, reset, out),
+                Turned::Refused => refused(domain, env, account, out),
             }
         }
         Event::Resume { account } => {
             if domain.phase == Phase::Wanted {
-                resume(domain, env, account);
+                resume(domain, env, account, out);
             }
         }
     }
 }
 /// The deployment's account of each provider offering no source, made at the first start that
-/// configures it (accounts.md, 3.1), while the accounts' bound and the counter leave room.
-fn none_accounts(domain: &mut Domain, env: &Env<Limits>) {
+/// configures it (accounts.md, 3.1), while the accounts' bound and the counter leave room; the
+/// account and its source are saved as they are made.
+fn none_accounts(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     for index in 0..domain.providers.providers.len() {
         let provider = domain.providers.providers.get(index).expect("an index below the length");
         if !provider.offers.none() {
@@ -466,7 +481,26 @@ fn none_accounts(domain: &mut Domain, env: &Env<Limits>) {
         assert!(fresh, "a new number, with room checked");
         let entry = Source::new(account, Kind::None, Box::new([]), &env.limits);
         assert!(domain.sources.insert(source, entry) == Ok(None), "a new number, within the sources' bound");
-        changed(domain, env, source);
+        out.push(Request::Save {
+            record: Stored::Account {
+                number: account,
+                provider,
+                holder: Holder::Deployment,
+                subject: Box::new([]),
+                display: Box::new([]),
+            },
+        });
+        out.push(Request::Save {
+            record: Stored::Source {
+                account,
+                number: source,
+                place: 0,
+                kind: Kind::None,
+                name: Box::new([]),
+                held: None,
+            },
+        });
+        changed(domain, env, source, None, out);
     }
 }
 /// The first unauthorized of a signed-in source's generation asks the component to renew it;
@@ -478,7 +512,7 @@ fn unauthorized(domain: &mut Domain, env: &Env<Limits>, source: u32, generation:
     };
     match kind {
         Kind::SignIn => {}
-        Kind::Key => return refused(domain, env, source),
+        Kind::Key => return refused(domain, env, source, out),
         Kind::Program | Kind::None => return,
     }
     let entry = domain.sources.get_mut(&source).expect("looked up above");
@@ -492,16 +526,18 @@ fn unauthorized(domain: &mut Domain, env: &Env<Limits>, source: u32, generation:
         out.push(Request::Component(ToComponent::Rejected { account: source, generation }));
         return;
     }
+    let before = entry.hold;
     entry.grant = None;
     entry.expiring = false;
     entry.retry = None;
     entry.state = State::NeedsSignIn;
-    changed(domain, env, source);
+    changed(domain, env, source, before, out);
 }
 /// Limited until the later of its resets; a limit with none holds until resumed.
 #[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches without closures")]
-fn limited(domain: &mut Domain, env: &Env<Limits>, source: u32, reset: Option<Time>) {
+fn limited(domain: &mut Domain, env: &Env<Limits>, source: u32, reset: Option<Time>, out: &mut Queue<Request>) {
     let Some(entry) = domain.sources.get_mut(&source) else { return };
+    let before = entry.hold;
     let until = match entry.hold {
         Some(Hold::Refused) => return,
         Some(Hold::Limited { until: None }) => None,
@@ -516,16 +552,18 @@ fn limited(domain: &mut Domain, env: &Env<Limits>, source: u32, reset: Option<Ti
         Some(until) => until.saturating_since(env.now) >= env.limits.spent_attention,
         None => true,
     };
-    changed(domain, env, source);
+    changed(domain, env, source, before, out);
 }
-fn refused(domain: &mut Domain, env: &Env<Limits>, source: u32) {
+fn refused(domain: &mut Domain, env: &Env<Limits>, source: u32, out: &mut Queue<Request>) {
     let Some(entry) = domain.sources.get_mut(&source) else { return };
+    let before = entry.hold;
     entry.hold = Some(Hold::Refused);
     entry.hold_attention = true;
-    changed(domain, env, source);
+    changed(domain, env, source, before, out);
 }
-fn resume(domain: &mut Domain, env: &Env<Limits>, source: u32) {
+fn resume(domain: &mut Domain, env: &Env<Limits>, source: u32, out: &mut Queue<Request>) {
     let Some(entry) = domain.sources.get_mut(&source) else { return };
+    let before = entry.hold;
     match entry.hold {
         Some(Hold::Limited { .. }) => {
             entry.hold = None;
@@ -533,7 +571,7 @@ fn resume(domain: &mut Domain, env: &Env<Limits>, source: u32) {
         }
         Some(Hold::Refused) | None => return,
     }
-    changed(domain, env, source);
+    changed(domain, env, source, before, out);
 }
 fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     match domain.phase {
@@ -559,8 +597,9 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             out.push(Request::Component(ToComponent::Release { account: *number }));
         }
     }
+    // The store keeps each hold: closing clears it for this run alone, and saves nothing.
     for number in &numbers {
-        changed(domain, env, *number);
+        changed(domain, env, *number, None, out);
     }
     out.push(Request::Component(ToComponent::Close));
 }
@@ -576,6 +615,7 @@ fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: 
     if entry.kind != Kind::SignIn {
         return;
     }
+    let before = entry.hold;
     match event {
         FromComponent::Granted { account: _, generation, valid } => {
             entry.grant = Some(Granted { generation, expires: env.now.saturating_add(valid) });
@@ -599,7 +639,7 @@ fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: 
         FromComponent::Failed { account: _, failure } => failed(entry, env, failure),
         FromComponent::Closed => return,
     }
-    changed(domain, env, source);
+    changed(domain, env, source, before, out);
 }
 fn failed(entry: &mut Source, env: &Env<Limits>, failure: Failure) {
     entry.retry = None;
@@ -647,6 +687,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     }
     let Some(source) = domain.alarms.expire(env.now) else { return };
     let entry = domain.sources.get_mut(&source).expect("alarm names a kept source");
+    let before = entry.hold;
     if match entry.retry {
         Some(until) => until <= env.now,
         None => false,
@@ -655,7 +696,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         entry.state = State::Asking;
         out.push(Request::Component(ToComponent::Want { account: source }));
     }
-    changed(domain, env, source);
+    changed(domain, env, source, before, out);
 }
 #[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches without closures")]
 fn fact(number: u32, entry: &Source) -> Fact {
@@ -702,11 +743,45 @@ fn fact(number: u32, entry: &Source) -> Fact {
         attention: attention || entry.expiring || entry.hold_attention,
     }
 }
-/// A source changed: it settles and its fact is queued.
-fn changed(domain: &mut Domain, env: &Env<Limits>, source: u32) {
-    let record = settle(domain, env, source);
-    if domain.facts.try_push(record).is_err() {
+/// A source changed: it settles and its fact is queued; once started, a hold that changed from
+/// `before`, set, moved or lifted, saves the source's record.
+fn changed(domain: &mut Domain, env: &Env<Limits>, source: u32, before: Option<Hold>, out: &mut Queue<Request>) {
+    let view = settle(domain, env, source);
+    if domain.facts.try_push(view).is_err() {
         domain.lost = domain.lost.saturating_add(1);
+    }
+    let held = domain.sources.get(&source).expect("settled above").hold;
+    if domain.phase == Phase::Wanted && held != before {
+        out.push(Request::Save { record: stored(domain, env, source) });
+    }
+}
+/// A source's record: its place in its account's order, and a limit's reset on the wall clock,
+/// so that it means the same after a restart (engine.md, 5.4).
+fn stored(domain: &Domain, env: &Env<Limits>, number: u32) -> Stored {
+    let entry = domain.sources.get(&number).expect("a kept source");
+    let account = domain.accounts.get(&entry.account).expect("a source's account is kept");
+    let mut place = None;
+    for (at, source) in &account.sources {
+        if *source == number {
+            place = Some(*at);
+        }
+    }
+    let held = match entry.hold {
+        Some(Hold::Limited { until: Some(until) }) => {
+            let left = until.saturating_since(env.now).as_nanos();
+            Some(Held::Limited { reset: Some(Wall::from_nanos(env.wall.as_nanos().saturating_add(left))) })
+        }
+        Some(Hold::Limited { until: None }) => Some(Held::Limited { reset: None }),
+        Some(Hold::Refused) => Some(Held::Refused),
+        None => None,
+    };
+    Stored::Source {
+        account: entry.account,
+        number,
+        place: place.expect("a source has its place"),
+        kind: entry.kind,
+        name: entry.name.clone(),
+        held,
     }
 }
 /// A passed limit lifts, a source's usability follows its kind and its one alarm is rearmed;
