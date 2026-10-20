@@ -96,6 +96,14 @@ impl Records {
         record
     }
 
+    /// A named restored source has no readable stored record.
+    pub fn missing(&mut self, account: u32) {
+        self.admit(account).expect("restored source fits driver bound");
+        let slot = self.slots.get_mut(&account).expect("admitted source");
+        slot.held = None;
+        slot.unread = true;
+    }
+
     /// A handed-in record at start (owner's decision D2): handed in now when
     /// the store already holds it, else kept in place of what it holds and
     /// handed in once kept.

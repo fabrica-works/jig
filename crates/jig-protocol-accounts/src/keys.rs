@@ -8,6 +8,8 @@ use skein_lib::{Map, Secret, Time, Token, sha256};
 struct Source {
     digest: Option<[u8; 32]>,
     generation: u64,
+    readable: bool,
+    existing: bool,
 }
 #[derive(Debug)]
 enum Waiting {
@@ -55,7 +57,10 @@ impl Keys {
             None => (None, 1),
         };
         if !self.sources.contains_key(&source)
-            && self.sources.insert(source, Source { digest: None, generation: 0 }).is_err()
+            && self
+                .sources
+                .insert(source, Source { digest: None, generation: 0, readable: false, existing: false })
+                .is_err()
         {
             return failed(source);
         }
@@ -110,11 +115,13 @@ impl Keys {
         let held = self.sources.get_mut(&source).expect("admitted LLM key source");
         held.digest = Some(sha256::digest(value.expose()));
         held.generation = generation;
+        held.readable = true;
+        held.existing = true;
         Some(granted(source, generation, value, now))
     }
     fn discard_unkept(&mut self, source: u32) {
         if let Some(held) = self.sources.get(&source)
-            && held.generation == 0
+            && !held.existing
         {
             let _removed = self.sources.remove(&source);
         }
@@ -126,10 +133,38 @@ impl Keys {
     #[must_use]
     pub fn want(&self, source: u32, now: Time) -> Option<accounts::FromComponent> {
         let held = self.sources.get(&source)?;
-        if held.generation == 0 {
-            return None;
+        if !held.readable {
+            return Some(accounts::FromComponent::Failed {
+                account: source,
+                failure: accounts::Failure::Unloaded { at: accounts::Place::File, why: accounts::Unread::Unreadable },
+            });
         }
         Some(event(source, held.generation, now))
+    }
+    /// Loads a named LLM key at generation one; only Want announces the grant.
+    #[expect(clippy::manual_map, reason = "step code does not use closures")]
+    pub fn restore(
+        &mut self,
+        source: u32,
+        value: Option<Secret>,
+        table: &mut table::Table,
+    ) -> Result<(), table::Unfit> {
+        let digest = match &value {
+            Some(value) => Some(sha256::digest(value.expose())),
+            None => None,
+        };
+        let readable = match &value {
+            Some(value) => value.len() <= usize::try_from(self.token_bytes).expect("token bound"),
+            None => false,
+        };
+        self.sources
+            .insert(source, Source { digest, generation: u64::from(readable), readable, existing: true })
+            .or(Err(table::Unfit))?;
+        if readable {
+            let token = value.expect("readable LLM key value");
+            table.granted(source, 1, table::Value { token, scheme: table::Scheme::Key }, Time::from_nanos(u64::MAX))?;
+        }
+        Ok(())
     }
     pub fn forget(&mut self, source: u32) {
         let _removed = self.sources.remove(&source);

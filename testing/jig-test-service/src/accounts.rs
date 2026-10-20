@@ -4,7 +4,7 @@ use crate::{Files, Seeds, values::Values};
 use alloc::boxed::Box;
 use jig_domain_accounts as domain;
 use jig_domain_core as core;
-use jig_protocol_accounts::{handed_in, installation, keys, party, records, table, translate};
+use jig_protocol_accounts::{handed_in, installation, keys, party, records, restart, table, translate};
 use jig_protocol_config::{self as config, Path, Problems, Segment, What};
 use jig_protocol_store as store;
 use jig_test_domain as root;
@@ -19,6 +19,7 @@ use skein_oauth_accounts as driver;
 pub(super) const PREFIX: u64 = 3_u64 << 60;
 /// The store's answer to the load of the sources' records; a replace is
 /// answered under its source's number.
+const SWEEP: Token = Token::new(PREFIX | (1_u64 << 34));
 const KEY_EXCHANGE: u64 = PREFIX | (1_u64 << 33);
 const LOAD: Token = Token::new(PREFIX | (1_u64 << 32_u32));
 #[derive(Debug)]
@@ -58,6 +59,7 @@ pub(super) struct Accounts {
     erasing: Map<u32, Erasing>,
     records: records::Records,
     keys: keys::Keys,
+    inventory: restart::Inventory,
     key_out: Queue<keys::Next>,
     key_events: Queue<domain::FromComponent>,
     forgotten: Queue<u32>,
@@ -227,10 +229,10 @@ impl Accounts {
         seeds: &Seeds,
         mut runtime: Option<AccountsRuntime>,
         room: u32,
-        secret_bytes: u32,
+        secrets: &skein_kv::Limits,
     ) -> Result<Self, Problems> {
         let limits = config.limits.driver;
-        if limits.client.document.record_bytes > secret_bytes {
+        if limits.client.document.record_bytes > secrets.value {
             return Err(problem(0, What::Bound));
         }
         let mut issuers = issuers(runtime.as_mut(), &limits)?;
@@ -305,6 +307,10 @@ impl Accounts {
         let checked = driver::Component::new(check, &limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
         drop(checked);
         let providers = provider_templates(config, runtime.as_mut(), &limits, &crypto, &seeds.installation)?;
+        let mut inventory = restart::Inventory::new(limits.accounts, secrets.page.rows);
+        for (number, _) in &configured {
+            inventory.name(*number);
+        }
         Ok(Self {
             component: None,
             phase: Phase::Loading { configured, crypto, after: None, asked: false },
@@ -315,6 +321,7 @@ impl Accounts {
             erasing: Map::with_capacity(limits.accounts),
             records: records::Records::new(limits.accounts),
             keys: keys::Keys::new(limits.accounts, limits.client.document.token_bytes),
+            inventory,
             key_out: Queue::with_capacity(room),
             key_events: Queue::with_capacity(room),
             forgotten: Queue::with_capacity(room),
@@ -337,12 +344,6 @@ impl Accounts {
             && self.io.room() >= driver::MAX_OUT_DOWN.io
             && self.files.room() >= driver::MAX_OUT_DOWN.files
     }
-    fn running(&self) -> bool {
-        match self.phase {
-            Phase::Running => self.early.is_empty(),
-            Phase::Loading { .. } | Phase::HandingIn => false,
-        }
-    }
     pub fn up_room(&self) -> bool {
         self.above.room() >= driver::MAX_OUT_UP.above && self.io.room() >= driver::MAX_OUT_UP.io
     }
@@ -353,17 +354,13 @@ impl Accounts {
             && self.key_out.room() >= batch
             && self.key_events.room() >= batch
             && self.forgotten.room() >= batch
-            && (self.running() || self.early.room() >= batch)
+            && self.early.room() >= batch
     }
     /// The domain's request: to the driver once it runs, held until then.
     pub fn request(&mut self, request: domain::Request) {
         match request {
             domain::Request::Component(_) | domain::Request::Signing(_) => {
-                if self.running() {
-                    self.dispatch(request);
-                } else {
-                    self.early.push(request);
-                }
+                self.early.push(request);
             }
             domain::Request::Granted { .. }
             | domain::Request::Save { .. }
@@ -372,7 +369,7 @@ impl Accounts {
             | domain::Request::Closed => (),
         }
     }
-    fn dispatch(&mut self, request: domain::Request) {
+    fn dispatch(&mut self, request: domain::Request, store: &mut crate::store::Store, values: &mut Values) {
         match request {
             domain::Request::Component(request) => match request {
                 domain::ToComponent::Want { account } if self.keys.contains(account) => {
@@ -387,60 +384,68 @@ impl Accounts {
                 | domain::ToComponent::Release { .. }
                 | domain::ToComponent::Close) => self.down(translate::down(other)),
             },
-            domain::Request::Signing(signing) => {
-                match signing {
-                    domain::Signing::Restore { .. } | domain::Signing::Restored => return,
-                    domain::Signing::Keep { .. }
-                    | domain::Signing::Forget { .. }
-                    | domain::Signing::SignIn { .. }
-                    | domain::Signing::SignOut { .. }
-                    | domain::Signing::Replaced { .. } => {}
-                }
-                match translate::down_signing(signing) {
-                    translate::Down::Keep { source, carried, replaces } => {
-                        let next = self.keys.keep(source, carried, replaces);
-                        self.key_out.push(next);
-                    }
-                    translate::Down::Forget { source } => {
-                        self.keys.forget(source);
-                        self.forgotten.push(source);
-                    }
-                    translate::Down::SignOut { source } => self.down(driver::Request::SignOut { account: source }),
-                    translate::Down::SignIn { source, provider } => {
-                        let Some(template) = self.providers.get(&provider) else {
-                            self.above.push(driver::Event::Refused {
-                                account: source,
-                                asked: driver::Asked::Add,
-                                why: driver::Refusal::Source,
-                            });
-                            return;
-                        };
-                        let account = unkept(template);
-                        let required = match &account {
-                            driver::Account::SignIn { registration, .. } => match &registration.terms {
-                                Some(terms) => terms.required_scopes.clone(),
-                                None => None,
-                            },
-                            driver::Account::HandedIn => None,
-                        }
-                        .unwrap_or_default();
-                        let before = self.above.len();
-                        self.component.as_mut().expect("running driver").add(
-                            &self.env,
-                            source,
-                            account,
-                            &mut self.above,
-                        );
-                        if self.above.len() != before {
-                            return;
-                        }
-                        self.ids.insert(source, Secret::new(Box::default())).expect("driver admitted account");
-                        self.required.insert(source, required).expect("driver admitted account");
-                        self.records.admit(source).expect("driver admitted account");
-                        self.down(driver::Request::SignIn { account: source, subject: None });
+            domain::Request::Signing(signing) => match translate::down_signing(signing) {
+                translate::Down::Restore { source, provider, kind } => {
+                    self.inventory.name(source);
+                    let value = match store.secrets(
+                        Token::new(PREFIX | u64::from(source)),
+                        store::Secrets::Get { owner: store::SecretOwner::Source, number: u64::from(source) },
+                    ) {
+                        Some(store::Event::Secret { value, .. }) => value,
+                        None => return,
+                        Some(other) => unreachable!("Source Get answers with its value: {other:?}"),
+                    };
+                    match kind {
+                        domain::Kind::Key => self
+                            .keys
+                            .restore(source, value, &mut values.accounts)
+                            .expect("restored LLM key source fits table"),
+                        domain::Kind::SignIn => self.restore_signed_in(source, provider, value),
+                        domain::Kind::Program | domain::Kind::None => (),
                     }
                 }
-            }
+                translate::Down::Restored => self.inventory.restored(),
+                translate::Down::Keep { source, carried, replaces } => {
+                    self.inventory.name(source);
+                    let next = self.keys.keep(source, carried, replaces);
+                    self.key_out.push(next);
+                }
+                translate::Down::Forget { source } => {
+                    self.keys.forget(source);
+                    self.inventory.forget(source);
+                    self.forgotten.push(source);
+                }
+                translate::Down::SignOut { source } => self.down(driver::Request::SignOut { account: source }),
+                translate::Down::SignIn { source, provider } => {
+                    let Some(template) = self.providers.get(&provider) else {
+                        self.above.push(driver::Event::Refused {
+                            account: source,
+                            asked: driver::Asked::Add,
+                            why: driver::Refusal::Source,
+                        });
+                        return;
+                    };
+                    let account = unkept(template);
+                    let required = match &account {
+                        driver::Account::SignIn { registration, .. } => match &registration.terms {
+                            Some(terms) => terms.required_scopes.clone(),
+                            None => None,
+                        },
+                        driver::Account::HandedIn => None,
+                    }
+                    .unwrap_or_default();
+                    let before = self.above.len();
+                    self.component.as_mut().expect("running driver").add(&self.env, source, account, &mut self.above);
+                    if self.above.len() != before {
+                        return;
+                    }
+                    self.inventory.name(source);
+                    self.ids.insert(source, Secret::new(Box::default())).expect("driver admitted account");
+                    self.required.insert(source, required).expect("driver admitted account");
+                    self.records.admit(source).expect("driver admitted account");
+                    self.down(driver::Request::SignIn { account: source, subject: None });
+                }
+            },
             domain::Request::Granted { .. }
             | domain::Request::Save { .. }
             | domain::Request::Erase { .. }
@@ -458,7 +463,8 @@ impl Accounts {
         }
     }
     pub fn is_empty(&self) -> bool {
-        self.key_out.is_empty()
+        (self.aborting || (!self.inventory.active() && !self.keys.pending()))
+            && self.key_out.is_empty()
             && self.key_events.is_empty()
             && self.forgotten.is_empty()
             && self.closed
@@ -480,6 +486,7 @@ impl Accounts {
             Phase::Running => !self.early.is_empty(),
         };
         starting
+            || self.inventory.work_pending()
             || !self.key_out.is_empty()
             || !self.key_events.is_empty()
             || !self.forgotten.is_empty()
@@ -509,6 +516,15 @@ impl Accounts {
         for _ in 0..self.early.len() {
             let _unasked = self.early.pop();
         }
+        for _ in 0..self.key_out.len() {
+            let _unkept = self.key_out.pop();
+        }
+        for _ in 0..self.key_events.len() {
+            let _unheard = self.key_events.pop();
+        }
+        for _ in 0..self.forgotten.len() {
+            let _unforgotten = self.forgotten.pop();
+        }
     }
     pub fn iterate(
         &mut self,
@@ -520,15 +536,10 @@ impl Accounts {
     ) {
         self.clock(now, wall);
         self.answers(store, events);
-        self.start(store);
+        self.start(store, values);
         self.key_steps(values, events, store);
-        if let Some(component) = &mut self.component
-            && self.above.room() >= 3
-            && self.io.room() >= 3
-            && self.files.room() >= 1
-        {
-            component.fire(&self.env, &mut self.above, &mut self.io, &mut self.files);
-        }
+        self.sweep(store);
+        self.fire_driver();
         for _ in 0..self.above.len() {
             if events.room() == 0 || !store.room() || !self.down_room() {
                 break;
@@ -592,6 +603,7 @@ impl Accounts {
                     let _id = self.ids.remove(&source);
                     let _required = self.required.remove(&source);
                     self.records.remove(source);
+                    self.inventory.forget(source);
                     values.accounts.remove(source);
                     continue;
                 }
@@ -621,7 +633,76 @@ impl Accounts {
             component.reclaim();
         }
     }
+    fn fire_driver(&mut self) {
+        if let Some(component) = &mut self.component
+            && self.above.room() >= 3
+            && self.io.room() >= 3
+            && self.files.room() >= 1
+        {
+            component.fire(&self.env, &mut self.above, &mut self.io, &mut self.files);
+        }
+    }
+    fn restore_signed_in(&mut self, source: u32, provider: u32, value: Option<Secret>) {
+        let Some(template) = self.providers.get(&provider) else {
+            self.key_events.push(domain::FromComponent::Failed {
+                account: source,
+                failure: domain::Failure::Unloaded { at: domain::Place::File, why: domain::Unread::Unreadable },
+            });
+            return;
+        };
+        let account =
+            party::restore(unkept(template), source, value, &mut self.records, &self.env.limits.client.document);
+        let (required, id) = match &account {
+            driver::Account::SignIn { registration, keeper, .. } => {
+                let required = match &registration.terms {
+                    Some(terms) => terms.required_scopes.clone().unwrap_or_default(),
+                    None => Box::default(),
+                };
+                let id = match keeper {
+                    driver::Keeper::Owner { kept: Some(record) } => record.metadata.clone().unwrap_or_default(),
+                    driver::Keeper::Owner { kept: None } => Box::default(),
+                    driver::Keeper::Private { .. } => unreachable!("party sources have owner keepers"),
+                };
+                (required, id)
+            }
+            driver::Account::HandedIn => unreachable!("party sources use provider registrations"),
+        };
+        let before = self.above.len();
+        self.component.as_mut().expect("running driver").add(&self.env, source, account, &mut self.above);
+        if self.above.len() != before {
+            return;
+        }
+        self.ids.insert(source, Secret::new(id)).expect("restored source fits driver");
+        self.required.insert(source, required).expect("restored source fits driver");
+    }
+    fn sweep_loaded(&mut self, rows: Box<[store::SecretRow]>, next: Option<u64>) {
+        for row in rows {
+            if row.owner == store::SecretOwner::Source {
+                self.inventory.row(row.number);
+            }
+        }
+        self.inventory.loaded(next);
+    }
+    fn sweep(&mut self, store: &mut crate::store::Store) {
+        if self.aborting || !store.room() {
+            return;
+        }
+        let Some(step) = self.inventory.step() else { return };
+        let request = match step {
+            restart::Sweep::Load { after } => store::Secrets::Load { owner: store::SecretOwner::Source, after },
+            restart::Sweep::Erase { number } => store::Secrets::Erase { owner: store::SecretOwner::Source, number },
+        };
+        match store.secrets(SWEEP, request) {
+            Some(store::Event::SecretsLoaded { rows, next, .. }) => self.sweep_loaded(rows, next),
+            Some(store::Event::Erased { .. }) => self.inventory.erased(),
+            None => (),
+            Some(other) => unreachable!("Source sweep answers load or erase: {other:?}"),
+        }
+    }
     fn key_steps(&mut self, values: &mut Values, events: &mut Queue<root::Event>, store: &mut crate::store::Store) {
+        if self.aborting {
+            return;
+        }
         for _ in 0..self.forgotten.len() {
             if !store.room() {
                 break;
@@ -658,7 +739,18 @@ impl Accounts {
                     }
                 }
                 keys::Next::Child(event) => {
-                    events.push(root::Event::Core(core::Event::Account(domain::Event::Component(event))))
+                    match &event {
+                        domain::FromComponent::KeepFailed { account, .. } => {
+                            if !self.keys.contains(*account) {
+                                self.inventory.forget(*account);
+                            }
+                        }
+                        domain::FromComponent::Granted { .. }
+                        | domain::FromComponent::Expiring { .. }
+                        | domain::FromComponent::Failed { .. }
+                        | domain::FromComponent::Closed => (),
+                    }
+                    events.push(root::Event::Core(core::Event::Account(domain::Event::Component(event))));
                 }
                 keys::Next::Granted { event, source, generation, value } => {
                     values
@@ -753,14 +845,19 @@ impl Accounts {
                 break;
             }
             match store.sources.pop().expect("source answers") {
-                store::Event::SecretsLoaded { owner: _, rows, next } => self.loaded(rows, next, &store.installation),
+                store::Event::SecretsLoaded { owner: SWEEP, rows, next } => self.sweep_loaded(rows, next),
+                store::Event::SecretsLoaded { rows, next, .. } => self.loaded(rows, next, &store.installation),
                 store::Event::Kept { owner } if owner.raw() & KEY_EXCHANGE == KEY_EXCHANGE => {
-                    if let Some(next) = self.keys.kept(Token::new(owner.raw() & !KEY_EXCHANGE), true, self.env.now) {
+                    if !self.aborting
+                        && let Some(next) = self.keys.kept(Token::new(owner.raw() & !KEY_EXCHANGE), true, self.env.now)
+                    {
                         self.key_out.push(next);
                     }
                 }
                 store::Event::Stale { owner } if owner.raw() & KEY_EXCHANGE == KEY_EXCHANGE => {
-                    if let Some(next) = self.keys.kept(Token::new(owner.raw() & !KEY_EXCHANGE), false, self.env.now) {
+                    if !self.aborting
+                        && let Some(next) = self.keys.kept(Token::new(owner.raw() & !KEY_EXCHANGE), false, self.env.now)
+                    {
                         self.key_out.push(next);
                     }
                 }
@@ -774,6 +871,7 @@ impl Accounts {
                         self.down(request);
                     }
                 }
+                store::Event::Erased { owner: SWEEP } => self.inventory.erased(),
                 store::Event::Erased { owner } => self.erased(source(owner), owner, events),
                 store::Event::Secret { .. } | store::Event::Carried { .. } => {
                     unreachable!("the accounts only load and replace their records")
@@ -860,7 +958,7 @@ impl Accounts {
     }
     /// Asks for the next page of records, hands in the handed-in records
     /// once kept, then lets the domain's requests through.
-    fn start(&mut self, store: &mut crate::store::Store) {
+    fn start(&mut self, store: &mut crate::store::Store, values: &mut Values) {
         match &mut self.phase {
             Phase::Loading { after, asked, .. } => {
                 if !*asked && store.opened && store.room() {
@@ -889,11 +987,16 @@ impl Accounts {
             }
             Phase::Running => {
                 for _ in 0..self.early.len() {
-                    if !self.down_room() {
+                    if !self.down_room()
+                        || !store.room()
+                        || self.key_out.room() == 0
+                        || self.key_events.room() == 0
+                        || self.forgotten.room() == 0
+                    {
                         break;
                     }
                     let request = self.early.pop().expect("early requests");
-                    self.dispatch(request);
+                    self.dispatch(request, store, values);
                 }
             }
         }
@@ -1027,7 +1130,7 @@ pub(super) fn untag(mut event: io::Event) -> io::Event {
 /// The accounts' bytes beside the driver's own: their queues, the sources
 /// as configured until the store's records are read, the handed-in records
 /// until kept, and each source's record on its way to the store.
-pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32) -> Option<u64> {
+pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32, page_rows: u32) -> Option<u64> {
     let record = u64::from(limits.client.document.record_bytes);
     Queue::<io::Request>::worst_case(room)?
         .checked_add(Queue::<driver::Event>::worst_case(room)?)?
@@ -1038,6 +1141,7 @@ pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32) ->
         .checked_add(u64::from(limits.accounts).checked_mul(record)?)?
         .checked_add(records::worst_case(limits.accounts, &limits.client.document)?)?
         .checked_add(keys::worst_case(limits.accounts, limits.client.document.token_bytes)?)?
+        .checked_add(restart::worst_case(limits.accounts, page_rows)?)?
         .checked_add(Queue::<keys::Next>::worst_case(room)?)?
         .checked_add(Queue::<domain::FromComponent>::worst_case(room)?)?
         .checked_add(Queue::<u32>::worst_case(room)?)?

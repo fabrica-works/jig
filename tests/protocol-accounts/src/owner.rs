@@ -597,7 +597,10 @@ impl Owner {
                         | child::Signing::Replaced { .. } => {}
                     }
                     match translate::down_signing(signing) {
-                        translate::Down::Keep { .. } | translate::Down::Forget { .. } => {
+                        translate::Down::Keep { .. }
+                        | translate::Down::Forget { .. }
+                        | translate::Down::Restore { .. }
+                        | translate::Down::Restored => {
                             unreachable!("LLM key tests use their component harness")
                         }
                         translate::Down::SignIn { source, provider: 1 } => {

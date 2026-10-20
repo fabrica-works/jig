@@ -110,7 +110,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             u64::from(limits.root.connector.value_bytes)
                 .checked_mul(u64::from(limits.root.core.accounts.credentials).checked_mul(2)?)?,
         )?
-        .checked_add(crate::accounts::worst_case(&limits.accounts, &limits.io, queue.checked_mul(3)?)?)?
+        .checked_add(crate::accounts::worst_case(
+            &limits.accounts,
+            &limits.io,
+            queue.checked_mul(3)?,
+            limits.store.secrets.page.rows,
+        )?)?
         .checked_add(crate::tools::worst_case(&limits.root.core)?)?
         .checked_add(Queue::<Box<root::Event>>::worst_case(
             queue.checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?,

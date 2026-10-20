@@ -440,7 +440,7 @@ pub(super) fn engine_startup(
             seeds,
             runtime,
             max.checked_mul(6).expect("account routing room"),
-            store_limits.secrets.value,
+            &store_limits.secrets,
         )?)
     } else {
         None

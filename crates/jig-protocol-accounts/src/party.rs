@@ -105,3 +105,26 @@ pub fn party_account(
         origins,
     }
 }
+
+/// Reattaches the stored record to a party source before its first Want.
+/// A missing or unreadable record remains an unloaded source, as configured ones do.
+pub fn restore(
+    mut account: driver::Account,
+    source: u32,
+    value: Option<skein_lib::Secret>,
+    records: &mut crate::records::Records,
+    limits: &oauth::Limits,
+) -> driver::Account {
+    let record = match value {
+        Some(value) => records.load(source, value.expose(), limits),
+        None => {
+            records.missing(source);
+            None
+        }
+    };
+    match &mut account {
+        driver::Account::SignIn { keeper, .. } => *keeper = driver::Keeper::Owner { kept: record },
+        driver::Account::HandedIn => unreachable!("party signed-in source uses its provider registration"),
+    }
+    account
+}
