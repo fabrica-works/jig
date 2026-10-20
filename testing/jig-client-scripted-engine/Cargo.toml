@@ -3,6 +3,7 @@ name = "jig-client-scripted-engine"
 description = "An engine keeping the client contract in scripted worlds"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

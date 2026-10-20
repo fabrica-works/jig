@@ -3,6 +3,7 @@ name = "jig-protocol-engine-clients"
 description = "Engine side of the native client's protocol"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

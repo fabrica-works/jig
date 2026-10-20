@@ -3,6 +3,7 @@ name = "jig-protocol-config"
 description = "Strict bounded configuration parsing and checks"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

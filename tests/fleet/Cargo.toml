@@ -3,6 +3,7 @@ name = "jig-fleet-world"
 description = "The fleet child domain's world: a simulation with scripted workers, a scripted parent, channels that drop and engine restarts"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

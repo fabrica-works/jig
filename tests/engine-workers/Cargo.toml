@@ -3,6 +3,7 @@ name = "jig-engine-workers-world"
 description = "Engine worker channels against scripted byte peers"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

@@ -3,6 +3,7 @@ name = "jig-domain-tasks"
 description = "Tasks, atomic batches and their durable lifecycle"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 [dependencies]

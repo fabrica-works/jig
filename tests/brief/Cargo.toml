@@ -3,6 +3,7 @@ name = "jig-brief-world"
 description = "The brief child domain's world: a simulation with a scripted parent serving its reads"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

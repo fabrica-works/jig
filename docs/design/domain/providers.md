@@ -324,9 +324,7 @@ legal and compliance page:
 ## 4. Open questions
 
 - **"Open-source project":** what OpenAI counts as one ("pure OSS
-  clients"). skein and smith take the MIT licence (their STATUS.md says
-  when), and jig takes it with the part of LLM accounts that its own
-  STATUS.md lists as not planned.
+  clients"). skein, smith and jig take the MIT licence.
 - **Unattended agents on a plan:** OpenAI's plan usage documents do not
   address background or unattended use; Anthropic's limits assume
   ordinary, individual use (3.4).

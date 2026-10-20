@@ -3,6 +3,7 @@ name = "jig-protocol-accounts-world"
 description = "The accounts child over the real driver and simulated private keeper"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

@@ -3,6 +3,7 @@ name = "jig-ops-client-protocol-wire"
 description = "The ops application's client family records"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

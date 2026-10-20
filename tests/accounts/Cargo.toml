@@ -3,6 +3,7 @@ name = "jig-accounts-world"
 description = "The account child domain with a scripted token endpoint and durable store"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

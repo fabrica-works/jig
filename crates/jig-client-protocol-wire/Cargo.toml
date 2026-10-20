@@ -3,6 +3,7 @@ name = "jig-client-protocol-wire"
 description = "The client contract's bounded wire records"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

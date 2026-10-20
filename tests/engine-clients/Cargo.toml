@@ -3,6 +3,7 @@ name = "jig-engine-clients-world"
 description = "Native client exchanges against scripted HTTP peers"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 [dependencies]

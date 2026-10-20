@@ -3,6 +3,7 @@ name = "jig-client-world"
 description = "Reusable client shell world with people and scripted truth"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

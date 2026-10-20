@@ -3,6 +3,7 @@ name = "jig-test-store-files"
 description = "The real store over memory and skein's crashing file machine"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

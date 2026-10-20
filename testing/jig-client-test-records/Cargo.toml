@@ -3,6 +3,7 @@ name = "jig-client-test-records"
 description = "Independent literal client wire records shared by both translations"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 [dependencies]

@@ -3,6 +3,7 @@ name = "jig-ops-world"
 description = "Worlds for ops's two connectors and reference root"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

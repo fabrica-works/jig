@@ -3,6 +3,7 @@ name = "jig-ops-fake-production"
 description = "The shared production fake for ops's connector worlds"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

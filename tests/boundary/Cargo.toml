@@ -3,6 +3,7 @@ name = "jig-boundary"
 description = "Checks the kit's crate graph and source vocabulary"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

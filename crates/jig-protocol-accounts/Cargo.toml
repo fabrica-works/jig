@@ -3,6 +3,7 @@ name = "jig-protocol-accounts"
 description = "The accounts vocabulary over skein's OAuth driver"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

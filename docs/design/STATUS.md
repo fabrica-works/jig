@@ -268,9 +268,6 @@ development.md, section 3.3).
   notices; the party's `accounts` watch; and the providers' terms kept.
   Waits for the first part, in skein and smith, and for the tools and
   forge-kit runs.
-- **The MIT licence**: a `LICENSE` file at the root and `license = "MIT"`
-  in each manifest (the user's decision, with the LLM accounts design,
-  2026-10-19). The second part of LLM accounts.
 - **The documents' open questions** (each document's "Open questions"):
   wait for a decision, or for a deployment's measurements.
 

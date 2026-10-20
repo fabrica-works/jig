@@ -3,6 +3,7 @@ name = "jig-test"
 description = "The reference one-process service and agent command"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
