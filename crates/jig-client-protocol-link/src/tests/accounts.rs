@@ -92,3 +92,55 @@ fn the_four_account_limits_are_read() {
         assert_eq!(translate::answers::admission_limit(&wire, &fixtures::limits()), client);
     }
 }
+
+#[test]
+fn all_eight_account_changes_translate_both_ways() {
+    let limits = fixtures::limits();
+    for holder in [c::AccountHolder::Own, c::AccountHolder::Deployment] {
+        for change in [
+            c::AccountChange::AddKey { provider: 3, join: Some(7), digest: [19; 32] },
+            c::AccountChange::ReplaceKey { source: 9, digest: [23; 32] },
+            c::AccountChange::RemoveKey { source: 9 },
+            c::AccountChange::Resume { source: 9 },
+            c::AccountChange::Remove { account: 7 },
+            c::AccountChange::MoveAccount { account: 7, place: 2 },
+            c::AccountChange::MoveSource { account: 7, source: 9, place: 2 },
+            c::AccountChange::SetUses {
+                account: 7,
+                uses: Some(Box::new([c::OwnerAccountUse::Party(5), c::OwnerAccountUse::Project(1)])),
+            },
+            c::AccountChange::SetUses { account: 7, uses: None },
+        ] {
+            let ask = c::Ask::AccountChange { holder, change };
+            let wire = translate::asks::ask(&ask, &limits.wire).unwrap();
+            assert_eq!(translate::store::restore_ask(wire, &limits), Ok(ask));
+        }
+    }
+}
+#[test]
+fn the_key_outcomes_and_provider_refusal_are_read() {
+    let limits = fixtures::limits();
+    for (wire, client) in [
+        (
+            w::OwnerOutcome::AccountKeyKept(
+                w::OwnerOutcomeAccountKeyKept::new(&limits.wire, w::OwnerOutcomeAccountKeyKeptParts { source: 9 })
+                    .unwrap(),
+            ),
+            c::OwnerOutcome::AccountKeyKept { source: 9 },
+        ),
+        (w::OwnerOutcome::AccountChanged, c::OwnerOutcome::AccountChanged),
+        (
+            w::OwnerOutcome::AccountRemoved(
+                w::OwnerOutcomeAccountRemoved::new(
+                    &limits.wire,
+                    w::OwnerOutcomeAccountRemovedParts { confirmed: true },
+                )
+                .unwrap(),
+            ),
+            c::OwnerOutcome::AccountRemoved { confirmed: true },
+        ),
+    ] {
+        assert_eq!(translate::answers::owner_outcome(&wire, &limits), client);
+    }
+    assert_eq!(translate::answers::refusal(&w::Refusal::Provider, &limits), Ok(c::Refusal::Provider));
+}

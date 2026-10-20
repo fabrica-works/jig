@@ -119,6 +119,7 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
                 | w::Ask::SetRoles(_)
                 | w::Ask::MakeService(_)
                 | w::Ask::SignIn(_)
+                | w::Ask::AccountChange(_)
                 | w::Ask::SignOut(_)
                 | w::Ask::SetPool(_) => None,
             };

@@ -151,6 +151,8 @@ pub enum Moved {
 pub enum Refusal {
     /// A root task has no escalation holder.
     NoEscalationHolder,
+    /// The provider's account use rule refuses this change.
+    Provider,
     /// A malformed operation, at its place in the compound.
     Malformed { at: u32, why: super::Malformed },
     /// The project role does not allow the act.

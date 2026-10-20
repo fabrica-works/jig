@@ -665,6 +665,10 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
                 role: wire_held_role(*role, limits)?,
             },
         )?),
+        c::Ask::AccountChange { holder, change } => w::Ask::AccountChange(w::AskAccountChange::new(
+            limits,
+            w::AskAccountChangeParts { holder: account_holder(*holder), change: account_change(change, limits)? },
+        )?),
         c::Ask::SignIn { holder, provider } => w::Ask::SignIn(w::AskSignIn::new(
             limits,
             w::AskSignInParts { holder: account_holder(*holder), provider: *provider },
@@ -685,4 +689,74 @@ fn account_holder(value: c::AccountHolder) -> w::AccountHolder {
         c::AccountHolder::Own => w::AccountHolder::Own,
         c::AccountHolder::Deployment => w::AccountHolder::Deployment,
     }
+}
+
+fn account_change(value: &c::AccountChange, limits: &w::Limits) -> Result<w::AccountChange, w::Problem> {
+    Ok(match value {
+        c::AccountChange::AddKey { provider, join, digest } => w::AccountChange::AddKey(w::AccountChangeAddKey::new(
+            limits,
+            w::AccountChangeAddKeyParts { provider: *provider, join: *join, digest: *digest },
+        )?),
+        c::AccountChange::ReplaceKey { source, digest } => {
+            w::AccountChange::ReplaceKey(w::AccountChangeReplaceKey::new(
+                limits,
+                w::AccountChangeReplaceKeyParts { source: *source, digest: *digest },
+            )?)
+        }
+        c::AccountChange::RemoveKey { source } => w::AccountChange::RemoveKey(w::AccountChangeRemoveKey::new(
+            limits,
+            w::AccountChangeRemoveKeyParts { source: *source },
+        )?),
+        c::AccountChange::Resume { source } => w::AccountChange::Resume(w::AccountChangeResume::new(
+            limits,
+            w::AccountChangeResumeParts { source: *source },
+        )?),
+        c::AccountChange::Remove { account } => w::AccountChange::Remove(w::AccountChangeRemove::new(
+            limits,
+            w::AccountChangeRemoveParts { account: *account },
+        )?),
+        c::AccountChange::MoveAccount { account, place } => {
+            w::AccountChange::MoveAccount(w::AccountChangeMoveAccount::new(
+                limits,
+                w::AccountChangeMoveAccountParts { account: *account, place: *place },
+            )?)
+        }
+        c::AccountChange::MoveSource { account, source, place } => {
+            w::AccountChange::MoveSource(w::AccountChangeMoveSource::new(
+                limits,
+                w::AccountChangeMoveSourceParts { account: *account, source: *source, place: *place },
+            )?)
+        }
+        c::AccountChange::SetUses { account, uses } => w::AccountChange::SetUses(w::AccountChangeSetUses::new(
+            limits,
+            w::AccountChangeSetUsesParts {
+                account: *account,
+                uses: match uses {
+                    None => None,
+                    Some(uses) => {
+                        let mut rows =
+                            List::with_capacity(u32::try_from(uses.len()).expect("account uses bounded by the wire"));
+                        for use_ in uses {
+                            rows.push(match use_ {
+                                c::OwnerAccountUse::Party(value) => {
+                                    w::OwnerAccountUse::Party(w::OwnerAccountUseParty::new(
+                                        limits,
+                                        w::OwnerAccountUsePartyParts { party: *value },
+                                    )?)
+                                }
+                                c::OwnerAccountUse::Project(value) => {
+                                    w::OwnerAccountUse::Project(w::OwnerAccountUseProject::new(
+                                        limits,
+                                        w::OwnerAccountUseProjectParts { project: *value },
+                                    )?)
+                                }
+                            })
+                            .expect("reserved uses");
+                        }
+                        Some(rows)
+                    }
+                },
+            },
+        )?),
+    })
 }

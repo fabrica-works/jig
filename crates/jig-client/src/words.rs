@@ -56,6 +56,7 @@ pub enum RefusalWord {
     Moved,
     Ended,
     Unknown,
+    Provider,
     NotOffered,
     KeyConflict,
     Llm,
@@ -120,6 +121,7 @@ impl Word {
             Refusal::Limit { .. } => RefusalWord::Limit,
             Refusal::Moved { .. } => RefusalWord::Moved,
             Refusal::Ended { .. } => RefusalWord::Ended,
+            Refusal::Provider => RefusalWord::Provider,
             Refusal::Unknown => RefusalWord::Unknown,
             Refusal::NotOffered => RefusalWord::NotOffered,
             Refusal::KeyConflict => RefusalWord::KeyConflict,
@@ -163,7 +165,7 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 85] = [
+pub const ALL: [Word; 86] = [
     Word::Phase(Phase::Waiting),
     Word::Phase(Phase::Idle),
     Word::Phase(Phase::Due),
@@ -204,6 +206,7 @@ pub const ALL: [Word; 85] = [
     Word::Refusal(RefusalWord::Limit),
     Word::Refusal(RefusalWord::Moved),
     Word::Refusal(RefusalWord::Ended),
+    Word::Refusal(RefusalWord::Provider),
     Word::Refusal(RefusalWord::Unknown),
     Word::Refusal(RefusalWord::NotOffered),
     Word::Refusal(RefusalWord::KeyConflict),

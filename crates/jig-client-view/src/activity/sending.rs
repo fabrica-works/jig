@@ -43,6 +43,7 @@ fn message(ask: &Ask, task: u64) -> Option<(&Text, u32)> {
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }

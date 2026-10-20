@@ -320,7 +320,6 @@ record Withdraw { project: u32 proposal: u64 }
 enum AccountHolder { own, deployment }
 record AskSignIn { holder: AccountHolder provider: u32 }
 record AskSignOut { holder: AccountHolder source: u32 }
-enum Ask { message: Message, answer: Answer, take: Take, hand_back: HandBack, decide: Decide, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, move_task: Move, seen: Seen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool, compound: Compound, create: Create, propose: Propose, withdraw: Withdraw, sign_in: AskSignIn, sign_out: AskSignOut }
 enum OwnerProposalChoice { accepted, rejected, passed, withdrawn, stale }
 enum OwnerEscalationChoice { released, rejected, passed }
 record OwnerOutcomeMarkedSeen { seen: SeenThrough }
@@ -349,7 +348,9 @@ record CreatedGiven { task: u64 amount: u64 }
 record OwnerOutcomeCreated { first: u64 last: u64 given: option CreatedGiven }
 record OwnerOutcomeAccountSignInStarted { source: u32 address: bytes 2048 }
 record OwnerOutcomeAccountSignedOut { confirmed: bool }
-enum OwnerOutcome { marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, amended: OwnerOutcomeAmended, proposed: OwnerOutcomeProposed, withdrawn: OwnerOutcomeWithdrawn, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, compound: OwnerOutcomeCompound, created: OwnerOutcomeCreated, account_sign_in_started: OwnerOutcomeAccountSignInStarted, account_signed_out: OwnerOutcomeAccountSignedOut }
+record OwnerOutcomeAccountKeyKept { source: u32 }
+record OwnerOutcomeAccountRemoved { confirmed: bool }
+enum OwnerOutcome { marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, amended: OwnerOutcomeAmended, proposed: OwnerOutcomeProposed, withdrawn: OwnerOutcomeWithdrawn, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, compound: OwnerOutcomeCompound, created: OwnerOutcomeCreated, account_sign_in_started: OwnerOutcomeAccountSignInStarted, account_signed_out: OwnerOutcomeAccountSignedOut, account_key_kept: OwnerOutcomeAccountKeyKept, account_changed, account_removed: OwnerOutcomeAccountRemoved }
 record MadeTasks { tasks: list 32 u64 }
 record MadeService { party: u64 credential: secret 40 }
 record MadePersonResult { task: u64 }
@@ -395,7 +396,7 @@ enum Malformed { project_mismatch, two_as_allowed, conversation_not_agent, cycle
 record RefusalMalformed { at: u32 why: Malformed }
 enum LlmWhy { unconfigured, effort, charter, authority, procedure, repeated }
 record RefusalLlm { model: text 4096 why: LlmWhy }
-enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm }
+enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider }
 record Done { outcome: Outcome }
 record Refused { refusal: Refusal at: option u32 }
 enum Final { done: Done, refused: Refused }

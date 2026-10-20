@@ -294,6 +294,7 @@ impl<A: crate::Application> Engine<A> {
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
             | Ask::SignIn { .. }
+            | Ask::AccountChange { .. }
             | Ask::SignOut { .. }
             | Ask::SetPool { .. } => None,
         };
@@ -342,6 +343,7 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::Seen { .. }
                 | Ask::EditNote { .. }
                 | Ask::SignIn { .. }
+                | Ask::AccountChange { .. }
                 | Ask::SignOut { .. }
                 | Ask::DeleteNote { .. }
                 | Ask::ChangePolicy { .. }
@@ -432,6 +434,7 @@ impl<A: crate::Application> Engine<A> {
             | Ask::Seen { .. }
             | Ask::EditNote { .. }
             | Ask::SignIn { .. }
+            | Ask::AccountChange { .. }
             | Ask::SignOut { .. }
             | Ask::DeleteNote { .. }
             | Ask::ChangePolicy { .. }
@@ -621,7 +624,7 @@ fn decision_kind(decision: &Decision) -> ActKind {
 type Target = (Option<u32>, Option<ObjectKey>, ActKind, Option<(Revision, Moved)>);
 fn target(ask: &Ask) -> Option<Target> {
     Some(match ask {
-        Ask::SignIn { .. } | Ask::SignOut { .. } => return None,
+        Ask::SignIn { .. } | Ask::SignOut { .. } | Ask::AccountChange { .. } => return None,
         Ask::Compound { project, operations } => {
             compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Message, None))
         }

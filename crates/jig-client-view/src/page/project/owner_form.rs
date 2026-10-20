@@ -40,6 +40,7 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. } => return false,
     };
@@ -204,6 +205,7 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. } => None,
     }
@@ -249,6 +251,7 @@ pub(crate) fn review(domain: &mut Ui, ask: Box<Ask>) {
             | Ask::Seen { .. }
             | Ask::EditNote { .. }
             | Ask::SignIn { .. }
+            | Ask::AccountChange { .. }
             | Ask::SignOut { .. }
             | Ask::DeleteNote { .. } => None,
         };
@@ -300,6 +303,7 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>) {
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. } => false,
     };

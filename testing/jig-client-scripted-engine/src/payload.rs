@@ -155,6 +155,18 @@ impl Payload for Ask {
         match self {
             Self::Create { tasks, .. } => tasks.heap(bounds),
             Self::Propose { action, reason, .. } => sum(&[action.heap(bounds), reason.heap(bounds)]),
+            Self::AccountChange { change, .. } => match change {
+                jig_client_domain::contract::AccountChange::SetUses { uses: Some(uses), .. } => {
+                    if uses.len()
+                        > usize::try_from(jig_client_domain::contract::ACCOUNT_USES).expect("account uses bound fits")
+                    {
+                        return None;
+                    }
+                    u64::try_from(uses.len() * core::mem::size_of::<jig_client_domain::contract::OwnerAccountUse>())
+                        .ok()
+                }
+                _ => Some(0),
+            },
             Self::Withdraw { .. } | Self::SignIn { .. } | Self::SignOut { .. } => Some(0),
             Self::Compound { operations, .. } => operations.heap(bounds),
             Self::Message { project, task, words } => {
@@ -1036,6 +1048,7 @@ impl Payload for Refusal {
             | Self::NotWaiting
             | Self::NoFurther
             | Self::Unknown
+            | Self::Provider
             | Self::NoEscalationHolder
             | Self::NotOffered
             | Self::KeyConflict => Some(0),

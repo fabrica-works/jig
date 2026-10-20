@@ -139,6 +139,7 @@ pub(crate) fn refused(
         | w::Ask::SetRoles(_)
         | w::Ask::MakeService(_)
         | w::Ask::SignIn(_)
+        | w::Ask::AccountChange(_)
         | w::Ask::SignOut(_)
         | w::Ask::SetPool(_)
         | w::Ask::Withdraw(_) => return Ok(None),

@@ -79,6 +79,7 @@ impl Word {
             Self::Refusal(RefusalWord::Unknown) => (41, b"No visible object with that name", &[]),
             Self::Refusal(RefusalWord::NotOffered) => (42, b"This act is not offered", &[]),
             Self::Refusal(RefusalWord::KeyConflict) => (43, b"The request key names another act", &[]),
+            Self::Refusal(RefusalWord::Provider) => (86, b"The provider does not permit these account uses", &[]),
             Self::Refusal(RefusalWord::Llm) => (85, b"This model cannot be chosen: ", &[HoleKind::Name]),
             Self::Waiting(WaitingWord::Party) => (44, b"Waiting for a party", &[]),
             Self::Waiting(WaitingWord::Delegates) => (45, b"Waiting for delegates", &[]),

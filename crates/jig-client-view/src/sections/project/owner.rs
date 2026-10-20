@@ -80,6 +80,7 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. } => return None,
     }
@@ -643,6 +644,7 @@ fn policy_request(ask: &Ask) -> Option<&PolicyEdit> {
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. }
         | Ask::SetRoles { .. }
@@ -720,6 +722,7 @@ fn holdings_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }
@@ -747,6 +750,7 @@ fn pool_request(ask: &Ask) -> bool {
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }
@@ -774,6 +778,7 @@ fn service_request(ask: &Ask) -> Option<(&jig_client::contract::Text, jig_client
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }
@@ -1220,6 +1225,7 @@ fn render_request(b: &mut Builder, ask: &Ask, words: &Words, text_limit: u32, ro
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::DeleteNote { .. } => {}
     }

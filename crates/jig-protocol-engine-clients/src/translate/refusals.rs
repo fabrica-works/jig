@@ -47,9 +47,7 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
-        p::Refusal::Provider => {
-            return Err(w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag });
-        }
+        p::Refusal::Provider => w::Refusal::Provider,
         p::Refusal::NotOffered => w::Refusal::NotOffered,
         p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,

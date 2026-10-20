@@ -35,53 +35,126 @@ pub enum OwnerEscalationChoice {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerOutcome {
     /// Consecutive task numbers and any resolved `AsAllowed` budget.
-    Created { first: u64, last: u64, given: Option<super::CreatedGiven> },
+    Created {
+        first: u64,
+        last: u64,
+        given: Option<super::CreatedGiven>,
+    },
     /// Operations committed together, taking consecutive message numbers.
-    Compound { project: u32, operations: u32, first_message: u64 },
+    Compound {
+        project: u32,
+        operations: u32,
+        first_message: u64,
+    },
     /// A results or conversation-replies position was marked seen.
-    MarkedSeen { seen: SeenThrough },
+    MarkedSeen {
+        seen: SeenThrough,
+    },
     /// A note correction or deletion was committed.
-    NoteEdited { name: u64 },
+    NoteEdited {
+        name: u64,
+    },
     /// A service party and its project role were made.
-    ServiceMade { person: u64 },
+    ServiceMade {
+        person: u64,
+    },
     /// The owner committed a project's adoption.
-    Adopted { project: u32 },
+    Adopted {
+        project: u32,
+    },
     /// A task was stopped for a later release or decision.
-    Stopped { task: u64 },
+    Stopped {
+        task: u64,
+    },
     /// A task and its descendants were cancelled.
-    Cancelled { task: u64 },
+    Cancelled {
+        task: u64,
+    },
     /// A task's hold was released.
-    Released { task: u64 },
+    Released {
+        task: u64,
+    },
     /// A role-addressed task was taken.
-    PersonTaken { task: u64 },
+    PersonTaken {
+        task: u64,
+    },
     /// The claimant handed the task back to its role.
-    PersonHandedBack { task: u64 },
+    PersonHandedBack {
+        task: u64,
+    },
     /// A person's task answer was admitted.
-    PersonAnswered { task: u64 },
+    PersonAnswered {
+        task: u64,
+    },
     /// A task and its remaining funding moved to the requesting person.
-    Moved { task: u64 },
+    Moved {
+        task: u64,
+    },
     /// A proposal's current or historical decision names its maker and winner.
-    ProposalDecided { proposal: ProposalKey, by: u64, at: Wall, choice: OwnerProposalChoice },
+    ProposalDecided {
+        proposal: ProposalKey,
+        by: u64,
+        at: Wall,
+        choice: OwnerProposalChoice,
+    },
     /// Words were admitted under a message number, with the supplied release fact.
-    Said { task: u64, message: u64 },
+    Said {
+        task: u64,
+        message: u64,
+    },
     /// A named question was answered by a message.
-    QuestionAnswered { task: u64, question: u64, message: u64 },
+    QuestionAnswered {
+        task: u64,
+        question: u64,
+        message: u64,
+    },
     /// A task accepted an amendment, with the supplied release fact.
-    Amended { task: u64 },
+    Amended {
+        task: u64,
+    },
     /// A party's action awaits the supplied proposal number.
-    Proposed { proposal: u64 },
+    Proposed {
+        proposal: u64,
+    },
     /// A party withdrew its own proposal.
-    Withdrawn { proposal: u64 },
+    Withdrawn {
+        proposal: u64,
+    },
     /// A project's roster and affected waiting recipients changed together.
-    RolesSet { project: u32 },
+    RolesSet {
+        project: u32,
+    },
     /// A project's policy changed for later checks.
-    PolicyChanged { project: u32 },
+    PolicyChanged {
+        project: u32,
+    },
     /// A person's project pool was opened or resized.
-    PoolSet { project: u32, person: u64 },
+    PoolSet {
+        project: u32,
+        person: u64,
+    },
     /// A hold revision's current or historical decision names its winner.
-    EscalationDecided { task: u64, revision: Revision, by: u64, at: Wall, choice: OwnerEscalationChoice },
+    EscalationDecided {
+        task: u64,
+        revision: Revision,
+        by: u64,
+        at: Wall,
+        choice: OwnerEscalationChoice,
+    },
     /// An LLM account sign-in's address to open on the engine's machine.
-    AccountSignInStarted { source: u32, address: Box<[u8]> },
+    AccountKeyKept {
+        source: u32,
+    },
+    AccountChanged,
+    AccountRemoved {
+        confirmed: bool,
+    },
+    AccountSignInStarted {
+        source: u32,
+        address: Box<[u8]>,
+    },
     /// Whether the issuer confirmed the end of the LLM account sign-in.
-    AccountSignedOut { confirmed: bool },
+    AccountSignedOut {
+        confirmed: bool,
+    },
 }

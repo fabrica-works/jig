@@ -220,6 +220,7 @@ pub fn named(ask: &Ask) -> Vec<(Object, Revision)> {
         | Ask::SetRoles { .. }
         | Ask::MakeService { .. }
         | Ask::SignIn { .. }
+        | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::SetPool { .. } => Vec::new(),
     }

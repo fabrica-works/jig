@@ -90,6 +90,9 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
         w::OwnerOutcome::AccountSignInStarted(row) => {
             c::OwnerOutcome::AccountSignInStarted { source: row.source(), address: bytes::copy_of(row.address()) }
         }
+        w::OwnerOutcome::AccountKeyKept(row) => c::OwnerOutcome::AccountKeyKept { source: row.source() },
+        w::OwnerOutcome::AccountChanged => c::OwnerOutcome::AccountChanged,
+        w::OwnerOutcome::AccountRemoved(row) => c::OwnerOutcome::AccountRemoved { confirmed: row.confirmed() },
         w::OwnerOutcome::AccountSignedOut(row) => c::OwnerOutcome::AccountSignedOut { confirmed: row.confirmed() },
         w::OwnerOutcome::PoolSet(row) => c::OwnerOutcome::PoolSet { project: row.project(), person: row.person() },
         w::OwnerOutcome::EscalationDecided(row) => c::OwnerOutcome::EscalationDecided {
@@ -457,6 +460,7 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
                 w::Malformed::ProjectMismatch => c::Malformed::ProjectMismatch,
             },
         },
+        w::Refusal::Provider => c::Refusal::Provider,
         w::Refusal::Unknown => c::Refusal::Unknown,
         w::Refusal::NoEscalationHolder => c::Refusal::NoEscalationHolder,
         w::Refusal::Llm(row) => super::llm::refusal(row, limits)?,

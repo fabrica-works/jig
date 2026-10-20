@@ -223,10 +223,15 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
                 w::OwnerOutcomeAccountSignedOutParts { confirmed: *confirmed },
             )?)
         }
-        p::Outcome::AccountKeyKept { .. }
-        | p::Outcome::AccountChanged
-        | p::Outcome::AccountRemoved { .. }
-        | p::Outcome::CompoundRefused { .. }
+        p::Outcome::AccountKeyKept { source } => w::OwnerOutcome::AccountKeyKept(w::OwnerOutcomeAccountKeyKept::new(
+            limits,
+            w::OwnerOutcomeAccountKeyKeptParts { source: *source },
+        )?),
+        p::Outcome::AccountChanged => w::OwnerOutcome::AccountChanged,
+        p::Outcome::AccountRemoved { confirmed } => w::OwnerOutcome::AccountRemoved(
+            w::OwnerOutcomeAccountRemoved::new(limits, w::OwnerOutcomeAccountRemovedParts { confirmed: *confirmed })?,
+        ),
+        p::Outcome::CompoundRefused { .. }
         | p::Outcome::Applied { .. }
         | p::Outcome::Again(_)
         | p::Outcome::SignedOut

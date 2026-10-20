@@ -166,6 +166,8 @@ pub enum Ask {
     SetPool { project: u32, party: u64, budget: u64 },
     /// Start an LLM account sign-in.
     SignIn { holder: AccountHolder, provider: u32 },
+    /// Change the holder's LLM account. Key values travel in the envelope only.
+    AccountChange { holder: AccountHolder, change: AccountChange },
     /// End an LLM account sign-in for a source.
     SignOut { holder: AccountHolder, source: u32 },
 }
@@ -214,4 +216,17 @@ pub enum Answer {
     Done(Outcome),
     /// A durable refusal.
     Refused { refusal: Refusal, at: Option<u32> },
+}
+
+/// Holder changes to LLM accounts (domain/accounts.md, section 5).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum AccountChange {
+    AddKey { provider: u32, join: Option<u32>, digest: [u8; 32] },
+    ReplaceKey { source: u32, digest: [u8; 32] },
+    RemoveKey { source: u32 },
+    Resume { source: u32 },
+    Remove { account: u32 },
+    MoveAccount { account: u32, place: u32 },
+    MoveSource { account: u32, source: u32, place: u32 },
+    SetUses { account: u32, uses: Option<Box<[super::OwnerAccountUse]>> },
 }

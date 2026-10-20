@@ -68,6 +68,9 @@ pub(crate) fn ask(record: w::Ask, models: &[crate::Model], limits: &w::Limits) -
             let v = value.into_parts();
             p::Ask::MakeService { project: v.project, name: v.name, role: role(v.role) }
         }
+        w::Ask::AccountChange(value) => {
+            p::Ask::AccountChange { holder: account_holder(value.holder()), change: account_change(value.change()) }
+        }
         w::Ask::SignIn(value) => {
             p::Ask::AccountSignIn { holder: account_holder(value.holder()), provider: value.provider() }
         }
@@ -501,5 +504,42 @@ fn account_holder(value: &w::AccountHolder) -> p::AccountHolder {
     match value {
         w::AccountHolder::Own => p::AccountHolder::Own,
         w::AccountHolder::Deployment => p::AccountHolder::Deployment,
+    }
+}
+
+fn account_change(value: &w::AccountChange) -> p::AccountChange {
+    match value {
+        w::AccountChange::AddKey(row) => {
+            p::AccountChange::AddKey { provider: row.provider(), join: *row.join(), digest: *row.digest() }
+        }
+        w::AccountChange::ReplaceKey(row) => {
+            p::AccountChange::ReplaceKey { source: row.source(), digest: *row.digest() }
+        }
+        w::AccountChange::RemoveKey(row) => p::AccountChange::RemoveKey { source: row.source() },
+        w::AccountChange::Resume(row) => p::AccountChange::Resume { source: row.source() },
+        w::AccountChange::Remove(row) => p::AccountChange::Remove { account: row.account() },
+        w::AccountChange::MoveAccount(row) => {
+            p::AccountChange::MoveAccount { account: row.account(), place: row.place() }
+        }
+        w::AccountChange::MoveSource(row) => {
+            p::AccountChange::MoveSource { account: row.account(), source: row.source(), place: row.place() }
+        }
+        w::AccountChange::SetUses(row) => p::AccountChange::SetUses {
+            account: row.account(),
+            uses: match row.uses() {
+                None => None,
+                Some(uses) => {
+                    let mut rows = List::with_capacity(uses.len());
+                    for use_ in uses {
+                        rows.push(match use_ {
+                            w::OwnerAccountUse::Party(value) => p::Use::Party(value.party()),
+                            w::OwnerAccountUse::Project(value) => p::Use::Project(value.project()),
+                        })
+                        .expect("reserved uses");
+                    }
+                    Some(rows.into_boxed())
+                }
+            },
+        },
     }
 }

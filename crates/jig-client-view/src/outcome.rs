@@ -39,6 +39,9 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             | OwnerOutcome::Amended { .. }
             | OwnerOutcome::RolesSet { .. }
             | OwnerOutcome::PolicyChanged { .. }
+            | OwnerOutcome::AccountKeyKept { .. }
+            | OwnerOutcome::AccountChanged
+            | OwnerOutcome::AccountRemoved { .. }
             | OwnerOutcome::AccountSignInStarted { .. }
             | OwnerOutcome::AccountSignedOut { .. }
             | OwnerOutcome::PoolSet { .. }

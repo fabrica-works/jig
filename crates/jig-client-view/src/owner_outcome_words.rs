@@ -1,5 +1,5 @@
 //! Checked committed-outcome phrases (client/domain/view.md, 7).
-//! IDs 6400..6460 belong to this owner vocabulary. Language data is
+//! IDs 6400..6462 belong to this owner vocabulary. Language data is
 //! composed into the caller's checked Words; no language is chosen here.
 use crate::Owner;
 use crate::words::Words;
@@ -111,9 +111,12 @@ pub enum OutcomePhrase {
     AccountSignInStarted,
     /// The LLM account signed out saying.
     AccountSignedOut,
+    AccountKeyKept,
+    AccountChanged,
+    AccountRemoved,
 }
 /// Every outcome phrase in stable owner order.
-pub const ALL: [OutcomePhrase; 52] = [
+pub const ALL: [OutcomePhrase; 55] = [
     OutcomePhrase::Created,
     OutcomePhrase::FirstTask,
     OutcomePhrase::LastTask,
@@ -166,6 +169,9 @@ pub const ALL: [OutcomePhrase; 52] = [
     OutcomePhrase::RepliesThrough,
     OutcomePhrase::AccountSignInStarted,
     OutcomePhrase::AccountSignedOut,
+    OutcomePhrase::AccountKeyKept,
+    OutcomePhrase::AccountChanged,
+    OutcomePhrase::AccountRemoved,
 ];
 impl OutcomePhrase {
     /// Stable identity for checked language composition.
@@ -224,6 +230,9 @@ impl OutcomePhrase {
             Self::RepliesThrough => 6449,
             Self::AccountSignInStarted => 6457,
             Self::AccountSignedOut => 6458,
+            Self::AccountKeyKept => 6459,
+            Self::AccountChanged => 6460,
+            Self::AccountRemoved => 6461,
         };
         PhraseId { owner: Owner::Jig.opaque(), number }
     }
@@ -279,6 +288,9 @@ impl OutcomePhrase {
             | Self::Withdrawn
             | Self::Stale
             | Self::AccountSignInStarted
+            | Self::AccountKeyKept
+            | Self::AccountChanged
+            | Self::AccountRemoved
             | Self::AccountSignedOut
             | Self::ReleaseChoice => None,
         }
@@ -354,6 +366,9 @@ pub fn english() -> Language {
             OutcomePhrase::ResultsThrough => b"Results seen through: ",
             OutcomePhrase::RepliesThrough => b"Replies seen through: ",
             OutcomePhrase::AccountSignInStarted => b"LLM account sign-in started",
+            OutcomePhrase::AccountKeyKept => b"LLM account key kept",
+            OutcomePhrase::AccountChanged => b"LLM account changed",
+            OutcomePhrase::AccountRemoved => b"LLM account removed",
             OutcomePhrase::AccountSignedOut => b"LLM account signed out",
         };
         let segments: Box<[Segment]> = match phrase.hole() {

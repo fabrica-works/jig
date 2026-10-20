@@ -69,6 +69,7 @@ fn fixed(refusal: &Refusal) -> bool {
         | Refusal::NotWaiting
         | Refusal::NoFurther
         | Refusal::Limit { .. }
+        | Refusal::Provider
         | Refusal::Unknown
         | Refusal::NotOffered
         | Refusal::KeyConflict

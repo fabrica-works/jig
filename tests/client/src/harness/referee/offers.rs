@@ -150,6 +150,7 @@ impl Offers {
             | Ask::Seen { .. }
             | Ask::EditNote { .. }
             | Ask::SignIn { .. }
+            | Ask::AccountChange { .. }
             | Ask::SignOut { .. }
             | Ask::DeleteNote { .. }
             | Ask::ChangePolicy { .. }
