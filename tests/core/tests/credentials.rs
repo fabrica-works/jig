@@ -1,11 +1,12 @@
 use jig_core_world::{
     effects::World,
-    fixtures::{CREDENTIAL_RESOURCE, WORKSPACE_CREDENTIAL},
+    fixtures::{CREDENTIAL_RESOURCE, WORKSPACE_CREDENTIAL, ask_as},
     world,
 };
 use jig_domain_accounts as accounts;
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
+use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::{Duration, Token};
 
@@ -106,4 +107,62 @@ fn an_adopted_run_is_sent_its_credential_again() {
             }
         )
     );
+}
+
+/// The core world with a provider offering a sign-in, and room for a party's account beside the
+/// configured one.
+fn signing(seed: u64) -> World {
+    let (mut config, mut limits) = jig_core_world::effects::fixture(seed, false);
+    config.core.settings.llm_providers = accounts::Providers {
+        providers: Box::new([accounts::Provider {
+            number: PROVIDER,
+            models: Box::new([]),
+            offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+        }]),
+    };
+    limits.core.accounts.accounts = 2;
+    jig_core_world::peers::journal(&mut limits);
+    World::configured(seed, false, config, limits)
+}
+const PROVIDER: u32 = 3;
+fn ask(world: &mut World, key: u8, ask: people::Ask) -> Option<&people::Reply> {
+    ask_as(world, world.sign_in.expect("a signed-in party"), key, ask);
+    world.people_answers.last()
+}
+fn signed_in(world: &mut World) -> (u32, u32) {
+    let sign_in = people::Ask::AccountSignIn { holder: people::AccountHolder::Own, provider: PROVIDER };
+    let Some(people::Reply::Outcome(people::Outcome::AccountSignInStarted { source })) =
+        ask(world, 40, sign_in).copied()
+    else {
+        panic!("the sign-in started: {:?}", world.people_answers.last());
+    };
+    let account = world.domain.accounts().source(source).expect("the signed-in source").account;
+    (account, source)
+}
+fn row(key: accounts::Key) -> root::Key {
+    root::Key::Core(core::Key::Accounts(key))
+}
+#[test]
+fn a_partys_sign_in_reaches_the_accounts_child_and_its_account_is_saved() {
+    let mut world = signing(154);
+    let (account, source) = signed_in(&mut world);
+    let made = world.domain.accounts().account(account).expect("the account made");
+    assert!(matches!(made.holder(), accounts::Holder::Party(_)), "the party's own account");
+    assert_eq!(made.subject(), b"signed-in");
+    assert!(world.store.rows.contains_key(&row(accounts::Key::Account { number: account })));
+    assert!(world.store.rows.contains_key(&row(accounts::Key::Source { account, number: source })));
+}
+#[test]
+fn a_partys_sign_out_removes_its_source_and_account() {
+    let mut world = signing(155);
+    let (account, source) = signed_in(&mut world);
+    let sign_out = people::Ask::AccountSignOut { holder: people::AccountHolder::Own, source };
+    assert_eq!(
+        ask(&mut world, 41, sign_out),
+        Some(&people::Reply::Outcome(people::Outcome::AccountSignedOut { confirmed: true }))
+    );
+    assert!(world.domain.accounts().source(source).is_none());
+    assert!(world.domain.accounts().account(account).is_none());
+    assert!(!world.store.rows.contains_key(&row(accounts::Key::Account { number: account })));
+    assert!(!world.store.rows.contains_key(&row(accounts::Key::Source { account, number: source })));
 }
