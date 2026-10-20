@@ -52,6 +52,10 @@ pub(crate) fn source() -> documents::Deployment {
         accounts: rows(
             3,
             [documents::Account {
+                provider: None,
+                display: documents::Text { bytes: Box::new([]), cut: false },
+                holder: jig_domain_accounts::Holder::Deployment,
+                sources: List::with_capacity(0),
                 number: u32::MAX,
                 generation: Some(u64::MAX),
                 state: documents::AccountState::SignInAgain,

@@ -162,6 +162,10 @@ pub fn deployment_document() -> d::Deployment {
         attempts: list([host_run()]),
         accounts: list([d::Account {
             number: 41,
+            provider: Some(3),
+            display: d::Text { bytes: b"Deployment account".as_slice().into(), cut: false },
+            holder: jig_domain_accounts::Holder::Deployment,
+            sources: List::with_capacity(0),
             generation: Some(43),
             state: d::AccountState::Later { until: Some(Wall::from_nanos(47)) },
             usable: false,

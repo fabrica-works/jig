@@ -72,6 +72,10 @@ pub enum AccountState {
 #[expect(clippy::struct_excessive_bools, reason = "independent child-owned flags plus document truncation")]
 pub struct Account {
     pub number: u32,
+    pub provider: Option<u32>,
+    pub display: super::Text,
+    pub holder: accounts::Holder,
+    pub sources: List<super::SourceLine>,
     pub generation: Option<u64>,
     pub state: AccountState,
     pub usable: bool,
@@ -281,10 +285,19 @@ pub(super) fn deployment(
     let rows = core.tasks.view_tasks();
     let mut accounts = List::with_capacity(limits.documents.lines);
     let source_accounts = core.accounts.account_views();
-    for value in source_accounts.iter().take(line_bound(limits)) {
+    for value in &source_accounts {
+        let account = core.accounts.account(value.account).expect("an account view names its account");
+        if account.holder() != accounts::Holder::Deployment {
+            continue;
+        }
+        if accounts.room() == 0 {
+            cut = true;
+            continue;
+        }
+        let sources = super::accounts::source_lines(core, limits, account, clock);
         let mut runs = List::with_capacity(limits.documents.lines);
         let mut waiting = List::with_capacity(limits.documents.lines);
-        let mut account_cut = false;
+        let mut account_cut = sources.len() < account.sources().len();
         for row in &rows {
             let row = core.tasks.task(row.number).expect("live view task");
             let agent = match row.executor {
@@ -327,6 +340,10 @@ pub(super) fn deployment(
         accounts
             .push(Account {
                 number: value.account,
+                provider: account.provider(),
+                display: super::small::text(account.display(), limits.documents.text_bytes),
+                holder: account.holder(),
+                sources,
                 generation: value.generation,
                 state: account_state(value.state, clock),
                 usable: value.usable,
@@ -342,7 +359,6 @@ pub(super) fn deployment(
             })
             .expect("bounded accounts");
     }
-    cut |= usize::try_from(source_accounts.len()).expect("account count fits") > line_bound(limits);
     let mut proposal_count = 0_u32;
     let mut projects = List::with_capacity(limits.documents.lines);
     for project in &core.projects {
@@ -488,8 +504,12 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(4)?;
     // One nested host-run/task/account carrier is smaller than a task page,
     // whose bound prices all its chip/part/list children. Hosts nest run lists.
+    let account_heap =
+        List::<super::SourceLine>::worst_case(limits.lines)?.checked_add(u64::from(limits.text_bytes))?;
     super::task_tree::worst_case(limits)?
         .checked_mul(carriers)?
+        .checked_add(List::<Account>::worst_case(limits.lines)?)?
+        .checked_add(u64::from(limits.lines).checked_mul(account_heap)?)?
         .checked_add(List::<HelloRefusalLine>::worst_case(limits.lines)?)?
         .checked_add(List::<people::CapacityRefusal>::worst_case(limits.lines)?)?
         .checked_add(List::<tasks::CapacityRefusal>::worst_case(limits.lines)?)?

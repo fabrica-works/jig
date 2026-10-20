@@ -382,6 +382,7 @@ pub fn host(value: &d::Host, limits: &w::Limits) -> Result<w::OwnerHost, w::Prob
     )
 }
 pub fn account(value: &d::Account, limits: &w::Limits) -> Result<w::OwnerAccount, w::Problem> {
+    // JP10 carries provider, display, holder and sources; client-v10 carries the existing status only.
     let mut runs = List::with_capacity(value.runs.len());
     for row in &value.runs {
         runs.push(chips::chip(row, limits)?).expect("supplied rows fit");
