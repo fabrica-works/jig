@@ -1,8 +1,7 @@
 //! Completed calls show the worker's job start and end on the person's page.
 use super::*;
 
-// The fixture uses one numbered transcript dialect.
-const DIALECT: u32 = 1;
+use jig_client_test_domain::DIALECT;
 use skein_fake_person::Target;
 use smith_transcript::v6 as source;
 

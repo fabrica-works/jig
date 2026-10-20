@@ -30,8 +30,7 @@
 //! stays live, the unread messages wake it again according to their policy.
 use jig_conformance::{Clock, Input};
 
-// The fixture uses one numbered dialect, as transcript v6 requires.
-const DIALECT: u32 = 1;
+use jig_client_test_domain::DIALECT;
 use jig_domain_host as host;
 use jig_ops_domain as root;
 use skein_lib::{Duration, List, Token, Writer};

@@ -1,7 +1,6 @@
 use super::*;
 
-// The fixture uses one numbered dialect, as transcript v6 requires.
-const DIALECT: u32 = 1;
+use jig_client_test_domain::DIALECT;
 use smith::{Block as SBlock, CEILINGS, MessageParts, TurnParts, UsageParts};
 
 fn limits() -> Limits {

@@ -14,3 +14,6 @@ smith-transcript.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+jig-client-test-domain.workspace = true

@@ -1228,6 +1228,7 @@ name = "jig-protocol-transcript"
 version = "0.0.0"
 dependencies = [
  "jig-client-domain",
+ "jig-client-test-domain",
  "skein-lib",
  "smith-transcript",
 ]

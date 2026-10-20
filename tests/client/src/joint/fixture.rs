@@ -1,10 +1,9 @@
 //! One shared authentic core/worker/client fixture, with externally supplied seeds and bounds.
 use super::{Joint, engine::Driver, session::Session};
 
-// The fixture uses one numbered dialect, as transcript v6 requires.
-const DIALECT: u32 = 1;
 use crate::{Settings, Test, World};
 use jig_client_domain::contract as client;
+use jig_client_test_domain::DIALECT;
 use jig_core_world::peers::Peers;
 use jig_domain_people as people;
 use jig_fake_workers::{Script, Worker};
