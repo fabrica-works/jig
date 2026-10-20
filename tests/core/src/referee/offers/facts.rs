@@ -84,6 +84,8 @@ fn beyond(value: &Beyond) -> Admission {
     }
 }
 /// `None` means the draft is outside the supplied supported form or its old facts are incomplete.
+/// A draft naming an LLM choice is outside it: offers carry no bound on models, which the core
+/// checks against configuration, charter and authority.
 pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task>) -> Option<Admission> {
     let Admission::Bounded { within, beyond: outcome } = value else {
         return Some(value.clone());
@@ -114,7 +116,7 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
                         && procedures.iter().any(|value| value.connector == *connector && value.code == *code)
                 }
             };
-            if !supported || amount > maximum_budget || !deadline(*maximum_deadline, *until) {
+            if !supported || member.llm.is_some() || amount > maximum_budget || !deadline(*maximum_deadline, *until) {
                 return None;
             }
             Some(if amount <= pool_left && amount <= budget && deadline(*latest, *until) {
@@ -143,6 +145,7 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
         ) => {
             let [member] = batch.as_ref() else { return None };
             if member.tracked.is_none()
+                || member.llm.is_some()
                 || member.authority.spend > *maximum_budget
                 || !deadline(*maximum_deadline, member.authority.deadline)
             {
@@ -155,7 +158,7 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
             people::Ask::Amend { amendment, revision, .. },
         ) => {
             let old = before?;
-            if old.spec_revision != *revision {
+            if old.spec_revision != *revision || amendment.llm.is_some() {
                 return None;
             }
             let Some(after) = &amendment.authority else {

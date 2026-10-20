@@ -6,6 +6,8 @@ use skein_lib::{
     Writer,
     base64::{self, Alphabet},
 };
+#[path = "requests/llm.rs"]
+mod llm;
 fn bearer(peer: &mut Peer, sign_in: u64, person: u64) -> Box<[u8]> {
     let link = peer.printed_link();
     let exchange = peer.post_link(&link);
@@ -82,9 +84,9 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
     );
 }
 
-fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
+fn owner_authority(spend: u64) -> w::OwnerAuthority {
     let limits = fixtures::limits().wire;
-    let authority = w::OwnerAuthority::new(
+    w::OwnerAuthority::new(
         &limits,
         w::OwnerAuthorityParts {
             tools: 0,
@@ -100,7 +102,11 @@ fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
             .expect("delegation"),
         },
     )
-    .expect("authority");
+    .expect("authority")
+}
+fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
+    let limits = fixtures::limits().wire;
+    let authority = owner_authority(spend);
     let ask = w::Ask::Amend(Box::new(
         w::Amend::new(
             &limits,
@@ -127,11 +133,16 @@ fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
         )
         .expect("amend"),
     ));
+    keyed([61; 16], &ask)
+}
+/// A keyed request carrying `ask` under `key`.
+fn keyed(key: [u8; 16], ask: &w::Ask) -> Box<[u8]> {
+    let limits = fixtures::limits().wire;
     let mut out = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
     ask.encode(&mut out).expect("ask bytes");
     let keyed = w::Keyed::new(
         &limits,
-        w::KeyedParts { key: [61; 16], owner: w::Owner::Jig, version: 10, request: out.finish(), value: None },
+        w::KeyedParts { key, owner: w::Owner::Jig, version: 10, request: out.finish(), value: None },
     )
     .expect("keyed");
     let mut out = Writer::new(usize::try_from(keyed.measure()).expect("keyed size"));
@@ -166,8 +177,16 @@ fn final_answer(peer: &Peer, socket: skein_lib::Token) -> w::Final {
     };
     w::Final::decode(&limits, &mut skein_lib::Reader::new(answer.record())).expect("owner answer")
 }
+/// A member signed in through the peer, its asks routed to the real core.
+fn member_setup(seed: u64) -> (Peer, jig_core_world::effects::World, Box<[u8]>) {
+    let world = jig_core_world::stories::offers::world(seed, Some(people::Role::Member));
+    let mut peer = Peer::started(&real_core_settings());
+    let bearer = bearer(&mut peer, world.sign_in.expect("member"), 1);
+    (peer, world, bearer)
+}
+/// A member signed in through the peer, with task 2 created in project 1.
 fn amendment_setup(seed: u64) -> (Peer, jig_core_world::effects::World, Box<[u8]>) {
-    let mut world = jig_core_world::stories::offers::world(seed, Some(people::Role::Member));
+    let (peer, mut world, bearer) = member_setup(seed);
     let sign_in = world.sign_in.expect("member");
     jig_core_world::fixtures::ask_as(
         &mut world,
@@ -175,9 +194,21 @@ fn amendment_setup(seed: u64) -> (Peer, jig_core_world::effects::World, Box<[u8]
         CREATE_TASK,
         people::Ask::Create { project: 1, batch: Box::new([jig_core_world::fixtures::people_member(b"work", 20)]) },
     );
-    let mut peer = Peer::started(&fixtures::settings());
-    let bearer = bearer(&mut peer, world.sign_in.expect("member"), 1);
     (peer, world, bearer)
+}
+/// A peer's settings naming the core world's configured models, as configuration fills both.
+fn real_core_settings() -> jig_protocol_engine_clients::Settings {
+    let model = jig_core_world::world::scripted_model();
+    jig_protocol_engine_clients::Settings {
+        models: Box::new([jig_protocol_engine_clients::Model {
+            name: model.name,
+            provider: None,
+            window: model.window,
+            output: model.output,
+            efforts: model.efforts,
+        }]),
+        ..fixtures::settings()
+    }
 }
 
 #[test]
