@@ -297,10 +297,20 @@ fn sign_in(document: &Document, at: u32, path: &Path, problems: &mut Problems) -
 }
 fn model(document: &Document, at: u32, path: &Path, endpoints: &[Endpoint], problems: &mut Problems) -> Option<Model> {
     let mut object = check::object(document, at, path, problems)?;
-    let name = check::text(&mut object, document, b"name", path, problems);
+    let mut name = None;
+    if let Some(at) = object.required(document, b"name", path, problems) {
+        match read::text(document, at, jig_domain_core::MODEL_NAME_BYTES) {
+            Ok(value) => name = Some(value),
+            Err(what) => problems.push(path.member(b"name"), what),
+        }
+    }
     let endpoint = check::text(&mut object, document, b"endpoint", path, problems);
     let window = check::count(&mut object, document, b"window", path, problems);
     let output = check::count(&mut object, document, b"output", path, problems);
+    let mut efforts = Some(Box::default());
+    if let Some(at) = object.member(document, b"efforts") {
+        efforts = model_efforts(document, at, &path.member(b"efforts"), problems);
+    }
     let mut prices = None;
     if let Some(at) = object.required(document, b"prices", path, problems) {
         prices = price(document, at, &path.member(b"prices"), problems);
@@ -326,7 +336,42 @@ fn model(document: &Document, at: u32, path: &Path, endpoints: &[Endpoint], prob
     model.endpoint = endpoint.number;
     model.window = window?;
     model.output = output?;
+    model.efforts = efforts?;
     Some(model)
+}
+/// The efforts a model takes, by name in order, none when absent (configuration.md, 3).
+fn model_efforts(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Box<[Box<[u8]>]>> {
+    let items = match read::list(document, at, jig_domain_core::EFFORTS) {
+        Ok(items) => items,
+        Err(what) => {
+            problems.push(path.clone(), what);
+            return None;
+        }
+    };
+    let mut efforts = List::<Box<[u8]>>::with_capacity(items.len());
+    let mut whole = true;
+    for (index, at) in items.iter().enumerate() {
+        let path = check::index(path, index);
+        match read::text(document, *at, jig_domain_core::EFFORT_BYTES) {
+            Ok(effort) if effort.is_empty() => {
+                problems.push(path, What::Form);
+                whole = false;
+            }
+            Ok(effort) if efforts.as_slice().contains(&effort) => {
+                problems.push(path, What::Unique);
+                whole = false;
+            }
+            Ok(effort) => efforts.push(effort).expect("efforts bounded by the list"),
+            Err(what) => {
+                problems.push(path, what);
+                whole = false;
+            }
+        }
+    }
+    if !whole {
+        return None;
+    }
+    Some(efforts.into_boxed())
 }
 fn price(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Model> {
     let mut object = check::object(document, at, path, problems)?;
@@ -354,7 +399,6 @@ fn price(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         cache_write_price,
         output_price: output_price?,
         price_unit: price_unit?,
-        // k1 reads each model's declared efforts (domain/tasks.md, section 3).
         efforts: Box::default(),
         effort: None,
     })

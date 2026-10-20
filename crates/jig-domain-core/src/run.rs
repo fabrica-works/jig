@@ -318,10 +318,19 @@ pub struct Model {
     pub efforts: Box<[Box<[u8]>]>,
     /// The effort a run uses on this model, one of `efforts` by name, or `None` for the LLM
     /// provider's default: a run's charter carries its task's choice's (domain/engine.md, 7.1).
-    /// Configured models and charters carry none until configuration gives a charter's models
-    /// their own (k1).
+    /// Configured models and charters carry none: configuration names a charter's models, not
+    /// an effort for each (configuration.md, 3).
     pub effort: Option<Box<[u8]>>,
 }
+
+/// The most efforts a configured model declares (configuration.md, 3).
+pub const EFFORTS: u32 = 16;
+/// The most bytes in an effort's name: the bound smith's charter holds an effort to
+/// (smith's protocol/charter.md, sections 2 and 6).
+pub const EFFORT_BYTES: u32 = 32;
+/// The most bytes in a configured model's name, configuration's bound on a text
+/// (configuration.md, 3).
+pub const MODEL_NAME_BYTES: u32 = 4_096;
 
 /// Root-owned charter policy, independent of Smith's run vocabulary.
 #[derive(Clone, PartialEq, Eq, Debug)]

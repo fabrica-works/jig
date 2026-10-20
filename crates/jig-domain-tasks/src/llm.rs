@@ -180,7 +180,8 @@ impl Domain {
             if !allows(models, *model) {
                 continue;
             }
-            // k1 takes the charter's own effort for each model, once configuration gives one.
+            // Configuration names a charter's models, not an effort for each (configuration.md,
+            // 3), so the charter's effort domain/tasks.md section 3 names is each model's first.
             let chosen = ModelEffort { model: *model, effort: first_effort(self, *model) };
             match main {
                 None => main = Some(chosen),

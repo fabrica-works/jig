@@ -69,6 +69,51 @@ fn a_cache_write_price_is_kept_when_named() {
     assert_eq!(model(&bytes).cache_write_price, Some(3));
 }
 #[test]
+fn a_model_takes_the_efforts_it_names_in_order() {
+    let bytes = fixtures::with(
+        fixtures::ENGINE_SMALL,
+        br#""output": 1024,"#,
+        br#""output": 1024, "efforts": ["low", "high"],"#,
+    );
+    let low: Box<[u8]> = Box::from(&b"low"[..]);
+    let high: Box<[u8]> = Box::from(&b"high"[..]);
+    assert_eq!(model(&bytes).efforts.as_ref(), [low, high]);
+}
+#[test]
+fn a_model_naming_no_efforts_takes_none() {
+    assert!(model(fixtures::ENGINE_SMALL).efforts.is_empty());
+}
+fn refuses_efforts(efforts: &[u8], path: crate::Path, what: What) {
+    let head = br#""output": 1024, "efforts": "#;
+    let mut writer = skein_lib::Writer::new(head.len().checked_add(efforts.len()).unwrap().checked_add(1).unwrap());
+    writer.put(head).unwrap();
+    writer.put(efforts).unwrap();
+    writer.put(b",").unwrap();
+    fixtures::refuses(br#""output": 1024,"#, &writer.finish(), path, what);
+}
+fn effort_path(index: u32) -> crate::Path {
+    model_path(b"efforts").child(crate::Segment::Index(index))
+}
+fn more_efforts_than_the_bound_are_refused() {
+    let efforts = br#"["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q"]"#;
+    refuses_efforts(efforts, model_path(b"efforts"), What::Bound);
+}
+fn an_effort_longer_than_smiths_bound_is_refused() {
+    refuses_efforts(br#"["low", "an-effort-named-past-thirty-two-bytes"]"#, effort_path(1), What::Bound);
+}
+fn an_empty_effort_is_refused() {
+    refuses_efforts(br#"["low", ""]"#, effort_path(1), What::Form);
+}
+fn a_repeated_effort_is_refused() {
+    refuses_efforts(br#"["low", "high", "low"]"#, effort_path(2), What::Unique);
+}
+fn an_effort_that_is_not_a_name_is_refused() {
+    refuses_efforts(br#"["low", 2]"#, effort_path(1), What::Kind);
+}
+fn efforts_that_are_not_a_list_are_refused() {
+    refuses_efforts(br#""low""#, model_path(b"efforts"), What::Kind);
+}
+#[test]
 fn a_model_uses_its_endpoints_number_dialect_and_account() {
     let model = model(fixtures::ENGINE_SMALL);
     assert_eq!((model.endpoint, model.dialect, model.account), (1, 0, 1));
@@ -136,6 +181,12 @@ fn llm_configuration_problems_name_the_invalid_fields() {
         ("plaintext_to_a_public_address_is_refused", plaintext_to_a_public_address_is_refused),
         ("a_sign_in_plaintext_refusal_names_its_endpoint", a_sign_in_plaintext_refusal_names_its_endpoint),
         ("an_in_process_llm_endpoint_is_refused", an_in_process_llm_endpoint_is_refused),
+        ("more_efforts_than_the_bound_are_refused", more_efforts_than_the_bound_are_refused),
+        ("an_effort_longer_than_smiths_bound_is_refused", an_effort_longer_than_smiths_bound_is_refused),
+        ("an_empty_effort_is_refused", an_empty_effort_is_refused),
+        ("a_repeated_effort_is_refused", a_repeated_effort_is_refused),
+        ("an_effort_that_is_not_a_name_is_refused", an_effort_that_is_not_a_name_is_refused),
+        ("efforts_that_are_not_a_list_are_refused", efforts_that_are_not_a_list_are_refused),
     ]);
 }
 

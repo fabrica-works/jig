@@ -100,6 +100,19 @@ fn task_carrier(limits: &Limits) -> Option<u64> {
         .checked_add(bytes(tasks::MODELS, sizeof(size_of::<tasks::ModelEffort>())?)?)
 }
 
+/// The configured models' settings: each name, the efforts it declares and the effort it
+/// carries (configuration.md, 3).
+fn models_worst_case() -> Option<u64> {
+    let efforts = bytes(crate::EFFORTS, sizeof(size_of::<Box<[u8]>>())?.checked_add(u64::from(crate::EFFORT_BYTES))?)?;
+    bytes(
+        tasks::MODELS,
+        sizeof(size_of::<crate::Model>())?
+            .checked_add(u64::from(crate::MODEL_NAME_BYTES))?
+            .checked_add(efforts)?
+            .checked_add(u64::from(crate::EFFORT_BYTES))?,
+    )
+}
+
 fn context_carrier(limits: &Limits) -> Option<u64> {
     let task = &limits.tasks;
     task_carrier(limits)?
@@ -184,6 +197,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                 .checked_add(u64::from(limits.documents.text_bytes))?
                 .checked_add(task_carrier(limits)?)?,
         )?)?
+        .checked_add(models_worst_case()?)?
         .checked_add(pending)?
         .checked_add(roles)?;
     for child in children {

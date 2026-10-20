@@ -31,7 +31,17 @@ pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
         for earlier in settings.models.iter().take(at) {
             assert!(earlier.name != model.name, "unique configured model names");
         }
-        assert!(u8::try_from(model.efforts.len()).is_ok(), "efforts named by a byte");
+        assert!(model.name.len() <= usize::try_from(crate::MODEL_NAME_BYTES).expect("name bound"), "model name bound");
+        assert!(model.efforts.len() <= usize::try_from(crate::EFFORTS).expect("effort count"), "effort count");
+        for (at, effort) in model.efforts.iter().enumerate() {
+            assert!(
+                !effort.is_empty() && effort.len() <= usize::try_from(crate::EFFORT_BYTES).expect("effort bound"),
+                "effort name bound"
+            );
+            for earlier in model.efforts.iter().take(at) {
+                assert!(earlier != effort, "unique effort names");
+            }
+        }
         assert!(declares(model), "a model's effort among those it declares");
     }
     let mut seen = List::with_capacity(limits.tasks.charters);
