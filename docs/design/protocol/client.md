@@ -756,8 +756,10 @@ section 2).
   skein's text shell's terminal in front of the native client, on
   skein's simulated machine: lines in on a pipe, pages out on another
   (`../client/domain/view.md`, 15.6). Its referee is the joint world's,
-  and adds: every record crossed decodes to what was encoded; no secret
-  reaches a domain; a slow stream never holds the engine up.
+  and adds: every record crossed decodes to what was encoded; no secret,
+  nor any value a request carried, reaches a domain; a carried value is
+  sent once, never resent nor in the small store (section 5); a slow
+  stream never holds the engine up.
 - **The browser tier:** the reference UI's browser shell in Chromium,
   against jig's test application, `jig-test` (`browser.md`, section
   15).

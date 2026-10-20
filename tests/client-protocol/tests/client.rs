@@ -1,3 +1,5 @@
+#[path = "client/carried.rs"]
+mod carried;
 #[path = "client/named.rs"]
 mod named;
 #[path = "client/words.rs"]

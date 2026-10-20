@@ -21,6 +21,9 @@ const CLIENT: ClientId = ClientId(0);
 pub struct Referee {
     revisions: Vec<(Watchable, u64)>,
     stored: BTreeMap<[u8; 16], u64>,
+    /// Each value the application carried: how often it was given, and how
+    /// often an exchange sent it (protocol/client.md, 5).
+    carried: BTreeMap<Box<[u8]>, (u64, u64)>,
 }
 impl Referee {
     /// # Errors
@@ -47,6 +50,40 @@ impl Referee {
         let scope = self.stored.get(&key).ok_or("keyed exchange left before its record was stored")?;
         if Some(*scope) != party {
             return Err("keyed exchange left for an unconfirmed party");
+        }
+        Ok(())
+    }
+    /// The application handed the client a request carrying `value`.
+    pub fn carry(&mut self, value: &[u8]) {
+        let (given, _) = self.carried.entry(Box::from(value)).or_default();
+        *given += 1;
+    }
+    /// # Errors
+    /// Refuses an exchange carrying a value whose request was stored, whose
+    /// party is unconfirmed, or that sends the value more often than the
+    /// application gave it: a carried value is sent once, never resent.
+    pub fn carrying(&mut self, key: [u8; 16], value: &[u8], party: Option<u64>) -> Result<(), &'static str> {
+        if self.stored.contains_key(&key) {
+            return Err("carried request kept in the small store");
+        }
+        if party.is_none() {
+            return Err("carried exchange left for an unconfirmed party");
+        }
+        match self.carried.get_mut(value) {
+            Some((given, sent)) if *sent < *given => {
+                *sent += 1;
+                Ok(())
+            }
+            Some(_) | None => Err("carried value sent more often than it was given"),
+        }
+    }
+    /// # Errors
+    /// Refuses a record for the small store that holds a carried value.
+    pub fn saved(&self, bytes: &[u8]) -> Result<(), &'static str> {
+        for value in self.carried.keys() {
+            if !value.is_empty() && bytes.windows(value.len()).any(|held| held == value.as_ref()) {
+                return Err("carried value reached the small store");
+            }
         }
         Ok(())
     }
@@ -90,6 +127,9 @@ impl Front {
         }
     }
     fn event(&mut self, now: Time, event: Event) {
+        if let Event::Carry { value, .. } = &event {
+            self.referee.carry(value.expose());
+        }
         self.client.step(now, fixtures::wall(now), event, &mut self.out);
     }
     fn advance(&mut self, now: Time, id: ClientId, net: &mut Net, engine: &mut Engine) -> bool {
@@ -130,6 +170,7 @@ impl Front {
                     self.event(now, Event::NotStored);
                 } else {
                     for record in records.into_boxed() {
+                        self.referee.saved(&record.bytes).expect("no carried value in the small store");
                         if record.key.as_ref() != client::STREAM_KEY {
                             self.referee.stored(&record);
                         }
@@ -149,7 +190,12 @@ impl Front {
                 if let client::Message::Request(bytes) = &message {
                     let keyed =
                         w::Keyed::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("client's keyed request");
-                    self.referee.keyed(*keyed.key(), self.client.link().party).expect("kept and confirmed exchange");
+                    let party = self.client.link().party;
+                    if let Some(value) = keyed.value() {
+                        self.referee.carrying(*keyed.key(), value.expose(), party).expect("a carried value sent once");
+                    } else {
+                        self.referee.keyed(*keyed.key(), party).expect("kept and confirmed exchange");
+                    }
                 }
                 self.connections.down(
                     now,
@@ -285,6 +331,15 @@ impl Story {
     /// Sends `request` under the application's `key`, named `name`.
     pub fn send_named(&mut self, key: Key, name: skein_lib::RequestKey, request: Ask) {
         self.event(Event::Send { key, name: Some(name), request });
+    }
+    /// Sends a request carrying `value` under `name` (protocol/client.md, 5).
+    pub fn carry(&mut self, key: Key, name: skein_lib::RequestKey, request: Ask, value: &[u8]) {
+        self.event(Event::Carry { key, name, request, value: skein_lib::Secret::new(Box::from(value)) });
+    }
+    /// The numbers of the carried values the engine's secrets hold.
+    #[must_use]
+    pub fn carried(&self) -> Vec<u64> {
+        self.engine.carried.keys().copied().collect()
     }
     pub fn event(&mut self, event: Event) {
         self.front.event(self.now, event);

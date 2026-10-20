@@ -126,6 +126,8 @@ impl Engine {
                         SecretsAnswer::Erased { owner }
                     }
                     SecretsRequest::Carry { exchange, value } => {
+                        // The referee's domain rule: no carried value in a root input.
+                        self.rules.secret(value.expose());
                         let number = self.next_carried;
                         self.next_carried = number.checked_add(1).expect("carried numbers left");
                         self.carried.insert(number, value);
