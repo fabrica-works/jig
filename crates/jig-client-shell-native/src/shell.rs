@@ -49,7 +49,8 @@ impl Shell {
                 && settings.io.output >= settings.limits.http.request.max(settings.limits.http.send),
             "transport fits io"
         );
-        let max = settings.limits.exchanges.checked_add(1).expect("connections");
+        let max = settings.io.sockets;
+        assert!(max > settings.limits.exchanges, "io fits exchanges and the stream");
         let room = max.checked_mul(64).expect("queue bound");
         Self {
             connections: Connections::new(
@@ -121,7 +122,7 @@ impl Shell {
                 self.held.push_back(request);
             }
             request @ client::Request::CloseStream => {
-                self.connections.down(self.env.now, request, &mut self.below);
+                self.connections.queue(self.env.now, request, &mut self.below);
             }
             client::Request::Told { .. } | client::Request::ServiceCredential { .. } => {}
             client::Request::Down { .. } | client::Request::SignOut => panic!("linked hosts emit wire work"),
@@ -151,18 +152,16 @@ impl Shell {
                     .expect("connected socket")
                     .connected = true;
             }
-            io::Event::Stream { owner, up } => self.connections.up(
+            io::Event::Stream { owner, up } => self.connections.receive(
                 self.env.now,
                 Conn(u32::try_from(owner.raw()).expect("connection name")),
                 up,
-                &mut self.events,
                 &mut self.below,
             ),
-            io::Event::Failed { owner, .. } => self.connections.up(
+            io::Event::Failed { owner, .. } => self.connections.receive(
                 self.env.now,
                 Conn(u32::try_from(owner.raw()).expect("connection name")),
                 Up::Failed(Fault::Reset),
-                &mut self.events,
                 &mut self.below,
             ),
             io::Event::Closed { owner } => {
@@ -233,6 +232,8 @@ impl Shell {
         {
             io::fire(&mut self.io, &self.env, &mut self.told, &mut self.raw);
         }
+        // Closed sockets remain in io's slab until this iteration's reclaim.
+        let free = self.max - u32::try_from(self.sockets.len()).expect("socket bound");
         while let Some(event) = self.told.pop() {
             self.socket_event(event);
         }
@@ -255,10 +256,10 @@ impl Shell {
         }
         if self.files.ready() && !self.closing {
             while let Some(request) = self.held.pop_front() {
-                self.connections.down(now, request, &mut self.below);
+                self.connections.queue(now, request, &mut self.below);
             }
         }
-        self.connections.take(now, &mut self.events, &mut self.below);
+        self.connections.take_with_room(now, free, &mut self.events, &mut self.below);
         self.pump();
         if self.closing {
             self.held.clear();
@@ -290,6 +291,7 @@ impl Shell {
             || !self.raw.is_empty()
             || self.files.pending()
             || (!self.closing && self.files.ready() && !self.held.is_empty())
+            || (self.sockets.len() < usize::try_from(self.max).expect("socket bound") && self.connections.waiting())
             || self.sockets.values().any(|s| s.connected && !s.below.is_empty())
     }
     #[must_use]

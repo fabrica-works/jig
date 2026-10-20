@@ -21,7 +21,7 @@ enum Owner {
     Link(Token),
     Stream,
 }
-type Pending = (Owner, Call);
+type Pending = (Owner, Call, Time);
 struct Exchange {
     owner: Owner,
     until: Time,
@@ -89,23 +89,35 @@ impl Connections {
         self.next = self.next.checked_add(1).expect("finite connection namespace");
         conn
     }
-    fn enqueue(&mut self, owner: Owner, call: Call) {
-        if self.pending.len() + self.exchanges.values().filter(|value| !matches!(value.owner, Owner::Stream)).count()
+    fn enqueue(&mut self, now: Time, owner: Owner, call: Call) {
+        if self.pending.iter().filter(|(owner, _, _)| matches!(owner, Owner::Link(_))).count()
+            + self.exchanges.values().filter(|value| !matches!(value.owner, Owner::Stream)).count()
             >= usize::try_from(self.limits.exchanges).expect("u32 fits")
         {
             self.failed(owner);
         } else {
-            self.pending.push_back((owner, call));
+            self.pending.push_back((owner, call, now.saturating_add(self.limits.deadline)));
         }
     }
     pub fn down(&mut self, now: Time, request: client::Request, below: &mut Queue<(Conn, stream::Down)>) {
+        self.queue(now, request, below);
+        self.flush(now, u32::MAX, below);
+    }
+    /// Queues a request without starting its exchange; `take_with_room` starts it.
+    pub fn queue(&mut self, now: Time, request: client::Request, below: &mut Queue<(Conn, Down)>) {
         match request {
             client::Request::Exchange { exchange, message, credential } => {
-                self.enqueue(Owner::Link(exchange), mapping::exchange(&self.mapping, credential.as_ref(), message));
+                self.enqueue(
+                    now,
+                    Owner::Link(exchange),
+                    mapping::exchange(&self.mapping, credential.as_ref(), message),
+                );
             }
             client::Request::OpenStream { credential } => {
-                if !self.exchanges.values().any(|value| matches!(value.owner, Owner::Stream)) {
-                    self.start(now, Owner::Stream, mapping::stream(&self.mapping, credential.as_ref()), below);
+                if !self.exchanges.values().any(|value| matches!(value.owner, Owner::Stream))
+                    && !self.pending.iter().any(|(owner, _, _)| matches!(owner, Owner::Stream))
+                {
+                    self.pending.push_back((Owner::Stream, mapping::stream(&self.mapping, credential.as_ref()), now));
                 }
             }
             client::Request::CloseStream => self.close(now, None, below),
@@ -115,18 +127,33 @@ impl Connections {
             | client::Request::ServiceCredential { .. } => {}
             client::Request::Down { .. } | client::Request::SignOut => panic!("linked hosts emit wire work"),
         }
-        self.flush(now, below);
     }
     pub fn take(&mut self, now: Time, to_link: &mut Queue<client::Event>, below: &mut Queue<(Conn, Down)>) {
+        self.take_with_room(now, u32::MAX, to_link, below);
+    }
+    /// Whether a call waits for a free socket.
+    #[must_use]
+    pub fn waiting(&self) -> bool {
+        !self.pending.is_empty()
+    }
+    /// Expires, then starts at most `free` waiting calls, then hands the link its events.
+    pub fn take_with_room(
+        &mut self,
+        now: Time,
+        free: u32,
+        to_link: &mut Queue<client::Event>,
+        below: &mut Queue<(Conn, Down)>,
+    ) {
         self.expire(now, below);
-        self.flush(now, below);
+        self.flush(now, free, below);
         while let Some(event) = self.events.pop_front() {
             to_link.push(event);
         }
     }
-    fn flush(&mut self, now: Time, below: &mut Queue<(Conn, Down)>) {
-        while let Some((owner, call)) = self.pending.pop_front() {
-            self.start(now, owner, call, below);
+    fn flush(&mut self, now: Time, free: u32, below: &mut Queue<(Conn, Down)>) {
+        for _ in 0..free {
+            let Some((owner, call, until)) = self.pending.pop_front() else { break };
+            self.start(now, owner, call, until, below);
         }
     }
     fn stream_limits(&self) -> mapping::Limits {
@@ -144,7 +171,7 @@ impl Connections {
     fn env(&self, now: Time) -> Env<http::Limits> {
         Env { now, wall: Wall::EPOCH, limits: self.limits.http }
     }
-    fn start(&mut self, now: Time, owner: Owner, call: Call, below: &mut Queue<(Conn, Down)>) {
+    fn start(&mut self, now: Time, owner: Owner, call: Call, until: Time, below: &mut Queue<(Conn, Down)>) {
         if call.body.len() > usize::try_from(self.limits.body_bytes).expect("u32 fits") {
             self.failed(owner);
             return;
@@ -155,7 +182,7 @@ impl Connections {
         headers.extend(call.headers.into_boxed());
         let mut value = Exchange {
             owner,
-            until: now.saturating_add(self.limits.deadline),
+            until,
             stream: if matches!(owner, Owner::Stream) {
                 Some(mapping::Stream::new(&self.stream_limits()))
             } else {
@@ -221,13 +248,17 @@ impl Connections {
         to_link: &mut Queue<client::Event>,
         below: &mut Queue<(Conn, Down)>,
     ) {
+        self.receive(now, conn, up, below);
+        self.take(now, to_link, below);
+    }
+    /// Feeds one socket's answer without starting waiting calls; `take_with_room` starts them.
+    pub fn receive(&mut self, now: Time, conn: Conn, up: Up, below: &mut Queue<(Conn, Down)>) {
         self.expire(now, below);
         let env = self.env(now);
         if let Some(value) = self.exchanges.get_mut(&conn) {
             http::up(&mut value.machine, &env, up, &mut value.events, &mut value.below);
         }
         self.pump(now, conn, below);
-        self.take(now, to_link, below);
     }
     fn pump(&mut self, now: Time, conn: Conn, below: &mut Queue<(Conn, Down)>) {
         let env = self.env(now);
@@ -379,9 +410,26 @@ impl Connections {
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        self.exchanges.values().filter(|value| matches!(value.owner, Owner::Link(_))).map(|value| value.until).min()
+        self.exchanges
+            .values()
+            .filter(|value| matches!(value.owner, Owner::Link(_)))
+            .map(|value| value.until)
+            .chain(self.pending.iter().filter_map(
+                |(owner, _, until)| {
+                    if matches!(owner, Owner::Link(_)) { Some(*until) } else { None }
+                },
+            ))
+            .min()
     }
     fn expire(&mut self, now: Time, below: &mut Queue<(Conn, Down)>) {
+        for _ in 0..self.pending.len() {
+            let (owner, call, until) = self.pending.pop_front().expect("pending call");
+            if matches!(owner, Owner::Link(_)) && now >= until {
+                self.failed(owner);
+            } else {
+                self.pending.push_back((owner, call, until));
+            }
+        }
         let expired: Vec<_> = self
             .exchanges
             .values()
@@ -408,6 +456,10 @@ impl Connections {
         self.events.clear();
     }
     fn close(&mut self, now: Time, exchange: Option<Token>, below: &mut Queue<(Conn, Down)>) {
+        self.pending.retain(|(owner, _, _)| match owner {
+            Owner::Link(token) => Some(*token) != exchange,
+            Owner::Stream => exchange.is_some(),
+        });
         let conn = self.exchanges.iter().find_map(|(conn, value)| match value.owner {
             Owner::Link(token) if Some(token) == exchange => Some(*conn),
             Owner::Stream if exchange.is_none() => Some(*conn),
