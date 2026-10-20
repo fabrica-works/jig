@@ -4,7 +4,7 @@ use jig_client_protocol_wire::v10 as w;
 fn me_preserves_two_projects_in_its_wire_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
-        translate::owner::frame(&fixtures::frame_two_projects(), &limits),
+        translate::owner::frame(&fixtures::frame_two_projects(), &[], &limits),
         Ok(jig_client_test_records::frame_two_projects_record())
     );
 }
@@ -20,7 +20,7 @@ fn me_encoding_preserves_rows_despite_spare_list_capacity() {
         }
         frame.projects = projects;
         assert_eq!(
-            translate::owner::frame(&frame, &limits),
+            translate::owner::frame(&frame, &[], &limits),
             Ok(jig_client_test_records::frame_two_projects_record()),
             "projects room {project_room}"
         );
@@ -29,7 +29,7 @@ fn me_encoding_preserves_rows_despite_spare_list_capacity() {
 fn a_task_with_a_hold_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
-        translate::task::document(&fixtures::task_with_hold(), &limits),
+        translate::task::document(&fixtures::task_with_hold(), &[], &limits),
         Ok(jig_client_test_records::task_with_hold_record())
     );
 }
@@ -54,7 +54,7 @@ fn me_overflow_reports_the_wire_bound_it_exceeds() {
     ];
     for (limits, path) in rows {
         assert_eq!(
-            translate::owner::frame(&frame, &limits),
+            translate::owner::frame(&frame, &[], &limits),
             Err(w::Problem { path, reason: skein_codec::Reason::Bound })
         );
     }
@@ -178,7 +178,7 @@ fn a_me_document_carries_each_project_s_template() {
         template.label = 5;
         project.templates = fixtures::list([template]);
     }
-    let record = translate::owner::frame(&frame, &w::CEILINGS).unwrap();
+    let record = translate::owner::frame(&frame, &[], &w::CEILINGS).unwrap();
     let mut reader = skein_lib::Reader::new(record.projects());
     for source in &frame.projects {
         let bytes = skein_codec::piece::split(&mut reader).unwrap().unwrap();
@@ -197,7 +197,7 @@ fn a_me_document_carries_each_project_s_template() {
 #[test]
 fn a_me_document_carries_each_project_s_creating_bounds() {
     let frame = frame_with_creating_bounds();
-    let record = translate::owner::frame(&frame, &w::CEILINGS).unwrap();
+    let record = translate::owner::frame(&frame, &[], &w::CEILINGS).unwrap();
     let mut reader = skein_lib::Reader::new(record.projects());
     for source in &frame.projects {
         let bytes = skein_codec::piece::split(&mut reader).unwrap().unwrap();

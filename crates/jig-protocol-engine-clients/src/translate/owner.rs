@@ -138,7 +138,11 @@ pub fn wake(value: t::WakePolicy, limits: &w::Limits) -> Result<w::OwnerWakePoli
         },
     )
 }
-fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::MeProject, w::Problem> {
+fn project(
+    value: &d::FrameProjectRole,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<w::MeProject, w::Problem> {
     w::MeProject::new(
         limits,
         w::MeProjectParts {
@@ -152,19 +156,19 @@ fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::MeProje
                 Some(item) => Some(ledger(item, limits)?),
                 None => None,
             },
-            templates: super::me::templates(&value.templates, limits)?,
+            templates: super::me::templates(&value.templates, models, limits)?,
             creating: match &value.creating {
                 Some(value) => Some(super::me::creating(value, limits)?),
                 None => None,
             },
-            models: List::with_capacity(0),
+            models: super::llm::models(value.models, models, limits)?,
         },
     )
 }
-pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Me, w::Problem> {
+pub fn frame(value: &d::Frame, models: &[crate::Model], limits: &w::Limits) -> Result<w::Me, w::Problem> {
     let mut projects = List::with_capacity(value.projects.len());
     for item in &value.projects {
-        projects.push(project(item, limits)?).expect("supplied projects");
+        projects.push(project(item, models, limits)?).expect("supplied projects");
     }
     let updates = match value.updates {
         d::Count::Known(value) => w::Count::new(limits, w::CountParts { value, limited: false })?,

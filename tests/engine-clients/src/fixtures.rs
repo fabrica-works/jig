@@ -2,7 +2,7 @@ pub use crate::Peer;
 mod receiving;
 use jig_domain_people::{Identity, IdentityKey};
 use jig_protocol_engine_clients::{Limits, Served, Settings};
-pub use receiving::signed_small_core;
+pub use receiving::{models, signed_small_core};
 use skein_lib::{Duration, List, Secret};
 pub const FIRST_SIGN_IN: u64 = 41;
 pub const FIRST_PERSON: u64 = 7;
@@ -32,6 +32,7 @@ pub fn settings() -> Settings {
         providers,
         seed: Secret::new(Box::new([7; 32])),
         stream: 31,
+        models: models(),
     }
 }
 // Match this world's HTTP intake so it exercises the same component bound.

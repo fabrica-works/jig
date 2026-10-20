@@ -312,6 +312,7 @@ impl Component {
             watch.rows,
             watch.name,
             watch.version,
+            &self.settings.models,
             &env.limits.wire,
         );
         self.queue_packet(env, watcher, value, Taken::Delivery(watcher));

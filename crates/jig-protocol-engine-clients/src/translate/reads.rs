@@ -138,13 +138,14 @@ pub(crate) fn none(why: reads::Why, limits: &w::Limits) -> w::ReadAnswer {
 pub(crate) fn answer(
     read: &reads::Read,
     answer: &reads::Answer,
+    models: &[crate::Model],
     limits: &w::Limits,
 ) -> Result<w::ReadAnswer, w::Problem> {
     let value = match answer {
         reads::Answer::None(why) => return Ok(none(*why, limits)),
         reads::Answer::Tasks(page) => pages::tasks(page, limits)?,
         reads::Answer::Page(page) => pages::page(read, page, limits)?,
-        reads::Answer::Document(_) | reads::Answer::Historical(_) => objects::document(answer, limits)?,
+        reads::Answer::Document(_) | reads::Answer::Historical(_) => objects::document(answer, models, limits)?,
     };
     let mut out = Writer::new(usize::try_from(value.measure()).expect("wire measure fits"));
     value.encode(&mut out).expect("measured value");

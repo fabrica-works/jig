@@ -43,6 +43,7 @@ impl Component {
             || settings.providers.capacity() > env.limits.providers
             || settings.heartbeat == skein_lib::Duration::ZERO
             || settings.rows == 0
+            || !crate::translate::llm::fits(&settings.models, &env.limits.wire)
         {
             return Err(Unusable::Limits);
         }

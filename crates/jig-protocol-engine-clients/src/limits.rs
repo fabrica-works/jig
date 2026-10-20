@@ -1,5 +1,6 @@
 //! Connection and exchange admission (protocol/client.md, section 13).
 use crate::{Request, exchange::Exchange, sign_in::Waiting};
+use alloc::boxed::Box;
 use skein_lib::{Duration, Map, Queue, Token};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -55,6 +56,17 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<Request>::worst_case(MAX_OUT_DOWN)?)?
         .checked_add(skein_lib::List::<crate::Served>::worst_case(limits.families)?)?
         .checked_add(skein_lib::List::<u16>::worst_case(limits.providers)?)?
+        // The configured models, which `Component::new` holds to the core's bounds.
+        .checked_add(skein_lib::List::<crate::Model>::worst_case(jig_domain_tasks::MODELS)?)?
+        .checked_add(
+            u64::from(jig_domain_tasks::MODELS).checked_mul(
+                u64::from(jig_domain_core::MODEL_NAME_BYTES)
+                    .checked_add(skein_lib::List::<Box<[u8]>>::worst_case(jig_domain_core::EFFORTS)?)?
+                    .checked_add(
+                        u64::from(jig_domain_core::EFFORTS).checked_mul(u64::from(jig_domain_core::EFFORT_BYTES))?,
+                    )?,
+            )?,
+        )?
         .checked_add(u64::from(limits.identity_bytes).checked_mul(u64::from(MAX_OUT_DOWN).checked_add(1)?)?)?
         .checked_add(u64::try_from(size_of::<jig_domain_core::Event>()).ok()?.checked_mul(u64::from(MAX_OUT_DOWN))?)?
         // Decoded messages' enums and owned list entries are at most 64 times

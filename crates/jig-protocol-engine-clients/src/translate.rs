@@ -11,6 +11,7 @@ pub mod deployment;
 pub mod history;
 pub mod inbox;
 pub mod live;
+pub mod llm;
 pub mod objects;
 pub(crate) mod operations;
 pub mod owner;

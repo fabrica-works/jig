@@ -206,6 +206,9 @@ pub struct Task {
     pub words: Text,
     pub parameters: List<Parameter>,
     pub instructions: Option<Text>,
+    /// An agent task's LLM choice as kept, by the core's indices; `None` takes its charter's
+    /// default (domain/tasks.md, 3).
+    pub llm: Option<tasks::LlmChoice>,
     pub resources: List<ResourceLine>,
     pub inputs: List<TaskLink>,
     pub dependencies: List<TaskLink>,
@@ -771,6 +774,7 @@ pub fn task_from_row(
             )),
             tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => None,
         },
+        llm: row.llm.clone(),
         resources,
         inputs: links(core, limits, party, &row.spec.inputs)?,
         dependencies: links(core, limits, party, &row.dependencies)?,
@@ -889,6 +893,7 @@ pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64>
         )?
         .checked_add(lines.checked_mul(u64::try_from(size_of::<tasks::ResultField>()).ok()?)?.checked_add(text)?)?
         .checked_add(List::<ProposalRef>::worst_case(limits.lines)?)?
+        .checked_add(u64::from(tasks::MODELS).checked_mul(u64::try_from(size_of::<tasks::ModelEffort>()).ok()?)?)?
         .checked_add(authority)?;
     let tree = chip
         .checked_add(List::<TreeRow>::worst_case(limits.rows)?)?

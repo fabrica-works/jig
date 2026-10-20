@@ -23,6 +23,19 @@ fn model() -> core::Model {
     }
 }
 
+/// The configured models as the client side names them, mirroring the core's.
+#[must_use]
+pub fn models() -> Box<[jig_protocol_engine_clients::Model]> {
+    let model = model();
+    Box::new([jig_protocol_engine_clients::Model {
+        name: model.name,
+        provider: None,
+        window: model.window,
+        output: model.output,
+        efforts: model.efforts,
+    }])
+}
+
 fn configuration(limits: &core::Limits) -> core::Config {
     let rules = authority::Rules {
         ceiling: authority::Authority {

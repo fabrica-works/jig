@@ -138,6 +138,7 @@ pub(crate) mod tests {
             parameters: state.spec.parameters.clone(),
             spec: state.spec,
             instructions: Some(documents::Text { bytes: Box::new([]), cut: false }),
+            llm: None,
             resources,
             inputs,
             dependencies: List::with_capacity(4),

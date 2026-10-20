@@ -109,7 +109,7 @@ impl Component {
                 self.read_response(
                     env,
                     exchange,
-                    crate::translate::reads::answer(&what, answer, &env.limits.wire),
+                    crate::translate::reads::answer(&what, answer, &self.settings.models, &env.limits.wire),
                     out,
                 );
             }

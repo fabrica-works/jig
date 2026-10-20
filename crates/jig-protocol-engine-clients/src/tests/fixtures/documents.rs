@@ -158,6 +158,7 @@ pub fn task_with_hold() -> d::Task {
         words: text(),
         parameters: List::with_capacity(0),
         instructions: None,
+        llm: None,
         resources: List::with_capacity(0),
         inputs: List::with_capacity(0),
         dependencies: List::with_capacity(0),

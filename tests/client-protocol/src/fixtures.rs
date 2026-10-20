@@ -63,7 +63,20 @@ pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
         providers: List::with_capacity(0),
         seed: Secret::new(Box::new([7; 32])),
         stream: 31,
+        models: models(),
     }
+}
+/// The core world's configured models as the client side names them.
+#[must_use]
+pub fn models() -> Box<[jig_protocol_engine_clients::Model]> {
+    let model = jig_core_world::world::scripted_model();
+    Box::new([jig_protocol_engine_clients::Model {
+        name: model.name,
+        provider: None,
+        window: model.window,
+        output: model.output,
+        efforts: model.efforts,
+    }])
 }
 // Match this world's HTTP intake and the small profile's component bound.
 pub const MESSAGE_BYTES: u32 = 65536;

@@ -42,7 +42,27 @@ pub fn settings() -> Settings {
         providers: List::with_capacity(0),
         seed: Secret::new(Box::new([7; 32])),
         stream: 31,
+        models: models(),
     }
+}
+/// Two configured models: one with efforts and its provider, one with neither.
+pub fn models() -> Box<[crate::Model]> {
+    Box::new([
+        crate::Model {
+            name: Box::from(b"careful".as_slice()),
+            provider: Some(3),
+            window: 200_000,
+            output: 32_000,
+            efforts: Box::new([Box::from(b"low".as_slice()), Box::from(b"high".as_slice())]),
+        },
+        crate::Model {
+            name: Box::from(b"quick".as_slice()),
+            provider: None,
+            window: 8192,
+            output: 1024,
+            efforts: Box::new([]),
+        },
+    ])
 }
 pub fn env() -> Env<Limits> {
     Env {

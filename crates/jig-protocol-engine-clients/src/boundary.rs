@@ -161,6 +161,22 @@ pub struct Settings {
     pub providers: List<u16>,
     pub seed: Secret,
     pub stream: u64,
+    /// The configured models in configuration's order: the client names a model and its effort
+    /// by their names, which the component maps to the core's indices (contract.md, 3.2 and 5.1).
+    pub models: Box<[Model]>,
+}
+/// A configured model as the client protocol names and shows it (configuration.md, 3).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Model {
+    pub name: Box<[u8]>,
+    /// The number of the LLM provider serving it, when configuration names one.
+    pub provider: Option<u32>,
+    /// Its context window in tokens.
+    pub window: u32,
+    /// Its longest completion in tokens.
+    pub output: u32,
+    /// The efforts it declares, by name in its order.
+    pub efforts: Box<[Box<[u8]>]>,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Served {

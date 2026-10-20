@@ -81,11 +81,12 @@ pub(crate) fn delivery(
     value: &d::Document,
     _project: u32,
     rows: u32,
+    models: &[crate::Model],
     limits: &w::Limits,
 ) -> Result<w::DeliveryValue, w::Problem> {
     Ok(match value {
-        d::Document::Frame(value) => w::DeliveryValue::Me(owner::frame(value, limits)?),
-        d::Document::Task(value) => w::DeliveryValue::Task(Box::new(task::document(value, limits)?)),
+        d::Document::Frame(value) => w::DeliveryValue::Me(owner::frame(value, models, limits)?),
+        d::Document::Task(value) => w::DeliveryValue::Task(Box::new(task::document(value, models, limits)?)),
         d::Document::Tree(value) => {
             let next = match &value.next {
                 Some(next) => Some(w::Cursor::new(
@@ -143,9 +144,10 @@ pub(crate) fn document_packet(
     rows: u32,
     watch: u64,
     version: u32,
+    models: &[crate::Model],
     limits: &w::Limits,
 ) -> Result<w::StreamEvent, w::Problem> {
-    let value = delivery(document, project, rows, limits)?;
+    let value = delivery(document, project, rows, models, limits)?;
     let document = owned(value, version, limits)?;
     Ok(w::StreamEvent::Delivery(w::Delivery::new(limits, w::DeliveryParts { watch, document })?))
 }

@@ -12,13 +12,17 @@ pub(super) mod question_answer;
 pub use current::{escalation, person_task, question, result};
 pub use projects::project;
 pub use proposals::proposal;
-pub fn historical(value: &reads::Historical, limits: &w::Limits) -> Result<w::OwnerHistorical, w::Problem> {
+pub fn historical(
+    value: &reads::Historical,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<w::OwnerHistorical, w::Problem> {
     let key = historical_key(&value.value, limits)?;
     let record = match &value.value {
         reads::Past::Task { document, result } => w::OwnerHistoricalValue::Task(w::OwnerHistoricalValueTask::new(
             limits,
             w::OwnerHistoricalValueTaskParts {
-                document: task::document(document, limits)?,
+                document: task::document(document, models, limits)?,
                 result: current::result(result, limits)?,
             },
         )?),
@@ -42,7 +46,7 @@ pub fn historical(value: &reads::Historical, limits: &w::Limits) -> Result<w::Ow
             w::OwnerHistoricalValue::Escalation(w::OwnerHistoricalValueEscalation::new(
                 limits,
                 w::OwnerHistoricalValueEscalationParts {
-                    task: task::document(document, limits)?,
+                    task: task::document(document, models, limits)?,
                     decision: historical::escalation_decision(decision, limits)?,
                     hold: match hold {
                         Some(item) => Some(historical::milestone(item, limits)?),
@@ -96,13 +100,17 @@ pub fn historical(value: &reads::Historical, limits: &w::Limits) -> Result<w::Ow
         },
     )
 }
-pub fn document(answer: &reads::Answer, limits: &w::Limits) -> Result<w::ReadValue, w::Problem> {
+pub fn document(
+    answer: &reads::Answer,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<w::ReadValue, w::Problem> {
     Ok(match answer {
         reads::Answer::Document(value) => match value.as_ref() {
-            d::Document::Frame(value) => w::ReadValue::Me(owner::frame(value, limits)?),
-            d::Document::Task(value) => w::ReadValue::Task(task::document(value, limits)?),
+            d::Document::Frame(value) => w::ReadValue::Me(owner::frame(value, models, limits)?),
+            d::Document::Task(value) => w::ReadValue::Task(task::document(value, models, limits)?),
             d::Document::Proposal(value) => w::ReadValue::OwnerProposal(proposal(value, limits)?),
-            d::Document::Escalation(value) => w::ReadValue::OwnerEscalation(escalation(value, limits)?),
+            d::Document::Escalation(value) => w::ReadValue::OwnerEscalation(escalation(value, models, limits)?),
             d::Document::Question(value) => w::ReadValue::Question(question(value, limits)?),
             d::Document::PersonTask(value) => w::ReadValue::OwnerPersonTask(person_task(value, limits)?),
             d::Document::Result(value) => w::ReadValue::Result(result(value, limits)?),
@@ -125,7 +133,7 @@ pub fn document(answer: &reads::Answer, limits: &w::Limits) -> Result<w::ReadVal
             | reads::Past::Escalation { .. }
             | reads::Past::Question { .. }
             | reads::Past::PersonTask { .. }
-            | reads::Past::Reply(_) => w::ReadValue::Historical(Box::new(historical(value, limits)?)),
+            | reads::Past::Reply(_) => w::ReadValue::Historical(Box::new(historical(value, models, limits)?)),
         },
         reads::Answer::Tasks(_) | reads::Answer::Page(_) | reads::Answer::None(_) => {
             return Err(w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag });

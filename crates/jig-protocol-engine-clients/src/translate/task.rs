@@ -289,7 +289,7 @@ pub fn delegates_pieces(rows: &List<w::LiveDelegate>, bound: u32, path: w::Path)
     }
     pieces(&encoded, bound, path)
 }
-pub fn document(value: &d::Task, limits: &w::Limits) -> Result<w::Task, w::Problem> {
+pub fn document(value: &d::Task, models: &[crate::Model], limits: &w::Limits) -> Result<w::Task, w::Problem> {
     // waits_on is carried by the document wire in jig 22.
     if value.project != value.chip.details.project
         || value.executor != value.chip.details.executor
@@ -333,7 +333,7 @@ pub fn document(value: &d::Task, limits: &w::Limits) -> Result<w::Task, w::Probl
     w::Task::new(
         limits,
         w::TaskParts {
-            llm: None,
+            llm: super::llm::choice(value.llm.as_ref(), models, limits)?,
             label: value.label,
             flags: super::me::flags(value.flags, limits)?,
             last_activity: value.last_activity.as_nanos(),

@@ -33,7 +33,11 @@ fn deadline(value: p::TemplateDeadline, limits: &w::Limits) -> Result<w::Templat
     })
 }
 
-pub fn templates(values: &List<jig_domain_core::Template>, limits: &w::Limits) -> Result<Box<[u8]>, w::Problem> {
+pub fn templates(
+    values: &List<jig_domain_core::Template>,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<Box<[u8]>, w::Problem> {
     let mut rows = List::with_capacity(values.len());
     for value in values {
         rows.push(w::Template::new(
@@ -53,7 +57,7 @@ pub fn templates(values: &List<jig_domain_core::Template>, limits: &w::Limits) -
                 flags: flags(value.flags, limits)?,
                 label: value.label,
                 grace: value.grace,
-                llm: None,
+                llm: super::llm::choice(value.llm.as_ref(), models, limits)?,
             },
         )?)
         .expect("one row per template");

@@ -141,6 +141,7 @@ impl Clients {
             providers,
             seed: seeds.crypto.clone(),
             stream: seeds.seed,
+            models: config::clients::models(&config.llm),
         };
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients };
         let out = Queue::with_capacity(room);

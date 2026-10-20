@@ -149,11 +149,15 @@ pub fn question(value: &d::Question, limits: &w::Limits) -> Result<w::Question, 
         },
     )
 }
-pub fn escalation(value: &d::Escalation, limits: &w::Limits) -> Result<w::OwnerEscalation, w::Problem> {
+pub fn escalation(
+    value: &d::Escalation,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<w::OwnerEscalation, w::Problem> {
     w::OwnerEscalation::new(
         limits,
         w::OwnerEscalationParts {
-            task: task::document(&value.task, limits)?,
+            task: task::document(&value.task, models, limits)?,
             acts: task::offered(&value.acts, limits, limits.owner_escalation_acts, w::Path::OwnerEscalationActs)?,
         },
     )

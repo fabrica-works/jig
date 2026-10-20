@@ -10,6 +10,8 @@ mod carried;
 
 #[path = "tests/documents.rs"]
 mod documents;
+#[path = "tests/llm.rs"]
+mod llm;
 #[path = "tests/services.rs"]
 mod services;
 

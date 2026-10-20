@@ -60,7 +60,7 @@ fn a_task_document_carries_its_label_flags_activity_and_oldest_waiting_entry() {
         task: QUERY_ROOT,
         kind: jig_domain_people::EntryKind::Question { message: fixtures::NUMBER },
     };
-    let value = crate::translate::task::document(&source, &limits).unwrap();
+    let value = crate::translate::task::document(&source, &[], &limits).unwrap();
     assert_eq!(
         (
             value.label(),
