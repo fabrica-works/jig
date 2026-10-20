@@ -18,6 +18,8 @@ pub enum Story {
     HandedInRejected,
     RateLimitedRefresh,
     RefusedRefresh,
+    RefusedGrant,
+    NoRecord,
     RejectedClient,
     DamagedRecord,
     ClosedExchange,
@@ -168,6 +170,17 @@ pub fn owner(outcome: &Outcome<Process>) -> &Owner {
         .iter()
         .find_map(|process| match process {
             Process::Owner(owner) => Some(owner.as_ref()),
+            Process::Issuer(_) | Process::Visitor(_) => None,
+        })
+        .expect("owner process")
+}
+#[must_use]
+pub fn owner_mut(outcome: &mut Outcome<Process>) -> &mut Owner {
+    outcome
+        .procs
+        .iter_mut()
+        .find_map(|process| match process {
+            Process::Owner(owner) => Some(owner.as_mut()),
             Process::Issuer(_) | Process::Visitor(_) => None,
         })
         .expect("owner process")

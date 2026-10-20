@@ -2,7 +2,7 @@ mod clients;
 mod engine;
 mod family;
 mod first_period;
-mod fixtures;
+pub(crate) mod fixtures;
 mod server;
 mod startup;
 mod stop;

@@ -19,6 +19,11 @@ pub enum Up {
         expires: Time,
     },
     Child(accounts::FromComponent),
+    /// The issuer refused a kept refresh token: fail needs sign-in now,
+    /// erase its Source record, and acknowledge it through `Records::erased`.
+    Revoked {
+        source: u32,
+    },
     Visited {
         source: u32,
         address: Box<[u8]>,
@@ -80,6 +85,11 @@ pub fn up(event: driver::Event, now: Time, required: &[u8]) -> Up {
         driver::Event::Expiring { account, generation } => {
             Up::Child(accounts::FromComponent::Expiring { account, generation })
         }
+        driver::Event::Failed {
+            account,
+            ends: driver::Ends::Grant | driver::Ends::Refresh,
+            failure: driver::Failure::Exchange(oauth::Failure::Refused),
+        } => Up::Revoked { source: account },
         driver::Event::Failed { account, ends, failure } => match ends {
             driver::Ends::Grant | driver::Ends::Refresh => failed(account, classify(failure)),
             driver::Ends::SignIn => Up::SignInFailed { source: account, failure: classify(failure) },

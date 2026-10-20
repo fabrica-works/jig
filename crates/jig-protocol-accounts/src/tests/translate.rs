@@ -95,10 +95,40 @@ fn malformed_limit_and_not_kept_fail_later() {
     }
 }
 #[test]
-fn refused_and_expired_fail_as_sign_in_again() {
-    for cause in [driver::Failure::Exchange(oauth::Failure::Refused), driver::Failure::Expired] {
+fn a_refused_grant_or_refresh_requests_record_erasure() {
+    for ends in [driver::Ends::Grant, driver::Ends::Refresh] {
+        assert_eq!(
+            translate::up(
+                driver::Event::Failed {
+                    account: ACCOUNT_CHAT,
+                    ends,
+                    failure: driver::Failure::Exchange(oauth::Failure::Refused),
+                },
+                fixtures::NOW,
+                b""
+            ),
+            Up::Revoked { source: ACCOUNT_CHAT }
+        );
+    }
+    assert_eq!(
+        translate::up(
+            driver::Event::Failed {
+                account: ACCOUNT_CHAT,
+                ends: driver::Ends::SignIn,
+                failure: driver::Failure::Exchange(oauth::Failure::Refused),
+            },
+            fixtures::NOW,
+            b""
+        ),
+        Up::SignInFailed { source: ACCOUNT_CHAT, failure: accounts::Failure::SignInAgain }
+    );
+}
+#[test]
+fn other_needs_sign_in_failures_do_not_request_record_erasure() {
+    for cause in [driver::Failure::Expired, driver::Failure::NotGranted, driver::Failure::AnotherSubject] {
         assert_eq!(failure(cause), child_failure(accounts::Failure::SignInAgain));
     }
+    assert_eq!(refused(driver::Refusal::NoRecord), child_failure(accounts::Failure::SignInAgain));
 }
 #[test]
 fn an_expiring_record_reaches_the_child_as_expiring() {

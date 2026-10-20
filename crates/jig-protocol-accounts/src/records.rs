@@ -71,6 +71,15 @@ impl Records {
     pub fn remove(&mut self, account: u32) {
         let _removed = self.slots.remove(&account);
     }
+    /// The store acknowledged erasure: forget its digest and pending record,
+    /// retaining the source's admitted place. Submission alone is not durable.
+    pub fn erased(&mut self, account: u32) {
+        if let Some(slot) = self.slots.get_mut(&account) {
+            slot.held = None;
+            slot.waiting = None;
+            slot.unread = false;
+        }
+    }
     /// The record the store holds for `account`, read at start: the record,
     /// when it is the account's and fits the driver's limits; otherwise
     /// none, and the source fails as unloaded until a new record replaces

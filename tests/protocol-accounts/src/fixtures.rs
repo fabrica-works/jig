@@ -176,6 +176,12 @@ pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
     use crate::world::Story;
     match story {
         Story::DamagedRecord => Some(bytes::copy_of(b"damaged record")),
+        Story::RefusedGrant => {
+            let mut record = kept();
+            record.expires_at = Wall::EPOCH;
+            Some(oauth::encode_record(&record, &limits().client.document).expect("expired record"))
+        }
+        Story::NoRecord => None,
         Story::HandedIn { .. }
         | Story::HandedInRejected
         | Story::SignIn
@@ -205,6 +211,8 @@ pub fn handed_lapse(story: crate::world::Story) -> Option<Duration> {
         | crate::world::Story::Closed
         | crate::world::Story::RateLimitedRefresh
         | crate::world::Story::RefusedRefresh
+        | crate::world::Story::RefusedGrant
+        | crate::world::Story::NoRecord
         | crate::world::Story::RejectedClient
         | crate::world::Story::DamagedRecord
         | crate::world::Story::ClosedExchange
@@ -237,7 +245,11 @@ pub fn wanted(story: crate::world::Story) -> usize {
         | crate::world::Story::AccountSignInVaryingPort
         | crate::world::Story::AccountSignOut { .. }
         | crate::world::Story::AccountSignInFull => 0,
-        crate::world::Story::Granted | crate::world::Story::Closed | crate::world::Story::DamagedRecord => 1,
+        crate::world::Story::Granted
+        | crate::world::Story::Closed
+        | crate::world::Story::DamagedRecord
+        | crate::world::Story::RefusedGrant
+        | crate::world::Story::NoRecord => 1,
         crate::world::Story::Refreshed
         | crate::world::Story::HandedInRejected
         | crate::world::Story::RateLimitedRefresh
@@ -279,6 +291,9 @@ pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
             Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
             Heard::Failed { account: ACCOUNT_CHAT, failure: child::Failure::Misconfigured },
         ],
+        Story::RefusedGrant | Story::NoRecord => {
+            vec![Heard::Failed { account: ACCOUNT_CHAT, failure: child::Failure::SignInAgain }]
+        }
         Story::DamagedRecord => vec![Heard::Failed {
             account: ACCOUNT_CHAT,
             failure: child::Failure::Unloaded { at: child::Place::File, why: child::Unread::Unreadable },
@@ -295,7 +310,8 @@ pub fn issuer_plans(story: crate::world::Story) -> Vec<fake::Plan> {
     use crate::world::Story;
     match story {
         Story::RateLimitedRefresh => vec![rate_limit(), rate_limit()],
-        Story::RefusedRefresh => vec![refuse()],
+        Story::RefusedRefresh | Story::RefusedGrant => vec![refuse()],
+        Story::NoRecord => vec![],
         Story::RejectedClient => vec![client_rejected()],
         Story::ClosedExchange => {
             let mut plan = rotate();

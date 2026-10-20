@@ -13,7 +13,7 @@ use jig_protocol_accounts::{
 };
 use jig_protocol_store as store;
 use skein_io::{self as io, kernel};
-use skein_lib::{Env, List, Queue, Secret, Time, Token, Wall, bytes, sha256};
+use skein_lib::{Env, List, Map, Queue, Secret, Time, Token, Wall, bytes, sha256};
 use skein_oauth_accounts as driver;
 use skein_world::Host;
 use std::net::SocketAddr;
@@ -75,6 +75,12 @@ pub struct Lent {
     pub generation: u64,
     pub digest: [u8; 32],
 }
+#[derive(Debug)]
+enum Erasing {
+    Revoked,
+    SignOut(bool),
+    Removing,
+}
 pub struct Owner {
     io: io::Io,
     component: Option<driver::Component>,
@@ -117,6 +123,7 @@ pub struct Owner {
     answers: Vec<child::Answer>,
     removed: Vec<u32>,
     erased: Option<()>,
+    erasing: Map<u32, Erasing>,
     account_sign_out_asked: Option<()>,
 }
 impl std::fmt::Debug for Owner {
@@ -205,6 +212,7 @@ impl Owner {
             answers: Vec::new(),
             removed: Vec::new(),
             erased: None,
+            erasing: Map::with_capacity(limits.accounts),
             account_sign_out_asked: None,
         };
         if let Some(kept) = installation.kept {
@@ -324,6 +332,19 @@ impl Owner {
     #[must_use]
     pub fn account_removed(&self) -> bool {
         !self.removed.is_empty()
+    }
+    /// The actual durable source record, read after the story has settled.
+    pub fn read_record(&mut self) -> Option<Box<[u8]>> {
+        self.secrets(
+            self.now,
+            Wall::EPOCH,
+            GET,
+            store::Secrets::Get { owner: store::SecretOwner::Source, number: u64::from(self.account) },
+        );
+        let Some(store::Event::Secret { owner: GET, value }) = self.store_above.pop() else {
+            panic!("the memory store answers Get immediately");
+        };
+        value.map(|value| bytes::copy_of(value.expose()))
     }
     pub(crate) fn unstarted(&self) -> bool {
         self.component.is_none()
@@ -486,6 +507,32 @@ impl Owner {
                     let Some(request) = self.records.stale(source(owner)) else { continue };
                     request
                 }
+                store::Event::Erased { owner } => {
+                    let source = source(owner);
+                    let Some(pending) = self.erasing.remove(&source) else { continue };
+                    if matches!(pending, Erasing::Removing) {
+                        self.erasing.insert(source, pending).expect("pending removal's place");
+                        continue;
+                    }
+                    self.records.erased(source);
+                    self.secrets(
+                        env.now,
+                        env.wall,
+                        GET,
+                        store::Secrets::Get { owner: store::SecretOwner::Source, number: u64::from(source) },
+                    );
+                    let Some(store::Event::Secret { owner: GET, value }) = self.store_above.pop() else {
+                        panic!("an erased record reads back");
+                    };
+                    assert!(value.is_none(), "the durable store no longer holds the record");
+                    self.erased = Some(());
+                    if let Erasing::SignOut(confirmed) = pending {
+                        self.erasing.insert(source, Erasing::Removing).expect("pending erase's place");
+                        self.child_event(env.now, env.wall, child::Event::SignedOut { source, confirmed });
+                        self.driver(env, driver::Request::Remove { account: source });
+                    }
+                    continue;
+                }
                 store::Event::Opened { .. }
                 | store::Event::OpenRefused { .. }
                 | store::Event::Committed { .. }
@@ -496,7 +543,6 @@ impl Owner {
                 | store::Event::Got { .. }
                 | store::Event::Turns { .. }
                 | store::Event::Unread { .. }
-                | store::Event::Erased { .. }
                 | store::Event::Carried { .. }
                 | store::Event::Secret { .. }
                 | store::Event::SecretsLoaded { .. }
@@ -504,6 +550,28 @@ impl Owner {
             };
             self.driver(env, request);
         }
+    }
+    fn erase(&mut self, env: &Env<driver::Limits>, source: u32, confirmed: Option<bool>) {
+        if self.removed.contains(&source) {
+            return;
+        }
+        if let Some(pending) = self.erasing.get_mut(&source) {
+            if matches!(pending, Erasing::Revoked)
+                && let Some(confirmed) = confirmed
+            {
+                *pending = Erasing::SignOut(confirmed);
+            }
+            return;
+        }
+        self.erasing
+            .insert(source, confirmed.map_or(Erasing::Revoked, Erasing::SignOut))
+            .expect("one erase per source");
+        self.secrets(
+            env.now,
+            env.wall,
+            source_token(source),
+            store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
+        );
     }
     fn child_requests(&mut self, env: &Env<driver::Limits>) {
         while let Some(request) = self.child_out.pop() {
@@ -584,6 +652,11 @@ impl Owner {
                     event
                 }
                 Up::Child(event) => event,
+                Up::Revoked { source } => {
+                    self.table.remove(source);
+                    self.erase(env, source, None);
+                    child::FromComponent::Failed { account: source, failure: child::Failure::SignInAgain }
+                }
                 Up::Visited { source, address } => {
                     self.trace.push(Trace::Visit { account: source });
                     self.visit = Some(address.clone());
@@ -606,26 +679,11 @@ impl Owner {
                     continue;
                 }
                 Up::SignedOut { source, confirmed } => {
-                    self.secrets(
-                        env.now,
-                        env.wall,
-                        source_token(source),
-                        store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
-                    );
-                    assert!(matches!(self.store_above.pop(), Some(store::Event::Erased { .. })));
-                    self.secrets(
-                        env.now,
-                        env.wall,
-                        GET,
-                        store::Secrets::Get { owner: store::SecretOwner::Source, number: u64::from(source) },
-                    );
-                    assert!(matches!(self.store_above.pop(), Some(store::Event::Secret { value: None, .. })));
-                    self.erased = Some(());
-                    self.child_event(env.now, env.wall, child::Event::SignedOut { source, confirmed });
-                    self.driver(env, driver::Request::Remove { account: source });
+                    self.erase(env, source, Some(confirmed));
                     continue;
                 }
                 Up::Removed { source } => {
+                    self.erasing.remove(&source);
                     self.records.remove(source);
                     self.table.remove(source);
                     self.removed.push(source);
@@ -705,6 +763,7 @@ impl Host for Owner {
         if self.reject_requested.take().is_some() {
             self.child_event(now, wall, child::Event::Unauthorized { account: self.account, generation: 1 });
         }
+        self.answers(&env);
         self.child_requests(&env);
         for _ in 0..ROOM {
             if !self.io.is_ready() || self.events.room() < 3 || self.submissions.room() < 2 {
@@ -763,6 +822,7 @@ impl Host for Owner {
             || !self.events.is_empty()
             || !self.requests.is_empty()
             || !self.above.is_empty()
+            || !self.store_above.is_empty()
             || !self.child_out.is_empty()
             || !self.completions.is_empty()
             || (self.component.is_none() && self.address.is_some())

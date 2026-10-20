@@ -40,6 +40,13 @@ enum Phase {
     HandingIn,
     Running,
 }
+/// One durable erase per source; only sign-out continues to driver removal.
+#[derive(Debug)]
+enum Erasing {
+    Revoked,
+    SignOut { confirmed: bool },
+    Removing,
+}
 pub(super) struct Accounts {
     component: Option<driver::Component>,
     phase: Phase,
@@ -47,7 +54,7 @@ pub(super) struct Accounts {
     ids: Map<u32, Secret>,
     providers: Map<u32, driver::Account>,
     required: Map<u32, Box<[u8]>>,
-    erasing: Map<u32, Option<bool>>,
+    erasing: Map<u32, Erasing>,
     records: records::Records,
     handed: Queue<(u32, oauth::SavedToken)>,
     early: Queue<domain::Request>,
@@ -508,6 +515,11 @@ impl Accounts {
                     event
                 }
                 translate::Up::Child(event) => event,
+                translate::Up::Revoked { source } => {
+                    values.accounts.remove(source);
+                    self.erase(source, Erasing::Revoked, events, store);
+                    domain::FromComponent::Failed { account: source, failure: domain::Failure::SignInAgain }
+                }
                 translate::Up::Visited { source, address } => {
                     events.push(root::Event::Core(core::Event::Account(domain::Event::Visited { source, address })));
                     continue;
@@ -531,7 +543,7 @@ impl Accounts {
                     continue;
                 }
                 translate::Up::SignedOut { source, confirmed } => {
-                    self.signed_out(source, confirmed, events, store);
+                    self.erase(source, Erasing::SignOut { confirmed }, events, store);
                     continue;
                 }
                 translate::Up::Removed { source } => {
@@ -591,17 +603,24 @@ impl Accounts {
             .expect("startup checks token and account id bounds");
         form
     }
-    fn signed_out(
+    fn erase(
         &mut self,
         source: u32,
-        confirmed: bool,
+        reason: Erasing,
         events: &mut Queue<root::Event>,
         store: &mut crate::store::Store,
     ) {
-        if self.erasing.contains_key(&source) {
+        if let Some(pending) = self.erasing.get_mut(&source) {
+            match pending {
+                Erasing::Revoked => match reason {
+                    Erasing::SignOut { confirmed } => *pending = Erasing::SignOut { confirmed },
+                    Erasing::Revoked | Erasing::Removing => (),
+                },
+                Erasing::SignOut { .. } | Erasing::Removing => (),
+            }
             return;
         }
-        self.erasing.insert(source, Some(confirmed)).expect("one erase per driver account");
+        self.erasing.insert(source, reason).expect("one erase per driver account");
         if let Some(store::Event::Erased { owner }) = store.secrets(
             Token::new(PREFIX | u64::from(source)),
             store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
@@ -610,15 +629,22 @@ impl Accounts {
         }
     }
     fn erased(&mut self, number: u32, _owner: Token, events: &mut Queue<root::Event>) {
-        if let Some(pending) = self.erasing.get_mut(&number)
-            && let Some(confirmed) = pending.take()
-        {
-            events
-                .push(root::Event::Core(core::Event::Account(domain::Event::SignedOut { source: number, confirmed })));
-            if self.ids.contains_key(&number) {
-                self.down(driver::Request::Remove { account: number });
-            } else {
-                let _erased = self.erasing.remove(&number);
+        let Some(pending) = self.erasing.remove(&number) else { return };
+        match pending {
+            Erasing::Revoked => self.records.erased(number),
+            Erasing::SignOut { confirmed } => {
+                self.records.erased(number);
+                events.push(root::Event::Core(core::Event::Account(domain::Event::SignedOut {
+                    source: number,
+                    confirmed,
+                })));
+                if self.ids.contains_key(&number) {
+                    self.erasing.insert(number, Erasing::Removing).expect("the removed erase's place");
+                    self.down(driver::Request::Remove { account: number });
+                }
+            }
+            Erasing::Removing => {
+                self.erasing.insert(number, Erasing::Removing).expect("the removed erase's place");
             }
         }
     }
@@ -906,7 +932,7 @@ pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32) ->
         .checked_add(records::worst_case(limits.accounts, &limits.client.document)?)?
         .checked_add(Map::<u32, Secret>::worst_case(limits.accounts)?)?
         .checked_add(Map::<u32, Box<[u8]>>::worst_case(limits.accounts)?)?
-        .checked_add(Map::<u32, Option<bool>>::worst_case(limits.accounts)?)?
+        .checked_add(Map::<u32, Erasing>::worst_case(limits.accounts)?)?
         .checked_add(u64::from(limits.accounts).checked_mul(u64::from(limits.client.scope_bytes))?)?
         .checked_add(u64::from(limits.accounts).checked_mul(u64::from(table::ACCOUNT_ID_BYTES))?)?
         .checked_add(u64::from(room).checked_mul(record.checked_add(4096)?)?)?
@@ -971,3 +997,7 @@ pub(super) fn configured_bytes(config: &config::Engine) -> Option<u64> {
     Map::<u32, driver::Account>::worst_case(count)?
         .checked_add(driver::worst_case(&limits)?.checked_mul(u64::from(count))?.checked_mul(2)?)
 }
+
+#[cfg(test)]
+#[path = "tests/accounts.rs"]
+mod tests;

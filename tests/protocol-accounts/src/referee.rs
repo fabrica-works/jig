@@ -95,7 +95,11 @@ impl Referee<Process> for Judge {
                 owner.became_usable(),
                 !matches!(
                     self.story,
-                    Story::DamagedRecord | Story::AccountSignInMissingScope | Story::AccountSignInFull
+                    Story::DamagedRecord
+                        | Story::RefusedGrant
+                        | Story::NoRecord
+                        | Story::AccountSignInMissingScope
+                        | Story::AccountSignInFull
                 ),
                 "the real child accepted its grant only with a readable record; account sign-in ended {:?}",
                 owner.account_sign_in_ended()
@@ -145,6 +149,9 @@ fn ends(story: Story, owner: &Owner, exchange_seen: bool, _answered: bool) -> bo
         Story::AccountSignInMissingScope => !owner.account_sign_in_ended().is_empty() && owner.account_removed(),
         Story::AccountSignInFull => !owner.account_sign_in_ended().is_empty(),
         Story::AccountSignOut { .. } => owner.account_removed(),
+        Story::RefusedRefresh | Story::RefusedGrant => {
+            owner.account_record_erased() && owner.child_heard().len() >= fixtures::wanted(story)
+        }
         Story::ClosedExchange => exchange_seen || owner.child_heard().len() >= fixtures::wanted(story),
         Story::Granted
         | Story::Refreshed
@@ -152,9 +159,9 @@ fn ends(story: Story, owner: &Owner, exchange_seen: bool, _answered: bool) -> bo
         | Story::HandedIn { .. }
         | Story::HandedInRejected
         | Story::RateLimitedRefresh
-        | Story::RefusedRefresh
         | Story::RejectedClient
-        | Story::DamagedRecord => owner.child_heard().len() >= fixtures::wanted(story),
+        | Story::DamagedRecord
+        | Story::NoRecord => owner.child_heard().len() >= fixtures::wanted(story),
     }
 }
 /// Whether the visitor's visit has its answer.

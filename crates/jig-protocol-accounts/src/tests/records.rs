@@ -141,3 +141,33 @@ fn a_stored_record_that_cannot_be_read_fails_its_source_as_unloaded() {
         Up::Child(accounts::FromComponent::Failed { account: ACCOUNT_CHAT, failure: accounts::Failure::SignInAgain })
     );
 }
+
+#[test]
+fn an_acknowledged_erase_forgets_the_record_and_retains_its_place() {
+    let mut records = Records::new(1);
+    let first = encoded(&record(ACCOUNT_CHAT, TOKEN_FIRST, 1));
+    assert!(records.load(ACCOUNT_CHAT, &first, &limits()).is_some());
+    drop(keep(&mut records, record(ACCOUNT_CHAT, TOKEN_SECOND, 2)));
+    records.erased(ACCOUNT_CHAT);
+    records.erased(ACCOUNT_CHAT);
+    records.erased(ACCOUNT_DELEGATE);
+    assert!(!records.keeping());
+    assert!(records.kept(ACCOUNT_CHAT).is_none());
+    assert!(records.admit(ACCOUNT_DELEGATE).is_err(), "the original place remains admitted");
+    let fresh = keep(&mut records, record(ACCOUNT_CHAT, TOKEN_SECOND, 3));
+    assert_eq!(fresh.replaces, None);
+    assert!(
+        records.kept(ACCOUNT_CHAT)
+            == Some(driver::Request::Kept { account: ACCOUNT_CHAT, generation: 3, keeping: driver::Keeping::Kept })
+    );
+    assert!(matches!(
+        records.up(fixtures::granted(ACCOUNT_CHAT, TOKEN_SECOND, 3, Duration::from_secs(60)), fixtures::NOW, b""),
+        Up::Granted { generation: 3, .. }
+    ));
+    assert!(records.load(ACCOUNT_CHAT, b"unread", &limits()).is_none());
+    records.erased(ACCOUNT_CHAT);
+    assert_eq!(
+        records.up(no_record(), fixtures::NOW, b""),
+        Up::Child(accounts::FromComponent::Failed { account: ACCOUNT_CHAT, failure: accounts::Failure::SignInAgain })
+    );
+}
