@@ -152,6 +152,9 @@ impl Core {
         }
         let mut asked = List::with_capacity(limits.batch);
         for member in batch {
+            if let Err(why) = crate::account_preference::executor(member.executor, member.llm.as_ref()) {
+                return Err(delegate_refused(None, why));
+            }
             if let Some(choice) = &member.llm
                 && choice.account.is_some()
             {

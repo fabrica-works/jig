@@ -9,6 +9,7 @@ use skein_lib::List;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RunWait {
     Account { account: Option<u32>, source: Option<u32>, why: accounts::WaitWhy },
+    InvalidAccount { account: u32, why: jig_domain_tasks::AccountWhy },
     Credential,
     Host,
 }
@@ -32,6 +33,13 @@ impl Core {
     pub fn run_choice(&self, task: u64) -> Result<RunChoice, RunWait> {
         let row = self.tasks.task(task).ok_or(RunWait::Host)?;
         let payer = self.tasks.payer(task).ok_or(RunWait::Host)?;
+        if row.kept_account.is_none()
+            && let jig_domain_tasks::Funder::Recurring { .. } = row.funder
+            && let Err(jig_domain_tasks::Refusal::Account { account, why }) =
+                self.account_preference(row.llm.as_ref(), payer, None)
+        {
+            return Err(RunWait::InvalidAccount { account, why });
+        }
         let coverage = self.account_coverage(payer);
         let policy = self.chosen_policy(task);
         let provider = self.provider(&policy.model).ok_or(account_wait(None))?;
@@ -42,14 +50,9 @@ impl Core {
         let mut excluded = None;
         if let Some(old) = row.kept_account
             && let Some(account) = self.accounts.account(old)
+            && let Some(accounts::State::Limited { .. }) = self.accounts.account_state(old)
         {
-            for fact in &self.accounts.account_views() {
-                if fact.account == old
-                    && let accounts::State::Limited { .. } = fact.state
-                {
-                    excluded = Some(accounts::Excluded { holder: account.holder(), provider: account.provider() });
-                }
-            }
+            excluded = Some(accounts::Excluded { holder: account.holder(), provider: account.provider() });
         }
         let mut unknown_program_logins = false;
         // Workers cannot establish the holder rule until their program half supplies facts.

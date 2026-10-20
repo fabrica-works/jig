@@ -130,10 +130,15 @@ pub(super) fn checked(
     if !proposing {
         super::deadlines::resolve(&mut members, env.wall);
     }
-    if let Err(why) = core.funded_accounts(
-        &members,
-        tasks::Funder::Pool { project: *project, person: *person, period: core.period(*project) },
-    ) {
+    let accounts = if proposing {
+        core.proposed_accounts(&members)
+    } else {
+        core.funded_accounts(
+            &members,
+            tasks::Funder::Pool { project: *project, person: *person, period: core.period(*project) },
+        )
+    };
+    if let Err(why) = accounts {
         return Err(core.account_refusal(why));
     }
     for _ in &members {

@@ -13,6 +13,12 @@ pub(super) fn waiting(value: Option<&w::TaskRunWait>) -> Option<c::TaskRunWait> 
                 w::TaskWaitWhy::Refreshing => c::TaskWaitWhy::Refreshing,
                 w::TaskWaitWhy::Host => c::TaskWaitWhy::Host,
                 w::TaskWaitWhy::Empty => c::TaskWaitWhy::Empty,
+                w::TaskWaitWhy::Invalid(row) => c::TaskWaitWhy::Invalid(match row.why() {
+                    w::AccountWhy::Unknown => c::AccountWhy::Unknown,
+                    w::AccountWhy::Provider => c::AccountWhy::Provider,
+                    w::AccountWhy::Uses => c::AccountWhy::Uses,
+                    w::AccountWhy::Limited => c::AccountWhy::Limited,
+                }),
                 w::TaskWaitWhy::Source(row) => c::TaskWaitWhy::Source(source_state(row.state())),
             },
         },

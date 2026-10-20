@@ -73,6 +73,7 @@ pub enum TaskWaitWhy {
     Refreshing,
     Host,
     Empty,
+    Invalid(AccountWhy),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TaskSourceState {

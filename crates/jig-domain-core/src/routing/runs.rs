@@ -288,9 +288,6 @@ pub(crate) fn named_propose(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
-    if let Err(why) = core.action_accounts(&action, tasks::Funder::Task(key.task)) {
-        return proposal_refused(core, to, key, why);
-    }
     if let Err(why) = core.proposal_admit_action(context.project, &action, env.wall) {
         return proposal_refused(core, to, key, why);
     }

@@ -17,6 +17,7 @@ pub enum TaskWaitWhy {
     Refreshing,
     Host,
     Empty,
+    Invalid(tasks::AccountWhy),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TaskSourceState {
@@ -48,6 +49,9 @@ pub(super) fn waiting(core: &Core, row: &tasks::TaskRecord) -> Option<TaskRunWai
     match core.run_choice(row.number) {
         Ok(_) if !core.credentials_ready(row.number) => Some(TaskRunWait::Credential),
         Ok(_) => None,
+        Err(RunWait::InvalidAccount { account, why }) => {
+            Some(TaskRunWait::Account { account: Some(account), source: None, why: TaskWaitWhy::Invalid(why) })
+        }
         Err(RunWait::Credential) => Some(TaskRunWait::Credential),
         Err(RunWait::Host) => Some(TaskRunWait::Host),
         Err(RunWait::Account { account, source, why }) => Some(TaskRunWait::Account {

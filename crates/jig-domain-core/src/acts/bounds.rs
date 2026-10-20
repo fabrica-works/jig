@@ -355,6 +355,9 @@ pub(crate) fn amendment_admit_in(
         };
         return Err(why);
     }
+    if let Err(why) = crate::account_preference::executor(row.executor, amendment.llm.as_ref()) {
+        return Err(core.account_refusal(why));
+    }
     if let Some(choice) = &amendment.llm
         && choice.account.is_some()
     {

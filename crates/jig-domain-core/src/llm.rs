@@ -23,17 +23,10 @@ impl Core {
         }
         for new in batch {
             let number = new.number;
-            self.default_llm(new, number, links.as_slice())?;
+            self.default_llm(new, number, links.as_slice(), None)?;
             if let Some(template) = &mut new.recurring {
-                let mut template_links =
-                    List::with_capacity(u32::try_from(template.batch.len()).expect("bounded template"));
-                for member in &template.batch {
-                    template_links
-                        .push(tasks::PayerLink { task: member.number, funder: member.funder })
-                        .expect("one template link");
-                }
                 for member in &mut template.batch {
-                    self.default_llm(member, number, template_links.as_slice())?;
+                    self.default_llm(member, number, &[], Some(tasks::Payer::Project(new.project)))?;
                 }
             }
         }
@@ -41,16 +34,24 @@ impl Core {
     }
 
     #[expect(clippy::result_large_err, reason = "the refusal keeps tasks' exact problem for the creator")]
-    fn default_llm(&self, new: &mut tasks::New, number: u64, links: &[tasks::PayerLink]) -> Result<(), tasks::Problem> {
+    fn default_llm(
+        &self,
+        new: &mut tasks::New,
+        number: u64,
+        links: &[tasks::PayerLink],
+        occurrence_payer: Option<tasks::Payer>,
+    ) -> Result<(), tasks::Problem> {
+        if let Err(why) = crate::account_preference::executor(new.executor, new.llm.as_ref()) {
+            return Err(tasks::Problem::new(Some(number), why));
+        }
         let charter = match new.executor {
             tasks::Executor::Agent { charter } => charter,
             tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => return Ok(()),
         };
         if let Some(choice) = &new.llm {
             if choice.account.is_some() {
-                let payer = self
-                    .tasks
-                    .prospective_payer(new.funder, links)
+                let payer = occurrence_payer
+                    .or(self.tasks.prospective_payer(new.funder, links))
                     .ok_or(tasks::Problem::new(Some(number), tasks::Refusal::Funding))?;
                 if let Err(why) = self.account_preference(Some(choice), payer, None) {
                     return Err(tasks::Problem::new(Some(number), why));
@@ -59,7 +60,7 @@ impl Core {
             return Ok(());
         }
         new.llm = self.tasks.default_llm(charter, new.authority.models);
-        if let Some(payer) = self.tasks.prospective_payer(new.funder, links)
+        if let Some(payer) = occurrence_payer.or(self.tasks.prospective_payer(new.funder, links))
             && let Some(choice) = &mut new.llm
         {
             let coverage = self.account_coverage(payer);

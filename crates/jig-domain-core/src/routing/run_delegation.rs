@@ -623,7 +623,9 @@ pub(super) fn start_recurring(
     for member in &mut template.batch {
         member.authority.models = authority.models;
     }
-    if !core.recurring_admit(project, &authority, &template) {
+    if !core.recurring_admit(project, &authority, &template)
+        || core.recurring_accounts(project, &template.batch).is_err()
+    {
         return;
     }
     let period = core.period(project);

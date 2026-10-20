@@ -194,6 +194,15 @@ pub(super) fn tag_tasks(
                 if checked.answer != authority::Answer::Allow {
                     continue;
                 }
+                // No per-occurrence refusal outcome exists. Invalid account hints become
+                // typed next-run waits on the created task (accounts.md, 4.3).
+                if let Err(why) = core.recurring_accounts(context.project, &template.batch) {
+                    if let tasks::Refusal::Account { .. } = why {
+                        // Keep this occurrence; run_choice rechecks the same facts for its wait.
+                    } else {
+                        continue;
+                    }
+                }
                 let mut numbers = List::with_capacity(env.limits.tasks.batch);
                 for _ in 0..members {
                     let Some(number) = crate::fresh(&mut core.counters, crate::Family::Task) else { break };
@@ -1416,10 +1425,10 @@ pub(super) fn route_task_escalation(core: &mut Core, env: &Env<Limits>, event: t
     tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, true, false)
 }
 
-pub(super) fn route_person_proposal(core: &mut Core, env: &Env<Limits>, mut event: tasks::Event) -> Requests {
+pub(super) fn route_person_proposal(core: &mut Core, env: &Env<Limits>, event: tasks::Event) -> Requests {
     let mut out = Queue::with_capacity(tasks::max_out(&env.limits.tasks));
-    if let tasks::Event::Make { batch, .. } | tasks::Event::MakeResultFollowups { batch, .. } = &mut event
-        && let Err(problem) = core.resolve_llm(batch)
+    if let tasks::Event::Make { batch, .. } | tasks::Event::MakeResultFollowups { batch, .. } = &event
+        && let Err(problem) = core.batch_accounts(batch)
     {
         let (tasks::Event::Make { reply_to, .. } | tasks::Event::MakeResultFollowups { reply_to, .. }) = event else {
             unreachable!("checked batch event")

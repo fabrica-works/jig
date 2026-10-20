@@ -203,6 +203,7 @@ impl Core {
         action: &tasks::ProposalAction,
         decision: Wall,
     ) -> Result<authority::Authority, tasks::Refusal> {
+        self.proposed_action_accounts(action)?;
         let Some(checked) = action_for_check(self, action, decision) else { return Err(tasks::Refusal::Executor) };
         let Some(needed) = authority::needs(&checked) else { return Err(tasks::Refusal::AuthorityShape) };
         let Some(policy) = self.authority.policy(project) else { return Err(tasks::Refusal::Project) };

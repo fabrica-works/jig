@@ -426,6 +426,15 @@ preparation is not authority for a later claim. Account/source waits retain the
 source's typed reason and optional reset, separately from host and application
 credential waits. With no reset, no polling deadline is invented.
 
+Recurring templates check explicit hints against the project's payer at start,
+regardless of their members' declared funders, and again before each occurrence.
+There is no per-occurrence refusal outcome yet. If an account has disappeared,
+changed provider or ceased to serve the project, the occurrence is created and
+its next run waits, naming the account and its typed admission reason in the
+Task document. This exceptional wait is rechecked from current facts; it does
+not silently choose a different account. A later occurrence-refusal outcome
+will replace this fallback.
+
 The grant number passed as smith's account is the selected **source** number.
 Changing sources within one billing account therefore conservatively causes
 smith's carry-over too: it preserves plain history, discards opaque replay and

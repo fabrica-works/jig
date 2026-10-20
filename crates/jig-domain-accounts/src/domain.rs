@@ -241,6 +241,15 @@ impl Domain {
     pub fn account(&self, number: u32) -> Option<&Account> {
         self.accounts.get(&number)
     }
+    /// State of the chosen or holding source, without allocating an account view list.
+    #[must_use]
+    pub fn account_state(&self, number: u32) -> Option<State> {
+        let source = match self.choose(self.accounts.get(&number)?) {
+            Choice::Usable(source) | Choice::Held(source) => source,
+            Choice::Empty => return None,
+        };
+        Some(fact(source, self.sources.get(&source).expect("chosen source is kept")).state)
+    }
     /// Borrow the bounded accounts in number order, without copying their state.
     #[must_use]
     pub const fn accounts_by_number(&self) -> &Map<u32, Account> {

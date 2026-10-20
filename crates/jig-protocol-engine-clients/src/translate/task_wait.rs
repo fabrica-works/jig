@@ -16,6 +16,17 @@ pub(super) fn waiting(value: Option<d::TaskRunWait>, limits: &w::Limits) -> Resu
                     d::TaskWaitWhy::Refreshing => w::TaskWaitWhy::Refreshing,
                     d::TaskWaitWhy::Host => w::TaskWaitWhy::Host,
                     d::TaskWaitWhy::Empty => w::TaskWaitWhy::Empty,
+                    d::TaskWaitWhy::Invalid(why) => w::TaskWaitWhy::Invalid(w::TaskWaitInvalid::new(
+                        limits,
+                        w::TaskWaitInvalidParts {
+                            why: match why {
+                                jig_domain_tasks::AccountWhy::Unknown => w::AccountWhy::Unknown,
+                                jig_domain_tasks::AccountWhy::Provider => w::AccountWhy::Provider,
+                                jig_domain_tasks::AccountWhy::Uses => w::AccountWhy::Uses,
+                                jig_domain_tasks::AccountWhy::Limited => w::AccountWhy::Limited,
+                            },
+                        },
+                    )?),
                     d::TaskWaitWhy::Source(state) => w::TaskWaitWhy::Source(w::TaskWaitSource::new(
                         limits,
                         w::TaskWaitSourceParts { state: source_state(state, limits)? },
