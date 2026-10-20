@@ -1797,6 +1797,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 
 /// Judge a connector's core part as its admitted party, without allocating another key.
 /// The caller completes this part before the application flight (domain/people.md, 5.1).
+/// Explicit model selectors refuse `Lack::Models`: parts carry no model-name context yet.
 pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, ask: Ask) -> Result<Request, Outcome> {
     let id = Id::from_token(request);
     let flight = domain.pending.get(id).ok_or(Outcome::Refused(Refusal::Unknown))?;
@@ -1870,6 +1871,9 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     }
     if !valid_ask(&env.limits, &ask) {
         return Err(Outcome::Refused(invalid_ask(&env.limits, &ask)));
+    }
+    if crate::models::has_model_selector(&ask) {
+        return Err(Outcome::Refused(Refusal::Authority { lacking: crate::Lack::Models, proposable: None }));
     }
     let person = flight.key.person;
     let role = role(domain, person, application_project);

@@ -263,18 +263,18 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
     );
 }
 #[test]
-#[expect(
-    clippy::disallowed_macros,
-    clippy::disallowed_methods,
-    reason = "this ordinary drift test refreshes its committed memory sum only under SKEIN_CODEGEN_WRITE"
-)]
 fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
     // Worker program sources add 6,723,936 bytes: the hub's and the fleet's source records
     // and pending replacements, their channel and routed output room, and the journal
     // writes and KV operations an extra Sources output at hello needs.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_662_179_031 });
+    // Named authority selectors add 14,819,720 bytes over main: 12,632,064 for the
+    // 32 answered and 16 pending payload name-context envelopes (48 * 263,168),
+    // 526,336 for one routed Event and its people::Request::Route (2 * 263,168),
+    // and 1,661,320 for native selector tags, name-list carriers and their derived
+    // retained-storage and queue envelopes. People's pending clone is priced there.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_676_998_751 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

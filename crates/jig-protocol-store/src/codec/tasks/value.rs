@@ -572,9 +572,14 @@ pub fn read_pattern(value: wire::Pattern) -> domain::Pattern {
     domain::Pattern { segments: members.into_boxed(), last }
 }
 /// Translate authority, checking bytes shared by grants and note resources.
-pub fn authority(value: &domain::Authority, limits: &wire::Limits) -> Result<wire::Authority, wire::Problem> {
+pub fn authority(
+    value: &domain::Authority,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::Authority, wire::Problem> {
     check_authority(value, limits)?;
     let domain::Authority { tools, models, grants, delegation, budget, notes, note_resources } = value;
+    let models = super::models::selector(*models, moved);
     let mut translated_grants = List::with_capacity(limits.authority_grants);
     for grant in grants {
         let domain::Grant { connector, kind, pattern: value } = grant;

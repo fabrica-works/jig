@@ -31,7 +31,7 @@ fn a_recurring_template_reads_back_one_level_deep() {
     use crate::{codec::tasks::phase, tasks_v5::Creation};
     let mut source = fixtures::task_creation(59);
     source.recurring = Some(Box::new(fixtures::task_template()));
-    let encoded = phase::new(&source, &tasks_limits()).expect("one level is supported");
+    let encoded = phase::new(&source, &tasks_limits(), None).expect("one level is supported");
     let encoded = saved_wire(encoded, Creation::measure, Creation::encode, Creation::decode);
     assert_eq!(phase::read_new(encoded, &tasks_limits()), Ok(source));
 }
@@ -40,7 +40,7 @@ fn a_template_member_holding_a_template_is_refused() {
     let mut source = fixtures::task_template();
     source.batch.get_mut(0).expect("first member").recurring = Some(Box::new(fixtures::task_template()));
     assert_eq!(
-        crate::codec::tasks::phase::template(&source, &tasks_limits()),
+        crate::codec::tasks::phase::template(&source, &tasks_limits(), None),
         Err(bound_problem(crate::tasks_v5::Path::CreationRecurring))
     );
 }
@@ -172,7 +172,7 @@ fn a_decoded_result_past_its_shared_byte_bound_is_refused() {
 
 fn saved_proposal(source: &jig_domain_tasks::Proposal) -> Result<jig_domain_tasks::Proposal, crate::tasks_v5::Problem> {
     use crate::{codec::tasks::proposals, tasks_v5::Proposal};
-    let encoded = proposals::proposal(source, &tasks_limits())?;
+    let encoded = proposals::proposal(source, &tasks_limits(), None)?;
     let encoded = saved_wire(encoded, Proposal::measure, Proposal::encode, Proposal::decode);
     proposals::read_proposal(encoded, &tasks_limits())
 }
@@ -230,7 +230,7 @@ fn an_amendment_without_replacements_reads_back() {
         llm: None,
         reason: Box::new([]),
     };
-    let encoded = proposals::amendment(&source, &tasks_limits()).expect("absent replacements fit");
+    let encoded = proposals::amendment(&source, &tasks_limits(), None).expect("absent replacements fit");
     let encoded = saved_wire(encoded, Amendment::measure, Amendment::encode, Amendment::decode);
     assert_eq!(proposals::read_amendment(encoded, &tasks_limits()), Ok(source));
 }
@@ -335,7 +335,7 @@ fn tracking_amendments_read_back() {
     for tracked in [None, Some(Tracking::Untracked), Some(Tracking::Tracked { priority: 7 })] {
         let mut source = fixtures::task_amendment();
         source.tracked = tracked;
-        let encoded = proposals::amendment(&source, &tasks_limits()).unwrap();
+        let encoded = proposals::amendment(&source, &tasks_limits(), None).unwrap();
         let encoded = saved_wire(encoded, Amendment::measure, Amendment::encode, Amendment::decode);
         assert_eq!(proposals::read_amendment(encoded, &tasks_limits()), Ok(source), "{tracked:?}");
     }

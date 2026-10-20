@@ -252,7 +252,7 @@ fn saved_authority(
     value: &jig_domain_tasks::Authority,
 ) -> Result<jig_domain_tasks::Authority, crate::tasks_v5::Problem> {
     use crate::{codec::tasks::value as translate, tasks_v5::Authority};
-    let value = translate::authority(value, &tasks_limits())?;
+    let value = translate::authority(value, &tasks_limits(), None)?;
     let value = saved_wire(value, Authority::measure, Authority::encode, Authority::decode);
     translate::read_authority(value, &tasks_limits())
 }
@@ -428,7 +428,7 @@ fn authority_past_shared_bytes() -> jig_domain_tasks::Authority {
 }
 fn grants_and_note_resources_past_their_shared_byte_bound_are_refused() {
     assert_eq!(
-        crate::codec::tasks::value::authority(&authority_past_shared_bytes(), &tasks_limits()),
+        crate::codec::tasks::value::authority(&authority_past_shared_bytes(), &tasks_limits(), None),
         Err(bound_problem(crate::tasks_v5::Path::AuthorityGrants)),
     );
 }
@@ -436,7 +436,7 @@ fn decoded_grants_and_note_resources_past_their_shared_byte_bound_are_refused() 
     use crate::codec::tasks::value as translate;
     let mut wider = tasks_limits();
     wider.authority_segment_bytes = 33;
-    let encoded = translate::authority(&authority_past_shared_bytes(), &wider).expect("within wider limit");
+    let encoded = translate::authority(&authority_past_shared_bytes(), &wider, None).expect("within wider limit");
     assert_eq!(
         translate::read_authority(encoded, &tasks_limits()),
         Err(bound_problem(crate::tasks_v5::Path::AuthorityGrants))
@@ -1068,4 +1068,134 @@ fn pending_policy_proposal_members_follow_names_on_restore() {
         crate::codec::tasks::decode(&bytes, &limits, &removed),
         Ok(t::Stored::PersonProposal(Box::new(proposal)))
     );
+}
+
+#[test]
+fn unrelated_tasks_rows_keep_no_model_names_or_configuration_bytes() {
+    use jig_domain_tasks as t;
+    let limits = tasks_limits();
+    let names = fixtures::model_names(&[b"unreferenced-model", b"another-model"]);
+    for row in [
+        t::Stored::Ledger(fixtures::task_funding()),
+        t::Stored::ClosedLedger(fixtures::task_funding()),
+        t::Stored::Writer(fixtures::task_writer()),
+        t::Stored::Pool(t::PoolSlots { number: 1, pool: fixtures::task_name(), slots: 1 }),
+        t::Stored::Delegate(t::Edge { requester: 1, task: 2 }),
+    ] {
+        let bytes = crate::codec::tasks::encode(&row, &limits, &names).unwrap();
+        assert_eq!(bytes, crate::codec::tasks::encode(&row, &limits, &[]).unwrap());
+        let wire = crate::tasks_v5::Row::decode(&limits, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert!(wire.models().is_empty());
+        assert_eq!(crate::codec::tasks::decode(&bytes, &limits, &names), Ok(row));
+    }
+}
+#[test]
+fn tasks_context_contains_only_canonical_referenced_names_with_reindexed_selectors() {
+    use jig_domain_tasks as t;
+    let limits = tasks_limits();
+    let mut same = None;
+    for (names, mask) in [
+        (fixtures::model_names(&[b"z", b"unused", b"a"]), 0b101),
+        (fixtures::model_names(&[b"a", b"z", b"unused"]), 0b011),
+        (fixtures::model_names(&[b"unused", b"a", b"z"]), 0b110),
+    ] {
+        let mut proposal = fixtures::task_person_proposal();
+        let t::PersonAction::Batch(batch) = &mut proposal.action else { panic!("batch") };
+        batch[0].authority.models = t::Models::Named(mask);
+        let row = t::Stored::PersonProposal(Box::new(proposal));
+        let bytes = crate::codec::tasks::encode(&row, &limits, &names).unwrap();
+        let wire = crate::tasks_v5::Row::decode(&limits, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(wire.models().len(), 2);
+        assert_eq!(wire.models().get(0).unwrap().value(), b"a");
+        assert_eq!(wire.models().get(1).unwrap().value(), b"z");
+        if let Some(same) = &same {
+            assert_eq!(&bytes, same);
+        } else {
+            same = Some(bytes.clone());
+        }
+        assert_eq!(crate::codec::tasks::decode(&bytes, &limits, &names), Ok(row));
+    }
+    let mut proposal = fixtures::task_person_proposal();
+    for selector in [t::Models::ALL, t::Models::NONE] {
+        let t::PersonAction::Batch(batch) = &mut proposal.action else { panic!("batch") };
+        batch[0].authority.models = selector;
+        let row = t::Stored::PersonProposal(Box::new(proposal.clone()));
+        let names = fixtures::model_names(&[b"z", b"unused", b"a"]);
+        let bytes = crate::codec::tasks::encode(&row, &limits, &names).unwrap();
+        let wire = crate::tasks_v5::Row::decode(&limits, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert!(wire.models().is_empty());
+        assert_eq!(crate::codec::tasks::decode(&bytes, &limits, &names), Ok(row));
+    }
+}
+
+#[test]
+fn tasks_named_all_64_keeps_its_names_and_literal_all_keeps_none() {
+    use jig_domain_tasks as t;
+    let limits = tasks_limits();
+    let mut names = skein_lib::List::with_capacity(64);
+    for at in 0_u8..64 {
+        let mut name = skein_lib::bytes::zeroed(usize::try_from(jig_domain_core::MODEL_NAME_BYTES).unwrap());
+        name.fill(b'0'.checked_add(at).unwrap());
+        names.push(name).unwrap();
+    }
+    let names = names.into_boxed();
+    let mut encoded = skein_lib::List::with_capacity(2);
+    for selector in [t::Models::ALL, t::Models::Named(u64::MAX)] {
+        let mut proposal = fixtures::task_person_proposal();
+        let t::PersonAction::Batch(batch) = &mut proposal.action else { panic!("batch") };
+        batch[0].authority.models = selector;
+        let row = t::Stored::PersonProposal(Box::new(proposal));
+        let bytes = crate::codec::tasks::encode(&row, &limits, &names).unwrap();
+        let wire = crate::tasks_v5::Row::decode(&limits, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(wire.models().len(), if selector.is_all() { 0 } else { 64 });
+        assert!(u64::try_from(bytes.len()).unwrap() <= crate::tasks_v5::Row::worst_case_bytes(&limits).unwrap());
+        assert_eq!(crate::codec::tasks::decode(&bytes, &limits, &names), Ok(row));
+        let now = Box::new([names[0].clone(), Box::<[u8]>::from(b"new".as_slice())]);
+        let decoded = crate::codec::tasks::decode(&bytes, &limits, now.as_ref()).unwrap();
+        let t::Stored::PersonProposal(proposal) = decoded else { panic!("proposal") };
+        let t::PersonAction::Batch(batch) = proposal.action else { panic!("batch") };
+        assert_eq!(batch[0].authority.models, if selector.is_all() { t::Models::ALL } else { t::Models::Named(1) });
+        encoded.push(bytes.len()).unwrap();
+    }
+    assert_eq!(
+        *encoded.get(1).unwrap() - *encoded.get(0).unwrap(),
+        64 * (4 + usize::try_from(jig_domain_core::MODEL_NAME_BYTES).unwrap())
+    );
+}
+
+#[test]
+fn canonical_tasks_context_reindexes_live_recurring_proposals_and_history() {
+    use jig_domain_tasks as t;
+    let limits = tasks_limits();
+    let names = fixtures::model_names(&[b"z", b"unused", b"a"]);
+    let mut task = fixtures::task_record();
+    task.authority.models = t::Models::Named(1);
+    task.recurring.as_mut().unwrap().template.batch[0].authority.models = t::Models::Named(4);
+    task.proposal.as_mut().unwrap().action =
+        t::ProposalAction::Widen { task: 17, authority: fixtures::task_authority() };
+    let t::ProposalAction::Widen { authority, .. } = &mut task.proposal.as_mut().unwrap().action else {
+        panic!("widen")
+    };
+    authority.models = t::Models::Named(5);
+    let mut history = fixtures::task_history();
+    history.amendment.as_mut().unwrap().before.authority.models = t::Models::Named(1);
+    history.amendment.as_mut().unwrap().after.authority.models = t::Models::Named(4);
+    let mut proposal = fixtures::task_person_proposal();
+    let mut amendment = fixtures::task_amendment();
+    amendment.authority.as_mut().unwrap().models = t::Models::Named(5);
+    proposal.action = t::PersonAction::Amend { task: 17, revision: 3, amendment: Box::new(amendment) };
+    for row in [
+        t::Stored::Live(Box::new(task.clone())),
+        t::Stored::Ended(Box::new(task)),
+        t::Stored::History(history),
+        t::Stored::PersonProposal(Box::new(proposal.clone())),
+        t::Stored::DecidedProposal(Box::new(proposal)),
+    ] {
+        let bytes = crate::codec::tasks::encode(&row, &limits, &names).unwrap();
+        let wire = crate::tasks_v5::Row::decode(&limits, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(wire.models().len(), 2);
+        assert_eq!(wire.models().get(0).unwrap().value(), b"a");
+        assert_eq!(wire.models().get(1).unwrap().value(), b"z");
+        assert_eq!(crate::codec::tasks::decode(&bytes, &limits, &names), Ok(row));
+    }
 }

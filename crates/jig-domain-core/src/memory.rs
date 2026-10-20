@@ -398,7 +398,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(context)?
         .checked_add(u64::from(task.message_bytes.max(task.result_bytes)).checked_mul(field_size.checked_add(1)?)?)?
         .checked_add(limits.policy_bytes)?
-        .checked_add(people::model_names_worst_case()?)?
         .checked_add(u64::from(limits.run_bytes))?
         .checked_add(u64::from(task.message_bytes))?
         .checked_add(u64::from(limits.brief.brief_bytes))?
@@ -422,5 +421,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(Queue::<Request>::worst_case(route.writes.checked_add(1)?)?)?;
     total = total.checked_add(bytes(route.writes, payload)?)?;
     total = total.checked_add(bytes(limits.load_slots, payload)?)?;
+    // One named client decision holds its routed Event and its emitted people::Request::Route.
+    // People already prices the retained Pending clone in people::worst_case; core keeps none.
+    total = total.checked_add(people::model_names_worst_case()?.checked_mul(2)?)?;
     Some(total)
 }

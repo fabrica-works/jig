@@ -348,9 +348,10 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 
 // 19.s3: application key2078/value4304, one orphan erase, 256 MiB map.
 // Nine choices plus the kept pin add ten optional u32s (50 bytes) to the largest tasks row.
+// The largest tasks row can reference all 64 names; sparse and ALL rows keep only used names.
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
-    value: 1_305_193,
+    value: 1_567_606,
     ops: 37_115,
     commit: 345_931_602,
     queued: 3,
@@ -358,8 +359,8 @@ pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     budget: 268_435_456,
     segment: 691_863_204,
     snapshot_after: 345_931_602,
-    chunk: 1_307_292,
-    page: skein_kv::Page { rows: 2, bytes: 1_307_272 },
+    chunk: 1_569_705,
+    page: skein_kv::Page { rows: 2, bytes: 1_569_685 },
     deadline: Duration::from_secs(30),
 };
 pub(super) const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {

@@ -1,4 +1,4 @@
-//! Proposals and immutable task history (protocol/store.md, 5.1).
+//! Proposals and immutable task history (protocol/store.md, 5.1, None).
 use super::{phase, value};
 use crate::tasks_v5 as wire;
 use alloc::boxed::Box;
@@ -120,7 +120,11 @@ pub fn read_address_change(
 }
 
 /// Translate `Amendment` to its store record.
-pub fn amendment(source: &domain::Amendment, limits: &wire::Limits) -> Result<wire::Amendment, wire::Problem> {
+pub fn amendment(
+    source: &domain::Amendment,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::Amendment, wire::Problem> {
     let domain::Amendment {
         tracked,
         addressed,
@@ -143,7 +147,7 @@ pub fn amendment(source: &domain::Amendment, limits: &wire::Limits) -> Result<wi
             spec: optional_spec(spec.as_ref(), limits)?,
             wake: optional_wake(wake.as_ref(), limits)?,
             dependencies: optional_dependencies(dependencies.as_deref(), limits)?,
-            authority: optional_authority(authority.as_ref(), limits)?,
+            authority: optional_authority(authority.as_ref(), limits, moved)?,
             llm: value::llm(llm.as_ref(), limits)?,
             reason: reason.clone(),
         },
@@ -178,18 +182,22 @@ pub fn read_amendment(source: wire::Amendment, limits: &wire::Limits) -> Result<
 }
 
 /// Translate `ProposalAction` to its store value.
-pub fn action(source: &domain::ProposalAction, limits: &wire::Limits) -> Result<wire::ProposalAction, wire::Problem> {
+pub fn action(
+    source: &domain::ProposalAction,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::ProposalAction, wire::Problem> {
     Ok(match source {
         domain::ProposalAction::Batch(value) => wire::ProposalAction::Batch(wire::ProposedBatch::new(
             limits,
-            wire::ProposedBatchParts { members: batch(value, limits)? },
+            wire::ProposedBatchParts { members: batch(value, limits, moved)? },
         )?),
         domain::ProposalAction::Effect { connector, authority, attempt, completion, position, purpose } => {
             wire::ProposalAction::Effect(wire::ProposedEffect::new(
                 limits,
                 wire::ProposedEffectParts {
                     connector: *connector,
-                    authority: value::authority(authority, limits)?,
+                    authority: value::authority(authority, limits, moved)?,
                     attempt: *attempt,
                     completion: *completion,
                     position: *position,
@@ -202,7 +210,7 @@ pub fn action(source: &domain::ProposalAction, limits: &wire::Limits) -> Result<
                 limits,
                 wire::ProposedProcedureEffectParts {
                     connector: *connector,
-                    authority: value::authority(authority, limits)?,
+                    authority: value::authority(authority, limits, moved)?,
                     step: *step,
                     purpose: *purpose,
                 },
@@ -214,13 +222,13 @@ pub fn action(source: &domain::ProposalAction, limits: &wire::Limits) -> Result<
                 wire::ProposedAmendmentParts {
                     task: *task,
                     revision: *revision,
-                    amendment: self::amendment(amendment, limits)?,
+                    amendment: self::amendment(amendment, limits, moved)?,
                 },
             )?))
         }
         domain::ProposalAction::Widen { task, authority } => wire::ProposalAction::Widen(wire::ProposedWidening::new(
             limits,
-            wire::ProposedWideningParts { task: *task, authority: value::authority(authority, limits)? },
+            wire::ProposedWideningParts { task: *task, authority: value::authority(authority, limits, moved)? },
         )?),
         domain::ProposalAction::Release { task } => {
             wire::ProposalAction::Release(wire::Task::new(limits, wire::TaskParts { task: *task })?)
@@ -274,7 +282,11 @@ pub fn read_action(
 }
 
 /// Translate `Proposal` to its store record.
-pub fn proposal(source: &domain::Proposal, limits: &wire::Limits) -> Result<wire::Proposal, wire::Problem> {
+pub fn proposal(
+    source: &domain::Proposal,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::Proposal, wire::Problem> {
     let domain::Proposal { number, proposer, project, action, reason, as_holder, state } = source;
     wire::Proposal::new(
         limits,
@@ -282,7 +294,7 @@ pub fn proposal(source: &domain::Proposal, limits: &wire::Limits) -> Result<wire
             number: *number,
             proposer: *proposer,
             project: *project,
-            action: self::action(action, limits)?,
+            action: self::action(action, limits, moved)?,
             reason: reason.clone(),
             as_holder: *as_holder,
             state: self::state(state, limits)?,
@@ -333,7 +345,11 @@ pub fn read_change(source: wire::Change, _limits: &wire::Limits) -> Result<domai
 }
 
 /// Translate `Settings` to its store record.
-pub fn settings(source: &domain::Settings, limits: &wire::Limits) -> Result<wire::Settings, wire::Problem> {
+pub fn settings(
+    source: &domain::Settings,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::Settings, wire::Problem> {
     let domain::Settings { tracked, addressed, taken_by, instructions, spec, wake, dependencies, authority, llm } =
         source;
     wire::Settings::new(
@@ -346,7 +362,7 @@ pub fn settings(source: &domain::Settings, limits: &wire::Limits) -> Result<wire
             spec: value::spec(spec, limits)?,
             wake: phase::wake(wake, limits)?,
             dependencies: self::dependencies(dependencies, limits)?,
-            authority: value::authority(authority, limits)?,
+            authority: value::authority(authority, limits, moved)?,
             llm: value::llm(llm.as_ref(), limits)?,
         },
     )
@@ -372,11 +388,15 @@ pub fn read_settings(source: wire::Settings, limits: &wire::Limits) -> Result<do
 pub fn amendment_history(
     source: &domain::AmendmentHistory,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<wire::AmendmentHistory, wire::Problem> {
     let domain::AmendmentHistory { before, after } = source;
     wire::AmendmentHistory::new(
         limits,
-        wire::AmendmentHistoryParts { before: settings(before, limits)?, after: settings(after, limits)? },
+        wire::AmendmentHistoryParts {
+            before: settings(before, limits, moved)?,
+            after: settings(after, limits, moved)?,
+        },
     )
 }
 /// Read `AmendmentHistory` from its store record.
@@ -389,7 +409,11 @@ pub fn read_amendment_history(
 }
 
 /// Translate `History` to its store record.
-pub fn history(source: &domain::History, limits: &wire::Limits) -> Result<wire::History, wire::Problem> {
+pub fn history(
+    source: &domain::History,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::History, wire::Problem> {
     let domain::History { task, revision, by, change, reason, proposal, at, amendment } = source;
     wire::History::new(
         limits,
@@ -399,9 +423,9 @@ pub fn history(source: &domain::History, limits: &wire::Limits) -> Result<wire::
             by: value::party(by, limits)?,
             change: self::change(change, limits)?,
             reason: reason.clone(),
-            proposal: optional_proposal(proposal.as_deref(), limits)?,
+            proposal: optional_proposal(proposal.as_deref(), limits, moved)?,
             at: at.as_nanos(),
-            amendment: optional_amendment_history(amendment.as_deref(), limits)?,
+            amendment: optional_amendment_history(amendment.as_deref(), limits, moved)?,
         },
     )
 }
@@ -481,12 +505,13 @@ pub fn read_person_state(
 pub fn person_proposal(
     source: &domain::PersonProposal,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<wire::PersonProposal, wire::Problem> {
     let domain::PersonProposal { number, proposer, project, action, reason, state } = source;
     let action = match action {
         domain::PersonAction::Batch(members) => wire::PersonAction::Batch(wire::ProposedBatch::new(
             limits,
-            wire::ProposedBatchParts { members: batch(members, limits)? },
+            wire::ProposedBatchParts { members: batch(members, limits, moved)? },
         )?),
         domain::PersonAction::Amend { task, revision, amendment } => {
             wire::PersonAction::Amend(Box::new(wire::ProposedAmendment::new(
@@ -494,7 +519,7 @@ pub fn person_proposal(
                 wire::ProposedAmendmentParts {
                     task: *task,
                     revision: *revision,
-                    amendment: self::amendment(amendment, limits)?,
+                    amendment: self::amendment(amendment, limits, moved)?,
                 },
             )?))
         }
@@ -548,10 +573,14 @@ pub fn read_milestone(source: wire::Milestone, limits: &wire::Limits) -> Result<
     Ok(domain::Milestone { task, position, phase: phase::read_phase(phase, limits)?, at: Wall::from_nanos(at) })
 }
 
-fn batch(source: &[domain::New], limits: &wire::Limits) -> Result<List<wire::Creation>, wire::Problem> {
+fn batch(
+    source: &[domain::New],
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<List<wire::Creation>, wire::Problem> {
     let mut members = List::with_capacity(limits.proposed_batch_members);
     for item in source {
-        let item = phase::new(item, limits)?;
+        let item = phase::new(item, limits, moved)?;
         if members.push(item).is_err() {
             return Err(wire::Problem { path: wire::Path::ProposedBatchMembers, reason: skein_codec::Reason::Bound });
         }
@@ -662,9 +691,10 @@ fn read_optional_wake(
 fn optional_authority(
     source: Option<&domain::Authority>,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<Option<wire::Authority>, wire::Problem> {
     match source {
-        Some(value) => Ok(Some(value::authority(value, limits)?)),
+        Some(value) => Ok(Some(value::authority(value, limits, moved)?)),
         None => Ok(None),
     }
 }
@@ -681,9 +711,10 @@ fn read_optional_authority(
 fn optional_proposal(
     source: Option<&domain::Proposal>,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<Option<wire::Proposal>, wire::Problem> {
     match source {
-        Some(value) => Ok(Some(proposal(value, limits)?)),
+        Some(value) => Ok(Some(proposal(value, limits, moved)?)),
         None => Ok(None),
     }
 }
@@ -700,9 +731,10 @@ fn read_optional_proposal(
 fn optional_amendment_history(
     source: Option<&domain::AmendmentHistory>,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<Option<wire::AmendmentHistory>, wire::Problem> {
     match source {
-        Some(value) => Ok(Some(amendment_history(value, limits)?)),
+        Some(value) => Ok(Some(amendment_history(value, limits, moved)?)),
         None => Ok(None),
     }
 }

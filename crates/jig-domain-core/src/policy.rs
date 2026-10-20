@@ -342,7 +342,7 @@ impl Core {
                     let models = authority::Models::from_parts(models.bits(), models.is_all());
                     if !models.at_most(policy.ceiling.models) || !models.at_most(self.authority.rules().ceiling.models)
                     {
-                        return Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape });
+                        return Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Models });
                     }
                 }
             }

@@ -495,7 +495,11 @@ pub(super) fn read_references(source: List<wire::Number>) -> Box<[u64]> {
     }
     members.into_boxed()
 }
-fn member(source: &domain::New, limits: &wire::Limits) -> Result<wire::Member, wire::Problem> {
+fn member(
+    source: &domain::New,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::Member, wire::Problem> {
     let domain::New {
         label,
         flags,
@@ -533,7 +537,7 @@ fn member(source: &domain::New, limits: &wire::Limits) -> Result<wire::Member, w
             llm: value::llm(llm.as_ref(), limits)?,
             spec: value::spec(spec, limits)?,
             contract: value::contract(contract, limits)?,
-            authority: value::authority(authority, limits)?,
+            authority: value::authority(authority, limits, moved)?,
             deadline: match deadline {
                 domain::Deadline::Named => wire::Deadline::Named,
                 domain::Deadline::Span(value) => {
@@ -596,12 +600,16 @@ fn read_member(source: wire::Member, limits: &wire::Limits) -> Result<domain::Ne
     })
 }
 /// Translate one creation, including its optional one-level template.
-pub fn new(source: &domain::New, limits: &wire::Limits) -> Result<wire::Creation, wire::Problem> {
+pub fn new(
+    source: &domain::New,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::Creation, wire::Problem> {
     let recurring = match &source.recurring {
-        Some(value) => Some(template(value, limits)?),
+        Some(value) => Some(template(value, limits, moved)?),
         None => None,
     };
-    wire::Creation::new(limits, wire::CreationParts { member: member(source, limits)?, recurring })
+    wire::Creation::new(limits, wire::CreationParts { member: member(source, limits, moved)?, recurring })
 }
 /// Read one creation, including its optional one-level template.
 pub fn read_new(source: wire::Creation, limits: &wire::Limits) -> Result<domain::New, wire::Problem> {
@@ -617,6 +625,7 @@ pub fn read_new(source: wire::Creation, limits: &wire::Limits) -> Result<domain:
 pub fn template(
     source: &domain::RecurringTemplate,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<wire::RecurringTemplate, wire::Problem> {
     let domain::RecurringTemplate { key, batch, overlap: rule } = source;
     let mut members = List::with_capacity(limits.recurring_template_batch);
@@ -624,7 +633,7 @@ pub fn template(
         if item.recurring.is_some() {
             return Err(problem(wire::Path::CreationRecurring));
         }
-        let item = member(item, limits)?;
+        let item = member(item, limits, moved)?;
         if members.push(item).is_err() {
             return Err(problem(wire::Path::RecurringTemplateBatch));
         }

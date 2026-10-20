@@ -400,7 +400,7 @@ pub(super) fn encode_result_followups(
         tasks::ResultFollowups::Proposal(value) => {
             wire::ResultFollowups::Proposal(Box::new(wire::ResultFollowupsProposal::new(
                 limits,
-                wire::ResultFollowupsProposalParts { value: super::proposals::proposal(value, limits)? },
+                wire::ResultFollowupsProposalParts { value: super::proposals::proposal(value, limits, None)? },
             )?))
         }
     })
@@ -498,7 +498,7 @@ fn encode_result_followups_delegates_value(
         Err(error) => return Err(too_large(error)),
     });
     for value in values {
-        result.push(super::phase::new(value, limits)?).expect("same number of members");
+        result.push(super::phase::new(value, limits, None)?).expect("same number of members");
     }
     Ok(result)
 }

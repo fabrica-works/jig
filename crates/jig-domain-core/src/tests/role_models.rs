@@ -110,7 +110,7 @@ fn an_explicit_role_past_the_ceiling_refuses_the_entire_edit() {
         });
         assert_eq!(
             core.change_policy(&limits(), 1, 1, change),
-            Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape })
+            Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Models })
         );
         assert_eq!(core.authority.policy(1), Some(&policy));
     }

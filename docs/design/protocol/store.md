@@ -239,7 +239,7 @@ secrets' store (section 9).
   family (version 5) keeps one bounded name context per policy row or retained
   ask. Tagged authority masks reference that context, including nested Create members, Amend, compound operations,
   proposals and ChangePolicy roles. A retained ask's names are unique and sorted by their
-  bytes (effective snapshot contexts follow configuration order), at most 64, each at most 4,096 UTF-8 bytes; these retained names
+  bytes (policy snapshot contexts follow configuration order), at most 64, each at most 4,096 UTF-8 bytes; these retained names
   are priced separately from an authority's other bounded payload.
   Omission is distinct too: Create defaults to the creator's models,
   Amend keeps the target's, an edited role keeps its models and a new
@@ -254,10 +254,12 @@ secrets' store (section 9).
   error; only literal ALL gains a newly configured model. Answers and
   pending proposals retain their identity and outcome. A policy row
   holds no ceiling: each start restores it under configuration's.
-  The tasks family's version 5 rows retain a bounded configuration-name
-  context too: live/ended authorities, pending or decided proposals,
-  recurring members and amendment history remap effective masks on load.
-  These are effective snapshots; the original keyed ask remains people's.
+  The tasks family's version 5 rows retain only names their own named
+  selectors reference, in canonical byte order, with masks reindexed to
+  that context. Literal ALL and unrelated variants retain no names.
+  Live/ended authorities, pending or decided proposals, recurring members
+  and amendment history remap effective masks on load. These are effective
+  snapshots; the original keyed ask remains people's.
 - **Golden bytes** per family and version; a fuzz target per family's
   decoder; bounds at their limit and one past it.
 

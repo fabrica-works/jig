@@ -343,7 +343,7 @@ pub const EFFORTS: u32 = 16;
 pub const EFFORT_BYTES: u32 = 32;
 /// The most bytes in a configured model's name, configuration's bound on a text
 /// (configuration.md, 3).
-pub const MODEL_NAME_BYTES: u32 = 4_096;
+pub use jig_domain_people::MODEL_NAME_BYTES;
 
 /// Root-owned charter policy, independent of Smith's run vocabulary.
 #[derive(Clone, PartialEq, Eq, Debug)]

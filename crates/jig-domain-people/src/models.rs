@@ -228,3 +228,76 @@ pub fn valid_model_context(ask: &Ask, names: &[Box<[u8]>]) -> bool {
         .unwrap_or(0);
     bits == mask
 }
+
+/// Application parts have no model-name carrier; explicit selectors need that capability.
+pub(crate) fn has_model_selector(ask: &Ask) -> bool {
+    match ask {
+        Ask::Create { batch, .. } => members_have_selector(batch),
+        Ask::Amend { amendment, .. } => amendment_has_selector(amendment),
+        Ask::Propose { action, .. } => match action {
+            Action::Batch(batch) => members_have_selector(batch),
+            Action::Amend { amendment, .. } => amendment_has_selector(amendment),
+        },
+        Ask::Compound { operations, .. } => {
+            for operation in operations {
+                match operation {
+                    Operation::Amend { amendment, .. } => {
+                        if amendment_has_selector(amendment) {
+                            return true;
+                        }
+                    }
+                    Operation::Cancel { .. }
+                    | Operation::Move { .. }
+                    | Operation::Release { .. }
+                    | Operation::Message { .. }
+                    | Operation::Stop { .. } => {}
+                }
+            }
+            false
+        }
+        Ask::ChangePolicy { change, .. } => match change {
+            PolicyChange::Role(role) => role.authority.models.is_some(),
+            PolicyChange::ProjectSpend { .. }
+            | PolicyChange::Requirements { .. }
+            | PolicyChange::Projections { .. }
+            | PolicyChange::Permissions { .. }
+            | PolicyChange::Templates { .. } => false,
+        },
+        Ask::MarkSeen { .. }
+        | Ask::Application { .. }
+        | Ask::EditNote { .. }
+        | Ask::MakeService { .. }
+        | Ask::Adopt { .. }
+        | Ask::Withdraw { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Release { .. }
+        | Ask::TakePerson { .. }
+        | Ask::HandBackPerson { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Move { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::Say { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::SetRoles { .. }
+        | Ask::SetPool { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. }
+        | Ask::AccountChange { .. } => false,
+    }
+}
+fn members_have_selector(batch: &[Member]) -> bool {
+    for member in batch {
+        if member.authority.models.is_some() {
+            return true;
+        }
+    }
+    false
+}
+fn amendment_has_selector(amendment: &Amendment) -> bool {
+    match &amendment.authority {
+        Some(authority) => authority.models.is_some(),
+        None => false,
+    }
+}

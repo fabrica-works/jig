@@ -331,7 +331,10 @@ The operations as the client sends them are
   (signed out, the party's role in the request's scope, a key sent again
   with another request, a limit) is answered with jig's refusal and never
   reaches its connector; only an admitted request is the connector's to
-  decide, and answered with its outcome.
+  decide, and answered with its outcome. A connector's core part carries
+  no model-name context: an explicit model selector (ALL or named,
+  including empty) is refused at people admission with `Lack::Models`;
+  an omitted selector keeps the operation's default.
 - **A watch is not a request:** it decides nothing and keeps no answer.
   It is admitted on the party's sign-in and on what their role lets them
   see in its scope, the party's own on the sign-in alone, and ends when

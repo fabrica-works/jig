@@ -111,6 +111,7 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
 
 /// Encode one tasks row within the configured bounds.
 pub fn encode(row: &domain::Stored, limits: &wire::Limits, names: &[Box<[u8]>]) -> Result<Box<[u8]>, wire::Problem> {
+    let (models, moved) = models::encode(row, names, limits)?;
     let value = match row {
         domain::Stored::Ledger(row) => wire::Value::Ledger(value::funding(row, limits)?),
         domain::Stored::ClosedLedger(row) => wire::Value::ClosedLedger(value::funding(row, limits)?),
@@ -137,10 +138,14 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits, names: &[Box<[u8]>]) 
             limits,
             wire::PoolSlotsParts { number: *number, pool: value::name(pool, limits)?, slots: *slots },
         )?),
-        domain::Stored::History(row) => wire::Value::History(Box::new(proposals::history(row, limits)?)),
+        domain::Stored::History(row) => wire::Value::History(Box::new(proposals::history(row, limits, Some(&moved))?)),
         domain::Stored::Milestone(row) => wire::Value::Milestone(proposals::milestone(row, limits)?),
-        domain::Stored::PersonProposal(row) => wire::Value::PersonProposal(proposals::person_proposal(row, limits)?),
-        domain::Stored::DecidedProposal(row) => wire::Value::DecidedProposal(proposals::person_proposal(row, limits)?),
+        domain::Stored::PersonProposal(row) => {
+            wire::Value::PersonProposal(proposals::person_proposal(row, limits, Some(&moved))?)
+        }
+        domain::Stored::DecidedProposal(row) => {
+            wire::Value::DecidedProposal(proposals::person_proposal(row, limits, Some(&moved))?)
+        }
         domain::Stored::Update(row) => wire::Value::Update(index::update(row, limits)?),
         domain::Stored::Result(row) => wire::Value::Result(index::result_row(row, limits)?),
         domain::Stored::EndedDelegate(row) => wire::Value::EndedDelegate(index::edge(row, limits)?),
@@ -148,11 +153,11 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits, names: &[Box<[u8]>]) 
         domain::Stored::EndedByProject(row) => wire::Value::EndedByProject(index::ended_by_project(row, limits)?),
         domain::Stored::Delegate(row) => wire::Value::Delegate(index::edge(row, limits)?),
         domain::Stored::Activity(row) => wire::Value::Activity(activity::activity_line(row, limits)?),
-        domain::Stored::Live(row) => wire::Value::Live(record::task_record(row, limits)?),
-        domain::Stored::Ended(row) => wire::Value::Ended(record::task_record(row, limits)?),
+        domain::Stored::Live(row) => wire::Value::Live(record::task_record(row, limits, Some(&moved))?),
+        domain::Stored::Ended(row) => wire::Value::Ended(record::task_record(row, limits, Some(&moved))?),
         domain::Stored::Stub(row) => wire::Value::Stub(state::stub(row, limits)?),
     };
-    let row = wire::Row::new(limits, wire::RowParts { value, models: models::encode(names, limits)? })?;
+    let row = wire::Row::new(limits, wire::RowParts { value, models })?;
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded row fits usize"));
     row.encode(&mut writer).expect("measured room");
     Ok(writer.finish())

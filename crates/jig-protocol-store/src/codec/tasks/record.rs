@@ -43,9 +43,10 @@ fn read_optional_retry_notice(
 fn optional_proposal(
     source: Option<&domain::Proposal>,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<Option<wire::Proposal>, wire::Problem> {
     match source {
-        Some(source) => Ok(Some(proposals::proposal(source, limits)?)),
+        Some(source) => Ok(Some(proposals::proposal(source, limits, moved)?)),
         None => Ok(None),
     }
 }
@@ -100,9 +101,10 @@ fn read_optional_person_wait(
 fn optional_recurring(
     source: Option<&domain::RecurringState>,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<Option<wire::RecurringState>, wire::Problem> {
     match source {
-        Some(source) => Ok(Some(state::recurring_state(source, limits)?)),
+        Some(source) => Ok(Some(state::recurring_state(source, limits, moved)?)),
         None => Ok(None),
     }
 }
@@ -300,13 +302,17 @@ fn read_saved(
 }
 
 /// Translate every retained task field.
-pub fn task_record(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<wire::TaskRecord, wire::Problem> {
+pub fn task_record(
+    source: &domain::TaskRecord,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::TaskRecord, wire::Problem> {
     wire::TaskRecord::new(
         limits,
         wire::TaskRecordParts {
             history: task_history(source, limits)?,
-            run: task_run(source, limits)?,
-            definition: task_definition(source, limits)?,
+            run: task_run(source, limits, moved)?,
+            definition: task_definition(source, limits, moved)?,
             interests: task_interests(source, limits)?,
             outcome: task_outcome(source, limits)?,
         },
@@ -337,7 +343,11 @@ fn task_history(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<wi
     )
 }
 
-fn task_run(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<wire::TaskRun, wire::Problem> {
+fn task_run(
+    source: &domain::TaskRecord,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::TaskRun, wire::Problem> {
     wire::TaskRun::new(
         limits,
         wire::TaskRunParts {
@@ -349,7 +359,7 @@ fn task_run(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<wire::
             last_reply: source.last_reply,
             replies: replies(&source.replies, limits)?,
             escalation: state::escalation(&source.escalation, limits)?,
-            proposal: optional_proposal(source.proposal.as_deref(), limits)?,
+            proposal: optional_proposal(source.proposal.as_deref(), limits, moved)?,
             result_proposal: source.result_proposal,
             number: source.number,
             project: source.project,
@@ -360,7 +370,11 @@ fn task_run(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<wire::
     )
 }
 
-fn task_definition(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<wire::TaskDefinition, wire::Problem> {
+fn task_definition(
+    source: &domain::TaskRecord,
+    limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
+) -> Result<wire::TaskDefinition, wire::Problem> {
     wire::TaskDefinition::new(
         limits,
         wire::TaskDefinitionParts {
@@ -374,11 +388,11 @@ fn task_definition(source: &domain::TaskRecord, limits: &wire::Limits) -> Result
             taken_by: source.taken_by,
             person_answer: optional_person_answer(source.person_answer.as_ref(), limits)?,
             person_wait: optional_person_wait(source.person_wait.as_ref(), limits)?,
-            recurring: optional_recurring(source.recurring.as_deref(), limits)?,
+            recurring: optional_recurring(source.recurring.as_deref(), limits, moved)?,
             tracked: source.tracked,
             spec: value::spec(&source.spec, limits)?,
             contract: value::contract(&source.contract, limits)?,
-            authority: value::authority(&source.authority, limits)?,
+            authority: value::authority(&source.authority, limits, moved)?,
             numbers: phase::numbers(&source.numbers, limits)?,
             funder: value::funder(source.funder, limits)?,
             dependencies: dependencies(&source.dependencies, limits)?,

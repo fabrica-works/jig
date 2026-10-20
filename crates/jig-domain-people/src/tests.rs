@@ -98,6 +98,52 @@ fn application_parts_use_party_admission_and_preserve_the_original_key() {
 }
 
 #[test]
+fn application_parts_refuse_explicit_model_selectors_before_routing() {
+    let mut test = Test::new(LIMITS);
+    test.signin(1, 10, identity(0, 1));
+    test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Owner }]) });
+    let application = Ask::Application { scope: ApplicationScope::Project(1), connector: 7, digest: [8; 32] };
+    let request = route(&test.request(10, 1, application));
+    for models in [Models::Named(1), Models::NONE, Models::ALL] {
+        let mut member = fixtures::member(b"part");
+        member.authority.models = Some(models);
+        let mut amendment = fixtures::unchanged(b"part");
+        amendment.authority = Some(member.authority.clone());
+        let mut operations = List::with_capacity(1);
+        operations
+            .push(Operation::Amend { task: 1, revision: 1, amendment: Box::new(amendment.clone()), release: None })
+            .unwrap();
+        for ask in [
+            Ask::Create { project: 1, batch: Box::new([member.clone()]) },
+            Ask::Amend { project: 1, task: 1, revision: 1, amendment: amendment.clone(), release: None },
+            Ask::Propose {
+                project: 1,
+                action: Action::Batch(Box::new([member.clone()])),
+                reason: b"part".as_slice().into(),
+            },
+            Ask::Compound { project: 1, operations },
+            Ask::ChangePolicy {
+                project: 1,
+                change: PolicyChange::Role(PolicyRole {
+                    number: 4,
+                    authority: member.authority,
+                    period_spend: 1,
+                    requests: 0,
+                    decides: 0,
+                }),
+            },
+        ] {
+            assert_eq!(
+                application_part(&mut test.d, &test.env, request, ask),
+                Err(Outcome::Refused(Refusal::Authority { lacking: Lack::Models, proposable: None }))
+            );
+        }
+    }
+    // Refusing a part leaves the application flight available for an omitted selector.
+    application_part(&mut test.d, &test.env, request, create_request(1, b"part".as_slice().into())).unwrap();
+}
+
+#[test]
 fn only_keyed_mark_seen_moves_results_and_restores_the_position() {
     let mut test = Test::new(LIMITS);
     test.signin(1, 10, identity(0, 1));

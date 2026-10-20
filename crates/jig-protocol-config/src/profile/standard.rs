@@ -166,15 +166,16 @@ const JOURNAL: skein_lib::JournalLimits =
     skein_lib::JournalLimits { commits: 3, writes: 142_876, held: 428_628, now: 1024, release: 1024 };
 // Same 19.s3 composition as small; the standard domain supplies the larger value and operation bounds.
 // Its 25 choices plus the kept pin add 26 optional u32s (130 bytes) to the largest tasks row.
+// The largest tasks row can reference all 64 names; sparse and ALL rows keep only used names.
 const STORE_KV: skein_kv::Limits = skein_kv::Limits {
-    value: 10_401_889,
+    value: 10_664_318,
     ops: 285_755,
     commit: 865_091_922,
     queued_bytes: 2_595_275_766,
     segment: 1_730_183_844,
     snapshot_after: 865_091_922,
-    chunk: 10_403_988,
-    page: skein_kv::Page { rows: 2, bytes: 10_403_968 },
+    chunk: 10_666_417,
+    page: skein_kv::Page { rows: 2, bytes: 10_666_397 },
     ..small::STORE_KV
 };
 const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {

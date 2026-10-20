@@ -240,12 +240,13 @@ pub fn read_person_wait(source: wire::PersonWait, limits: &wire::Limits) -> Resu
 pub fn recurring_state(
     source: &domain::RecurringState,
     limits: &wire::Limits,
+    moved: Option<&[u64; 64]>,
 ) -> Result<wire::RecurringState, wire::Problem> {
     let domain::RecurringState { template, last_batch, last_period, pending_period } = source;
     wire::RecurringState::new(
         limits,
         wire::RecurringStateParts {
-            template: phase::template(template, limits)?,
+            template: phase::template(template, limits, moved)?,
             last_batch: phase::references(
                 last_batch,
                 limits.recurring_state_last_batch,
