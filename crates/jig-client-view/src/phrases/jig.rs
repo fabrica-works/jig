@@ -952,7 +952,6 @@ pub enum JigPhrase {
     EngineLimitHolderAccounts,
     EngineLimitSources,
     EngineLimitSignIns,
-
     FailedBare,
     CancelledBare,
     DecidedBare,
@@ -1554,7 +1553,6 @@ impl JigPhrase {
             Self::EngineLimitHolderAccounts => 566,
             Self::EngineLimitSources => 567,
             Self::EngineLimitSignIns => 568,
-
             Self::FailedBare => 448,
             Self::CancelledBare => 449,
             Self::DecidedBare => 450,

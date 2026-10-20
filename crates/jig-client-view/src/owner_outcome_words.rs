@@ -107,7 +107,9 @@ pub enum OutcomePhrase {
     ResultsThrough,
     /// The replies seen through saying.
     RepliesThrough,
+    /// The LLM account sign-in started saying.
     AccountSignInStarted,
+    /// The LLM account signed out saying.
     AccountSignedOut,
 }
 /// Every outcome phrase in stable owner order.

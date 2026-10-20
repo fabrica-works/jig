@@ -367,7 +367,6 @@ pub fn language() -> Language {
             JigPhrase::EngineLimitSignIns => {
                 Box::new([Segment::Text(copy_of(b"Engine admission limit: account sign-ins"))])
             }
-
             JigPhrase::DecidedBare => Box::new([Segment::Text(copy_of(b"Decided"))]),
             JigPhrase::DeletedEnding => Box::new([Segment::Text(copy_of(b"Deleted"))]),
             JigPhrase::ByProjectDeployment => Box::new([
