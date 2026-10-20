@@ -1,5 +1,5 @@
 //! Engine endpoint, model values (llm.md, 4 and 5).
-use crate::{Address, Directories, Directory, Limits, Path, Problems, Segment, What, check, read};
+use crate::{Address, Directories, Directory, Path, Problems, Segment, What, check, read};
 use alloc::boxed::Box;
 use jig_domain_core::Model;
 use skein_json::Document;
@@ -42,7 +42,6 @@ pub(crate) fn parse(
     document: &Document,
     at: u32,
     path: &Path,
-    _limits: &Limits,
     directories: &Directories,
     problems: &mut Problems,
 ) -> Option<Llm> {

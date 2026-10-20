@@ -61,7 +61,7 @@ fn a_restart_re_adds_a_party_signed_in_source() {
     assert!(matches!(event, translate::Up::Granted { account: 7, generation: 1, .. }), "{event:?}");
 }
 #[test]
-fn the_restart_spares_named_sources_of_every_holder_and_erases_only_unnamed_source_rows() {
+fn the_restart_erases_only_unnamed_source_rows() {
     let mut world = World::new();
     for number in [1, 7, 8, 9, 10] {
         world.secret(Secrets::Keep { owner: SecretOwner::Source, number, value: Secret::new(Box::new([7; 32])) });

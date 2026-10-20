@@ -76,7 +76,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
     }
     let mut llm = None;
     if let Some(at) = object.required(document, b"llm", &path, &mut problems) {
-        llm = llm::parse(document, at, &path.member(b"llm"), &limits, directories, &mut problems);
+        llm = llm::parse(document, at, &path.member(b"llm"), directories, &mut problems);
     }
     let mut hosts = None;
     if let Some(at) = object.required(document, b"hosts", &path, &mut problems) {

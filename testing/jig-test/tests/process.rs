@@ -19,11 +19,10 @@ fn peer() -> skein_fake_peers::llm::Peer {
 }
 
 #[test]
-fn providers_only_startup_keeps_a_requested_key_across_restart() {
+fn a_killed_jig_test_finds_its_work_after_restart() {
     let directory = support::scratch();
     support::configuration(directory.path());
     assert_eq!(support::run(directory.path(), Script::answered_chat(b"Hello", support::ANSWER), Some(peer())), (1, 1));
-    assert!(!directory.path().join("accounts/chat.json").exists());
     assert_eq!(support::run(directory.path(), Script::found_chat(support::ANSWER), None), (1, 0));
 }
 

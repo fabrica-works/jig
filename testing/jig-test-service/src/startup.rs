@@ -430,7 +430,6 @@ pub(super) fn engine_startup(
     let accounts = if parsed.accounts {
         Some(crate::accounts::Accounts::new(
             &parsed.engine,
-            files,
             seeds,
             runtime,
             max.checked_mul(6).expect("account routing room"),

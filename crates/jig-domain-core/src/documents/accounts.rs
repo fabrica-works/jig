@@ -119,7 +119,7 @@ pub(super) fn make(
                 place: account.place(),
                 uses: uses(account),
                 plan: account.plan(),
-                provider: account.provider(),
+                provider: Some(account.provider()),
                 display: super::small::text(account.display(), limits.documents.text_bytes),
                 holder: account.holder(),
                 cut: sources.len() < account.sources().len(),

@@ -49,7 +49,7 @@ fn numbers_are_never_given_twice() {
     world.restore(vec![Stored::Next { number: 12 }]);
     world.step(Event::Want);
     let made = world.domain.account(12).expect("the counter's first number");
-    assert_eq!((made.holder(), made.provider()), (Holder::Deployment, Some(3)));
+    assert_eq!((made.holder(), made.provider()), (Holder::Deployment, 3));
     assert_eq!(world.domain.next_number(), 14);
     let mut world = fresh();
     world.restore(vec![
@@ -78,7 +78,7 @@ fn the_none_account_is_made_at_the_first_start_alone() {
     );
     assert_eq!(world.domain.accounts(), 1);
     let none = world.domain.account(0).expect("made at the start");
-    assert_eq!((none.holder(), none.provider()), (Holder::Deployment, Some(3)));
+    assert_eq!((none.holder(), none.provider()), (Holder::Deployment, 3));
     let fact = world.domain.source(1).expect("its source");
     assert_eq!((fact.kind, fact.state, fact.usable), (Kind::None, State::Granted, true));
     assert!(world.domain.usable(0));

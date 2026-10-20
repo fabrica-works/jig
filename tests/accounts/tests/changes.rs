@@ -65,7 +65,7 @@ fn a_key_makes_an_account_once_it_is_kept() {
     let entry = world.domain.account(account).expect("new account");
     assert_eq!(
         (entry.provider(), entry.holder(), entry.place(), entry.plan(), entry.uses()),
-        (Some(PROVIDER), HOLDER, 0, false, None)
+        (PROVIDER, HOLDER, 0, false, None)
     );
     assert!(entry.subject().is_empty() && entry.display().is_empty());
     assert!(outputs.iter().any(

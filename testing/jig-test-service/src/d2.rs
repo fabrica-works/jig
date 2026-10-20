@@ -5,10 +5,17 @@ use jig_protocol_accounts::handed_in;
 use skein_lib::{Map, Secret, Wall};
 use skein_oauth as oauth;
 
+/// D2: removed by JP13. The explicit live fixture's durable identities.
+pub const D2_ACCOUNT: u32 = 10;
+pub const D2_SOURCE: u32 = 11;
+pub const D2_PROVIDER: u32 = 1;
+pub const D2_HOLDER: Holder = Holder::Party(1);
+
 /// D2: removed by JP13. Not configuration, and never inferred from stored records.
 pub struct D2 {
     pub(crate) sources: Map<u32, oauth::SavedToken>,
 }
+// SavedToken metadata may contain a private account id; Debug prints only the count.
 impl core::fmt::Debug for D2 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("D2").field("sources", &self.sources.len()).finish()

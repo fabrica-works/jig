@@ -55,7 +55,7 @@ fn addable(domain: &Domain, limits: &Limits, holder: Holder, provider: u32, join
     match join {
         Some(account) => {
             let Some(entry) = domain.accounts.get(&account) else { return Err(Refusal::Unknown) };
-            if entry.holder != holder || entry.provider != Some(provider) {
+            if entry.holder != holder || entry.provider != provider {
                 return Err(Refusal::Unknown);
             }
             crate::changes::account(domain, holder, account)?;
@@ -83,7 +83,7 @@ pub(crate) fn replace(
             return;
         }
     };
-    let provider = domain.accounts.get(&account).expect("checked account").provider.expect("LLM key provider");
+    let provider = domain.accounts.get(&account).expect("checked account").provider;
     let keeping = Keeping { request, holder, provider, join: Some(account), replacing: true };
     assert!(domain.keeping.insert(source, keeping) == Ok(None), "one keep per source, admitted");
     out.push(Request::Signing(Signing::Keep { source, carried, replaces: true }));
@@ -94,7 +94,7 @@ fn replaceable(domain: &Domain, limits: &Limits, holder: Holder, source: u32) ->
     if kind != Kind::Key {
         return Err(Refusal::Kind { kind });
     }
-    let provider = domain.accounts.get(&account).expect("checked account").provider.expect("an LLM key's provider");
+    let provider = domain.accounts.get(&account).expect("checked account").provider;
     match domain.providers.get(provider) {
         Some(offered) if offered.offers.key => {}
         Some(_) | None => return Err(Refusal::Provider { provider }),
@@ -125,7 +125,7 @@ pub(crate) fn granted(domain: &mut Domain, env: &Env<Limits>, source: u32, out: 
                 let account = domain.take();
                 domain.counted(out);
                 let entry = Account {
-                    provider: Some(keeping.provider),
+                    provider: keeping.provider,
                     holder: keeping.holder,
                     place: domain.last_place(keeping.holder),
                     uses: None,

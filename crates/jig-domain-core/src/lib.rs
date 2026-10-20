@@ -758,7 +758,7 @@ impl Core {
                 return false;
             }
             if let Some(account) = self.accounts.account(binding.account)
-                && account.provider() != Some(binding.provider)
+                && account.provider() != binding.provider
             {
                 return false;
             }

@@ -193,7 +193,7 @@ fn make(
         },
     });
     let entry = Account {
-        provider: Some(made.provider),
+        provider: made.provider,
         holder: made.holder,
         place: domain.last_place(made.holder),
         uses: None,

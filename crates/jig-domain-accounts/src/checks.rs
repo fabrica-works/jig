@@ -74,7 +74,7 @@ impl Domain {
             Some(_) | None => return Err(Refusal::Provider { provider }),
         }
         for (number, account) in &self.accounts {
-            if account.provider != Some(provider) || *account.subject != *subject {
+            if account.provider != provider || *account.subject != *subject {
                 continue;
             }
             if account.holder != holder {

@@ -258,7 +258,8 @@ development.md, section 3.3).
   requests or restored from the store. The none provider's ordinary
   durable account survives restart. The handed-in record and withdrawn
   grant remain only for jig's D2 live fixture, explicitly preseeded
-  through a typed testing input (removed by JP13); no live success is
+  through `jig-test serve-d2 CONFIG RECORD` and its typed testing input
+  (removed by JP13); no live success is
   claimed. Each grant names its form, set by the accounts
   child and carried through the fleet and hub to smith, its table
   following from the form. A credential's grant carries its scheme and

@@ -334,7 +334,6 @@ fn restore_chat_account(domain: &mut Domain, env: &Env<Limits>) {
 }
 
 fn started_chat() -> (Domain, Env<Limits>, Token) {
-    use jig_domain_accounts as accounts;
     use jig_domain_fleet as fleet;
     use jig_domain_people as people;
     use jig_domain_tasks as tasks;

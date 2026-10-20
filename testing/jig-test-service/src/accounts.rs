@@ -35,6 +35,7 @@ pub struct AccountsRuntime {
 enum Phase {
     Loading { crypto: CryptoRng },
     Running,
+    UnmatchedD2,
 }
 /// One durable erase per source; only sign-out continues to driver removal.
 #[derive(Debug)]
@@ -67,9 +68,9 @@ pub(super) struct Accounts {
     aborting: bool,
     closed: bool,
 }
-fn problem(_index: usize, what: What) -> Problems {
+fn problem(path: Path, what: What) -> Problems {
     let mut found = Problems::empty();
-    found.push(Path::root().member(b"engine").member(b"llm").member(b"providers"), what);
+    found.push(path, what);
     found
 }
 impl Files {
@@ -158,9 +159,10 @@ fn provider_templates(
                     break;
                 }
             }
-            let registration = registration.ok_or(problem(0, What::Refers))?;
+            let registration = registration
+                .ok_or(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Refers))?;
             if (runtime.trust_roots == 0 || runtime.trust_root_bytes == 0) && has_tls(&endpoint, &origins) {
-                return Err(problem(0, What::Bound));
+                return Err(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Bound));
             }
             let account = party::party_account(
                 &registration_input(registration, &endpoint.transport),
@@ -169,14 +171,19 @@ fn provider_templates(
                 installation_id,
             );
             let mut check = List::with_capacity(1);
-            check.push(unkept(&account)).or(Err(problem(0, What::Bound)))?;
-            let _checked = driver::Component::new(check, limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
-            providers.insert(number, account).or(Err(problem(0, What::Bound)))?;
+            check
+                .push(unkept(&account))
+                .or(Err(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Bound)))?;
+            let _checked = driver::Component::new(check, limits, crypto.clone())
+                .or(Err(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Form)))?;
+            providers
+                .insert(number, account)
+                .or(Err(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Bound)))?;
         }
     }
     for provider in &config.llm.providers {
         if provider.sign_in.is_some() && !providers.contains_key(&provider.number) {
-            return Err(problem(0, What::Refers));
+            return Err(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Refers));
         }
     }
     Ok(providers)
@@ -185,7 +192,6 @@ impl Accounts {
     /// Checks public provider registrations; restored sources are admitted after the store opens.
     pub fn new(
         config: &config::Engine,
-        _files: &Files,
         seeds: &Seeds,
         mut runtime: Option<AccountsRuntime>,
         room: u32,
@@ -193,9 +199,10 @@ impl Accounts {
     ) -> Result<Self, Problems> {
         let limits = config.limits.driver;
         if limits.client.document.record_bytes > secrets.value {
-            return Err(problem(0, What::Bound));
+            return Err(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Bound));
         }
-        let crypto = CryptoRng::new(&seeds.crypto, 1).ok_or(problem(0, What::Bound))?;
+        let crypto = CryptoRng::new(&seeds.crypto, 1)
+            .ok_or(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Bound))?;
         let providers = provider_templates(config, runtime.as_mut(), &limits, &crypto, &seeds.installation)?;
         let inventory = restart::Inventory::new(limits.accounts, secrets.page.rows);
         let d2 = match runtime {
@@ -203,7 +210,7 @@ impl Accounts {
             None => crate::D2::empty(),
         };
         if d2.sources.len() > limits.accounts {
-            return Err(problem(0, What::Bound));
+            return Err(problem(Path::root().member(b"D2"), What::Bound));
         }
         Ok(Self {
             component: None,
@@ -298,7 +305,13 @@ impl Accounts {
                         domain::Kind::Program | domain::Kind::None => (),
                     }
                 }
-                translate::Down::Restored => self.inventory.restored(),
+                translate::Down::Restored => {
+                    if self.d2.sources.is_empty() {
+                        self.inventory.restored();
+                    } else {
+                        self.phase = Phase::UnmatchedD2;
+                    }
+                }
                 translate::Down::Keep { source, carried, replaces } => {
                     self.inventory.name(source);
                     let next = self.keys.keep(source, carried, replaces);
@@ -375,7 +388,7 @@ impl Accounts {
     }
     pub fn work_pending(&self, now: Time) -> bool {
         let starting = match &self.phase {
-            Phase::Loading { .. } => true,
+            Phase::Loading { .. } | Phase::UnmatchedD2 => true,
             Phase::Running => !self.early.is_empty(),
         };
         starting
@@ -427,6 +440,9 @@ impl Accounts {
         self.clock(now, wall);
         self.answers(store, events);
         self.start(store, values);
+        if let Phase::UnmatchedD2 = self.phase {
+            return;
+        }
         self.key_steps(values, events, store);
         self.sweep(store);
         self.fire_driver();
@@ -553,14 +569,24 @@ impl Accounts {
                 });
                 return;
             }
-            let _loaded = self.records.load(source, value.expose(), &self.env.limits.client.document);
+            let Some(record) = self.records.load(source, value.expose(), &self.env.limits.client.document) else {
+                self.key_events.push(domain::FromComponent::Failed {
+                    account: source,
+                    failure: domain::Failure::Unloaded { at: domain::Place::File, why: domain::Unread::Unreadable },
+                });
+                return;
+            };
             let id = Secret::new(record.metadata.clone().unwrap_or_default());
+            let before = self.above.len();
             self.component.as_mut().expect("running driver").add(
                 &self.env,
                 source,
                 driver::Account::HandedIn,
                 &mut self.above,
             );
+            if self.above.len() != before {
+                return;
+            }
             self.ids.insert(source, id).expect("D2 source fits driver");
             self.required.insert(source, Box::default()).expect("D2 source fits driver");
             let records::Next::Driver(request) =
@@ -861,8 +887,19 @@ impl Accounts {
                     }
                     let request = self.early.pop().expect("early requests");
                     self.dispatch(request, store, values);
+                    match self.phase {
+                        Phase::UnmatchedD2 => break,
+                        Phase::Loading { .. } | Phase::Running => (),
+                    }
                 }
             }
+            Phase::UnmatchedD2 => (),
+        }
+    }
+    pub fn startup_problem(&self) -> Option<Problems> {
+        match self.phase {
+            Phase::UnmatchedD2 => Some(problem(Path::root().member(b"D2"), What::Refers)),
+            Phase::Loading { .. } | Phase::Running => None,
         }
     }
 }

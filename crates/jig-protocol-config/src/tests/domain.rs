@@ -274,6 +274,8 @@ fn memory_below_the_components_sum_is_refused() {
     // 526,336 for one routed Event and its people::Request::Route (2 * 263,168),
     // and 1,661,320 for native selector tags, name-list carriers and their derived
     // retained-storage and queue envelopes. People's pending clone is priced there.
+    // x1c adds 0 bytes here: Account's alignment absorbs its now-required provider's
+    // removed Option tag. Provider registrations and the D2 input are priced by the service.
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_676_998_751 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

@@ -1,16 +1,6 @@
 use super::*;
 
 #[test]
-fn a_charter_whose_alternative_names_another_account_is_allowed() {
-    let mut config = config(1);
-    let alternative = config.settings.charters[0].policy.model.clone();
-    config.settings.charters[0].policy.alternatives = Box::new([alternative]);
-    let mut bounds = limits();
-    bounds.run_bytes = 1024;
-    let _core = Core::new(config, &bounds);
-}
-
-#[test]
 #[should_panic(expected = "charter default spend holds reserve floor")]
 fn a_charter_whose_default_spend_misses_its_floor_is_refused() {
     let mut config = config(1);

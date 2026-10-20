@@ -72,19 +72,25 @@ fn providers_reach_the_accounts_settings() {
     );
 }
 #[test]
-fn a_model_without_a_provider_is_refused_even_when_providers_is_omitted_or_empty() {
-    let omitted = fixtures::with(
+fn a_model_without_a_provider_is_refused_when_providers_is_omitted() {
+    let bytes = fixtures::with(
         fixtures::ENGINE_SMALL,
         br#""providers": [{"name":"Fake","number":1,"models":["small"],"sources":{}}],"#,
         b"",
     );
-    for bytes in [omitted, with_providers(b"[]")] {
-        first_problem(
-            &bytes,
-            fixtures::path(&[b"llm", b"models"]).child(Segment::Index(0)).member(b"name"),
-            What::NoProvider,
-        );
-    }
+    first_problem(
+        &bytes,
+        fixtures::path(&[b"llm", b"models"]).child(Segment::Index(0)).member(b"name"),
+        What::NoProvider,
+    );
+}
+#[test]
+fn a_model_without_a_provider_is_refused_when_providers_is_empty() {
+    first_problem(
+        &with_providers(b"[]"),
+        fixtures::path(&[b"llm", b"models"]).child(Segment::Index(0)).member(b"name"),
+        What::NoProvider,
+    );
 }
 #[test]
 fn no_models_need_no_providers() {
@@ -92,14 +98,7 @@ fn no_models_need_no_providers() {
     for value in [br#"{"endpoints":[],"models":[]}"#.as_slice(), br#"{"providers":[],"endpoints":[],"models":[]}"#] {
         let doc = fixtures::document(value);
         let mut problems = crate::Problems::empty();
-        let llm = crate::llm::parse(
-            &doc,
-            0,
-            &Path::root(),
-            &fixtures::engine(fixtures::ENGINE_SMALL).unwrap().limits,
-            &crate::Directories::working(),
-            &mut problems,
-        );
+        let llm = crate::llm::parse(&doc, 0, &Path::root(), &crate::Directories::working(), &mut problems);
         assert!(llm.unwrap().providers.is_empty());
         assert!(problems.problems.is_empty());
     }

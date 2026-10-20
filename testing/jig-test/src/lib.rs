@@ -15,7 +15,7 @@ mod bundle;
 mod host;
 pub use host::Host;
 const CONFIG_BYTES: u32 = 1 << 20;
-const USAGE: &str = "usage: jig-test serve CONFIG.json | jig-test agent AGENT.json";
+const USAGE: &str = "usage: jig-test serve CONFIG.json | jig-test serve-d2 CONFIG RECORD | jig-test agent AGENT.json";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
@@ -300,10 +300,10 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> R
     if let Some(record) = d2 {
         let engine = engine.as_ref().ok_or("D2 requires an engine")?;
         let fixture = service::d2_preseed(
-            10,
-            11,
-            1,
-            jig_domain_accounts::Holder::Party(1),
+            service::D2_ACCOUNT,
+            service::D2_SOURCE,
+            service::D2_PROVIDER,
+            service::D2_HOLDER,
             record.token,
             record.lapses,
             record.account_id,

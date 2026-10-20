@@ -275,8 +275,12 @@ fn aborting_does_not_submit_an_llm_key_adoption_to_the_closing_store() {
     };
 }
 
-#[test]
-fn d2_preseed_restores_the_fake_issuers_handed_source_and_names_it_in_the_sweep() {
+struct D2Fixture {
+    service: crate::Service,
+    accounts: Accounts,
+    token: Box<[u8]>,
+}
+fn d2_fixture(restore: bool) -> D2Fixture {
     use jig_protocol_accounts_world::world;
     let issued = world::run(31, world::Story::SignIn);
     assert!(world::owner(&issued).last_kept().is_some());
@@ -308,7 +312,6 @@ fn d2_preseed_restores_the_fake_issuers_handed_source_and_names_it_in_the_sweep(
     let configuration = crate::startup::parse(&fixtures::accounts_document()).unwrap().engine;
     let mut component = Accounts::new(
         &configuration,
-        &fixtures::files(&[]),
         &fixtures::seeds(),
         Some(AccountsRuntime {
             d2: fixture.input,
@@ -330,28 +333,83 @@ fn d2_preseed_restores_the_fake_issuers_handed_source_and_names_it_in_the_sweep(
     let mut child = domain::Domain::new(&configuration.limits.core.accounts, providers);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: configuration.limits.core.accounts };
     let mut out = Queue::with_capacity(domain::max_out(&env.limits));
-    for record in fixture.rows {
-        domain::step(&mut child, &env, domain::Event::Restore { record }, &mut out);
+    if restore {
+        for record in fixture.rows {
+            domain::step(&mut child, &env, domain::Event::Restore { record }, &mut out);
+        }
     }
     domain::step(&mut child, &env, domain::Event::Want, &mut out);
     while let Some(request) = out.pop() {
         component.request(request);
     }
-    let mut granted = false;
-    for event in &pump_accounts(&mut component, engine) {
-        if let domain::FromComponent::Granted { account: 9001, .. } = event {
-            granted = true;
+    D2Fixture { service, accounts: component, token: expected_token }
+}
+
+#[test]
+fn a_d2_preseed_restores_the_handed_in_source_under_its_number() {
+    let D2Fixture { mut service, mut accounts, token } = d2_fixture(true);
+    let engine = fixtures::engine(&mut service);
+    let mut granted = None;
+    for event in &pump_accounts(&mut accounts, engine) {
+        if let domain::FromComponent::Granted { account: 9001, form, .. } = event {
+            granted = Some(*form);
         }
     }
-    assert!(granted);
+    assert_eq!(granted, Some(domain::Form::Withdrawn));
     let value = engine.values.accounts.value(9001, 1, Time::from_nanos(1)).unwrap();
-    assert_eq!(value.token.expose(), expected_token.as_ref());
-    let table::Scheme::Withdrawn { .. } = value.scheme else {
+    assert_eq!(value.token.expose(), token.as_ref());
+    let table::Scheme::Withdrawn { id } = &value.scheme else {
         panic!("D2 withdrawn grant");
     };
-    let Some(store::Event::Secret { value: Some(_), .. }) =
-        engine.store.secrets(Token::new(123), store::Secrets::Get { owner: store::SecretOwner::Source, number: 9001 })
-    else {
-        panic!("named D2 source survived the sweep");
+    assert_eq!(id.expose(), b"D2-only-account-id");
+}
+
+#[test]
+fn a_d2_preseed_source_is_named_in_the_sweep() {
+    let D2Fixture { mut service, mut accounts, .. } = d2_fixture(true);
+    let engine = fixtures::engine(&mut service);
+    let _later = engine.store.secrets(
+        Token::new(123),
+        store::Secrets::Keep {
+            owner: store::SecretOwner::Source,
+            number: 9002,
+            value: Secret::new(b"unnamed-control".as_slice().into()),
+        },
+    );
+    while engine.store.above.pop().is_some() {}
+    let _heard = pump_accounts(&mut accounts, engine);
+    for (number, exists) in [(9001, true), (9002, false)] {
+        let Some(store::Event::Secret { value, .. }) =
+            engine.store.secrets(Token::new(123), store::Secrets::Get { owner: store::SecretOwner::Source, number })
+        else {
+            panic!("source secret answer");
+        };
+        assert_eq!(value.is_some(), exists, "source {number}");
+    }
+}
+
+#[test]
+fn an_unmatched_d2_source_refuses_startup() {
+    let D2Fixture { mut service, accounts, .. } = d2_fixture(false);
+    let engine = fixtures::engine(&mut service);
+    engine.accounts = Some(accounts);
+    for _ in 0_u32..2 {
+        crate::engine::iterate(engine, Time::from_nanos(1), Wall::from_nanos(1));
+    }
+    let Some(crate::End::Stopped(crate::Stop::Start(problems))) = &engine.end else {
+        panic!("unconsumed D2 input must refuse startup");
     };
+    assert_eq!(problems, &problem(Path::root().member(b"D2"), What::Refers));
+}
+
+#[test]
+fn a_refused_d2_add_lends_no_value() {
+    let D2Fixture { mut service, mut accounts, .. } = d2_fixture(true);
+    let engine = fixtures::engine(&mut service);
+    accounts.opened(&engine.store.installation);
+    accounts.component.as_mut().unwrap().add(&accounts.env, 9001, driver::Account::HandedIn, &mut accounts.above);
+    assert!(accounts.above.is_empty(), "the first add was admitted");
+    let _heard = pump_accounts(&mut accounts, engine);
+    assert!(!accounts.ids.contains_key(&9001), "the refused add must not install its id");
+    assert!(engine.values.accounts.value(9001, 1, Time::from_nanos(1)).is_none());
 }

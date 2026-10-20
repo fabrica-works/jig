@@ -114,7 +114,7 @@ fn efforts_that_are_not_a_list_are_refused() {
     refuses_efforts(br#""low""#, model_path(b"efforts"), What::Kind);
 }
 #[test]
-fn a_model_uses_its_endpoints_number_and_dialect() {
+fn a_model_uses_its_endpoint() {
     let model = model(fixtures::ENGINE_SMALL);
     assert_eq!((model.endpoint, model.dialect), (1, 0));
 }

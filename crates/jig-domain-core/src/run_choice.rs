@@ -46,9 +46,8 @@ impl Core {
             for fact in &self.accounts.account_views() {
                 if fact.account == old
                     && let accounts::State::Limited { .. } = fact.state
-                    && let Some(provider) = account.provider()
                 {
-                    excluded = Some(accounts::Excluded { holder: account.holder(), provider });
+                    excluded = Some(accounts::Excluded { holder: account.holder(), provider: account.provider() });
                 }
             }
         }

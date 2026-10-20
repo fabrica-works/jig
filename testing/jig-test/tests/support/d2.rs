@@ -18,10 +18,10 @@ pub fn preseed(directory: &Path, raw: &[u8]) {
     let record = config::handed_in(raw, &config::DocumentLimits { bytes: 1 << 20, tokens: 1 << 20, depth: 16 })
         .expect("D2 handed-in decoder");
     let fixture = jig_test_service::d2_preseed(
-        10,
-        11,
-        1,
-        jig_domain_accounts::Holder::Party(1),
+        jig_test_service::D2_ACCOUNT,
+        jig_test_service::D2_SOURCE,
+        jig_test_service::D2_PROVIDER,
+        jig_test_service::D2_HOLDER,
         record.token,
         record.lapses,
         record.account_id,
@@ -75,7 +75,7 @@ pub fn preseed(directory: &Path, raw: &[u8]) {
     }
     super::private(&directory.join("state/store/log-00000000000000000001"), &frame(rows.into_iter().collect()));
     let mut key = skein_kv::KeyWriter::new(64);
-    key.tag(3).tag(0).u64(11);
+    key.tag(3).tag(0).u64(u64::from(jig_test_service::D2_SOURCE));
     super::private(
         &directory.join("state/secrets/log-00000000000000000001"),
         &frame(vec![(key.finish().expect("bounded D2 fixture"), fixture.value.expose().into())]),

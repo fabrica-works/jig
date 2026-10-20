@@ -97,7 +97,7 @@ fn a_sign_in_to_a_new_subject_makes_an_account_that_restores() {
     let account = world.domain.account(1).expect("made");
     assert_eq!(
         (account.holder(), account.provider(), account.subject(), account.display()),
-        (ALICE, Some(1), &b"alice"[..], &b"Al"[..])
+        (ALICE, 1, &b"alice"[..], &b"Al"[..])
     );
     assert_eq!(places(&world, 1), vec![(0, 0)]);
     assert_eq!(world.domain.source(0).expect("its source").state, State::Asking);

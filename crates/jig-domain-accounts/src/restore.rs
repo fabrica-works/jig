@@ -23,7 +23,7 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored) {
                     env,
                     number,
                     Account {
-                        provider: Some(provider),
+                        provider,
                         holder,
                         place,
                         uses,

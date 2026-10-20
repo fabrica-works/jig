@@ -227,7 +227,7 @@ fn host_allows(host: &[HostSource], source: u32, kind: Kind) -> bool {
 }
 
 fn eligible(number: u32, account: &Account, provider: u32, excluded: Option<Excluded>, coverage: &[Coverage]) -> bool {
-    if account.provider() != Some(provider) {
+    if account.provider() != provider {
         return false;
     }
     if let Some(excluded) = excluded

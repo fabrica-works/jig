@@ -34,7 +34,7 @@ pub(super) fn outcome(answer: accounts::Answer) -> people::Outcome {
         }
         accounts::Refusal::Limit { bound } => people::Refusal::Limit { which: limit(bound) },
         accounts::Refusal::Numbers => people::Refusal::Limit { which: people::LimitKind::Arithmetic },
-        // A provider offering no sign-in, or a configured source that no sign-out serves.
+        // A provider or source kind that does not offer the requested change.
         accounts::Refusal::Provider { .. }
         | accounts::Refusal::Kind { .. }
         | accounts::Refusal::NotLimited

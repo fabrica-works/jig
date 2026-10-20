@@ -5,6 +5,9 @@ use crate::{
 };
 use skein_lib::Duration;
 
+/// The deterministic startup step immediately before its provider query is submitted.
+pub const BEFORE_PROVIDER_QUERY: u32 = 124;
+
 #[derive(Clone, Copy, Debug)]
 pub enum Story {
     Chat,
@@ -95,7 +98,7 @@ pub fn drawn(seed: u64) -> Outcome {
         2 => Story::Call,
         3 => Story::HeldCommit,
         4 => Story::MidFrame,
-        5 => Story::Restart { before: 124 },
+        5 => Story::Restart { before: BEFORE_PROVIDER_QUERY },
         _ => panic!("bounded draw"),
     };
     if matches!(story, Story::Restart { .. }) {

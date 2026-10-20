@@ -24,7 +24,7 @@ pub(crate) const fn out_bound(limits: &Limits) -> Option<u32> {
 /// order, with its explicit payers or the default uses (4.2).
 #[derive(Hash, Debug)]
 pub struct Account {
-    pub(crate) provider: Option<u32>,
+    pub(crate) provider: u32,
     pub(crate) holder: Holder,
     pub(crate) subject: Box<[u8]>,
     pub(crate) display: Box<[u8]>,
@@ -36,7 +36,7 @@ pub struct Account {
 impl Account {
     /// The numbered provider whose account was restored or admitted.
     #[must_use]
-    pub const fn provider(&self) -> Option<u32> {
+    pub const fn provider(&self) -> u32 {
         self.provider
     }
     #[must_use]
@@ -521,7 +521,7 @@ fn want(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             let account = domain.accounts.get(&source.account).expect("a source's account");
             out.push(Request::Signing(Signing::Restore {
                 source: *number,
-                provider: account.provider.expect("party source has a provider"),
+                provider: account.provider,
                 kind: source.kind,
             }));
         }
@@ -565,7 +565,7 @@ fn none_accounts(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request
         let provider = provider.number;
         let mut held = false;
         for (_, account) in &domain.accounts {
-            if account.holder == Holder::Deployment && account.provider == Some(provider) {
+            if account.holder == Holder::Deployment && account.provider == provider {
                 for (_, number) in &account.sources {
                     held |= domain.sources.get(number).expect("an account's sources are kept").kind == Kind::None;
                 }
@@ -579,7 +579,7 @@ fn none_accounts(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request
         let mut places = Map::with_capacity(env.limits.sources);
         assert!(places.insert(0, source) == Ok(None), "a first place");
         let entry = Account {
-            provider: Some(provider),
+            provider,
             holder: Holder::Deployment,
             subject: Box::new([]),
             display: Box::new([]),

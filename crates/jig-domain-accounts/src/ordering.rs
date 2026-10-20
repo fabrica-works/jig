@@ -6,7 +6,7 @@ pub(crate) fn account_record(domain: &Domain, number: u32) -> Stored {
     let account = domain.accounts.get(&number).expect("a kept account");
     Stored::Account {
         number,
-        provider: account.provider.expect("a stored account has a provider"),
+        provider: account.provider,
         holder: account.holder,
         place: account.place,
         uses: account.uses.clone(),

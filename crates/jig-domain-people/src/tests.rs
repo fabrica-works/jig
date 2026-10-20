@@ -1768,7 +1768,7 @@ fn original_name_context_checks_count_bytes_order_and_references() {
 }
 
 #[test]
-fn a_kept_llm_key_answer_restores_and_replays_source_zero() {
+fn a_restored_kept_llm_key_answer_replays_source_zero() {
     let mut test = Test::new(LIMITS);
     test.member();
     let ask = Ask::AccountChange {
