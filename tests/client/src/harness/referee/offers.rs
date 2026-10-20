@@ -128,6 +128,7 @@ impl Offers {
                         budget: task.authority.spend,
                         deadline: task.authority.deadline,
                         priority: task.tracked,
+                        llm: task.llm.clone(),
                     },
                     task.deadline,
                 )

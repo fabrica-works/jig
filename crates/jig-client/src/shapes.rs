@@ -1,8 +1,8 @@
 //! Template recipes over the public contract (client/domain/client.md, 19).
 use crate::contract::{
-    Ask, Beyond, CreateBounds, Creating, Me, NewBudget, NewContract, NewDeadline, NewTask, Operation, OwnerExecutor,
-    ProposeAction, Recipient, Refusal, Specification, TaskContractDocument, Template, TemplateBudget, TemplateDeadline,
-    TemplateExecutor, Text,
+    Ask, Beyond, CreateBounds, Creating, LlmChoice, Me, NewBudget, NewContract, NewDeadline, NewTask, Operation,
+    OwnerExecutor, ProposeAction, Recipient, Refusal, Specification, TaskContractDocument, Template, TemplateBudget,
+    TemplateDeadline, TemplateExecutor, Text,
 };
 use skein_lib::{List, Wall};
 pub const CHAT: u32 = 1;
@@ -32,6 +32,8 @@ pub struct GoalDraft {
     pub budget: u64,
     pub deadline: Option<Wall>,
     pub priority: Option<u32>,
+    /// The LLM choice the creator names, by configured names; `None` takes the template's.
+    pub llm: Option<LlmChoice>,
 }
 #[derive(Debug)]
 pub enum Judged {
@@ -116,6 +118,7 @@ pub fn set_goal(me: &Me, project: u32, draft: GoalDraft, reason: Text) -> Judged
         budget: task.authority.spend,
         deadline: task.authority.deadline,
         priority: task.tracked,
+        llm: task.llm.clone(),
     };
     match fall(creating, &filled, task.deadline) {
         Fall::Within => Judged::Create(Ask::Create { project, tasks: single(task) }),
@@ -196,6 +199,12 @@ fn fill(
             NewDeadline::Named
         }
     };
+    let mut llm = template.llm.clone();
+    if let Some(draft) = draft
+        && let Some(choice) = &draft.llm
+    {
+        llm = Some(choice.clone());
+    }
     Ok(NewTask {
         deadline,
         executor,
@@ -209,7 +218,7 @@ fn fill(
         tracked: priority(template.tracked, draft),
         label: template.label,
         flags: template.flags,
-        llm: None,
+        llm,
     })
 }
 #[must_use]

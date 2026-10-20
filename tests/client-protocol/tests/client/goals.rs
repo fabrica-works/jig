@@ -36,6 +36,7 @@ fn goal(world: &mut bytes::Story, client: jig_client_world::ClientId, words: &[u
             budget: 10,
             deadline: None,
             priority: Some(priority),
+            llm: None,
         },
         jig_client_world::stories::text(b""),
     );

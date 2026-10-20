@@ -974,6 +974,9 @@ with a person in front of a tree, are view.md's, 18.10.
     which the engine makes a wall (contract.md, 3.2), or the creator's
     wall where the template has it given, so that no shape reads a
     clock; no wake policy, so the executor's own;
+    the template's LLM choice, or the goal draft's where it names one,
+    by configured names (contract.md, 3.2), none being the charter's
+    default;
     no parameters, inputs, dependencies or grants named after it;
   - a template it cannot fill gives `NotOffered::Template`, and nothing
     is sent: a contract no `Create` names (an approval, or a verdict

@@ -66,6 +66,7 @@ fn goal_fixture() -> (Story, c::Ask, c::Text) {
         budget: GOAL_BUDGET,
         deadline: None,
         priority: Some(7),
+        llm: None,
     };
     let shapes::Judged::Create(ask) = shapes::set_goal(&me, PROJECT, draft, words.clone()) else {
         panic!("span draft within first bounds")

@@ -157,6 +157,7 @@ pub(super) fn ask(me: &Me, executor: OwnerExecutor) -> Ask {
             budget: 2,
             deadline: None,
             priority: Some(0),
+            llm: None,
         },
         text(b""),
     ) {

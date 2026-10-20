@@ -15,6 +15,7 @@ fn draft() -> GoalDraft {
         budget: 150,
         deadline: None,
         priority: Some(7),
+        llm: None,
     }
 }
 #[test]
@@ -118,6 +119,44 @@ fn a_template_span_is_kept_in_the_ask() {
     let task = shape_task(chat(&me, PROJECT, words()).unwrap());
     assert_eq!(task.deadline, NewDeadline::Span(SHAPE_GRACE));
     assert_eq!(task.authority.deadline, None);
+}
+#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
+fn choice(model: &[u8], effort: Option<&[u8]>) -> LlmChoice {
+    let mut subagents = List::with_capacity(1);
+    subagents.push(ModelEffort { model: Text::new(b"quick".as_slice().into(), 32).unwrap(), effort: None }).unwrap();
+    LlmChoice {
+        main: ModelEffort {
+            model: Text::new(model.into(), 32).unwrap(),
+            effort: match effort {
+                Some(effort) => Some(Text::new(effort.into(), 32).unwrap()),
+                None => None,
+            },
+        },
+        subagents,
+    }
+}
+#[test]
+fn a_template_s_llm_choice_is_copied_into_the_create() {
+    let mut me = me();
+    shape_project(&mut me).templates.get_mut(0).unwrap().llm = Some(choice(b"careful", Some(b"high")));
+    let task = shape_task(chat(&me, PROJECT, words()).unwrap());
+    assert_eq!(task.llm, Some(choice(b"careful", Some(b"high"))));
+    shape_project(&mut me).templates.get_mut(0).unwrap().llm = None;
+    assert_eq!(shape_task(chat(&me, PROJECT, words()).unwrap()).llm, None);
+}
+#[test]
+fn a_goal_draft_s_llm_choice_overrides_its_template_s() {
+    let mut me = me();
+    shape_project(&mut me).templates.get_mut(1).unwrap().llm = Some(choice(b"careful", Some(b"high")));
+    let mut plain = draft();
+    plain.budget = 10;
+    let Judged::Create(ask) = set_goal(&me, PROJECT, plain, words()) else { panic!("created") };
+    assert_eq!(shape_task(ask).llm, Some(choice(b"careful", Some(b"high"))));
+    let mut naming = draft();
+    naming.budget = 10;
+    naming.llm = Some(choice(b"quick", None));
+    let Judged::Create(ask) = set_goal(&me, PROJECT, naming, words()) else { panic!("created") };
+    assert_eq!(shape_task(ask).llm, Some(choice(b"quick", None)));
 }
 #[test]
 fn a_template_narrows_the_task_delegation() {

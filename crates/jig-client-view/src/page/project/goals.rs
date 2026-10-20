@@ -126,6 +126,7 @@ pub(crate) fn draft(form: GoalForm, words: Text) -> jig_client::shapes::GoalDraf
         budget: form.budget,
         deadline: form.deadline,
         priority: Some(form.priority),
+        llm: None,
     }
 }
 pub(crate) fn fall(
