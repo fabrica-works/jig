@@ -12,7 +12,7 @@ fn signing_core() -> (Core, Env<Limits>) {
     let mut limits = limits();
     limits.accounts.accounts = 2;
     let mut config = config(73);
-    let offers = accounts::Offers { sign_in: true, key: false, programs: Box::new([]) };
+    let offers = accounts::Offers { sign_in: true, key: true, programs: Box::new([]) };
     config.settings.llm_providers =
         accounts::Providers { providers: Box::new([accounts::Provider { number: 3, models: Box::new([]), offers }]) };
     let mut core = Core::new(config, &limits);
@@ -113,4 +113,113 @@ fn a_party_s_account_sign_in_is_answered_at_its_visit_and_sign_out_at_its_end() 
         stepped(&mut core, &env, confirmed),
         (None, Some(people::Outcome::AccountSignedOut { confirmed: true }))
     );
+}
+
+#[test]
+fn a_value_is_in_no_committed_row() {
+    const VALUE: &[u8] = b"raw-llm-key-value-never-committed";
+    let (mut core, env) = signing_core();
+    // This fixture's provider now offers both sign-in and LLM keys.
+    let ask = people::Ask::AccountChange {
+        holder: people::AccountHolder::Own,
+        change: people::AccountChange::AddKey { provider: 3, join: None, digest: [7; 32] },
+    };
+    let Requests::Out(mut out) = step(
+        &mut core,
+        &env,
+        Event::Key {
+            reply_to: ReplyTo::new(Token::new(90)),
+            sign_in: SIGN_IN,
+            key: [90; 16],
+            ask: Box::new(ask.clone()),
+            carried: Carried { number: 1_u64 << 63_u32, digest: [7; 32] },
+        },
+    );
+    let mut source = None;
+    while let Some(request) = out.pop() {
+        if let Request::Now(now) = request
+            && let Now::Account(accounts::Request::Signing(accounts::Signing::Keep { source: number, carried, .. })) =
+                *now
+        {
+            assert_eq!(carried, 1_u64 << 63_u32);
+            source = Some(number);
+        }
+    }
+    assert_eq!(core.keys.len(), 1);
+    let source = source.expect("the component keeps the LLM key");
+    // A duplicate in flight releases only its own carried value and joins the
+    // first request's answer; the original value remains owned by the keep.
+    let Requests::Out(mut duplicate) = step(
+        &mut core,
+        &env,
+        Event::Key {
+            reply_to: ReplyTo::new(Token::new(91)),
+            sign_in: SIGN_IN,
+            key: [90; 16],
+            ask: Box::new(ask.clone()),
+            carried: Carried { number: (1_u64 << 63_u32) + 1, digest: [7; 32] },
+        },
+    );
+    let mut unused = 0_u32;
+    while let Some(request) = duplicate.pop() {
+        if let Request::Held(held) = request {
+            let Held::CarriedUnused { number } = *held else { panic!("only the duplicate LLM key value is unused") };
+            assert_eq!(number, (1_u64 << 63_u32) + 1);
+            unused += 1;
+        }
+    }
+    assert_eq!(unused, 1);
+    assert_eq!(core.keys.len(), 1);
+    let Requests::Out(mut out) = step(
+        &mut core,
+        &env,
+        Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
+            account: source,
+            generation: 1,
+            valid: accounts::KEY_VALID,
+            form: accounts::Form::Credential(accounts::Scheme::Key),
+        })),
+    );
+    let mut saved = 0_u32;
+    while let Some(request) = out.pop() {
+        if let Request::Write(Write::Save(record)) = request {
+            match record {
+                Record::People(people::Stored::Answer { key, ask: retained, outcome, .. }) => {
+                    saved += 1;
+                    assert_eq!(*retained, ask);
+                    assert_eq!(outcome, people::Outcome::AccountKeyKept { source });
+                    // The answer row's byte fields are the request key and the LLM key's
+                    // digest. The raw value never crosses the core's input boundary.
+                    let people::Ask::AccountChange { change: people::AccountChange::AddKey { digest, .. }, .. } =
+                        *retained
+                    else {
+                        panic!("the retained LLM key ask")
+                    };
+                    for bytes in [key.key.as_slice(), digest.as_slice()] {
+                        for window in bytes.windows(VALUE.len()) {
+                            assert_ne!(window, VALUE);
+                        }
+                    }
+                }
+                Record::Accounts(accounts::Stored::Account { subject, display, .. }) => {
+                    for bytes in [subject.as_ref(), display.as_ref()] {
+                        for window in bytes.windows(VALUE.len()) {
+                            assert_ne!(window, VALUE);
+                        }
+                    }
+                }
+                Record::Accounts(accounts::Stored::Source { name, .. }) => {
+                    for window in name.windows(VALUE.len()) {
+                        assert_ne!(window, VALUE);
+                    }
+                }
+                Record::Accounts(accounts::Stored::Next { .. }) | Record::Core(CoreRecord::Deployment(_)) => {}
+                other @ (Record::Core(_) | Record::Tasks(_) | Record::People(_) | Record::Notes(_)) => {
+                    panic!("unexpected saved row: {other:?}")
+                }
+            }
+        }
+    }
+    assert_eq!(saved, 1);
+    assert!(core.keys.is_empty() && core.key_input.is_none());
 }

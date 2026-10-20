@@ -6,6 +6,7 @@ use facts::{
     decode_again, decode_escalation_choice, decode_proposal_choice, decode_refusal, encode_again,
     encode_escalation_choice, encode_proposal_choice, encode_refusal,
 };
+#[expect(clippy::too_many_lines, reason = "one exhaustive permanent outcome translation table")]
 pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
     Ok(match value {
         domain::Outcome::Compound { project, operations, first_message } => {
@@ -122,6 +123,7 @@ fn account_signed_out(confirmed: bool, limits: &wire::Limits) -> Result<wire::Ou
     let parts = wire::OutcomeAccountSignedOutParts { confirmed };
     Ok(wire::Outcome::AccountSignedOut(wire::OutcomeAccountSignedOut::new(limits, parts)?))
 }
+#[expect(clippy::too_many_lines, reason = "one exhaustive permanent outcome translation table")]
 pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
     match value {
         wire::Outcome::Compound(value) => {

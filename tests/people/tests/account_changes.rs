@@ -41,9 +41,17 @@ fn an_account_change_is_admitted_for_its_holder_with_no_role() {
         let expected = match value {
             AccountChange::AddKey { .. } | AccountChange::ReplaceKey { .. } => Outcome::AccountKeyKept { source: 1 },
             AccountChange::Remove { .. } => Outcome::AccountRemoved { confirmed: true },
-            _ => Outcome::AccountChanged,
+            AccountChange::RemoveKey { .. }
+            | AccountChange::Resume { .. }
+            | AccountChange::MoveAccount { .. }
+            | AccountChange::MoveSource { .. }
+            | AccountChange::SetUses { .. } => Outcome::AccountChanged,
         };
-        let call = world.request(11, [at as u8; 16], change(AccountHolder::Own, value));
+        let call = world.request(
+            11,
+            [u8::try_from(at).expect("eight account changes"); 16],
+            change(AccountHolder::Own, value),
+        );
         world.commit_all();
         assert_eq!(world.reply(call), Some(Reply::Outcome(expected)));
     }
@@ -69,8 +77,8 @@ fn a_service_may_not_change_an_account() {
     let Some(Reply::Outcome(Outcome::ServiceMade { person })) = world.reply(service) else { panic!("service made") };
     world.signin_service(12, person);
     world.commit_all();
-    for holder in [AccountHolder::Own, AccountHolder::Deployment] {
-        let call = world.request(12, [holder as u8; 16], change(holder, AccountChange::Remove { account: 1 }));
+    for (key, holder) in [(0, AccountHolder::Own), (1, AccountHolder::Deployment)] {
+        let call = world.request(12, [key; 16], change(holder, AccountChange::Remove { account: 1 }));
         world.commit_all();
         assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: None }))));
     }
@@ -110,7 +118,10 @@ fn account_uses_are_bounded_before_admission() {
         [11; 16],
         change(
             AccountHolder::Own,
-            AccountChange::SetUses { account: 1, uses: Some(vec![Use::Party(1); USES as usize + 1].into()) },
+            AccountChange::SetUses {
+                account: 1,
+                uses: Some(vec![Use::Party(1); usize::try_from(USES).expect("account uses fit usize") + 1].into()),
+            },
         ),
     );
     world.commit_all();

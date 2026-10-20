@@ -7,6 +7,7 @@
 pub(crate) mod application_routes;
 mod create;
 pub(crate) mod deadlines;
+pub(crate) mod key_routes;
 pub(crate) mod party_inputs;
 mod propose;
 
@@ -341,6 +342,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: room.held }),
         Event::Stopping
         | Event::Marked { .. }
+        | Event::Key { .. }
         | Event::Application { .. }
         | Event::ApplicationPart { .. }
         | Event::ApplicationFinished { .. }
@@ -461,6 +463,9 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         }
         Event::Stopping => crate::stopping::start(core),
         Event::Marked { connector, subjects } => view_routes::marked(core, connector, subjects),
+        Event::Key { reply_to, sign_in, key, ask, carried } => {
+            key_routes::start(core, env, work, reply_to, sign_in, key, *ask, carried)
+        }
         Event::Application { reply_to, sign_in, key, scope, connector, digest, owner, carried } => {
             let input = application_routes::Input { connector, owner, carried: application_routes::number(carried) };
             application_routes::start(core, env, work, reply_to, sign_in, key, scope, digest, input)

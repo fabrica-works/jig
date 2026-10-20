@@ -921,3 +921,25 @@ fn the_providers_rule_refusal_round_trips() {
         jig_domain_people::Refusal::Provider,
     )));
 }
+
+#[test]
+fn an_llm_key_answer_keeps_its_digest_without_the_value() {
+    use jig_domain_people::{AccountChange, AccountHolder, Ask, Outcome, RequestKey, Stored};
+    const VALUE: &[u8] = b"raw-llm-key-value-never-committed";
+    let row = Stored::Answer {
+        key: RequestKey { person: 1, key: [2; 16] },
+        ask: Box::new(Ask::AccountChange {
+            holder: AccountHolder::Own,
+            change: AccountChange::AddKey { provider: 3, join: None, digest: [7; 32] },
+        }),
+        outcome: Outcome::AccountKeyKept { source: 2 },
+        at: skein_lib::Wall::EPOCH,
+    };
+    let limits = people_limits();
+    let names = fixtures::model_names(&[b"first", b"second", b"third"]);
+    let bytes = crate::codec::people::encode(&row, &limits, &names).expect("bounded people row");
+    for window in bytes.windows(VALUE.len()) {
+        assert_ne!(window, VALUE);
+    }
+    assert_eq!(crate::codec::people::decode(&bytes, &limits, &names), Ok(row));
+}

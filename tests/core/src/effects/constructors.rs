@@ -223,6 +223,7 @@ impl World {
             renew_on_running: None,
             fail_account_before_workspace: false,
             hold_accounts: false,
+            fail_llm_key_keep: None,
             assignments: Vec::new(),
             cancellations: Vec::new(),
             busy_turns: Vec::new(),

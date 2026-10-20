@@ -1182,14 +1182,13 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
         | Ask::Withdraw { .. }
         | Ask::AccountSignIn { .. }
         | Ask::AccountSignOut { .. } => return Refusal::Unknown,
-        Ask::AccountChange { .. } => LimitKind::Words,
         Ask::Adopt { .. } => LimitKind::Resource,
         Ask::SetRoles { .. } => LimitKind::Roles,
         Ask::ChangePolicy { .. } => LimitKind::Policy,
         Ask::Create { batch, .. } | Ask::Propose { action: crate::Action::Batch(batch), .. } => {
             crate::batch::invalid(limits, batch)
         }
-        Ask::Propose { action: crate::Action::Amend { .. }, .. } => LimitKind::Words,
+        Ask::AccountChange { .. } | Ask::Propose { action: crate::Action::Amend { .. }, .. } => LimitKind::Words,
         Ask::Say { task, words, .. } => {
             if *task == 0 {
                 return Refusal::Unknown;

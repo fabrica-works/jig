@@ -223,10 +223,10 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
                 w::OwnerOutcomeAccountSignedOutParts { confirmed: *confirmed },
             )?)
         }
-        p::Outcome::AccountKeyKept { .. } | p::Outcome::AccountChanged | p::Outcome::AccountRemoved { .. } => {
-            return Err(problem());
-        }
-        p::Outcome::CompoundRefused { .. }
+        p::Outcome::AccountKeyKept { .. }
+        | p::Outcome::AccountChanged
+        | p::Outcome::AccountRemoved { .. }
+        | p::Outcome::CompoundRefused { .. }
         | p::Outcome::Applied { .. }
         | p::Outcome::Again(_)
         | p::Outcome::SignedOut

@@ -246,6 +246,8 @@ pub struct Core {
     pub(crate) census_position: Option<(u64, u64, u64)>,
     pub(crate) ended_marks: Map<Token, ended_marks::Loaded>,
     pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
+    pub(crate) key_input: Option<Carried>,
+    pub(crate) keys: Map<Token, Carried>,
     pub(crate) application_input: Option<routing::application_routes::Input>,
     pub(crate) task_capacity_mark: u64,
     pub(crate) applications: Map<Token, routing::application_routes::Flight>,
@@ -570,6 +572,8 @@ impl Core {
                     .checked_add(1)
                     .expect("validated archive cache bound"),
             ),
+            key_input: None,
+            keys: Map::with_capacity(limits.people.pending),
             application_input: None,
             task_capacity_mark: 0,
             applications: Map::with_capacity(limits.people.pending),

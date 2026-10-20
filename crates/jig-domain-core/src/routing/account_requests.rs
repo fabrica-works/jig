@@ -60,7 +60,7 @@ const fn limit(bound: accounts::Bound) -> people::LimitKind {
 }
 
 /// Convert the holder's account change and check the provider's uses rule. LLM key
-/// changes need the carried envelope and are dispatched by key_routes instead.
+/// changes need the carried envelope and are dispatched by `key_routes` instead.
 pub(crate) fn change(
     core: &crate::Core,
     holder: accounts::Holder,

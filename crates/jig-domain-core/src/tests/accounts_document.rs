@@ -561,14 +561,12 @@ fn the_providers_uses_rule_checks_people_and_projects_for_plans_and_llm_keys() {
         }
         let empty: Box<[people::Use]> = Box::new([]);
         for uses in [None, Some(empty)] {
-            assert!(
-                routing::account_requests::change(
-                    &core,
-                    accounts::Holder::Party(ALICE),
-                    people::AccountChange::SetUses { account: OWN, uses }
-                )
-                .is_ok()
-            );
+            routing::account_requests::change(
+                &core,
+                accounts::Holder::Party(ALICE),
+                people::AccountChange::SetUses { account: OWN, uses },
+            )
+            .expect("the holder may keep default or empty uses");
         }
         assert_eq!(
             routing::account_requests::change(

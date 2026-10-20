@@ -50,6 +50,9 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
     }
     match event {
         Event::SignIn { reply_to, .. } => Err(party(reply_to)),
+        Event::Key { reply_to, carried, .. } => {
+            Err(crate::routing::application_routes::first(Some(carried.number), party(reply_to)))
+        }
         Event::Application { reply_to, connector, owner, carried, .. } => {
             let unused = crate::routing::application_routes::number(carried);
             let Requests::Out(mut out) = crate::routing::application_routes::first(unused, party(reply_to));

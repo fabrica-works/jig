@@ -399,6 +399,9 @@ pub enum Event {
         owner: Token,
         carried: Option<Carried>,
     },
+    /// An LLM key ask whose value is already in the secrets' store. People keeps
+    /// only the ask's digest; the accounts child receives the carried number.
+    Key { reply_to: ReplyTo, sign_in: u64, key: [u8; 16], ask: Box<people::Ask>, carried: Carried },
     /// A connector asks the core within the admitted party decision.
     ApplicationPart { request: Token, ask: Box<people::Ask> },
     /// The connector durably kept its outcome, or could not decide this time.

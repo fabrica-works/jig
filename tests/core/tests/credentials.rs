@@ -117,7 +117,7 @@ fn signing(seed: u64) -> World {
         providers: Box::new([accounts::Provider {
             number: PROVIDER,
             models: Box::new([]),
-            offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+            offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
         }]),
     };
     limits.core.accounts.accounts = 2;
@@ -333,16 +333,18 @@ fn party(world: &World, sign_in: u64) -> u64 {
         .store
         .rows
         .values()
-        .find_map(|record| match record {
-            root::Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. }))
-                if *number == sign_in =>
+        .find_map(|record| {
+            if let root::Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. })) = record
+                && *number == sign_in
             {
                 Some(*person)
+            } else {
+                None
             }
-            _ => None,
         })
         .expect("a signed-in party")
 }
+
 #[test]
 fn a_plans_uses_naming_another_person_are_refused_naming_the_providers_rule() {
     let mut world = signing(167);
@@ -360,4 +362,227 @@ fn a_plans_uses_naming_another_person_are_refused_naming_the_providers_rule() {
         },
     );
     assert_eq!(answer, Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Provider))));
+}
+
+fn llm_key(digest: u8) -> people::Ask {
+    people::Ask::AccountChange {
+        holder: people::AccountHolder::Own,
+        change: people::AccountChange::AddKey { provider: PROVIDER, join: None, digest: [digest; 32] },
+    }
+}
+fn carry(world: &mut World, key: u8, ask: people::Ask, number: u64, digest: u8) {
+    world.send(root::Event::Core(core::Event::Key {
+        reply_to: skein_lib::ReplyTo::new(Token::new(u64::from(key))),
+        sign_in: world.sign_in.expect("signed in"),
+        key: [key; 16],
+        ask: Box::new(ask),
+        carried: core::Carried { number, digest: [digest; 32] },
+    }));
+}
+fn unused_before_answer(world: &World, before: usize, number: u64) {
+    assert_eq!(world.carried_unused.last(), Some(&(before + world.application_answers.len(), number)));
+    assert_eq!(world.people_answers.len(), before + 1);
+}
+#[test]
+fn a_key_ask_routes_to_the_child_and_is_answered() {
+    let mut world = signing(168);
+    carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
+    let Some(people::Reply::Outcome(people::Outcome::AccountKeyKept { source })) = world.people_answers.last().cloned()
+    else {
+        panic!("LLM key kept")
+    };
+    assert_eq!(world.domain.accounts().source(source).expect("kept LLM key").generation, Some(1));
+    let before = world.people_answers.len();
+    carry(
+        &mut world,
+        41,
+        people::Ask::AccountChange {
+            holder: people::AccountHolder::Own,
+            change: people::AccountChange::ReplaceKey { source, digest: [8; 32] },
+        },
+        (1_u64 << 63) + 1,
+        8,
+    );
+    assert_eq!(world.people_answers.len(), before + 1);
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::AccountKeyKept { source })));
+    assert_eq!(world.domain.accounts().source(source).expect("replaced LLM key").generation, Some(2));
+    assert!(world.carried_unused.is_empty());
+}
+#[test]
+fn a_refused_key_ask_returns_its_carried_value_unused() {
+    let mut world = signing(169);
+    for (at, failure, expected) in [
+        (0, accounts::KeyFailure::NotStored, people::Outcome::Again(people::Again::NotReady)),
+        (
+            1,
+            accounts::KeyFailure::TooLong,
+            people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Words }),
+        ),
+    ] {
+        world.fail_llm_key_keep = Some(failure);
+        let before = world.people_answers.len();
+        carry(&mut world, 40 + at, llm_key(7), (1_u64 << 63) + u64::from(at), 7);
+        unused_before_answer(&world, before, (1_u64 << 63) + u64::from(at));
+        let reply = if let people::Outcome::Again(why) = expected {
+            people::Reply::Again(why)
+        } else {
+            people::Reply::Outcome(expected)
+        };
+        assert_eq!(world.people_answers.last(), Some(&reply));
+    }
+    let before = world.people_answers.len();
+    carry(
+        &mut world,
+        42,
+        people::Ask::AccountChange {
+            holder: people::AccountHolder::Own,
+            change: people::AccountChange::AddKey { provider: 99, join: None, digest: [7; 32] },
+        },
+        (1_u64 << 63) + 2,
+        7,
+    );
+    unused_before_answer(&world, before, (1_u64 << 63) + 2);
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::NotOffered)))
+    );
+}
+#[test]
+fn a_key_ask_people_does_not_admit_returns_it_unused() {
+    let mut world = signing(170);
+    let first = world.sign_in.expect("signed in");
+    carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
+    let expected = world.people_answers.last().cloned();
+    for (digest, expected) in [(7, expected), (8, Some(people::Reply::Refused(people::Refusal::KeyConflict)))] {
+        let before = world.people_answers.len();
+        let number = (1_u64 << 63) + u64::from(digest);
+        carry(&mut world, 40, llm_key(digest), number, digest);
+        unused_before_answer(&world, before, number);
+        assert_eq!(world.people_answers.last().cloned(), expected);
+    }
+    world.sign_in = Some(u64::MAX);
+    let before = world.people_answers.len();
+    carry(&mut world, 41, llm_key(7), (1_u64 << 63) + 9, 7);
+    unused_before_answer(&world, before, (1_u64 << 63) + 9);
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::SignedOut));
+    world.sign_in = Some(first);
+    jig_core_world::fixtures::second_party(&mut world, b"not-owner", people::Role::Observer);
+    let before = world.people_answers.len();
+    carry(
+        &mut world,
+        42,
+        people::Ask::AccountChange {
+            holder: people::AccountHolder::Deployment,
+            change: people::AccountChange::AddKey { provider: PROVIDER, join: None, digest: [7; 32] },
+        },
+        (1_u64 << 63) + 10,
+        7,
+    );
+    unused_before_answer(&world, before, (1_u64 << 63) + 10);
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Role { held: None })))
+    );
+}
+#[test]
+fn an_llm_key_ask_with_the_wrong_envelope_is_not_offered() {
+    let mut world = signing(171);
+    assert_eq!(
+        ask(&mut world, 40, llm_key(7)),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::NotOffered)))
+    );
+    assert_eq!(
+        ask(
+            &mut world,
+            41,
+            people::Ask::AccountChange {
+                holder: people::AccountHolder::Own,
+                change: people::AccountChange::ReplaceKey { source: 99, digest: [7; 32] }
+            }
+        ),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::NotOffered)))
+    );
+    for (key, ask, digest) in [
+        (42, people::Ask::AccountSignIn { holder: people::AccountHolder::Own, provider: PROVIDER }, 7),
+        (43, llm_key(7), 8),
+    ] {
+        let before = world.people_answers.len();
+        carry(&mut world, key, ask, (1_u64 << 63) + u64::from(key), digest);
+        unused_before_answer(&world, before, (1_u64 << 63) + u64::from(key));
+        assert_eq!(world.people_answers.last(), Some(&people::Reply::Refused(people::Refusal::NotOffered)));
+    }
+}
+#[test]
+fn a_keys_uses_may_name_any_known_party_or_project() {
+    let mut world = signing(172);
+    let first = world.sign_in.expect("signed in");
+    let second = jig_core_world::fixtures::second_party(&mut world, b"llm-key-payer", people::Role::Member);
+    let other = party(&world, second);
+    world.sign_in = Some(first);
+    carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
+    let Some(people::Reply::Outcome(people::Outcome::AccountKeyKept { source })) = world.people_answers.last() else {
+        panic!("LLM key kept")
+    };
+    let account = world.domain.accounts().source(*source).expect("LLM key source").account;
+    assert_eq!(
+        ask(
+            &mut world,
+            41,
+            people::Ask::AccountChange {
+                holder: people::AccountHolder::Own,
+                change: people::AccountChange::SetUses {
+                    account,
+                    uses: Some(Box::new([people::Use::Party(other), people::Use::Project(1)]))
+                }
+            }
+        ),
+        Some(&people::Reply::Outcome(people::Outcome::AccountChanged))
+    );
+    assert_eq!(
+        world.domain.accounts().account(account).expect("LLM key account").uses(),
+        Some([accounts::Use::Party(other), accounts::Use::Project(1)].as_slice())
+    );
+}
+
+#[test]
+fn a_carried_llm_key_of_another_holders_shape_is_not_offered() {
+    let mut world = signing(173);
+    carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
+    let Some(people::Reply::Outcome(people::Outcome::AccountKeyKept { source })) = world.people_answers.last().cloned()
+    else {
+        panic!("LLM key kept")
+    };
+    let account = world.domain.accounts().source(source).expect("LLM key source").account;
+    jig_core_world::fixtures::second_party(&mut world, b"another-holder", people::Role::Member);
+    for (at, change) in [
+        people::AccountChange::ReplaceKey { source, digest: [7; 32] },
+        people::AccountChange::AddKey { provider: PROVIDER, join: Some(account), digest: [7; 32] },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let before = world.people_answers.len();
+        let number = (1_u64 << 63) + u64::try_from(at).expect("two account changes") + 1;
+        carry(
+            &mut world,
+            41 + u8::try_from(at).expect("two account changes"),
+            people::Ask::AccountChange { holder: people::AccountHolder::Own, change },
+            number,
+            7,
+        );
+        unused_before_answer(&world, before, number);
+        assert_eq!(
+            world.people_answers.last(),
+            Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::NotOffered)))
+        );
+    }
+}
+#[test]
+fn a_carried_llm_key_is_returned_unused_while_stopping() {
+    let mut world = signing(174);
+    world.send(root::Event::Core(core::Event::Stopping));
+    let before = world.people_answers.len();
+    carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
+    unused_before_answer(&world, before, 1_u64 << 63);
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Again(people::Again::NotReady)));
 }

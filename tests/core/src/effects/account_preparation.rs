@@ -67,8 +67,22 @@ impl World {
                 }
             }
             accounts::Signing::SignOut { source } => accounts::Event::SignedOut { source, confirmed: true },
-            accounts::Signing::Keep { .. }
-            | accounts::Signing::Forget { .. }
+            accounts::Signing::Keep { source, .. } => {
+                let response = if let Some(why) = self.fail_llm_key_keep.take() {
+                    accounts::FromComponent::KeepFailed { account: source, why }
+                } else {
+                    let generation =
+                        self.domain.accounts().source(source).and_then(|fact| fact.generation).unwrap_or(0) + 1;
+                    accounts::FromComponent::Granted {
+                        form: accounts::Form::Credential(accounts::Scheme::Key),
+                        account: source,
+                        generation,
+                        valid: accounts::KEY_VALID,
+                    }
+                };
+                accounts::Event::Component(response)
+            }
+            accounts::Signing::Forget { .. }
             | accounts::Signing::Replaced { .. }
             | accounts::Signing::Restore { .. }
             | accounts::Signing::Restored => {

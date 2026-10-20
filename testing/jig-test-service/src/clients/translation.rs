@@ -126,6 +126,7 @@ pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }
         | core::Event::Read { .. }
+        | core::Event::Key { .. }
         | core::Event::Application { .. }
         | core::Event::ApplicationPart { .. }
         | core::Event::ApplicationFinished { .. }
@@ -203,6 +204,7 @@ pub(crate) fn starting(value: core::Event) -> Option<kit::Event> {
         | core::Event::Stopping
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }
+        | core::Event::Key { .. }
         | core::Event::Application { .. }
         | core::Event::ApplicationPart { .. }
         | core::Event::ApplicationFinished { .. }

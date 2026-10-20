@@ -209,6 +209,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     for value in [
         size_of::<crate::GoalRoute>(),
         size_of::<crate::routing::application_routes::Flight>(),
+        size_of::<crate::Carried>(),
         size_of::<crate::PersonTaskRoute>(),
         size_of::<crate::PersonProposalRoute>(),
         size_of::<crate::RoutedCall>(),
@@ -229,6 +230,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         limits.tasks.tasks,        // dependency results
         limits.people.pending,     // made
         limits.people.pending,     // application continuations
+        limits.people.pending,     // LLM key flights
         limits.people.pending,     // goal routes
         limits.fleet.calls,        // delegation
         limits.people.pending,     // proposal routes

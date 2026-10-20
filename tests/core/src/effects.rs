@@ -50,6 +50,8 @@ pub struct World {
     renew_on_running: Option<accounts::FromComponent>,
     pub fail_account_before_workspace: bool,
     pub hold_accounts: bool,
+    /// Fail the next LLM key keep at the scripted accounts component.
+    pub fail_llm_key_keep: Option<accounts::KeyFailure>,
     pub assignments: Vec<(u64, u64)>,
     pub cancellations: Vec<(u64, u64)>,
     pub busy_turns: Vec<(u64, u64, u32)>,

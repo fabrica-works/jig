@@ -52,6 +52,9 @@ pub(super) fn route_people(
                     unused = None;
                 }
             }
+            let key_unused = super::key_routes::finished(core, request, &outcome);
+            assert!(unused.is_none() || key_unused.is_none(), "one carried owner per people flight");
+            unused = unused.or(key_unused);
             people::Event::Decided { request, outcome }
         }
         other @ (people::Event::ChatState { .. }
@@ -305,9 +308,9 @@ pub(super) fn tag_people(
                     },
                     people::Ask::AccountChange { holder, change } => {
                         let holder = super::account_requests::holder(holder, person);
-                        match super::account_requests::change(core, holder, change) {
+                        match super::key_routes::admitted(core, request, holder, change) {
                             Ok(change) => {
-                                work.push(Event::Account(accounts::Event::Change { request, holder, change }))
+                                work.push(Event::Account(accounts::Event::Change { request, holder, change }));
                             }
                             Err(why) => work.push(Event::People(people::Event::Decided {
                                 request,

@@ -45,7 +45,7 @@ pub(super) fn encode(
         domain::AccountChange::SetUses { account, uses } => {
             wire::AccountChange::SetUses(wire::AccountChangeSetUses::new(
                 limits,
-                wire::AccountChangeSetUsesParts { account: *account, uses: encode_uses(uses, limits)? },
+                wire::AccountChangeSetUsesParts { account: *account, uses: encode_uses(uses.as_deref(), limits)? },
             )?)
         }
     })
@@ -94,12 +94,12 @@ pub(super) fn decode(value: wire::AccountChange) -> Result<domain::AccountChange
     })
 }
 fn encode_uses(
-    uses: &Option<Box<[domain::Use]>>,
+    uses: Option<&[domain::Use]>,
     limits: &wire::Limits,
 ) -> Result<Option<List<wire::AccountUse>>, wire::Problem> {
     let Some(uses) = uses else { return Ok(None) };
     let mut out = List::with_capacity(limits.account_change_set_uses_uses_some);
-    for value in &**uses {
+    for value in uses {
         let value = match value {
             domain::Use::Party(number) => wire::AccountUse::Party(wire::AccountUseParty::new(
                 limits,
@@ -120,7 +120,7 @@ fn encode_uses(
     Ok(Some(out))
 }
 fn decode_uses(uses: Option<List<wire::AccountUse>>) -> Option<Box<[domain::Use]>> {
-    let Some(uses) = uses else { return None };
+    let uses = uses?;
     let mut out = List::with_capacity(uses.len());
     for value in uses.into_boxed() {
         out.push(match value {
