@@ -1,7 +1,7 @@
 //! Application-verified identities mint credentials only after durability (client.md, 8).
 use super::{
-    Box, Component, Env, Kept, Limits, Queue, ReplyTo, Request, SecretOwner, SecretsRequest, Token, Waiting, core,
-    people, routes, sign_in, w,
+    Box, Component, Env, Kept, Limits, Queue, ReplyTo, Request, SecretOwner, SecretsRequest, Token, Waiting, closing,
+    core, people, routes, sign_in, w,
 };
 use crate::MintRefusal;
 impl Component {
@@ -51,6 +51,13 @@ impl Component {
         if self.stopping() && self.mint_refused(exchange, MintRefusal::NotReady, out) {
             return;
         }
+        let spent = match self.spending.take() {
+            Some((held, link)) if held == exchange => Some(link),
+            other => {
+                self.spending = other;
+                None
+            }
+        };
         match reply {
             people::Reply::SignedIn { person, sign_in, expires } => {
                 let token = sign_in::token(&mut self.rng, sign_in);
@@ -80,6 +87,13 @@ impl Component {
                     people::Again::Busy => MintRefusal::Busy,
                 };
                 if !self.mint_refused(exchange, refusal, out) {
+                    // Not ready spends no secret: the same link signs in when sent again.
+                    if refusal == MintRefusal::NotReady
+                        && self.link.is_none()
+                        && (self.phase == closing::Phase::Active || self.phase == closing::Phase::Stopped)
+                    {
+                        self.link = spent;
+                    }
                     let answer = if refusal == MintRefusal::NotReady {
                         routes::sign_in_not_ready()
                     } else {

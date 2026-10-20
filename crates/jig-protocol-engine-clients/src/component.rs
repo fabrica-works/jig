@@ -30,6 +30,8 @@ pub struct Component {
     settings: Settings,
     rng: CryptoRng,
     link: Option<Link>,
+    /// The link a sign-in spends while the core answers it, given back on not ready (client.md, 8).
+    spending: Option<(Token, Link)>,
     connections: Map<Token, Exchange>,
     pending: Pending,
     streams: Map<Token, crate::stream::Stream>,
@@ -65,6 +67,7 @@ impl Component {
             settings,
             rng,
             link: None,
+            spending: None,
             connections: Map::with_capacity(env.limits.exchanges),
             pending: Pending {
                 mints: Map::with_capacity(env.limits.mints),
@@ -336,7 +339,9 @@ impl Component {
                     connection.respond(crate::Reply::Record(routes::refused(&env.limits.wire)), &env.limits);
                     return;
                 }
-                self.link = None;
+                if let Some(link) = self.link.take() {
+                    self.spending = Some((exchange, link));
+                }
                 self.pending.exchanges.insert(exchange, Waiting::Core).expect("admitted exchange");
                 out.push(Request::Core(Box::new(core::Event::SignIn {
                     reply_to: ReplyTo::new(exchange),

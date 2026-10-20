@@ -502,9 +502,11 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   application's startup, `Link { secret }`, which prints a URL carrying
   it. The URL is the application's; the default mapping's is its link
   route (17.1). Signing in with the secret signs that person in as the
-  deployment's first owner it names, and spends it. One link is live at
-  a time: a sign-in with a secret spent, expired or unknown is refused,
-  and the component draws a fresh one, which the startup prints again.
+  deployment's first owner it names, and spends it; a sign-in answered
+  not ready spends nothing, so the same link signs in when sent again
+  (below). One link is live at a time: a sign-in with a secret spent,
+  expired or unknown is refused, and the component draws a fresh one,
+  which the startup prints again.
   It is enabled by configuration (`configuration.md`, section 3,
   clients), and only where the application's clients' listener is on
   loopback, which its startup checks (`service.md`, section 3).

@@ -32,6 +32,18 @@ fn a_spent_link_is_refused_and_a_fresh_one_printed() {
     assert_ne!(peer.printed_link(), link);
 }
 #[test]
+fn a_link_answered_not_ready_is_not_spent() {
+    let mut peer = peer();
+    let link = peer.printed_link();
+    let exchange = peer.post_link(&link);
+    let Some(jig_domain_core::Event::SignIn { reply_to, .. }) = peer.take_core() else { panic!("sign-in") };
+    peer.answer_request(reply_to, jig_domain_people::Reply::Again(jig_domain_people::Again::NotReady));
+    assert_eq!(peer.answered(exchange), Some(b"\x02".as_slice()), "not_ready wire record");
+    let answer = complete_sign_in(&mut peer);
+    assert_eq!(answer.party(), fixtures::FIRST_PERSON);
+    assert_eq!(peer.printed_link(), link, "no replacement link");
+}
+#[test]
 fn the_token_leaves_only_after_its_digest_is_kept() {
     let mut peer = peer();
     let exchange = pending_sign_in(&mut peer);
