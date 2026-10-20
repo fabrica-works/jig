@@ -14,6 +14,29 @@ impl Providers {
     pub fn none() -> Self {
         Self { providers: Box::new([]) }
     }
+    /// The provider of this number.
+    #[must_use]
+    #[expect(clippy::manual_find, reason = "the strict subset iterates without a closure")]
+    pub fn get(&self, number: u32) -> Option<&Provider> {
+        for provider in &self.providers {
+            if provider.number == number {
+                return Some(provider);
+            }
+        }
+        None
+    }
+    /// The provider serving a configured model, by its name.
+    #[must_use]
+    pub fn serving(&self, model: &[u8]) -> Option<&Provider> {
+        for provider in &self.providers {
+            for name in &provider.models {
+                if **name == *model {
+                    return Some(provider);
+                }
+            }
+        }
+        None
+    }
 }
 
 /// One LLM provider: its number, the configured models it serves and the sources it offers.
@@ -34,4 +57,12 @@ pub struct Offers {
     pub key: bool,
     /// Program names, such as `claude_code` for Claude Code.
     pub programs: Box<[Box<[u8]>]>,
+}
+
+impl Offers {
+    /// Offering no source: the provider's one account is the deployment's `none` account.
+    #[must_use]
+    pub fn none(&self) -> bool {
+        !self.sign_in && !self.key && self.programs.is_empty()
+    }
 }
