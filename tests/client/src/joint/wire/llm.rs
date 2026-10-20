@@ -240,3 +240,46 @@ fn unconfigured(value: &c::ModelEffort, configured: &[Model]) -> Option<c::LlmWh
     }
     Some(c::LlmWhy::Unconfigured)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn choice_lists_obey_the_receiving_bound() {
+        let source = t::LlmChoice {
+            account: Some(3),
+            main: t::ModelEffort { model: 0, effort: None },
+            subagents: Box::new([t::ModelEffort { model: 0, effort: Some(1) }]),
+        };
+        let models = [jig_core_world::world::scripted_model()];
+        let limits = super::super::deployment::tests::limits();
+        assert!(choice(Some(&source), &models, &Limits { rows: 1, ..limits }).is_ok());
+        assert_eq!(choice(Some(&source), &models, &Limits { rows: 0, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(choice(Some(&source), &models, &Limits { text: 3, ..limits }), Err(owner::Invalid::TooLarge));
+    }
+
+    #[test]
+    fn model_lists_obey_the_receiving_bound() {
+        let configured = [jig_core_world::world::scripted_model()];
+        let providers = jig_domain_accounts::Providers::none();
+        let limits = super::super::deployment::tests::limits();
+        assert!(
+            models(jig_domain_authority::Models::ALL, &configured, &providers, &Limits { rows: 2, ..limits }).is_ok()
+        );
+        assert_eq!(
+            models(jig_domain_authority::Models::ALL, &configured, &providers, &Limits { rows: 1, ..limits }),
+            Err(owner::Invalid::TooLarge)
+        );
+    }
+
+    #[test]
+    fn missing_choice_indices_are_refused() {
+        let models = [jig_core_world::world::scripted_model()];
+        let limits = super::super::deployment::tests::limits();
+        for main in [t::ModelEffort { model: 1, effort: None }, t::ModelEffort { model: 0, effort: Some(2) }] {
+            let source = t::LlmChoice { account: None, main, subagents: Box::new([]) };
+            assert_eq!(choice(Some(&source), &models, &limits), Err(owner::Invalid::Llm));
+        }
+    }
+}

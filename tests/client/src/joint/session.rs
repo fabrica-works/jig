@@ -906,15 +906,27 @@ mod tests {
     use skein_lib::Token;
 
     fn session() -> (Session, Time, Wall) {
+        configured_session(jig_core_world::world::config(8455), Peers::new(Vec::new(), Vec::new()))
+    }
+
+    fn configured_session(configuration: root::Config, peers: Peers) -> (Session, Time, Wall) {
         let now = Time::from_nanos(17);
         let wall = Wall::from_nanos(1_000_000_000_000);
-        let driver = Driver::new(
-            jig_core_world::world::config(8455),
-            jig_core_world::world::limits(),
-            Peers::new(Vec::new(), Vec::new()),
-            now,
-            wall,
-        );
+        let mut owner_limits = jig_core_world::world::limits();
+        owner_limits.core.authority = *configuration.core.authority.limits();
+        owner_limits.core.tasks.batch = owner_limits.core.tasks.batch.max(owner_limits.core.authority.batch);
+        for charter in &configuration.core.settings.charters {
+            let bytes = core::policy_owned_bytes(&charter.policy).expect("fixture run policy size");
+            owner_limits.core.run_bytes =
+                owner_limits.core.run_bytes.max(u32::try_from(bytes).expect("fixture run bound"));
+        }
+        let room = core::room_max(&owner_limits.core).expect("fixture core output bound");
+        let connectors = jig_test_connector::MAX_OUT.checked_mul(2).expect("two fixture connectors");
+        owner_limits.journal.writes =
+            owner_limits.journal.writes.max(room.writes.checked_add(connectors).expect("fixture writes"));
+        owner_limits.journal.held =
+            owner_limits.journal.held.max(room.held.checked_add(connectors).expect("fixture deliveries"));
+        let driver = Driver::new(configuration, owner_limits, peers, now, wall);
         let mut limits = crate::test::limits();
         limits.client.domain.rows = 32;
         limits.client.domain.projects = 64;
@@ -1654,6 +1666,7 @@ mod tests {
         assert!(matches!(session.driver.transport.taken(ClientId(1), native), Some(core::Event::Delivered { .. })));
     }
     mod carried;
+    mod llm;
     mod offline;
 }
 

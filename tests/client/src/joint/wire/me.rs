@@ -131,3 +131,29 @@ pub(super) fn empty_authority() -> jig_domain_core::documents::AuthorityLine {
         note_resources: List::with_capacity(0),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn template_carries_its_named_choice() {
+        let mut source = jig_core_world::world::config(8455).core.settings.templates[0].clone();
+        source.llm = Some(t::LlmChoice {
+            account: Some(17),
+            main: t::ModelEffort { model: 0, effort: Some(1) },
+            subagents: Box::new([t::ModelEffort { model: 0, effort: None }]),
+        });
+        let limits = super::super::deployment::tests::limits();
+        let actual = template(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole template");
+        let text = |value: &[u8]| c::Text::new(value.into(), limits.text).expect("fixture name");
+        assert_eq!(
+            actual.llm,
+            Some(c::LlmChoice {
+                account: Some(17),
+                main: c::ModelEffort { model: text(b"scripted"), effort: Some(text(b"high")) },
+                subagents: crate::test::list([c::ModelEffort { model: text(b"scripted"), effort: None }]),
+            })
+        );
+    }
+}
