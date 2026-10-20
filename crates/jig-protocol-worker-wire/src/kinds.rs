@@ -28,6 +28,19 @@ pub enum Kind {
     SignedOut,
 }
 
+impl Kind {
+    /// The record's allocated worker-channel number.
+    #[must_use]
+    pub fn number(self) -> u16 {
+        for rule in KINDS {
+            if rule.body == self {
+                return rule.kind;
+            }
+        }
+        unreachable!("every worker record has one kind rule")
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct KindRule {
     pub kind: u16,

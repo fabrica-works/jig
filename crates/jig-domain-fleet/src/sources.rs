@@ -31,7 +31,7 @@ impl Sources {
             return false;
         }
         for login in &self.logins {
-            if login.state != LoginState::NotSignedIn {
+            if !absent(&login.state) {
                 return false;
             }
         }
@@ -48,13 +48,14 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     let names = u64::from(limits.program_sources).checked_mul(u64::try_from(size_of::<SourceName>()).ok()?)?;
     let rows = u64::from(limits.program_sources)
         .checked_mul(u64::try_from(size_of::<Login>()).ok()?.checked_add(u64::from(limits.source_detail_bytes))?)?;
-    // Sent, previous, desired and the domain's current list; one inventory
-    // and its incoming replacement coexist, as do loss's pending names.
-    names
-        .checked_mul(5)?
-        .checked_add(rows.checked_mul(2)?)?
-        .checked_add(Map::<SourceName, ReplyTo>::worst_case(limits.program_sources)?)?
-        .checked_add(List::<SourceName>::worst_case(limits.program_sources)?)
+    let lists = names.checked_mul(3)?; // Sent, previous and desired per worker.
+    let pending = Map::<SourceName, ReplyTo>::worst_case(limits.program_sources)?;
+    let workers = lists.checked_add(rows)?.checked_add(pending)?.checked_mul(u64::from(limits.workers))?;
+    let declaration = names; // One current list for the whole domain.
+    // A malformed inventory can lose one channel while its input still lives.
+    let ending = List::<SourceName>::worst_case(limits.program_sources)?;
+    let incoming = rows.max(names).max(u64::from(limits.source_detail_bytes)); // Inventory, declaration or terminal.
+    workers.checked_add(declaration)?.checked_add(incoming)?.checked_add(ending)
 }
 pub(crate) fn replace(domain: &mut Domain, env: &Env<Limits>, names: Box<[SourceName]>, out: &mut Queue<Request>) {
     assert!(
@@ -142,7 +143,7 @@ pub(crate) fn logins(
     }
     if bounded && covers(&sources.sent, &rows) {
         for old in &sources.logins {
-            if old.state != LoginState::NotSignedIn && !sources.sent.contains(&old.name) {
+            if !absent(&old.state) && !sources.sent.contains(&old.name) {
                 sources.retained_removed = true;
             }
         }
@@ -209,9 +210,11 @@ pub(crate) fn signed_out(
         SignOutResult::SignedOut => {}
     }
     let host = domain.channels.get_mut(id).expect("current channel");
-    if let Some(to) = host.sources.pending.remove(&name) {
-        out.push(Request::SignedOut { to, channel, name, result: Some(result) });
-    }
+    let Some(to) = host.sources.pending.remove(&name) else {
+        fault(domain, env, channel, out);
+        return;
+    };
+    out.push(Request::SignedOut { to, channel, name, result: Some(result) });
     // Even success is not a check of the login; restrictions wait for Logins.
 }
 pub(crate) fn lost(sources: &mut Sources, channel: Token, out: &mut Queue<Request>) {
@@ -234,4 +237,11 @@ fn unique(names: &[SourceName]) -> bool {
         }
     }
     true
+}
+
+fn absent(state: &LoginState) -> bool {
+    match state {
+        LoginState::NotSignedIn | LoginState::Failed { reason: crate::SourceFailure::Unconfigured, .. } => true,
+        LoginState::Usable | LoginState::SignedInOtherwise(_) | LoginState::Failed { .. } => false,
+    }
 }

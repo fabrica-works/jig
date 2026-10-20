@@ -263,11 +263,26 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
     );
 }
 #[test]
+#[expect(
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    reason = "this owning drift test reads the write flag and its crate-relative text artifact"
+)]
 fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
-    // Runtime placement plus whole program-source state and routed output room.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_662_335_043 });
+    let What::Memory { over } = problems.problems.get(0).unwrap().what else { panic!("memory refusal") };
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("golden/engine-small-memory.txt");
+    let actual = format!("{}\n", over + 1);
+    if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
+        std::fs::create_dir_all(path.parent().unwrap()).expect("memory golden directory");
+        std::fs::write(&path, &actual).expect("write memory sum");
+    }
+    assert_eq!(
+        std::fs::read_to_string(path).expect("memory sum golden"),
+        actual,
+        "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-protocol-config -E test(memory_below_the_components_sum_is_refused)"
+    );
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

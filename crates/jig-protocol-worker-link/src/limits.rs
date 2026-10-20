@@ -65,20 +65,18 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let channel = channel_limits(limits).ok()?;
     let bound = channel::worst_case(&schema, Role::Initiator, &channel)?;
     let state = u64::try_from(size_of::<Component>()).ok()?;
-    let sources = u64::from(limits.sizes.program_sources)
-        .checked_mul(u64::try_from(size_of::<host::Login>()).ok()?.checked_add(u64::from(limits.sizes.detail))?)?;
+    let source_rows = List::<host::Login>::worst_case(limits.sizes.program_sources)?
+        .checked_add(u64::from(limits.sizes.program_sources).checked_mul(u64::from(limits.sizes.detail))?)?;
+    let pending_inventory = wire::Logins::worst_case_bytes(&bodies)?.checked_add(8)?;
+    // One typed/codec row representation and one latest encoded inventory.
     bound
-        .checked_add(sources.checked_mul(2)?)?
-        .checked_add(wire::Logins::worst_case_bytes(&bodies)?.checked_add(8)?.checked_mul(2)?)?
-        .checked_add(
-            u64::from(limits.sizes.program_sources)
-                .checked_mul(u64::try_from(size_of::<host::SourceName>()).ok()?)?
-                .checked_mul(2)?,
-        )?
+        .checked_add(source_rows)?
+        .checked_add(pending_inventory)?
         .checked_add(state)?
         .checked_add(crate::relays::Relays::worst_case(limits)?)?
         .checked_add(crate::busy::Busy::worst_case(limits)?)?
-        .checked_add(u64::from(channel.skip).checked_mul(2)?)?
+        // Transient body and framed output copies during record translation.
+        .checked_add(u64::from(channel.skip).checked_add(8)?.checked_mul(2)?)?
         .checked_add(List::<Box<[u8]>>::worst_case(limits.sizes.transcript.checked_div(4)?)?)?
         .checked_add(List::<host::StartMessage>::worst_case(limits.sizes.inbox)?)?
         .checked_add(List::<host::AnsweredCall>::worst_case(limits.sizes.answered)?)?

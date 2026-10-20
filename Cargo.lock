@@ -308,6 +308,7 @@ dependencies = [
  "jig-client-test-records",
  "jig-domain-accounts",
  "jig-domain-core",
+ "jig-domain-fleet",
  "jig-domain-host",
  "jig-domain-notes",
  "jig-domain-people",
@@ -339,10 +340,12 @@ dependencies = [
  "smith-agent-service",
  "smith-agent-shell",
  "smith-domain",
+ "smith-fake-claude",
  "smith-host-domain",
  "smith-host-protocol",
  "smith-protocol-channel",
  "smith-protocol-llm",
+ "smith-protocol-program",
 ]
 
 [[package]]
@@ -1418,6 +1421,7 @@ dependencies = [
  "smith-host-domain",
  "smith-host-protocol",
  "smith-protocol-channel",
+ "smith-protocol-program",
  "smith-transcript",
 ]
 

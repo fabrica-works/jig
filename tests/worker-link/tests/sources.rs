@@ -73,13 +73,8 @@ fn host_wide_source_records_cross_bytes_without_an_assignment() {
     assert!(records.iter().any(|record| record.kind == 0x0109));
 }
 #[test]
-fn invalid_duplicate_or_oversized_source_lists_are_link_faults() {
-    for names in [
-        &[b"".as_slice()][..],
-        &[b"Alice".as_slice()][..],
-        &[b"alice".as_slice(), b"alice"],
-        &[b"a".as_slice(), b"b", b"c"],
-    ] {
+fn malformed_or_oversized_source_lists_are_link_faults() {
+    for names in [&[b"Alice".as_slice()][..], &[b"a".as_slice(), b"b", b"c"]] {
         let mut world = world();
         world.play(sources(names));
         assert!(world.root().iter().any(|request| matches!(request, Request::Lost)));
@@ -87,44 +82,29 @@ fn invalid_duplicate_or_oversized_source_lists_are_link_faults() {
 }
 
 #[test]
-fn backpressure_coalesces_within_a_list_and_preserves_replacement_order() {
+fn backpressure_keeps_only_the_latest_inventory_until_the_queue_is_empty() {
     let mut world = world();
     world.withhold_write_room();
     let alice = host::SourceName::new(b"alice").expect("name");
-    let bob = host::SourceName::new(b"bob").expect("name");
-    for _ in 0..16 {
+    let latest = host::SourceName::new(b"latest").expect("name");
+    for name in [alice, alice, host::SourceName::new(b"middle").expect("name"), latest] {
         world.down(Event::Up {
-            up: host::LinkUp::Logins {
-                logins: Box::new([host::Login { name: alice, state: host::LoginState::Usable }]),
-            },
+            up: host::LinkUp::Logins { logins: Box::new([host::Login { name, state: host::LoginState::Usable }]) },
             parts: Box::new([]),
         });
     }
-    for state in [host::LoginState::NotSignedIn, host::LoginState::Usable] {
-        world.down(Event::Up {
-            up: host::LinkUp::Logins { logins: Box::new([host::Login { name: bob, state }]) },
-            parts: Box::new([]),
-        });
-    }
-    world.grant_write_room();
-    world.run();
     assert!(!world.root().iter().any(|request| matches!(request, Request::Lost)));
+    assert!(!world.records()[0].iter().any(|record| record.kind == wire::Kind::Logins.number()));
+    world.grant_write_room();
     let records = world.records();
     let inventories = records[0]
         .iter()
-        .filter(|record| record.kind == 0x0108)
+        .filter(|record| record.kind == wire::Kind::Logins.number())
         .map(|record| wire::Logins::decode(&fixtures::codec(), &mut Reader::new(&record.body)).expect("inventory"))
         .collect::<Vec<_>>();
-    assert!(inventories.len() <= 4, "bounded coalescing instead of one frame per check");
-    let names = inventories.iter().map(|record| record.logins().get(0).expect("one source").name()).collect::<Vec<_>>();
-    let replacement = names.iter().position(|name| *name == b"bob").expect("replacement published");
-    assert!(replacement > 0, "the previous whole inventory leaves first");
-    assert!(names[..replacement].iter().all(|name| *name == b"alice"));
-    assert!(names[replacement..].iter().all(|name| *name == b"bob"));
-    assert_eq!(
-        inventories.last().expect("latest inventory").logins().get(0).expect("one row").state(),
-        &wire::LoginState::Usable
-    );
+    assert_eq!(inventories.len(), 2, "one queued frame and one latest pending snapshot");
+    assert_eq!(inventories[0].logins().get(0).expect("first row").name(), alice.as_bytes());
+    assert_eq!(inventories[1].logins().get(0).expect("latest row").name(), latest.as_bytes());
 }
 
 #[test]

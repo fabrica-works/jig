@@ -48,7 +48,14 @@ impl World {
         })
     }
     fn available(&self) -> bool {
-        self.domain.free_kind(fleet::Kinds::Workers, 1, 0).is_some()
+        let available = self.domain.free_kind(fleet::Kinds::Workers, 1, 0).is_some();
+        assert_eq!(self.domain.probe(fleet::Kinds::Workers, 1, &[], &[]).is_some(), available);
+        assert_eq!(
+            self.domain
+                .placement_available(fleet::PlacementConstraint { channel: CHANNEL, kind: fleet::HostKind::Worker }),
+            available
+        );
+        available
     }
 }
 fn source(name: &[u8]) -> fleet::SourceName {
@@ -115,6 +122,7 @@ fn only_absence_lifts_the_conservative_personal_login_restriction() {
         fleet::LoginState::Usable,
         fleet::LoginState::SignedInOtherwise(jig_domain_fleet::LoginMethod::new(b"api-key").expect("method")),
         fleet::LoginState::Failed { reason: jig_domain_fleet::SourceFailure::Exited, detail: Box::new([]) },
+        fleet::LoginState::Failed { reason: jig_domain_fleet::SourceFailure::Deadline, detail: Box::new([]) },
     ] {
         let mut world = World::new(&[b"a"]);
         world.hello(CHANNEL);
@@ -123,6 +131,24 @@ fn only_absence_lifts_the_conservative_personal_login_restriction() {
         world.inventory(&[b"a"]);
         assert!(world.available());
     }
+}
+#[test]
+fn an_unconfigured_program_is_absent_and_an_unawaited_sign_out_faults() {
+    let mut world = World::new(&[b"a"]);
+    world.hello(CHANNEL);
+    world.step(Event::Logins {
+        channel: CHANNEL,
+        logins: Box::new([fleet::Login {
+            name: source(b"a"),
+            state: fleet::LoginState::Failed { reason: fleet::SourceFailure::Unconfigured, detail: Box::new([]) },
+        }]),
+    });
+    assert!(world.available());
+    assert_eq!(
+        world.step(Event::SignedOut { channel: CHANNEL, name: source(b"a"), result: fleet::SignOutResult::SignedOut }),
+        vec![Request::Refuse { channel: CHANNEL }]
+    );
+    assert!(!world.available());
 }
 #[test]
 fn lost_sign_out_ends_once_and_never_replays_or_completes_a_new_channel_call() {

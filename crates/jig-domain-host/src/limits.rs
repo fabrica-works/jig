@@ -13,7 +13,9 @@ use crate::turns::{Name, Pending};
 pub struct Limits {
     /// Local program sources; their command lifecycle does not consume run slots.
     pub program_sources: u32,
+    /// Positive delay from a completed check to the next periodic check.
     pub source_interval: skein_lib::Duration,
+    /// Positive deadline span for one source check or sign-out command.
     pub source_timeout: skein_lib::Duration,
     /// Runs hosted at once: the run slots. An assignment beyond them is
     /// refused as busy.

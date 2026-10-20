@@ -288,7 +288,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
 }
 
 /// Cancels a run on the ready list, if one is, emitting at most [`max_out`]
-/// requests: one of those a `CancelAll` named, for its reason.
+/// requests: one of those a `CancelAll` named, for its reason. Also fires due
+/// source checks, independently of the run slots, within the same output bound.
 pub fn resume(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     hosted::resume(domain, env, out);
     crate::sources::fire(&mut domain.sources, env, out);

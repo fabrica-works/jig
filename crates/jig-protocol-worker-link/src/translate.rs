@@ -353,10 +353,10 @@ pub(crate) fn down(
             let mut names = List::with_capacity(record.sources.len());
             for source in record.sources.into_boxed() {
                 let name = host::SourceName::new(source.name())?;
-                if names.as_slice().contains(&name) {
-                    return None;
-                }
                 names.push(name).ok()?;
+            }
+            if !host::sources::unique(names.as_slice()) {
+                return None;
             }
             host::LinkDown::Sources { sources: names.into_boxed() }
         }
@@ -593,7 +593,7 @@ fn logins_frame(logins: Box<[host::Login]>, limits: &wire::v3::Limits) -> Option
     let record = wire::Logins::new(limits, wire::LoginsParts { logins: rows }).ok()?;
     let mut body = Writer::new(usize::try_from(record.measure()).ok()?);
     record.encode(&mut body).ok()?;
-    frame(0x0108, body.finish())
+    frame(wire::Kind::Logins.number(), body.finish())
 }
 fn signed_out_frame(name: host::SourceName, result: host::SignOutResult, limits: &wire::v3::Limits) -> Option<Frame> {
     let result = match result {
@@ -606,5 +606,5 @@ fn signed_out_frame(name: host::SourceName, result: host::SignOutResult, limits:
         wire::SignedOut::new(limits, wire::SignedOutParts { name: Box::from(name.as_bytes()), result }).ok()?;
     let mut body = Writer::new(usize::try_from(record.measure()).ok()?);
     record.encode(&mut body).ok()?;
-    frame(0x0109, body.finish())
+    frame(wire::Kind::SignedOut.number(), body.finish())
 }

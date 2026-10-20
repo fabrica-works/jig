@@ -34,7 +34,6 @@ struct Busy {
 #[derive(Debug)]
 pub struct Domain {
     rows: List<Row>,
-    replacement: Option<Box<[SourceName]>>,
     busy: Option<Busy>,
     sequence: u64,
     first: bool,
@@ -46,7 +45,6 @@ impl Domain {
     pub fn new(capacity: u32) -> Self {
         Self {
             rows: List::with_capacity(capacity),
-            replacement: None,
             busy: None,
             sequence: 1,
             first: false,
@@ -81,10 +79,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     let rows = List::<Row>::worst_case(limits.program_sources)?;
-    let snapshot = List::<Login>::worst_case(limits.program_sources)?;
-    let names = u64::from(limits.program_sources).checked_mul(u64::try_from(size_of::<SourceName>()).ok()?)?;
     let details = u64::from(limits.program_sources).checked_mul(u64::from(limits.detail_bytes))?;
-    rows.checked_add(snapshot)?.checked_add(names)?.checked_add(details.checked_mul(2)?)
+    let retained = rows.checked_add(details)?;
+    // A replacement moves surviving states while old/new row arrays coexist.
+    let replacing =
+        rows.checked_add(u64::from(limits.program_sources).checked_mul(u64::try_from(size_of::<SourceName>()).ok()?)?)?;
+    let publishing = List::<Login>::worst_case(limits.program_sources)?.checked_add(details)?;
+    retained.checked_add(replacing.max(publishing))
 }
 
 pub(crate) fn replace(domain: &mut Domain, env: &Env<Limits>, names: Box<[SourceName]>, out: &mut Queue<Request>) {
@@ -96,8 +97,30 @@ pub(crate) fn replace(domain: &mut Domain, env: &Env<Limits>, names: Box<[Source
         out.push(Request::SourceFault);
         return;
     }
+    let mut old = core::mem::replace(&mut domain.rows, List::with_capacity(env.limits.program_sources));
+    for name in names {
+        let mut row = Row { name, state: None, check: true, sign_out: false, explicit: false, next: None };
+        for index in 0..old.len() {
+            let previous = old.get_mut(index).expect("previous source row");
+            if previous.name == name {
+                row.state = previous.state.take();
+                row.sign_out = previous.sign_out;
+                row.explicit = previous.explicit;
+                previous.sign_out = false;
+            }
+        }
+        domain.rows.push(row).expect("validated source list");
+    }
+    for row in &old {
+        if row.sign_out && domain.connected {
+            out.push(Request::Up(LinkUp::SignedOut {
+                name: row.name,
+                result: SignOutResult::Failed { reason: SourceFailure::Unknown, detail: Box::new([]) },
+            }));
+        }
+    }
     domain.connected = true;
-    domain.replacement = Some(names);
+    domain.first = true;
     advance(domain, env, out);
 }
 #[must_use]
@@ -112,14 +135,6 @@ pub fn unique(names: &[SourceName]) -> bool {
     true
 }
 pub(crate) fn check(domain: &mut Domain, env: &Env<Limits>, name: SourceName, out: &mut Queue<Request>) {
-    if let Some(busy) = &mut domain.busy
-        && busy.current
-        && busy.name == name
-        && busy.operation == Operation::Check
-    {
-        busy.explicit = true;
-        return;
-    }
     let mut found = false;
     for index in 0..domain.rows.len() {
         let row = domain.rows.get_mut(index).expect("source row");
@@ -136,6 +151,13 @@ pub(crate) fn check(domain: &mut Domain, env: &Env<Limits>, name: SourceName, ou
     advance(domain, env, out);
 }
 pub(crate) fn sign_out(domain: &mut Domain, env: &Env<Limits>, name: SourceName, out: &mut Queue<Request>) {
+    if domain.closed {
+        out.push(Request::Up(LinkUp::SignedOut {
+            name,
+            result: SignOutResult::Failed { reason: SourceFailure::Closed, detail: Box::new([]) },
+        }));
+        return;
+    }
     if let Some(busy) = &domain.busy
         && busy.current
         && busy.name == name
@@ -156,8 +178,8 @@ pub(crate) fn sign_out(domain: &mut Domain, env: &Env<Limits>, name: SourceName,
             found = true;
         }
     }
-    if !found || domain.closed {
-        let reason = if domain.closed { SourceFailure::Closed } else { SourceFailure::Unknown };
+    if !found {
+        let reason = SourceFailure::Unknown;
         out.push(Request::Up(LinkUp::SignedOut {
             name,
             result: SignOutResult::Failed { reason, detail: Box::new([]) },
@@ -188,8 +210,9 @@ pub(crate) fn answered(domain: &mut Domain, env: &Env<Limits>, owner: Token, ans
                     let row = domain.rows.get_mut(index).expect("source row");
                     if row.name == busy.name {
                         changed = row.state.as_ref() != Some(&state);
-                        row.state = Some(state.clone());
+                        row.state = Some(state);
                         row.next = Some(env.now.saturating_add(env.limits.source_interval));
+                        break;
                     }
                 }
                 if !domain.first && domain.connected && !domain.closed && (changed || busy.explicit) {
@@ -197,16 +220,13 @@ pub(crate) fn answered(domain: &mut Domain, env: &Env<Limits>, owner: Token, ans
                 }
             }
             Answer::SignedOut(result) => {
-                let mut result = match result {
+                let result = match result {
                     SignOutResult::SignedOut => SignOutResult::SignedOut,
                     SignOutResult::Failed { reason, detail } => {
                         SignOutResult::Failed { reason, detail: tail(detail, env.limits.detail_bytes) }
                     }
                 };
                 assert!(busy.operation == Operation::SignOut, "typed sign-out terminal");
-                if domain.closed {
-                    result = SignOutResult::Failed { reason: SourceFailure::Closed, detail: Box::new([]) };
-                }
                 if domain.connected {
                     out.push(Request::Up(LinkUp::SignedOut { name: busy.name, result }));
                 }
@@ -239,7 +259,6 @@ pub(crate) fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Reque
 pub(crate) fn lost(domain: &mut Domain) {
     domain.connected = false;
     domain.first = false;
-    domain.replacement = None;
     domain.rows.clear();
     if let Some(busy) = &mut domain.busy {
         busy.current = false;
@@ -247,7 +266,6 @@ pub(crate) fn lost(domain: &mut Domain) {
 }
 pub(crate) fn close(domain: &mut Domain, out: &mut Queue<Request>) {
     domain.closed = true;
-    domain.replacement = None;
     for index in 0..domain.rows.len() {
         let row = domain.rows.get_mut(index).expect("source row");
         row.check = false;
@@ -278,7 +296,7 @@ fn advance(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     if domain.first {
         let mut complete = true;
         for row in &domain.rows {
-            if row.state.is_none() {
+            if row.state.is_none() || row.check {
                 complete = false;
             }
         }
@@ -286,31 +304,6 @@ fn advance(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             if domain.connected {
                 publish(domain, out);
             }
-            domain.first = false;
-        }
-    }
-    if !domain.first
-        && let Some(names) = domain.replacement.take()
-    {
-        // Pending sign-outs end before the old list is forgotten.
-        for row in &domain.rows {
-            if row.sign_out && domain.connected {
-                out.push(Request::Up(LinkUp::SignedOut {
-                    name: row.name,
-                    result: SignOutResult::Failed { reason: SourceFailure::Unknown, detail: Box::new([]) },
-                }));
-            }
-        }
-        domain.rows.clear();
-        for name in names {
-            domain
-                .rows
-                .push(Row { name, state: None, check: true, sign_out: false, explicit: false, next: None })
-                .expect("validated list");
-        }
-        domain.first = true;
-        if domain.rows.is_empty() {
-            publish(domain, out);
             domain.first = false;
         }
     }

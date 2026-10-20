@@ -507,7 +507,20 @@ fn full_source_inventories_replacements_and_pending_sign_outs_fit_the_bound() {
     // One sent replacement and the latest desired list coexist on every host.
     measured_step(Event::Sources { sources: Box::new([SourceName::new(b"replacement").expect("name")]) });
     measured_step(Event::Sources { sources: names });
+    // Rejected full inventories coexist with loss's pending sign-out names.
     for worker in 1..=limits.workers {
-        measured_step(Event::Lost { channel: Token::new(u64::from(worker)) });
+        measured_step(Event::Logins {
+            channel: Token::new(u64::from(worker)),
+            logins: (0..limits.program_sources)
+                .map(|_| Login {
+                    name: SourceName::new(b"foreign").expect("foreign source"),
+                    state: LoginState::Failed {
+                        reason: jig_domain_fleet::SourceFailure::Exited,
+                        detail: vec![b'x'; usize::try_from(limits.source_detail_bytes).expect("detail bound")]
+                            .into_boxed_slice(),
+                    },
+                })
+                .collect(),
+        });
     }
 }

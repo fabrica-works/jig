@@ -1,6 +1,5 @@
 //! The fleet's state and its entry points (programming-model.md, section 3).
 
-use alloc::boxed::Box;
 use skein_lib::{Deadlines, Env, Id, List, Map, Queue, Slab, Time, Token};
 
 use crate::attempt::{self, Attempt, Run};

@@ -265,16 +265,23 @@ its root chooses otherwise:
   for (engine.md, section 8; accounts.md, 3.4).
 
 The hub's source machine owns when to check: on a new list, an explicit
-check and a positive interval. It coalesces overlapping checks and never
-runs two commands for a source together; sign-out precedes a pending check.
+check and a positive interval. An explicit check queues a fresh command;
+requests for that queued command coalesce, while a command already running
+finishes independently. Sign-out precedes a pending check.
 Commands are serialized across the worker so one command owns the injected
-resources and settles before reuse. Its whole first inventory waits for every source's answer. The protocol
-layer drives the real host half's command I/O and deadlines, with an
-explicit executable, private directory and bounded environment below the
-root. Without a configured program, the check fails as unconfigured.
-These commands take no run slot. Shutdown waits for an active command to
-settle before its terminal; channel loss suppresses its old-channel reply,
-while the replacement channel starts with a fresh whole inventory.
+resources and settles before reuse. Its whole first inventory waits for
+every source's answer. The protocol layer drives the real host half's
+command I/O and deadlines, with an explicit executable, private directory
+and bounded environment below the root. Without a configured program, the check fails as unconfigured.
+These commands take no run slot. An unconfigured program counts as an
+absent login: it cannot sign in or use a program login. A failed check after
+an exit or timeout keeps withholding new placement until a later check
+establishes absence, because a lost reply does not prove the login absent.
+The joint holder check will narrow this restriction to the person's runs.
+Shutdown reports an active sign-out's actual result once it settles; only a
+queued sign-out that never started fails as closed. Channel loss suppresses
+its old-channel reply, while the replacement channel starts with a fresh
+whole inventory.
 
 ### 5.2 `smith-inline-agent`
 

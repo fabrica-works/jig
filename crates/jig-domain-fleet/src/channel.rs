@@ -288,7 +288,8 @@ pub(crate) fn probe(
     for (_, &id) in &domain.tokens {
         let channel = domain.channels.get(id).expect("connected host");
         let free = channel.slots.saturating_sub(channel.hosts.len());
-        if free == 0
+        if !channel.sources.ready()
+            || free == 0
             || channel.draining
             || !kinds.allows(channel.kind)
             || excluded.contains(&channel.token)
@@ -311,7 +312,8 @@ pub(crate) fn probe(
 pub(crate) fn constrained(domain: &Domain, placement: crate::PlacementConstraint, kinds: Kinds) -> Option<Id<Channel>> {
     let id = *domain.tokens.get(&placement.channel)?;
     let channel = domain.channels.get(id)?;
-    if channel.kind != placement.kind
+    if !channel.sources.ready()
+        || channel.kind != placement.kind
         || !kinds.allows(channel.kind)
         || channel.draining
         || channel.slots <= channel.hosts.len()

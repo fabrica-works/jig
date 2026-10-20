@@ -588,11 +588,10 @@ holds, and neither of its components reads them.
     notice per LLM account's source a run may hold; a logins notice, and
     a signed out per program source; and a reserve for facts.
 - **Inventories coalesce while output waits.** The worker's component
-  keeps the latest whole snapshot of each of at most two ordered lists
-  outside the channel queue: the current list and its replacement. It sends
-  them in order when the reserved inventory slot is available. All buffers
-  are priced; updates coalesce only within the same list. A replacement's
-  snapshot never erases a pending snapshot of its predecessor.
+  keeps one latest whole snapshot outside the channel queue and sends it
+  when that queue is empty. A replacement snapshot overwrites an unsent
+  predecessor: fleet has already received that predecessor's first inventory
+  before it sends the replacement list. The held snapshot is priced.
 - **Facts take only the reserve.** The worker's side sends a fact only
   while the queue leaves the rest of the cap free; a long operation's
   beginning and end are facts too.

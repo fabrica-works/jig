@@ -9,6 +9,11 @@ use smith_host_domain as smith;
 use smith_host_protocol::{ProgramSource, SourceAnswer, SourceAsk};
 use smith_protocol_program::Programs;
 
+const PATH_BYTES: usize = 1024;
+const ENVIRONMENT_ENTRIES: u32 = 64;
+const ENVIRONMENT_BYTES: u64 = 4096;
+const RESOURCE_PATH_BYTES: u64 = 2 * 1024;
+
 #[derive(Debug)]
 pub struct Resources {
     programs: Programs,
@@ -17,23 +22,23 @@ pub struct Resources {
 impl Resources {
     #[must_use]
     pub fn new(programs: Programs, environment: Box<[Box<[u8]>]>) -> Option<Self> {
-        if programs.directory.len() > 1024
+        if programs.directory.len() > PATH_BYTES
             || programs.claude.is_empty()
-            || programs.claude.len() > 1024
+            || programs.claude.len() > PATH_BYTES
             || programs.claude.contains(&0)
         {
             return None;
         }
         let configuration = smith_protocol_program::configuration_directory(&programs, &[b'x'; 32]).ok()?;
         // Validate both the retained base and the filtered child environment.
-        if environment.len() > 64 {
+        if environment.len() > usize::try_from(ENVIRONMENT_ENTRIES).ok()? {
             return None;
         }
         let mut bytes = 0_usize;
         for entry in &environment {
             bytes = bytes.checked_add(entry.len())?;
         }
-        if bytes > 4096 {
+        if u64::try_from(bytes).ok()? > ENVIRONMENT_BYTES {
             return None;
         }
         smith_protocol_program::environment(&environment, &configuration).ok()?;
@@ -193,8 +198,8 @@ pub fn worst_case(detail: u32) -> Option<u64> {
     // One serialized command, its resource bundle and one terminal. The
     // worker prices its I/O/output queues separately at their step peaks.
     smith_host_protocol::program_source_worst_case(detail)?
-        .checked_add(skein_lib::List::<Box<[u8]>>::worst_case(64)?)?
-        .checked_add(4096)?
-        .checked_add(2048)?
+        .checked_add(skein_lib::List::<Box<[u8]>>::worst_case(ENVIRONMENT_ENTRIES)?)?
+        .checked_add(ENVIRONMENT_BYTES)?
+        .checked_add(RESOURCE_PATH_BYTES)?
         .checked_add(u64::from(detail))
 }

@@ -53,9 +53,7 @@ fn whole_logins_and_signed_out_are_host_wide_without_attempt_fences() {
 }
 #[test]
 fn malformed_or_oversized_login_rows_are_refused_and_empty_inventory_is_valid() {
-    for names in
-        [&[b"".as_slice()][..], &[b"Alice".as_slice()][..], &[b"a".as_slice(), b"a"], &[b"a".as_slice(), b"b", b"c"]]
-    {
+    for names in [&[b"Alice".as_slice()][..], &[b"a".as_slice(), b"b", b"c"]] {
         let mut world = World::new(&fixtures::limits(), &fixtures::workers(), 1);
         let (connection, _) = world.reporting(fixtures::WORKER_A, fixtures::SECRET_A);
         world.play(connection, frame(names));

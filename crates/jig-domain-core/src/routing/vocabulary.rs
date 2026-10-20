@@ -133,203 +133,82 @@ pub enum Write {
 }
 
 /// Core output that must follow the decision's commit.
+#[rustfmt::skip]
 #[derive(Debug)]
 pub enum Held {
-    Sources {
-        channel: Token,
-        sources: Box<[fleet::SourceName]>,
-    },
-    CheckSource {
-        channel: Token,
-        name: fleet::SourceName,
-    },
-    SignOutSource {
-        channel: Token,
-        name: fleet::SourceName,
-    },
-    SourceSignedOut {
-        to: ReplyTo,
-        channel: Token,
-        name: fleet::SourceName,
-        result: Option<fleet::SignOutResult>,
-    },
     /// Every earlier commit is durable when the journal releases this terminal.
     Drained,
     /// A point load sent once every earlier commit is durable.
     Load(Box<Now>),
     /// Assemble the connector-owned document prepared for this delivery in the same decision.
-    ApplicationDelivery {
-        watcher: Token,
-        connector: u16,
-        subject: Token,
-    },
+    ApplicationDelivery { watcher: Token, connector: u16, subject: Token },
     /// Drop the connector-owned subject binding and deliver its paced ending.
-    ApplicationWatchEnded {
-        watcher: Token,
-        connector: u16,
-        subject: Token,
-        why: views::End,
-    },
+    ApplicationWatchEnded { watcher: Token, connector: u16, subject: Token, why: views::End },
     /// Load an owner range only after every preceding commit is durable.
-    ReadLoad {
-        load: Token,
-        range: Box<crate::reads::Range>,
-    },
+    ReadLoad { load: Token, range: Box<crate::reads::Range> },
     /// One authenticated read answer after every preceding commit is durable.
-    Read {
-        reply: ReplyTo,
-        answer: crate::reads::Answer,
-    },
+    Read { reply: ReplyTo, answer: crate::reads::Answer },
     /// The root assembles the outcome retained by its numbered connector.
-    Applied {
-        to: ReplyTo,
-        connector: u16,
-        token: Token,
-    },
+    Applied { to: ReplyTo, connector: u16, token: Token },
     /// A request's carried value went unused (refused, sent again, joined
     /// or stopped): the clients' component erases it, if its own decode
     /// kept it, before the request's answer (`protocol/store.md`, 9).
-    CarriedUnused {
-        number: u64,
-    },
+    CarriedUnused { number: u64 },
     /// Current subject document, held until every preceding commit is durable.
-    Delivery {
-        watcher: Token,
-        document: Box<crate::documents::Document>,
-    },
+    Delivery { watcher: Token, document: Box<crate::documents::Document> },
     /// A watch has ended after every outstanding terminal.
-    WatchEnded {
-        watcher: Token,
-        why: views::End,
-    },
+    WatchEnded { watcher: Token, why: views::End },
 
     /// A connector may make this entry only after its keeping decision commits.
-    MakeEffect {
-        connector: u16,
-        entry: u64,
-    },
+    MakeEffect { connector: u16, entry: u64 },
     /// A rendered answer and all opaque evidence have reached the store.
-    SettledCall {
-        to: ReplyTo,
-        key: CallKey,
-        call: crate::SettledCall,
-    },
+    SettledCall { to: ReplyTo, key: CallKey, call: crate::SettledCall },
     /// A claimed host receives the parent's conversation references.
-    Assign {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-        activation: u64,
-        assignment: fleet::Assignment,
-    },
+    Assign { channel: Token, run: Token, attempt: Token, activation: u64, assignment: fleet::Assignment },
+    /// Replace the connected worker's whole program-source list after commit.
+    Sources { channel: Token, sources: Box<[fleet::SourceName]> },
+    /// Request a fresh observation of one named program source on this channel.
+    CheckSource { channel: Token, name: fleet::SourceName },
+    /// Ask this channel to sign out one source, without retrying after loss.
+    SignOutSource { channel: Token, name: fleet::SourceName },
+    /// End one source sign-out; None means the channel could not confirm it.
+    SourceSignedOut { to: ReplyTo, channel: Token, name: fleet::SourceName, result: Option<fleet::SignOutResult> },
     /// A grant follows every prior commit and its attempt's assignment (engine.md, 5.2).
-    Grant {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-        grant: fleet::Grant,
-    },
+    Grant { channel: Token, run: Token, attempt: Token, grant: fleet::Grant },
     /// The host receives an answer under its original opaque call name.
-    Relayed {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-        call: Box<[u8]>,
-        answer: Token,
-    },
+    Relayed { channel: Token, run: Token, attempt: Token, call: Box<[u8]>, answer: Token },
     /// The host receives the same named label and words the root supplied.
-    Inbound {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-        message: fleet::Message,
-    },
+    Inbound { channel: Token, run: Token, attempt: Token, message: fleet::Message },
     /// A saved word relayed to its fenced live attempt after commit.
-    Relay {
-        task: u64,
-        attempt: u64,
-        previous: Option<u64>,
-        word: tasks::Word,
-    },
+    Relay { task: u64, attempt: u64, previous: Option<u64>, word: tasks::Word },
     /// A party's keyed terminal, released after its decision is durable.
-    PeopleReply {
-        to: ReplyTo,
-        reply: people::Reply,
-    },
+    PeopleReply { to: ReplyTo, reply: people::Reply },
     /// A named core call answer, assembled and delivered after its decision commits.
-    CallAnswer {
-        to: ReplyTo,
-        key: CallKey,
-        part: CallPart,
-    },
+    CallAnswer { to: ReplyTo, key: CallKey, part: CallPart },
     /// An ended task's result is delivered to its person requester.
-    Result {
-        person: u64,
-        task: u64,
-        words: Box<[u8]>,
-    },
+    Result { person: u64, task: u64, words: Box<[u8]> },
     /// A host may forget its terminal only after the task decision commits.
-    Acknowledge {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-    },
+    Acknowledge { channel: Token, run: Token, attempt: Token },
     /// The fleet may forget an accepted task terminal after its decision commits.
-    TaskTerminalAcknowledged {
-        task: u64,
-        attempt: u64,
-    },
+    TaskTerminalAcknowledged { task: u64, attempt: u64 },
     /// The fleet may forget one accepted turn after its decision commits.
-    TaskTurnKept {
-        task: u64,
-        attempt: u64,
-        turn: u32,
-    },
+    TaskTurnKept { task: u64, attempt: u64, turn: u32 },
     /// A host may forget its turn only after that turn commits.
-    AcknowledgeTurn {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-        turn: u32,
-    },
+    AcknowledgeTurn { channel: Token, run: Token, attempt: Token, turn: u32 },
     /// Fence and cancel one hosted attempt after the decision commits.
-    Cancel {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-    },
+    Cancel { channel: Token, run: Token, attempt: Token },
     /// Refuse one host request after the decision commits.
-    Refuse {
-        channel: Token,
-    },
+    Refuse { channel: Token },
     /// Ask the host to retain and retry a turn that did not enter a decision.
-    TurnBusy {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-        turn: u32,
-    },
+    TurnBusy { channel: Token, run: Token, attempt: Token, turn: u32 },
     /// Cancel the current fenced run after its task decision commits.
-    StopRun {
-        task: u64,
-        attempt: u64,
-    },
+    StopRun { task: u64, attempt: u64 },
     /// Store page requested by the notes child after earlier commits.
-    NotesLoad {
-        owner: Token,
-        range: notes::Range,
-    },
+    NotesLoad { owner: Token, range: notes::Range },
     /// A note write's accepted revision.
-    NotesWritten {
-        owner: Token,
-        name: u64,
-        revision: u32,
-    },
+    NotesWritten { owner: Token, name: u64, revision: u32 },
     /// A note deletion's accepted name.
-    NotesDeleted {
-        owner: Token,
-        name: u64,
-    },
+    NotesDeleted { owner: Token, name: u64 },
 }
 
 /// Why an unkeyed watch was not admitted (`client/domain/contract.md`, 7.2).

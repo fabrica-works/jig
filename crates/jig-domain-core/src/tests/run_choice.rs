@@ -51,6 +51,12 @@ fn host(core: &mut Core, limits: &Limits, channel: Token, names: &[&[u8]]) {
         },
         &mut out,
     );
+    fleet::step(
+        &mut core.fleet,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
+        fleet::Event::Logins { channel, logins: Box::new([]) },
+        &mut out,
+    );
 }
 fn ready(none: bool) -> (Core, Limits) {
     let (base, mut limits) = core();

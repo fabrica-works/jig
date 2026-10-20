@@ -20,6 +20,12 @@ fn a_run_waits_while_a_credential_it_needs_is_unusable() {
         },
         &mut placed,
     );
+    fleet::step(
+        &mut core.fleet,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
+        fleet::Event::Logins { channel: Token::new(1), logins: Box::new([]) },
+        &mut placed,
+    );
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.accounts };
     let mut out = Queue::with_capacity(accounts::max_out(&limits.accounts));
     accounts::step(&mut core.accounts, &env, accounts::Event::Want, &mut out);

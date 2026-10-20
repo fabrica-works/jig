@@ -35,11 +35,6 @@ enum Life {
     Closed,
 }
 #[derive(Debug)]
-struct Inventory {
-    names: Box<[host::SourceName]>,
-    frame: channel::Frame,
-}
-#[derive(Debug)]
 pub struct Component {
     limits: Limits,
     credential: wire::Credential,
@@ -54,8 +49,7 @@ pub struct Component {
     grace: Grace,
     life: Life,
     facts: u64,
-    pending_logins: Option<Inventory>,
-    replacement_logins: Option<Inventory>,
+    pending_logins: Option<channel::Frame>,
 }
 impl Component {
     pub fn new(limits: &Limits, credential: Credential, seed: u64) -> Result<Self, Unusable> {
@@ -82,7 +76,6 @@ impl Component {
             life: Life::Active,
             facts: 0,
             pending_logins: None,
-            replacement_logins: None,
         })
     }
     pub fn down(&mut self, now: Time, event: Event, out: &mut Queue<Request>) {
@@ -252,7 +245,6 @@ impl Component {
             return;
         }
         self.pending_logins = None;
-        self.replacement_logins = None;
         if self.life != Life::Active {
             self.completed(out);
             return;
@@ -323,15 +315,12 @@ impl Component {
                     | host::LinkUp::Turn { .. }
                     | host::LinkUp::Answer { .. } => None,
                 };
-                let inventory_names = inventory_names(&up, self.limits.sizes.program_sources);
                 let Some(frame) = translate::up(up, parts, &limits) else {
                     self.dropped = self.dropped.saturating_add(1);
                     return;
                 };
-                if frame.kind() == 0x0108 {
-                    let inventory =
-                        Inventory { names: inventory_names.expect("codec accepted bounded inventory"), frame };
-                    self.retain_logins(now, inventory, out);
+                if frame.kind() == wire::Kind::Logins.number() {
+                    self.pending_logins = Some(frame);
                     return;
                 }
                 if frame.kind() == 0x0104 && !self.fact_fits(&frame) {
@@ -561,39 +550,13 @@ impl Component {
             }
         }
     }
-    fn retain_logins(&mut self, now: Time, inventory: Inventory, out: &mut Queue<Request>) {
-        if let Some(pending) = &self.replacement_logins {
-            if !same_sources(&pending.names, &inventory.names) {
-                self.lose(now, Closed::Owner, out);
-                return;
-            }
-            self.replacement_logins = Some(inventory);
-        } else if let Some(pending) = &self.pending_logins {
-            if same_sources(&pending.names, &inventory.names) {
-                self.pending_logins = Some(inventory);
-            } else {
-                self.replacement_logins = Some(inventory);
-            }
-        } else {
-            self.pending_logins = Some(inventory);
-        }
-    }
     fn send_logins(&mut self) {
-        let Some(inventory) = &self.pending_logins else { return };
         let Some(connection) = self.phase.connection() else { return };
-        let cap = sizes::worker_cap(&self.limits.sizes).expect("checked worker cap");
-        let bytes = sizes::largest_body(&self.limits.sizes, wire::Kind::Logins)
-            .expect("checked body")
-            .checked_add(8)
-            .expect("frame");
-        let reserved = cap.cap.bytes.checked_sub(bytes).expect("one inventory reserved");
-        let room = connection.machine.room();
-        if room.bytes.saturating_sub(reserved) < inventory.frame.wire_len() || room.frames < cap.cap.frames {
+        if connection.queued() {
             return;
         }
-        let inventory = self.pending_logins.take().expect("pending inventory");
-        self.pending_logins = self.replacement_logins.take();
-        self.command(channel::Request::Send { token: Token::new(1), frame: inventory.frame });
+        let Some(frame) = self.pending_logins.take() else { return };
+        self.command(channel::Request::Send { token: Token::new(1), frame });
     }
     fn fact_fits(&mut self, frame: &channel::Frame) -> bool {
         let cap = sizes::worker_cap(&self.limits.sizes).expect("checked cap");
@@ -605,7 +568,6 @@ impl Component {
     }
     fn end(&mut self, now: Time, abort: bool, out: &mut Queue<Request>) {
         self.pending_logins = None;
-        self.replacement_logins = None;
         if self.life == Life::Closed {
             return;
         }
@@ -659,7 +621,6 @@ impl Component {
     }
     fn begin_loss(&mut self, now: Time, why: Closed, out: &mut Queue<Request>) -> bool {
         self.pending_logins = None;
-        self.replacement_logins = None;
         let phase = mem::replace(&mut self.phase, Phase::Connecting);
         let mut started = false;
         self.phase = match phase {
@@ -699,35 +660,4 @@ fn expired(at: Option<Time>, now: Time) -> bool {
         Some(at) => now >= at,
         None => false,
     }
-}
-
-fn inventory_names(up: &host::LinkUp, capacity: u32) -> Option<Box<[host::SourceName]>> {
-    match up {
-        host::LinkUp::Logins { logins } => {
-            let mut names = List::with_capacity(capacity);
-            for row in logins {
-                names.push(row.name).ok()?;
-            }
-            Some(names.into_boxed())
-        }
-        host::LinkUp::SignedOut { .. }
-        | host::LinkUp::Activity { .. }
-        | host::LinkUp::Unauthorized { .. }
-        | host::LinkUp::Limited { .. }
-        | host::LinkUp::AccountRefused { .. }
-        | host::LinkUp::Turn { .. }
-        | host::LinkUp::Call { .. }
-        | host::LinkUp::Answer { .. } => None,
-    }
-}
-fn same_sources(left: &[host::SourceName], right: &[host::SourceName]) -> bool {
-    if left.len() != right.len() {
-        return false;
-    }
-    for name in left {
-        if !right.contains(name) {
-            return false;
-        }
-    }
-    true
 }
