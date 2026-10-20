@@ -460,6 +460,7 @@ fn make_referee(script: &Script, store: Rc<RefCell<Store>>, views: Rc<RefCell<Vi
             crate::stories::Story::Window => 7,
             crate::stories::Story::Drain
             | crate::stories::Story::ApplicationGeneration
+            | crate::stories::Story::Key { .. }
             | crate::stories::Story::Chat
             | crate::stories::Story::Stalled
             | crate::stories::Story::Quiet
@@ -500,6 +501,8 @@ fn launch(
         program: b"agent-program".as_slice().into(),
         make: if matches!(script.story, crate::stories::Story::BeyondGrace) {
             processes::agent_slow
+        } else if matches!(script.story, crate::stories::Story::Key { .. }) {
+            processes::agent_anthropic
         } else {
             processes::agent
         },
@@ -564,6 +567,16 @@ fn launch(
             }]);
             let peer = if matches!(script.story, crate::stories::Story::Window) {
                 processes::window_provider(scripts)
+            } else if matches!(script.story, crate::stories::Story::Key { .. }) {
+                let mut peer = fixtures::provider(
+                    scripts,
+                    skein_llm::Credential::key(fixtures::KEY.into()),
+                    script.latency,
+                    skein_fake_peers::Transport::Plaintext,
+                    skein_fake_llm_protocol::documents::Provider::Anthropic,
+                );
+                peer.accept(skein_llm::Credential::key(fixtures::NEXT_KEY.into())).expect("the next key");
+                peer
             } else {
                 fixtures::provider(
                     scripts,

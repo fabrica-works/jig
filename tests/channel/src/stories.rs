@@ -9,6 +9,8 @@ use skein_lib::Duration;
 pub enum Story {
     Chat,
     ApplicationGeneration,
+    // The sign-in account's grant is a key; `replaced` puts its next generation while the attempt runs.
+    Key { replaced: bool },
     Stalled,
     Quiet,
     Replaced,
@@ -47,7 +49,7 @@ fn script(story: Story) -> crate::world::Script {
     ) {
         script.leading_turns = 1;
     }
-    if matches!(story, Story::Restart { .. } | Story::ApplicationGeneration) {
+    if matches!(story, Story::Restart { .. } | Story::ApplicationGeneration | Story::Key { replaced: true }) {
         script.latency = Duration::from_secs(1);
     }
     if matches!(story, Story::Partition { .. } | Story::Facts | Story::Reconnect | Story::Shutdown | Story::Refusals(_))

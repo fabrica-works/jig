@@ -5,6 +5,10 @@ use skein_lib::{Duration, List, Secret};
 
 pub const SEED: u64 = 7;
 pub const TOKEN: &[u8] = b"test-token";
+/// A key the story puts in the engine's table before the attempt starts.
+pub const KEY: &[u8] = b"test-key";
+/// The key's next generation, put while the attempt runs.
+pub const NEXT_KEY: &[u8] = b"test-key-2";
 const DIGEST: &[u8] = b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf";
 const REPORT: &[u8] = br#"{"form":"report","text":"Hello","fields":{}}"#;
 const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":1767229200}"#;
@@ -231,6 +235,11 @@ pub fn agent() -> jig_test_service::Agent {
 #[must_use]
 pub fn agent_configuration() -> smith_agent_service::Config {
     agent_configuration_for(skein_llm::Endpoint::openai())
+}
+/// The agent calls Anthropic's Messages path, where a key and a bearer differ.
+#[must_use]
+pub fn anthropic_agent_configuration() -> smith_agent_service::Config {
+    agent_configuration_for(skein_llm::Endpoint::anthropic())
 }
 fn agent_configuration_for(llm: skein_llm::Endpoint) -> smith_agent_service::Config {
     let mut config = smith_agent_process_world::configuration();

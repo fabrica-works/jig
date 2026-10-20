@@ -24,6 +24,7 @@ skein-kv.workspace = true
 jig-fake-parties.workspace = true
 jig-protocol-worker-wire.workspace = true
 jig-protocol-config.workspace = true
+jig-protocol-accounts.workspace = true
 skein-channel.workspace = true
 skein-fake-channel.workspace = true
 skein-lib.workspace = true

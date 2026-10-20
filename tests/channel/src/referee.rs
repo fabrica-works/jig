@@ -87,6 +87,14 @@ impl skein_world::Referee<Proc> for Referee {
                                 resource: 1,
                             }]);
                         }
+                        if matches!(self.story, crate::stories::Story::Key { .. })
+                            && let core::Event::People(jig_domain_people::Event::Ask {
+                                ask: jig_domain_people::Ask::Create { .. },
+                                ..
+                            }) = &event
+                        {
+                            put_key(engine, 2, crate::fixtures::KEY, now);
+                        }
                         engine.parties_in().push(event);
                     }
                     if self.passed && !host.stopping {
@@ -175,6 +183,13 @@ impl skein_world::Referee<Proc> for Referee {
             if matches!(self.story, crate::stories::Story::Chat) {
                 assert_eq!(&*presented(worker, procs, false).1, crate::fixtures::TOKEN);
             }
+            if let crate::stories::Story::Key { replaced } = self.story {
+                assert_eq!(presented(worker, procs, true), (2, crate::fixtures::KEY.into()));
+                if replaced {
+                    assert!(self.injected, "generation 3 put while the agent was running");
+                    key_replaced(worker);
+                }
+            }
             self.passed = true;
         }
     }
@@ -204,6 +219,24 @@ impl skein_world::Referee<Proc> for Referee {
     fn passed(&self) -> bool {
         self.passed && self.stopped
     }
+}
+
+/// The sign-in account's grant of `key` at `generation`, put in the table and
+/// announced as its accounts component would.
+fn put_key(engine: &mut jig_test_service::Engine, generation: u64, key: &[u8], now: Time) {
+    let valid = skein_lib::Duration::from_secs(60);
+    engine.put_account(
+        1,
+        generation,
+        jig_protocol_accounts::table::Value {
+            token: skein_lib::Secret::new(key.into()),
+            scheme: jig_protocol_accounts::table::Scheme::Key,
+        },
+        now.saturating_add(valid),
+    );
+    engine.parties_in().push(core::Event::Account(jig_domain_accounts::Event::Component(
+        jig_domain_accounts::FromComponent::Granted { account: 1, generation, valid },
+    )));
 }
 
 fn assignment(worker: &crate::processes::Wire) -> jig_protocol_worker_wire::Assignment {
@@ -254,6 +287,26 @@ fn presented(worker: &crate::processes::Wire, procs: &[Proc], key: bool) -> (u64
         "the provider matched the granted credential in its scheme"
     );
     (grant.generation(), value.bytes().expose().into())
+}
+
+/// The key's generation 3 reached the live attempt's connection before its answer.
+fn key_replaced(worker: &crate::processes::Wire) {
+    use jig_protocol_worker_wire::{GrantValue, Scheme};
+    let assignment = assignment(worker);
+    let (fd, granted) = worker
+        .granted
+        .iter()
+        .find(|(_, frame)| frame.grant().generation() == 3)
+        .expect("generation 3 granted on the live attempt's connection (0x0187)");
+    assert_eq!((granted.task(), granted.attempt()), (assignment.task(), assignment.attempt()));
+    assert_eq!(worker.placements.get(&(granted.task(), granted.attempt())), Some(fd));
+    assert_eq!(granted.grant().number(), 1);
+    let GrantValue::Credential(value) = granted.grant().value() else { panic!("the account's grant is a credential") };
+    assert_eq!(*value.scheme(), Scheme::Key);
+    assert_eq!(value.bytes().expose(), crate::fixtures::NEXT_KEY);
+    let grant = worker.frames.iter().position(|(_, kind, _)| *kind == 0x0187).expect("granted frame");
+    let answer = worker.frames.iter().position(|(_, kind, _)| *kind == 0x0103).expect("same attempt answers");
+    assert!(grant < answer, "the key arrives before the live attempt finishes");
 }
 
 fn application_generation(worker: &crate::processes::Wire) {
@@ -465,6 +518,33 @@ impl std::fmt::Debug for Roots<'_> {
 }
 
 impl Referee {
+    /// Once the provider is first asked, the next generation of the grant the
+    /// story replaces mid-run: the application's credential, or the key.
+    fn inject_grant(&mut self, now: Time, procs: &mut [Proc]) {
+        let key = matches!(self.story, crate::stories::Story::Key { replaced: true });
+        if !(key || matches!(self.story, crate::stories::Story::ApplicationGeneration)) || self.injected
+            || !procs.iter().any(|proc| matches!(proc, Proc::Peer(peer) if smith_agent_process_world::fake::queries(peer).next().is_some()))
+        {
+            return;
+        }
+        self.injected = true;
+        for proc in procs.iter_mut() {
+            if let Proc::Engine(host) = proc {
+                let engine = host.service.engine().expect("engine");
+                if key {
+                    put_key(engine, 3, crate::fixtures::NEXT_KEY, now);
+                } else {
+                    engine.put_application(1, 2, skein_lib::Secret::new(b"application-token-2".as_slice().into()));
+                    engine.parties_in().push(core::Event::Account(jig_domain_accounts::Event::Credential {
+                        number: 1,
+                        generation: 2,
+                        valid: skein_lib::Duration::from_secs(60),
+                    }));
+                }
+            }
+        }
+    }
+
     fn inject(&mut self, now: Time, procs: &mut [Proc]) {
         if matches!(self.story, crate::stories::Story::HeldCommit) && now >= Time::from_nanos(1_000_000_000) {
             self.injected = true;
@@ -472,20 +552,7 @@ impl Referee {
         self.drain_engine(procs);
         self.resume_runs(procs);
         self.inject_refusal(procs);
-        if matches!(self.story, crate::stories::Story::ApplicationGeneration) && !self.injected
-            && procs.iter().any(|proc| matches!(proc, Proc::Peer(peer) if smith_agent_process_world::fake::queries(peer).next().is_some()))
-        {
-            self.injected = true;
-            for proc in procs.iter_mut() {
-                if let Proc::Engine(host) = proc {
-                    let engine = host.service.engine().expect("engine");
-                    engine.put_application(1, 2, skein_lib::Secret::new(b"application-token-2".as_slice().into()));
-                    engine.parties_in().push(core::Event::Account(jig_domain_accounts::Event::Credential {
-                        number: 1, generation: 2, valid: skein_lib::Duration::from_secs(60),
-                    }));
-                }
-            }
-        }
+        self.inject_grant(now, procs);
         if matches!(self.story, crate::stories::Story::Inbox) && !self.injected {
             self.injected = true;
             for proc in procs.iter_mut() {
@@ -522,6 +589,7 @@ impl Referee {
             }
             crate::stories::Story::Chat
             | crate::stories::Story::ApplicationGeneration
+            | crate::stories::Story::Key { .. }
             | crate::stories::Story::Stalled
             | crate::stories::Story::Quiet
             | crate::stories::Story::Replaced

@@ -239,15 +239,18 @@ fn worker_configured(root: kernel::Fd, bad_charter: bool, message: bool) -> Proc
     Proc::Worker(Box::new(ServiceHost::new(service, true)))
 }
 pub(crate) fn agent(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
-    agent_configured(inherited, false)
+    agent_configured(inherited, fixtures::agent_configuration(), false)
 }
 pub(crate) fn agent_slow(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
-    agent_configured(inherited, true)
+    agent_configured(inherited, fixtures::agent_configuration(), true)
 }
-fn agent_configured(inherited: &Inherited, slow: bool) -> Proc {
+/// An agent calling Anthropic's path, where a key goes out as a key.
+pub(crate) fn agent_anthropic(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
+    agent_configured(inherited, fixtures::anthropic_agent_configuration(), false)
+}
+fn agent_configured(inherited: &Inherited, mut configuration: smith_agent_service::Config, slow: bool) -> Proc {
     let fd = inherited.pipes.iter().find(|(child, _)| *child == 2).expect("stderr").1;
     let (errors, capture) = agent_fixture::AgentErrors::pipe(fd);
-    let mut configuration = fixtures::agent_configuration();
     if slow {
         configuration.domain.models[0].head = skein_lib::Duration::from_secs(30);
     }

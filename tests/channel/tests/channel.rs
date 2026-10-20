@@ -27,6 +27,22 @@ fn a_new_application_credential_generation_reaches_a_live_attempt() {
 }
 
 #[test]
+fn a_key_grant_reaches_the_provider_as_a_key() {
+    let outcome = run(Story::Key { replaced: false });
+    assert_eq!(outcome.verdict, Verdict::Passed);
+    assert_eq!(outcome.agent_starts, 1);
+    assert_eq!(outcome.answers_acknowledged, 1);
+}
+
+#[test]
+fn a_key_replaced_mid_run_reaches_the_running_worker() {
+    let outcome = run(Story::Key { replaced: true });
+    assert_eq!(outcome.verdict, Verdict::Passed);
+    assert_eq!(outcome.agent_starts, 1);
+    assert_eq!(outcome.answers_acknowledged, 1);
+}
+
+#[test]
 fn a_run_takes_turns_and_progresses_before_its_answer() {
     let outcome = run(Story::Progress);
     assert_eq!(outcome.verdict, Verdict::Passed);
