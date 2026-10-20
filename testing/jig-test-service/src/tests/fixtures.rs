@@ -657,6 +657,8 @@ pub fn service_bytes(document: &[u8]) -> u64 {
     crate::limits::worst_case(&parsed.limits)
         .expect("root bounds")
         .checked_add(crate::workers::configured_bytes(&parsed.engine).expect("configured bounds"))
+        .expect("worker total")
+        .checked_add(crate::accounts::configured_bytes(&parsed.engine).expect("configured account bounds"))
         .expect("service total")
 }
 

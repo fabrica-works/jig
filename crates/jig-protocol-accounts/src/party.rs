@@ -91,10 +91,15 @@ pub fn party_account(
             metadata_claim: None,
             terms: Some(terms),
         },
-        endpoint: driver::Endpoint { address: endpoint.address, transport: match &configured.endpoint_transport {
-                driver::Transport::Tls { server_name, trust } => driver::Transport::Tls { server_name: server_name.clone(), trust: trust.clone() },
+        endpoint: driver::Endpoint {
+            address: endpoint.address,
+            transport: match &configured.endpoint_transport {
+                driver::Transport::Tls { server_name, trust } => {
+                    driver::Transport::Tls { server_name: server_name.clone(), trust: trust.clone() }
+                }
                 driver::Transport::Plaintext => driver::Transport::Plaintext,
-            } },
+            },
+        },
         keeper: driver::Keeper::Owner { kept: None },
         shared: false,
         origins,

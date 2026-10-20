@@ -186,7 +186,10 @@ fn an_account_sign_in_registration_names_its_endpoints_and_its_must_grant_scopes
     assert_eq!(r.name_hint.as_deref(), Some(b"jig".as_slice()));
     assert_eq!(r.resource.as_deref(), Some(b"https://resource.example".as_slice()));
     assert_eq!((&*r.redirect_path, r.redirect_port), (b"callback".as_slice(), None));
-    assert!(matches!(r.endpoint_transport, crate::Transport::Tls { .. }));
+    match r.endpoint_transport {
+        crate::Transport::Tls { .. } => (),
+        crate::Transport::Plaintext => panic!("configured TLS account sign-in transport"),
+    }
 }
 #[test]
 fn an_account_sign_in_must_grant_scope_outside_the_scopes_is_refused_at_its_name() {

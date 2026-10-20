@@ -51,9 +51,15 @@ fn the_tables_take_account_numbers_beyond_the_configured_accounts() {
     let mut table = table();
     grant(&mut table, 20_000, 1, TOKEN_FIRST, 1000);
     grant(&mut table, 40_000, 1, TOKEN_FIRST, 1000);
+    assert_eq!(table.value(20_000, 1, Time::ZERO).unwrap().token.expose(), TOKEN_FIRST);
     assert_eq!(table.granted(60_000, 1, fixtures::value(TOKEN_FIRST), Time::from_nanos(1000)), Err(Unfit));
     table.remove(20_000);
+    assert!(table.value(20_000, 1, Time::ZERO).is_none());
     grant(&mut table, 60_000, 1, TOKEN_FIRST, 1000);
+    let mut records = crate::records::Records::new(2);
+    records.admit(20_000).unwrap();
+    records.admit(40_000).unwrap();
+    assert!(records.admit(60_000).is_err());
 }
 #[test]
 fn the_tables_debug_never_shows_a_value() {

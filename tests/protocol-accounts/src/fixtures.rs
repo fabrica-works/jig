@@ -270,7 +270,8 @@ pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
                 failure: child::Failure::Later { after: Some(Duration::from_secs(7)) },
             },
         ],
-        Story::RefusedRefresh => vec![
+        // Account sign-out expires the held grant before revoking the record.
+        Story::RefusedRefresh | Story::AccountSignOut { .. } => vec![
             Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
             Heard::Failed { account: ACCOUNT_CHAT, failure: child::Failure::SignInAgain },
         ],
@@ -282,16 +283,9 @@ pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
             account: ACCOUNT_CHAT,
             failure: child::Failure::Unloaded { at: child::Place::File, why: child::Unread::Unreadable },
         }],
-        Story::Granted | Story::Closed | Story::ClosedExchange => {
+        Story::Granted | Story::Closed | Story::ClosedExchange | Story::SignIn | Story::AccountSignInVaryingPort => {
             vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]
         }
-        Story::SignIn | Story::AccountSignInVaryingPort => {
-            vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]
-        }
-        Story::AccountSignOut { .. } => vec![
-            Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
-            Heard::Failed { account: ACCOUNT_CHAT, failure: child::Failure::Cancelled },
-        ],
         Story::AccountSignInMissingScope | Story::AccountSignInFull => vec![],
     }
 }
@@ -339,6 +333,7 @@ fn client_rejected() -> fake::Plan {
 }
 
 pub const PARTY_REDIRECT: &[u8] = b"http://127.0.0.1:31234/callback";
+#[must_use]
 pub fn account_sign_in(story: crate::world::Story) -> bool {
     matches!(
         story,
@@ -349,6 +344,7 @@ pub fn account_sign_in(story: crate::world::Story) -> bool {
             | crate::world::Story::AccountSignInFull
     )
 }
+#[must_use]
 pub fn party_registration(story: crate::world::Story) -> jig_protocol_accounts::party::Registration {
     jig_protocol_accounts::party::Registration {
         issuer: bytes::copy_of(b"http://127.0.0.1:31000"),
@@ -366,6 +362,7 @@ pub fn party_registration(story: crate::world::Story) -> jig_protocol_accounts::
         redirect_port: (story != crate::world::Story::AccountSignInVaryingPort).then_some(31234),
     }
 }
+#[must_use]
 pub fn issuer_terms(story: crate::world::Story) -> Option<fake::Terms> {
     account_sign_in(story).then(|| fake::Terms {
         issued: Box::new([bytes::copy_of(b"issued-client")]),

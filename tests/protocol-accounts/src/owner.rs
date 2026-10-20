@@ -116,8 +116,8 @@ pub struct Owner {
     ended: Vec<child::Ended>,
     answers: Vec<child::Answer>,
     removed: Vec<u32>,
-    erased: bool,
-    account_sign_out_asked: bool,
+    erased: Option<()>,
+    account_sign_out_asked: Option<()>,
 }
 impl std::fmt::Debug for Owner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -204,8 +204,8 @@ impl Owner {
             ended: Vec::new(),
             answers: Vec::new(),
             removed: Vec::new(),
-            erased: false,
-            account_sign_out_asked: false,
+            erased: None,
+            account_sign_out_asked: None,
         };
         if let Some(kept) = installation.kept {
             // An earlier start kept its draw with its first commit; this
@@ -309,20 +309,35 @@ impl Owner {
     pub fn last_kept(&self) -> Option<&[u8]> {
         self.last_kept.as_ref().map(Secret::expose)
     }
+    #[must_use]
     pub fn account_sign_in_ended(&self) -> &[child::Ended] {
         &self.ended
     }
+    #[must_use]
     pub fn account_answers(&self) -> &[child::Answer] {
         &self.answers
     }
+    #[must_use]
     pub fn account_record_erased(&self) -> bool {
-        self.erased
+        self.erased.is_some()
     }
+    #[must_use]
     pub fn account_removed(&self) -> bool {
         !self.removed.is_empty()
     }
     pub(crate) fn unstarted(&self) -> bool {
         self.component.is_none()
+    }
+    // The story signs out after the successful account sign-in's HTTP exchanges close.
+    // Its grant alone does not mean the driver has released that exchange's place.
+    fn account_sign_out_ready(&self) -> bool {
+        matches!(self.story, Story::AccountSignOut { .. })
+            && self.usable
+            && self.account_sign_out_asked.is_none()
+            && self.io.is_empty()
+            && self.requests.is_empty()
+            && self.events.is_empty()
+            && self.above.is_empty()
     }
     fn child_event(&mut self, now: Time, wall: Wall, event: child::Event) {
         child::step(&mut self.child, &Env { now, wall, limits: self.child_limits }, event, &mut self.child_out);
@@ -363,7 +378,12 @@ impl Owner {
         let crypto = skein_lib::CryptoRng::new(&skein_world::crypto_seed(17), 0).expect("world crypto seed");
         self.component = Some(driver::Component::new(configured, &self.limits, crypto).expect("configured driver"));
         if self.story == Story::AccountSignInFull {
-            self.component.as_mut().unwrap().add(env, 999, driver::Account::HandedIn, &mut self.above);
+            self.component.as_mut().expect("started account driver").add(
+                env,
+                999,
+                driver::Account::HandedIn,
+                &mut self.above,
+            );
             assert!(self.above.is_empty());
         }
         if let Some(lapses_in) = handed {
@@ -387,7 +407,7 @@ impl Owner {
             self.child_event(
                 env.now,
                 env.wall,
-                child::Event::SignIn { request: Token::new(80), holder: child::Holder::Party(7), provider: 1 },
+                child::Event::SignIn { request: Token::new(80), holder: child::Holder::Party(7), provider: 1, by: 7 },
             );
         } else {
             self.child_event(env.now, env.wall, child::Event::Want);
@@ -515,18 +535,23 @@ impl Owner {
                                     transport: driver::Transport::Plaintext,
                                 },
                             })
-                            .unwrap();
+                            .expect("account sign-in origin fits");
                         let account = party::party_account(&registration, endpoint, origins, &self.installation);
                         let before = self.above.len();
-                        self.component.as_mut().unwrap().add(env, source, account, &mut self.above);
+                        self.component.as_mut().expect("started account driver").add(
+                            env,
+                            source,
+                            account,
+                            &mut self.above,
+                        );
                         if self.above.len() == before {
-                            self.records.admit(source).unwrap();
+                            self.records.admit(source).expect("driver admitted account");
                             self.driver(env, driver::Request::SignIn { account: source, subject: None });
                         }
                     }
                     translate::Down::SignIn { .. } => panic!("known account sign-in provider"),
                     translate::Down::SignOut { source } => {
-                        self.driver(env, driver::Request::SignOut { account: source })
+                        self.driver(env, driver::Request::SignOut { account: source });
                     }
                 },
                 child::Request::Answer { answer, .. } => self.answers.push(answer),
@@ -584,7 +609,7 @@ impl Owner {
                         store::Secrets::Get { owner: store::SecretOwner::Source, number: u64::from(source) },
                     );
                     assert!(matches!(self.store_above.pop(), Some(store::Event::Secret { value: None, .. })));
-                    self.erased = true;
+                    self.erased = Some(());
                     self.child_event(env.now, env.wall, child::Event::SignedOut { source, confirmed });
                     self.driver(env, driver::Request::Remove { account: source });
                     continue;
@@ -650,8 +675,8 @@ impl Host for Owner {
         if self.component.is_none() {
             return;
         }
-        if matches!(self.story, Story::AccountSignOut { .. }) && self.usable && !self.account_sign_out_asked {
-            self.account_sign_out_asked = true;
+        if self.account_sign_out_ready() {
+            self.account_sign_out_asked = Some(());
             self.child_event(
                 now,
                 wall,
@@ -723,7 +748,7 @@ impl Host for Owner {
     }
     fn work_pending(&self, now: Time) -> bool {
         self.io.is_ready()
-            || (matches!(self.story, Story::AccountSignOut { .. }) && self.usable && !self.account_sign_out_asked)
+            || self.account_sign_out_ready()
             || !self.events.is_empty()
             || !self.requests.is_empty()
             || !self.above.is_empty()

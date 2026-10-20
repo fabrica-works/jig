@@ -1,9 +1,9 @@
+use crate::party::Registration;
 use crate::{
     party,
     translate::{self, Down, Up},
 };
 use jig_domain_accounts as child;
-use crate::party::Registration;
 use skein_lib::{List, Time, bytes};
 use skein_oauth_accounts as driver;
 
@@ -29,7 +29,10 @@ fn account(port: Option<u16>) -> driver::Account {
     r.redirect_port = port;
     party::party_account(
         &r,
-        driver::Endpoint { address: "127.0.0.1:31000".parse().unwrap(), transport: driver::Transport::Plaintext },
+        driver::Endpoint {
+            address: core::net::SocketAddr::from(([127, 0, 0, 1], 31000)),
+            transport: driver::Transport::Plaintext,
+        },
         List::with_capacity(0),
         &[5; 16],
     )
@@ -44,7 +47,11 @@ fn party_account_sign_in_carries_the_installation_id_and_the_name_hint() {
     assert_eq!(&*r.redirect_uri, b"http://127.0.0.1:0/callback");
     assert_eq!(&*r.scope, b"openid read");
     assert!(r.client_secret.is_none() && !r.pkce_for_confidential && r.metadata_claim.is_none());
-    assert!(matches!(keeper, driver::Keeper::Owner { kept: None }) && !shared && origins.is_empty());
+    match keeper {
+        driver::Keeper::Owner { kept } => assert!(kept.is_none()),
+        driver::Keeper::Private { .. } => panic!("account sign-in keeper"),
+    }
+    assert!(!shared && origins.is_empty());
     let terms = r.terms.unwrap();
     assert_eq!(&*terms.parameters[0].name, crate::installation::NAME);
     assert_eq!(terms.parameters[0].value, crate::installation::urn(&[5; 16]));
@@ -52,7 +59,9 @@ fn party_account_sign_in_carries_the_installation_id_and_the_name_hint() {
         (&*terms.parameters[1].name, &*terms.parameters[1].value),
         (b"agent_name_hint".as_slice(), b"jig".as_slice())
     );
-    assert!(terms.parameters.iter().all(|p| p.sent == skein_oauth::Sent::EverySignIn));
+    for parameter in &terms.parameters {
+        assert_eq!(parameter.sent, skein_oauth::Sent::EverySignIn);
+    }
     assert_eq!(terms.resource.as_deref(), Some(b"api".as_slice()));
     assert_eq!(terms.revocation_endpoint.as_deref(), Some(b"http://127.0.0.1:31000/revoke".as_slice()));
 }
@@ -88,7 +97,10 @@ fn an_account_visit_is_the_childs_visited_event() {
 fn an_account_visit_longer_than_the_address_bound_fails_the_account_sign_in_misconfigured() {
     assert_eq!(
         translate::up(
-            driver::Event::Visit { account: 55, url: bytes::zeroed(child::ADDRESS as usize + 1) },
+            driver::Event::Visit {
+                account: 55,
+                url: bytes::zeroed(usize::try_from(child::ADDRESS.checked_add(1).unwrap()).unwrap())
+            },
             Time::ZERO,
             b""
         ),

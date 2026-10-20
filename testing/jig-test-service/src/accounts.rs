@@ -106,7 +106,10 @@ fn issuers(
     Ok(issuers)
 }
 /// The host resolves transports; the component owns its public registration vocabulary.
-fn registration_input(configured: &config::llm::Registration, endpoint_transport: &driver::Transport) -> party::Registration {
+fn registration_input(
+    configured: &config::llm::Registration,
+    endpoint_transport: &driver::Transport,
+) -> party::Registration {
     party::Registration {
         issuer: configured.issuer.clone(),
         client: configured.client.clone(),
@@ -117,7 +120,9 @@ fn registration_input(configured: &config::llm::Registration, endpoint_transport
         revocation: configured.revocation.clone(),
         keys: configured.keys.clone(),
         endpoint_transport: match endpoint_transport {
-            driver::Transport::Tls { server_name, trust } => driver::Transport::Tls { server_name: server_name.clone(), trust: trust.clone() },
+            driver::Transport::Tls { server_name, trust } => {
+                driver::Transport::Tls { server_name: server_name.clone(), trust: trust.clone() }
+            }
             driver::Transport::Plaintext => driver::Transport::Plaintext,
         },
         must_grant: configured.must_grant.clone(),
@@ -158,6 +163,48 @@ fn unkept(account: &driver::Account) -> driver::Account {
             origins: copy_origins(origins),
         },
     }
+}
+fn provider_templates(
+    config: &config::Engine,
+    runtime: Option<&mut AccountsRuntime>,
+    limits: &driver::Limits,
+    crypto: &CryptoRng,
+    installation_id: &[u8; 16],
+) -> Result<Map<u32, driver::Account>, Problems> {
+    let mut providers = Map::with_capacity(u32::try_from(config.llm.providers.len()).expect("provider count"));
+    if let Some(runtime) = runtime {
+        for (number, endpoint, origins) in
+            ::core::mem::replace(&mut runtime.providers, List::with_capacity(0)).into_boxed()
+        {
+            let mut registration = None;
+            for provider in &config.llm.providers {
+                if provider.number == number {
+                    registration = provider.sign_in.as_ref();
+                    break;
+                }
+            }
+            let registration = registration.ok_or(problem(0, What::Refers))?;
+            if (runtime.trust_roots == 0 || runtime.trust_root_bytes == 0) && has_tls(&endpoint, &origins) {
+                return Err(problem(0, What::Bound));
+            }
+            let account = party::party_account(
+                &registration_input(registration, &endpoint.transport),
+                endpoint,
+                origins,
+                installation_id,
+            );
+            let mut check = List::with_capacity(1);
+            check.push(unkept(&account)).or(Err(problem(0, What::Bound)))?;
+            let _checked = driver::Component::new(check, limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
+            providers.insert(number, account).or(Err(problem(0, What::Bound)))?;
+        }
+    }
+    for provider in &config.llm.providers {
+        if provider.sign_in.is_some() && !providers.contains_key(&provider.number) {
+            return Err(problem(0, What::Refers));
+        }
+    }
+    Ok(providers)
 }
 impl Accounts {
     /// Checks the configured sources and makes them ready to start; the
@@ -245,35 +292,7 @@ impl Accounts {
         }
         let checked = driver::Component::new(check, &limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
         drop(checked);
-        let mut providers = Map::with_capacity(u32::try_from(config.llm.providers.len()).expect("provider count"));
-        if let Some(runtime) = &mut runtime {
-            for (number, endpoint, origins) in
-                ::core::mem::replace(&mut runtime.providers, List::with_capacity(0)).into_boxed()
-            {
-                let mut registration = None;
-                for provider in &config.llm.providers {
-                    if provider.number == number {
-                        registration = provider.sign_in.as_ref();
-                        break;
-                    }
-                }
-                let registration = registration.ok_or(problem(0, What::Refers))?;
-                if (runtime.trust_roots == 0 || runtime.trust_root_bytes == 0) && has_tls(&endpoint, &origins) {
-                    return Err(problem(0, What::Bound));
-                }
-                let account = party::party_account(&registration_input(registration, &endpoint.transport), endpoint, origins, &seeds.installation);
-                let mut check = List::with_capacity(1);
-                check.push(unkept(&account)).or(Err(problem(0, What::Bound)))?;
-                let _checked =
-                    driver::Component::new(check, &limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
-                providers.insert(number, account).or(Err(problem(0, What::Bound)))?;
-            }
-        }
-        for provider in &config.llm.providers {
-            if provider.sign_in.is_some() && !providers.contains_key(&provider.number) {
-                return Err(problem(0, What::Refers));
-            }
-        }
+        let providers = provider_templates(config, runtime.as_mut(), &limits, &crypto, &seeds.installation)?;
         Ok(Self {
             component: None,
             phase: Phase::Loading { configured, crypto, after: None, asked: false },
@@ -319,12 +338,19 @@ impl Accounts {
     }
     /// The domain's request: to the driver once it runs, held until then.
     pub fn request(&mut self, request: domain::Request) {
-        if matches!(request, domain::Request::Component(_) | domain::Request::Signing(_)) {
-            if self.running() {
-                self.dispatch(request);
-            } else {
-                self.early.push(request);
+        match request {
+            domain::Request::Component(_) | domain::Request::Signing(_) => {
+                if self.running() {
+                    self.dispatch(request);
+                } else {
+                    self.early.push(request);
+                }
             }
+            domain::Request::Granted { .. }
+            | domain::Request::Save { .. }
+            | domain::Request::Erase { .. }
+            | domain::Request::Answer { .. }
+            | domain::Request::Closed => (),
         }
     }
     fn dispatch(&mut self, request: domain::Request) {
@@ -343,9 +369,10 @@ impl Accounts {
                     };
                     let account = unkept(template);
                     let required = match &account {
-                        driver::Account::SignIn { registration, .. } => {
-                            registration.terms.as_ref().and_then(required_scopes)
-                        }
+                        driver::Account::SignIn { registration, .. } => match &registration.terms {
+                            Some(terms) => terms.required_scopes.clone(),
+                            None => None,
+                        },
                         driver::Account::HandedIn => None,
                     }
                     .unwrap_or_default();
@@ -453,21 +480,13 @@ impl Accounts {
             };
             let event = match self.records.up(event, now, required) {
                 translate::Up::Granted { mut event, account, generation, value, expires } => {
-                    // An account with a provider account id is jig's live test's
-                    // (D2): its bearer goes out beside the id until JP13.
-                    let id = self.ids.get(&account).expect("configured account id");
-                    let value = if id.expose().is_empty() {
-                        value
-                    } else {
-                        table::Value { token: value.token, scheme: table::Scheme::Withdrawn { id: id.clone() } }
-                    };
-                    if let domain::FromComponent::Granted { form, .. } = &mut event {
-                        *form = translate::form(&value.scheme);
+                    let granted_form = self.granted(account, generation, value, expires, values);
+                    match &mut event {
+                        domain::FromComponent::Granted { form, .. } => *form = granted_form,
+                        domain::FromComponent::Expiring { .. }
+                        | domain::FromComponent::Failed { .. }
+                        | domain::FromComponent::Closed => unreachable!("a lent value accompanies its grant"),
                     }
-                    values
-                        .accounts
-                        .granted(account, generation, value, expires)
-                        .expect("startup checks token and account id bounds");
                     event
                 }
                 translate::Up::Child(event) => event,
@@ -494,16 +513,7 @@ impl Accounts {
                     continue;
                 }
                 translate::Up::SignedOut { source, confirmed } => {
-                    if self.erasing.contains_key(&source) {
-                        continue;
-                    }
-                    self.erasing.insert(source, Some(confirmed)).expect("one erase per driver account");
-                    if let Some(store::Event::Erased { owner }) = store.secrets(
-                        Token::new(PREFIX | u64::from(source)),
-                        store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
-                    ) {
-                        self.erased(source, owner, events);
-                    }
+                    self.signed_out(source, confirmed, events, store);
                     continue;
                 }
                 translate::Up::Removed { source } => {
@@ -537,6 +547,47 @@ impl Accounts {
         values.accounts.expire(now);
         if let Some(component) = &mut self.component {
             component.reclaim();
+        }
+    }
+    fn granted(
+        &self,
+        account: u32,
+        generation: u64,
+        value: table::Value,
+        expires: Time,
+        values: &mut Values,
+    ) -> domain::Form {
+        // An account with a provider account id is jig's live test's
+        // (D2): its bearer goes out beside the id until JP13.
+        let id = self.ids.get(&account).expect("configured account id");
+        let value = if id.expose().is_empty() {
+            value
+        } else {
+            table::Value { token: value.token, scheme: table::Scheme::Withdrawn { id: id.clone() } }
+        };
+        let form = translate::form(&value.scheme);
+        values
+            .accounts
+            .granted(account, generation, value, expires)
+            .expect("startup checks token and account id bounds");
+        form
+    }
+    fn signed_out(
+        &mut self,
+        source: u32,
+        confirmed: bool,
+        events: &mut Queue<root::Event>,
+        store: &mut crate::store::Store,
+    ) {
+        if self.erasing.contains_key(&source) {
+            return;
+        }
+        self.erasing.insert(source, Some(confirmed)).expect("one erase per driver account");
+        if let Some(store::Event::Erased { owner }) = store.secrets(
+            Token::new(PREFIX | u64::from(source)),
+            store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
+        ) {
+            self.erased(source, owner, events);
         }
     }
     fn erased(&mut self, number: u32, _owner: Token, events: &mut Queue<root::Event>) {
@@ -844,9 +895,6 @@ pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32) ->
         .checked_add(Map::<Token, Token>::worst_case(io::operations(io)?.checked_add(2)?)?)
 }
 
-fn required_scopes(terms: &oauth::Terms) -> Option<Box<[u8]>> {
-    terms.required_scopes.clone()
-}
 fn copy_endpoint(endpoint: &driver::Endpoint) -> driver::Endpoint {
     driver::Endpoint {
         address: endpoint.address,
@@ -867,12 +915,14 @@ fn copy_origins(origins: &List<driver::Origin>) -> List<driver::Origin> {
     copy
 }
 fn has_tls(endpoint: &driver::Endpoint, origins: &List<driver::Origin>) -> bool {
-    if matches!(endpoint.transport, driver::Transport::Tls { .. }) {
-        return true;
+    match endpoint.transport {
+        driver::Transport::Tls { .. } => return true,
+        driver::Transport::Plaintext => (),
     }
     for origin in origins {
-        if matches!(origin.endpoint.transport, driver::Transport::Tls { .. }) {
-            return true;
+        match origin.endpoint.transport {
+            driver::Transport::Tls { .. } => return true,
+            driver::Transport::Plaintext => (),
         }
     }
     false
