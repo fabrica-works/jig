@@ -340,11 +340,17 @@ pub(crate) fn owner_deployment_fields(
     for item in value.connectors() {
         list4.push(*item).expect("reserved supplied list");
     }
+    let mut room = super::document_room(limits);
     Ok(c::OwnerDeployment {
+        providers: super::catalogue::offers(value.providers(), limits, &mut room)?,
+        providers_cut: value.providers_cut(),
+        key_bytes: value.key_bytes(),
+        readiness: super::catalogue::readiness(value.readiness(), limits, &mut room)?,
+        readiness_cut: value.readiness_cut(),
         store: store_fill_fields(value.store(), limits),
         hosts: owner_host_piece(value.hosts(), limits, limits.client.rows)?,
         attempts: owner_host_run_piece(value.attempts(), limits, limits.client.rows)?,
-        accounts: owner_account_piece(value.accounts(), limits, &mut super::document_room(limits))?,
+        accounts: owner_account_piece(value.accounts(), limits, &mut room)?,
         tasks: owner_capacity_fields(value.tasks(), limits),
         workers: owner_capacity_fields(value.workers(), limits),
         attempts_capacity: owner_capacity_fields(value.attempts_capacity(), limits),

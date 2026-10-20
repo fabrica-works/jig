@@ -7,6 +7,8 @@ use jig_client_protocol_wire::v10 as w;
 use skein_lib::{List, Reader, Wall, bytes};
 #[path = "accounts.rs"]
 mod accounts;
+#[path = "catalogue.rs"]
+mod catalogue;
 #[path = "documents_part0.rs"]
 mod part0;
 pub(crate) use accounts::*;

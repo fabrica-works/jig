@@ -294,12 +294,11 @@ fn an_accounts_document_is_watched_but_never_read() {
             w::OwnerAccounts::new(
                 &limits,
                 w::OwnerAccountsParts {
+                    skein_bools: [false, true, false, false],
+                    readiness: Box::new([]),
                     accounts: Box::from([]),
                     signing: Box::from([]),
-                    last_end: None,
-                    usable: false,
-                    settled: true,
-                    cut: false
+                    last_end: None
                 }
             )
             .unwrap()

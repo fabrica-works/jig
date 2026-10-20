@@ -33,6 +33,11 @@ pub struct OwnerDeployment {
     pub connectors: List<u16>,
     /// Independently supplied configured catalogue loss.
     pub connectors_cut: bool,
+    pub providers: List<super::ProviderOffer>,
+    pub providers_cut: bool,
+    pub key_bytes: u32,
+    pub readiness: List<super::PayerReadiness>,
+    pub readiness_cut: bool,
 }
 
 /// Store map bytes at the last commit answer and its admission mark (store.md, 11.2).

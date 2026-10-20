@@ -120,3 +120,22 @@ fn catalogue_keeps_public_offers_for_an_ordinary_party() {
     assert_eq!(offer.manage_usage.as_deref(), Some(b"https://usage.example/".as_slice()));
     assert_eq!(frame.key_bytes, 123);
 }
+
+#[test]
+fn readiness_rechecks_a_projects_current_members() {
+    let (mut core, env) = serving();
+    let project = |core: &Core| document(core, &env, ALICE).readiness.get(1).unwrap().readiness;
+    assert_eq!(project(&core), Readiness::Usable);
+    drop(step(
+        &mut core,
+        &env,
+        Event::People(people::Event::Roles {
+            project: 0,
+            holdings: Box::new([
+                people::Holding { person: ALICE, role: people::Role::Owner },
+                people::Holding { person: BOB, role: people::Role::Member },
+            ]),
+        }),
+    ));
+    assert_eq!(project(&core), Readiness::Unavailable);
+}

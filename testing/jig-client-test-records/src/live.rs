@@ -56,6 +56,10 @@ pub fn owner_deployment_record() -> w::OwnerDeployment {
     w::OwnerDeployment::new(
         &lim,
         w::OwnerDeploymentParts {
+            skein_bools: [false, false, false, false],
+            providers: Box::new([]),
+            key_bytes: 256,
+            readiness: Box::new([]),
             store: w::StoreFill::new(&lim, w::StoreFillParts { bytes: 7, mark: 7 }).expect("literal fixture fits"),
             hosts: Box::from([]),
             attempts: Box::from([]),
@@ -79,9 +83,7 @@ pub fn owner_deployment_record() -> w::OwnerDeployment {
             person_answer_retention: Duration::from_nanos(19),
             task_room_refusals: List::with_capacity(0),
             task_room_refusals_forgotten: 7,
-            cut: false,
             connectors: List::with_capacity(0),
-            connectors_cut: false,
         },
     )
     .expect("literal fixture fits")

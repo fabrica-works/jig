@@ -35,6 +35,11 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     let mut wire = w::CEILINGS;
     wire.owned_record = u32::try_from(client.document_bytes).ok()?;
     wire.document_text_bytes = client.text;
+    wire.me_providers = wire.owned_record;
+    wire.owner_accounts_readiness = wire.owned_record;
+    wire.owner_deployment_providers = wire.owned_record;
+    wire.owner_deployment_readiness = wire.owned_record;
+    wire.provider_offer_programs = client.rows;
     wire.model_set_names_names_item = client.text.min(w::CEILINGS.model_set_names_names_item);
     wire.owner_chip_phase_waiting_dependencies = client.rows;
     wire.call_identity_id = client.text;

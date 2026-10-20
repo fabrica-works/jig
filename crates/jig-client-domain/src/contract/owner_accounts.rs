@@ -32,6 +32,8 @@ pub struct OwnerAccounts {
     pub usable: bool,
     pub settled: bool,
     pub cut: bool,
+    pub readiness: List<super::PayerReadiness>,
+    pub readiness_cut: bool,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerAccountLine {

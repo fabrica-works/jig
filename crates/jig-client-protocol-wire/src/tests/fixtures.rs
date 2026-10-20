@@ -526,6 +526,9 @@ pub fn frame_at_ceilings(limits: &Limits) -> Me {
     Me::new(
         limits,
         MeParts {
+            providers: Box::new([]),
+            providers_cut: false,
+            key_bytes: 256,
             party: frame_party(limits),
             projects: piece_items(&repeated(project_role(limits), 2), MeProject::measure, MeProject::encode),
             needs: needs(limits),

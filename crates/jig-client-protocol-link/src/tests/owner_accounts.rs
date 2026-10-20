@@ -39,6 +39,8 @@ fn source_rows() -> [c::OwnerAccountSource; 2] {
 #[expect(clippy::manual_map, reason = "optional fixture facts follow the step crate lint configuration")]
 fn document(end: Option<c::OwnerAccountEnd>) -> c::OwnerAccounts {
     c::OwnerAccounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         accounts: list([
             c::OwnerAccountLine {
                 provider_name: None,

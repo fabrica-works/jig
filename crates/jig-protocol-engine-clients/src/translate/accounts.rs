@@ -222,12 +222,11 @@ pub fn document(value: &d::Accounts, limits: &w::Limits) -> Result<w::OwnerAccou
     w::OwnerAccounts::new(
         limits,
         w::OwnerAccountsParts {
+            skein_bools: [value.usable, value.settled, value.cut, value.readiness_cut],
+            readiness: super::catalogue::readiness(&value.readiness, limits.owner_accounts_readiness, limits)?,
             accounts,
             signing,
             last_end,
-            usable: value.usable,
-            settled: value.settled,
-            cut: value.cut,
         },
     )
 }

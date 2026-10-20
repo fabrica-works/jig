@@ -177,6 +177,9 @@ pub fn frame(value: &d::Frame, models: &[crate::Model], limits: &w::Limits) -> R
     w::Me::new(
         limits,
         w::MeParts {
+            providers: super::catalogue::offers(&value.providers, limits.me_providers, limits)?,
+            providers_cut: value.providers_cut,
+            key_bytes: value.key_bytes,
             party: w::MeParty::new(
                 limits,
                 w::MePartyParts {

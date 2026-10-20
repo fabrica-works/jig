@@ -28,6 +28,9 @@ pub fn frame_record() -> w::Me {
 }
 pub fn frame() -> c::Me {
     c::Me {
+        providers: List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
         party: c::MeParty {
             number: 7,
             kind: c::PartyKind::Person,

@@ -88,6 +88,9 @@ pub fn frame_record() -> w::Me {
     w::Me::new(
         &lim,
         w::MeParts {
+            providers: Box::new([]),
+            providers_cut: false,
+            key_bytes: 256,
             party: w::MeParty::new(
                 &lim,
                 w::MePartyParts {

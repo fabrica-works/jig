@@ -101,6 +101,9 @@ pub(super) fn document() -> Me {
         })
         .unwrap();
     Me {
+        providers: List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
         party: MeParty {
             number: 1,
             kind: PartyKind::Person,

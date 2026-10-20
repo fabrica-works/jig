@@ -111,6 +111,8 @@ pub fn accounts_record(end: Option<w::OwnerAccountEnd>) -> w::OwnerAccounts {
     w::OwnerAccounts::new(
         &l,
         w::OwnerAccountsParts {
+            skein_bools: [true, false, true, false],
+            readiness: Box::new([]),
             accounts: pieces([
                 encoded(line.measure(), |w| line.encode(w)),
                 encoded(other.measure(), |w| other.encode(w)),
@@ -119,9 +121,6 @@ pub fn accounts_record(end: Option<w::OwnerAccountEnd>) -> w::OwnerAccounts {
             last_end: end.map(|end| {
                 w::OwnerAccountLastEnd::new(&l, w::OwnerAccountLastEndParts { source: 11, end }).expect("literal")
             }),
-            usable: true,
-            settled: false,
-            cut: true,
         },
     )
     .expect("literal")

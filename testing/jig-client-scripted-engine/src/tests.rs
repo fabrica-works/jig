@@ -27,6 +27,9 @@ fn budget() -> Budget {
 }
 fn frame(number: u64) -> Me {
     Me {
+        providers: skein_lib::List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
         party: MeParty {
             number,
             kind: PartyKind::Person,

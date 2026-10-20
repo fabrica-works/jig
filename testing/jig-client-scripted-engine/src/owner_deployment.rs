@@ -18,6 +18,8 @@ impl Payload for OwnerDeployment {
         total = total.checked_add(self.person_room_refusals.heap(bounds)?)?;
         total = total.checked_add(self.task_room_refusals.heap(bounds)?)?;
         total = total.checked_add(self.connectors.heap(bounds)?)?;
+        total = total.checked_add(self.providers.heap(bounds)?)?;
+        total = total.checked_add(self.readiness.heap(bounds)?)?;
         Some(total)
     }
 }
@@ -253,6 +255,20 @@ impl Payload for jig_client_domain::contract::OwnerAccountLine {
 }
 impl Payload for jig_client_domain::contract::OwnerAccounts {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        self.accounts.heap(bounds)?.checked_add(self.signing.heap(bounds)?)
+        self.accounts.heap(bounds)?.checked_add(self.signing.heap(bounds)?)?.checked_add(self.readiness.heap(bounds)?)
+    }
+}
+
+impl Payload for jig_client_domain::contract::ProviderOffer {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.name
+            .heap(bounds)?
+            .checked_add(self.programs.heap(bounds)?)?
+            .checked_add(self.manage_usage.heap(&Bounds { text: 2048, ..*bounds })?)
+    }
+}
+impl Payload for jig_client_domain::contract::PayerReadiness {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        Some(0)
     }
 }

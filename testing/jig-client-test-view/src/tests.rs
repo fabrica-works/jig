@@ -94,6 +94,9 @@ fn ready() -> Domain {
                 up: jig_client::Up::Watched {
                     watch,
                     event: WatchEvent::Delivered(Delivery::Me(Box::new(Me {
+                        providers: List::with_capacity(0),
+                        providers_cut: false,
+                        key_bytes: 256,
                         party: MeParty {
                             number: 7,
                             kind: PartyKind::Person,

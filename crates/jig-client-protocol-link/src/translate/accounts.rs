@@ -163,6 +163,8 @@ pub(crate) fn owner_accounts(value: w::OwnerAccounts, limits: &Limits) -> Result
     let mut room = document_room(limits);
     charge(&mut room, Some(u64::try_from(size_of::<c::OwnerAccounts>()).expect("a record's size fits u64")))?;
     Ok(c::OwnerAccounts {
+        readiness: super::catalogue::readiness(value.readiness(), limits, &mut room)?,
+        readiness_cut: value.readiness_cut(),
         accounts: owner_account_line_piece(value.accounts(), limits, &mut room)?,
         signing: owner_account_sign_in_piece(value.signing(), limits, &mut room)?,
         last_end: match value.last_end() {

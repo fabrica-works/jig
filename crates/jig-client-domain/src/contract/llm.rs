@@ -88,3 +88,34 @@ pub enum TaskSourceState {
     Cancelled,
     Closing,
 }
+
+/// Configured public source offers; no private account identity is carried.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[expect(clippy::struct_excessive_bools, reason = "independent configured source offers and cut facts")]
+pub struct ProviderOffer {
+    pub provider: u32,
+    pub name: super::DocumentText,
+    pub sign_in: bool,
+    pub key: bool,
+    pub programs: List<Text>,
+    pub programs_cut: bool,
+    pub none: bool,
+    pub signed_in_plan: bool,
+    pub manage_usage: Option<alloc::boxed::Box<[u8]>>,
+}
+/// Availability does not reserve a run's account, host, slots or budget.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Readiness {
+    Usable,
+    Unavailable,
+    Unknown,
+}
+/// A provider's readiness for one authorized payer, independent of private account rows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PayerReadiness {
+    pub provider: u32,
+    pub payer: super::OwnerAccountUse,
+    pub readiness: Readiness,
+    /// Unknown until the engine has program check facts; pending sign-ins are false.
+    pub settled: Option<bool>,
+}

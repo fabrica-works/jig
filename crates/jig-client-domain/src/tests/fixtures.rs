@@ -242,6 +242,9 @@ pub(crate) fn me(party: u64, retention: Duration) -> Up {
     Up::Watched {
         watch: ME_WATCH,
         event: contract::WatchEvent::Delivered(contract::Delivery::Me(Box::new(contract::Me {
+            providers: List::with_capacity(0),
+            providers_cut: false,
+            key_bytes: 256,
             party: contract::MeParty {
                 number: party,
                 kind: contract::PartyKind::Person,

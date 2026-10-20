@@ -14,6 +14,11 @@ use jig_domain_tasks as tasks;
 /// Refuses any whole reserved collection or nested owner value above bounds.
 pub fn document(source: &documents::Deployment, limits: &Limits) -> Result<client::OwnerDeployment, owner::Invalid> {
     Ok(client::OwnerDeployment {
+        providers: skein_lib::List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
+        readiness: skein_lib::List::with_capacity(0),
+        readiness_cut: false,
         store: client::StoreFill { bytes: source.store.bytes, mark: source.store.mark },
         hosts: owner::list(&source.hosts, limits, |value| host(value, limits))?,
         attempts: owner::list(&source.attempts, limits, |value| run(value, limits))?,

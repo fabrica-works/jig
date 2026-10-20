@@ -6,6 +6,7 @@ pub mod accounts;
 pub mod activity;
 pub(crate) mod answers;
 pub(crate) mod asks;
+mod catalogue;
 pub mod chips;
 pub(crate) mod cursor;
 pub mod deployment;

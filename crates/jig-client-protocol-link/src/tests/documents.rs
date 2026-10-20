@@ -195,3 +195,44 @@ fn an_authority_uses_its_own_bound_beyond_the_document_rows() {
     let (record, _) = fixtures::task_with_authority_grants(limits.client.authority + 1);
     assert_eq!(documents::task(record, &limits), Err(Undecodable::TooLarge));
 }
+
+fn catalogue_frame(address: &[u8]) -> w::Me {
+    let limits = fixtures::limits().wire;
+    let row = w::ProviderOffer::new(
+        &limits,
+        w::ProviderOfferParts {
+            provider: 37,
+            name: w::DocumentText::new(
+                &limits,
+                w::DocumentTextParts { bytes: b"Arbitrary".as_slice().into(), cut: false },
+            )
+            .unwrap(),
+            skein_bools: [true, true, false, false, true],
+            programs: skein_lib::List::with_capacity(0),
+            manage_usage: Some(address.into()),
+        },
+    )
+    .unwrap();
+    let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).unwrap());
+    row.encode(&mut writer).unwrap();
+    let bytes = writer.finish();
+    let mut writer = skein_lib::Writer::new(bytes.len().checked_add(4).unwrap());
+    skein_codec::piece::write(&mut writer, &bytes).unwrap();
+    let mut frame = fixtures::frame_record().into_parts();
+    frame.providers = writer.finish();
+    w::Me::new(&limits, frame).unwrap()
+}
+#[test]
+fn catalogue_addresses_are_checked_before_publication() {
+    for address in [b"ftp://x".as_slice(), b"https:///", b"https://x/\""] {
+        assert_eq!(documents::frame(catalogue_frame(address), &fixtures::limits()), Err(Undecodable::Malformed));
+    }
+}
+#[test]
+fn catalogue_keeps_the_configured_provider_words() {
+    let frame = documents::frame(catalogue_frame(b"https://usage.example/"), &fixtures::limits()).unwrap();
+    let row = frame.providers.get(0).unwrap();
+    assert_eq!(row.provider, 37);
+    assert_eq!(row.name.bytes(), b"Arbitrary");
+    assert!(row.sign_in && row.key && row.signed_in_plan);
+}

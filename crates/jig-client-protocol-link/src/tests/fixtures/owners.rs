@@ -5,6 +5,11 @@ pub fn owner_deployment_record() -> w::OwnerDeployment {
 }
 pub fn owner_deployment() -> c::OwnerDeployment {
     c::OwnerDeployment {
+        providers: List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         store: c::StoreFill { bytes: 7, mark: 7 },
         hosts: List::with_capacity(0),
         attempts: List::with_capacity(0),

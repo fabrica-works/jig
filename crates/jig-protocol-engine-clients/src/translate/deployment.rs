@@ -526,6 +526,10 @@ pub fn document(value: &d::Deployment, limits: &w::Limits) -> Result<w::OwnerDep
     w::OwnerDeployment::new(
         limits,
         w::OwnerDeploymentParts {
+            skein_bools: [value.cut, value.connectors_cut, value.providers_cut, value.readiness_cut],
+            providers: super::catalogue::offers(&value.providers, limits.owner_deployment_providers, limits)?,
+            key_bytes: value.key_bytes,
+            readiness: super::catalogue::readiness(&value.readiness, limits.owner_deployment_readiness, limits)?,
             store: w::StoreFill::new(limits, w::StoreFillParts { bytes: value.store.bytes, mark: value.store.mark })?,
             hosts,
             attempts,
@@ -545,9 +549,7 @@ pub fn document(value: &d::Deployment, limits: &w::Limits) -> Result<w::OwnerDep
             person_answer_retention: value.person_answer_retention,
             task_room_refusals,
             task_room_refusals_forgotten: value.task_room_refusals_forgotten,
-            cut: value.cut,
             connectors,
-            connectors_cut: value.connectors_cut,
         },
     )
 }

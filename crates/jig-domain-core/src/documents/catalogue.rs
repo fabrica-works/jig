@@ -52,6 +52,9 @@ pub(super) fn offers(core: &Core, limits: &DocumentLimits) -> Result<(List<Provi
                 programs_cut = true;
                 continue;
             }
+            if name.len() > 32 {
+                return Err(Missing::TooLarge);
+            }
             programs.push(name.clone()).or(Err(Missing::TooLarge))?;
         }
         result
@@ -150,11 +153,12 @@ fn eligible_host(core: &Core, provider: u32) -> Readiness {
         }
         match host.kind {
             fleet::HostKind::Engine => {}
-            fleet::HostKind::Worker if core.fleet.awaiting_logins(host.channel)
-                || !fleet::host_rule(!unknown_logins, &[], &[]) => {
-                    unknown = true;
-                    continue;
-                }
+            fleet::HostKind::Worker
+                if core.fleet.awaiting_logins(host.channel) || !fleet::host_rule(!unknown_logins, &[], &[]) =>
+            {
+                unknown = true;
+                continue;
+            }
             fleet::HostKind::Worker => {}
         }
         for model in &core.settings.models {

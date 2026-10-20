@@ -17,6 +17,9 @@ pub struct Me {
     pub cut: bool,
     pub retention: Duration,
     pub deployment_role: Option<HeldRole>,
+    pub providers: List<super::ProviderOffer>,
+    pub providers_cut: bool,
+    pub key_bytes: u32,
 }
 
 /// The authenticated identity, with independently supplied local text loss.

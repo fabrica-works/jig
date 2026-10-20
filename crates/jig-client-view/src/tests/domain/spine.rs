@@ -62,6 +62,9 @@ fn needs() -> Needs {
 }
 pub(crate) fn frame(party: u64) -> Me {
     Me {
+        providers: List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
         party: MeParty {
             number: party,
             kind: PartyKind::Person,

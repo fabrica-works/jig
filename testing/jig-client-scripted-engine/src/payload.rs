@@ -379,7 +379,20 @@ impl Payload for Decision {
 }
 fields!(TurnName { attempt, number });
 fields!(Count { value, limited });
-fields!(Me { party, projects, needs, needs_total, updates, results_seen, cut, retention, deployment_role });
+fields!(Me {
+    party,
+    projects,
+    needs,
+    needs_total,
+    updates,
+    results_seen,
+    cut,
+    retention,
+    deployment_role,
+    providers,
+    providers_cut,
+    key_bytes
+});
 fields!(MeParty { number, kind, login, name });
 fields!(Needs { questions, proposals, escalations, person_tasks });
 fields!(MeProject { templates, creating, project, name, role, pool, models });

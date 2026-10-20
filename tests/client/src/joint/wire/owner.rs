@@ -81,6 +81,9 @@ pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Me, In
         })
     })?;
     Ok(client::Me {
+        providers: skein_lib::List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
         party: client::MeParty {
             number: value.party,
             kind: match value.kind {

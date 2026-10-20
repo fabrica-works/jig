@@ -5,6 +5,11 @@ use core::mem::size_of;
 
 fn empty() -> OwnerDeployment {
     OwnerDeployment {
+        providers: skein_lib::List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
+        readiness: skein_lib::List::with_capacity(0),
+        readiness_cut: false,
         store: StoreFill { bytes: 0, mark: 0 },
         hosts: List::with_capacity(2),
         attempts: List::with_capacity(2),

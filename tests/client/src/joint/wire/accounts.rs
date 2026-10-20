@@ -117,6 +117,8 @@ pub(super) fn sources(
 /// Refuses an account collection or display above the receiving bounds.
 pub(super) fn document(value: &d::Accounts, limits: &Limits) -> Result<c::OwnerAccounts, owner::Invalid> {
     Ok(c::OwnerAccounts {
+        readiness: skein_lib::List::with_capacity(0),
+        readiness_cut: false,
         accounts: owner::list(&value.accounts, limits, |row| {
             Ok(c::OwnerAccountLine {
                 number: row.number,

@@ -12,7 +12,7 @@ impl Story {
                 signed_in_plan: true,
                 manage_usage: Some(b"https://usage.example/".as_slice().into()),
                 number: 3,
-                models: Box::new([]),
+                models: Box::new([config.core.settings.models[0].name.clone()]),
                 offers: accounts::Offers { sign_in: offered, key: false, programs: Box::new([]) },
             }]),
         };

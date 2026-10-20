@@ -365,6 +365,10 @@ pub fn deployment_rows_record() -> w::OwnerDeployment {
     w::OwnerDeployment::new(
         &l,
         w::OwnerDeploymentParts {
+            skein_bools: [false, true, false, false],
+            providers: Box::new([]),
+            key_bytes: 256,
+            readiness: Box::new([]),
             store: w::StoreFill::new(&l, w::StoreFillParts { bytes: 31, mark: 37 }).expect("literal"),
             hosts: pieces([encoded(host.measure(), |w| host.encode(w))]),
             attempts: pieces([encoded(run.measure(), |w| run.encode(w))]),
@@ -393,8 +397,6 @@ pub fn deployment_rows_record() -> w::OwnerDeployment {
             task_room_refusals: rows([task_refusal_record()]),
             task_room_refusals_forgotten: 149,
             connectors: rows([2, 3]),
-            connectors_cut: true,
-            cut: false,
         },
     )
     .expect("literal")

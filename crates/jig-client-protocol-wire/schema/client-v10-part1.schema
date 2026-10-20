@@ -43,6 +43,7 @@ enum OwnerAccountState { asking, granted, later: OwnerAccountStateLater, sign_in
 record OwnerAccountUseParty { party: u64 }
 record OwnerAccountUseProject { project: u32 }
 enum OwnerAccountUse { party: OwnerAccountUseParty, project: OwnerAccountUseProject }
+record PayerReadiness { provider: u32 payer: OwnerAccountUse readiness: Readiness settled: option bool }
 # Account changes share the account documents' payer type and ACCOUNT_USES bound.
 record AccountChangeAddKey { provider: u32 join: option u32 digest: fixed 32 }
 record AccountChangeReplaceKey { source: u32 digest: fixed 32 }
@@ -79,9 +80,9 @@ record OwnerAccountSource { place: u32 number: u32 kind: OwnerAccountKind state:
 record OwnerAccountLine { number: u32 place: u32 uses: option list 16 OwnerAccountUse plan: bool provider: option u32 display: DocumentText holder: OwnerAccountHolder sources: bytes 16777216 cut: bool provider_name: option DocumentText manage_usage: option bytes 2048 }
 record OwnerAccountSignIn { source: u32 provider: u32 holder: OwnerAccountHolder }
 record OwnerAccountLastEnd { source: u32 end: OwnerAccountEnd }
-record OwnerAccounts { accounts: bytes 16777216 signing: bytes 16777216 last_end: option OwnerAccountLastEnd usable: bool settled: bool cut: bool }
+record OwnerAccounts { accounts: bytes 16777216 signing: bytes 16777216 last_end: option OwnerAccountLastEnd usable: bool settled: bool cut: bool readiness: bytes 16777216 readiness_cut: bool }
 record OwnerAccount { number: u32 place: u32 uses: option list 16 OwnerAccountUse plan: bool provider: option u32 display: DocumentText holder: OwnerAccountHolder sources: bytes 16777216 generation: option u64 state: OwnerAccountState usable: bool expiring: bool attention: bool spent_until: option u64 runs: bytes 16777216 waiting: bytes 16777216 cut: bool provider_name: option DocumentText manage_usage: option bytes 2048 }
-record OwnerDeployment { store: StoreFill hosts: bytes 16777216 attempts: bytes 16777216 accounts: bytes 16777216 tasks: OwnerCapacity workers: OwnerCapacity attempts_capacity: OwnerCapacity waiting_attempts: u32 proposals: OwnerCapacity projects: list 32 OwnerProjectCapacity grace_bound: duration hello_refusals: list 32 OwnerHelloRefusalLine hosts_forgotten: u64 hello_refusals_forgotten: u64 person_room_refusals: list 32 OwnerPersonCapacityRefusal person_room_refusals_forgotten: u64 person_answer_retention: duration task_room_refusals: list 32 OwnerTaskCapacityRefusal task_room_refusals_forgotten: u64 cut: bool connectors: list 32 u16 connectors_cut: bool }
+record OwnerDeployment { store: StoreFill hosts: bytes 16777216 attempts: bytes 16777216 accounts: bytes 16777216 tasks: OwnerCapacity workers: OwnerCapacity attempts_capacity: OwnerCapacity waiting_attempts: u32 proposals: OwnerCapacity projects: list 32 OwnerProjectCapacity grace_bound: duration hello_refusals: list 32 OwnerHelloRefusalLine hosts_forgotten: u64 hello_refusals_forgotten: u64 person_room_refusals: list 32 OwnerPersonCapacityRefusal person_room_refusals_forgotten: u64 person_answer_retention: duration task_room_refusals: list 32 OwnerTaskCapacityRefusal task_room_refusals_forgotten: u64 cut: bool connectors: list 32 u16 connectors_cut: bool providers: bytes 16777216 providers_cut: bool key_bytes: u32 readiness: bytes 16777216 readiness_cut: bool }
 # Small store (protocol/client.md, 10); TableEntry.request has Keyed.request's ceiling.
 versioned record Kept { store_version: u16 record: bytes 65536 }
 record TableEntry { asker: u32 number: u64 key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1114240 }

@@ -129,3 +129,33 @@ fn an_accounts_watch_delivers_the_partys_completed_sign_in() {
         })
     );
 }
+
+#[test]
+fn an_ordinary_party_receives_the_public_catalogue() {
+    let mut story = Story::account_sign_in(fixtures::SEED, true);
+    let me = jig_client::Handle { asker: Asker(7), number: 2 };
+    story.watch(me, jig_client::Watchable::Jig(c::Subject::Me));
+    assert!(story.run_until(|s| s.client.document(me).is_some_and(|d| d.latest.is_some()), WAIT));
+    let jig_client::Latest::Jig(c::Delivery::Me(value)) = story.client.document(me).unwrap().latest.unwrap() else {
+        panic!("me")
+    };
+    assert!(value.deployment_role.is_none());
+    assert_eq!(value.key_bytes, 256);
+    let [offer] = value.providers.as_slice() else { panic!("one public provider") };
+    assert_eq!(offer.provider, 3);
+    assert_eq!(offer.name.bytes.bytes(), b"Fake");
+    assert!(offer.sign_in && offer.signed_in_plan);
+    assert_eq!(offer.manage_usage.as_deref(), Some(b"https://usage.example/".as_slice()));
+}
+#[test]
+fn an_account_limit_refreshes_payer_readiness() {
+    let mut story = Story::account_sign_in(fixtures::SEED, true);
+    story.watch(ACCOUNTS, jig_client::Watchable::Jig(c::Subject::Accounts));
+    assert!(story.run_until(|s| accounts(s).is_some(), WAIT));
+    assert_eq!(accounts(&story).unwrap().readiness.get(0).unwrap().readiness, c::Readiness::Usable);
+    story.limit_account_source(1);
+    assert!(story.run_until(
+        |s| accounts(s).is_some_and(|d| d.readiness.get(0).is_some_and(|r| r.readiness == c::Readiness::Unavailable)),
+        WAIT
+    ));
+}
