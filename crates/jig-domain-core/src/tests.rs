@@ -3013,6 +3013,7 @@ mod own_watches;
 mod default_llm;
 mod goal_of;
 mod kept_models;
+mod role_models;
 mod task_query;
 
 mod brief_revisions;

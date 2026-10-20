@@ -190,11 +190,16 @@ pub(crate) fn apply(
             if edit.number <= 3 && !role_exists(policy, edit.number) {
                 return None;
             }
-            let value = authority_to_authority(edit.authority)?;
+            let mut value = authority_to_authority(edit.authority)?;
+            // A party's edit names no models until the client wire carries them (JP10): an edited
+            // role keeps its own, and a new one takes every model the project's ceiling names.
+            value.models = policy.ceiling.models;
             let mut found = false;
             for role in &mut policy.roles {
                 if role.number == edit.number {
+                    let models = role.authority.models;
                     role.authority = value.clone();
+                    role.authority.models = models;
                     role.period_spend = edit.period_spend;
                     role.requests = authority::Requests(edit.requests);
                     role.decides = authority::Proposals(edit.decides);
