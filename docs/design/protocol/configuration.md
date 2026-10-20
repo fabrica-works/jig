@@ -342,6 +342,14 @@ host's half reports it (`llm.md`, 5.5).
 - **The application's limits** are its own members, checked in the same
   sum.
 
+Program-source capacity is per worker, independently of its run slots.
+It bounds whole source lists, inventories and pending sign-outs on both
+channel ends. The small profile reserves twelve sources (four accounts
+with three sources each); status/sign-out failure detail uses the host's
+bounded detail. Source-check intervals and command deadlines must be
+positive, and source commands and their protocol resources enter startup's
+memory sum even when every run slot is occupied.
+
 ## 7. Secrets
 
 | Secret | Kind | Configured as |

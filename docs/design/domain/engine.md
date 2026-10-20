@@ -750,6 +750,9 @@ The fleet child domain knows the hosts and the runs they host:
   half checks each login when told of a new source, on its holder's
   check (accounts.md, section 5) and at a configured interval
   (`../protocol/configuration.md`, section 4), and reports what changed.
+  The fleet waits for the inventory matching its desired source list,
+  including an empty list, and resets that readiness on each channel.
+  Hello listings and adoption recovery still run while new placement waits.
   A run is placed only on a host that declares its task's models and,
   for a program source, where that source's login is usable
   (accounts.md, 3.4). The engine's own slots never take a program

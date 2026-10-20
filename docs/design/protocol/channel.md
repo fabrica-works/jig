@@ -228,6 +228,16 @@ answer, and a **notice** is not answered.
 | logins | for each program source the engine named (5.2), its name and its login's state on this host: usable, not signed in, signed in otherwise and how, or failed, with bounded detail (smith's `protocol/hosts.md`, section 2) | notice: once checked after each `sources`, then on each change |
 | signed out | a program source's name; whether the program's sign-out ran, or failed, with bounded detail | answer to a sign out |
 
+- **Every login notice is whole:** the current `sources` list, each name
+  once, including an empty list. An explicit check publishes it even when
+  unchanged. The fleet keeps the sent list and at most one desired
+  replacement, and sends the replacement only after the sent list's first
+  inventory. While awaiting that inventory, a snapshot naming exactly the
+  previous sent list is stale and changes nothing; one naming exactly the
+  sent list answers it. Any other list is a link fault. After that first
+  inventory, only the sent list is valid. Names, rather than request IDs,
+  distinguish these ordered replacements.
+
 - **A refused start is not kept.** An answer that refuses its start
   (busy, a duplicate among them, or invalid, at the entrance or as a
   start the agent refuses; `../domain/hosts.md`, 6.1 and 6.3) crosses
@@ -577,6 +587,12 @@ holds, and neither of its components reads them.
     and its calls in flight; a limited, a refused and an unauthorized
     notice per LLM account's source a run may hold; a logins notice, and
     a signed out per program source; and a reserve for facts.
+- **Inventories coalesce while output waits.** The worker's component
+  keeps the latest whole snapshot of each of at most two ordered lists
+  outside the channel queue: the current list and its replacement. It sends
+  them in order when the reserved inventory slot is available. All buffers
+  are priced; updates coalesce only within the same list. A replacement's
+  snapshot never erases a pending snapshot of its predecessor.
 - **Facts take only the reserve.** The worker's side sends a fact only
   while the queue leaves the rest of the cap free; a long operation's
   beginning and end are facts too.

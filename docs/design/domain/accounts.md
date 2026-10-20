@@ -202,8 +202,9 @@ Account
   A check answers usable, not signed in, signed in otherwise (another
   way of paying than the holder's plan) or failed (smith's
   `protocol/programs.md`, section 3), and the deployment's document
-  shows each host's answer; the fleet places a run on a program's source
-  only where its login is usable (engine.md, section 8). The engine's
+  shows each host's answer. Every notice names the worker's whole current
+  source list, without login contents; the fleet places a run on a
+  program's source only where its login is usable (engine.md, section 8). The engine's
   own slots run `smith-inline-agent`, which has no program backend, so
   they never take a program's source.
 - **A program source's name** is 1 to 32 characters of `a-z`, `0-9` and

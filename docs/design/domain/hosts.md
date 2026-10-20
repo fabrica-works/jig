@@ -264,6 +264,18 @@ its root chooses otherwise:
   keeps a person's logins takes only runs that person's accounts pay
   for (engine.md, section 8; accounts.md, 3.4).
 
+The hub's source machine owns when to check: on a new list, an explicit
+check and a positive interval. It coalesces overlapping checks and never
+runs two commands for a source together; sign-out precedes a pending check.
+Commands are serialized across the worker so one command owns the injected
+resources and settles before reuse. Its whole first inventory waits for every source's answer. The protocol
+layer drives the real host half's command I/O and deadlines, with an
+explicit executable, private directory and bounded environment below the
+root. Without a configured program, the check fails as unconfigured.
+These commands take no run slot. Shutdown waits for an active command to
+settle before its terminal; channel loss suppresses its old-channel reply,
+while the replacement channel starts with a fresh whole inventory.
+
 ### 5.2 `smith-inline-agent`
 
 `smith-inline-agent` runs smith's domains in the host's own process
