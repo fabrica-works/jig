@@ -357,20 +357,25 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   record's bytes as they came (SHA-256), which tells a key sent again
   with another request apart (`../client/domain/contract.md`, 3.3). The
   record is canonical (skein's `codec.md`, section 1), so the same
-  request always has the same digest.
+  request always has the same digest. A request carrying a value
+  (below) has a digest of its own.
 - **A request carrying a value,** an LLM account's key added or
-  replaced (`../client/domain/contract.md`, 3.2), is sent once and never
-  kept: the client never stores it in the small store, and never sends
-  it again by itself (`../client/domain/client.md`, section 6). Its key
-  is its caller's name, never made from the value
+  replaced (`../client/domain/contract.md`, 3.2), or an application's
+  request that carries one, is sent once and never kept: the client
+  never stores it in the small store, and never sends it again by
+  itself (`../client/domain/client.md`, section 6). Its key is its
+  caller's name, never made from the value
   (`../client/domain/contract.md`, 3.1).
   - *The engine's side* takes the value out of the record as it decodes
     it, keeps it in the secrets' store before the core sees the request
     (`store.md`, section 9), and hands the core the request with the
-    value named by its party and key, and the digest of the record's
-    bytes as they came, as for an application's request, so that a key
-    sent again with another value is told apart. The digest is the only
-    trace of the bytes the core keeps, and no value can be read from it.
+    value named by a number jig draws for it, never one the request
+    names (a key's value, by its party and key, instead), and the
+    value's digest. The request's own digest covers its record, the
+    value left out, and its value, each after its length, in place of
+    the record's bytes as they came, so that a key sent again with
+    another value is told apart. Those digests are the only trace of the
+    bytes the core keeps, and no value can be read from them.
   - *The client's side* sends it once: an answer of busy or not ready, a
     link down, or a party signed out or not yet confirmed ends it as
     *unsent*, the engine having made nothing; an exchange that ends with
