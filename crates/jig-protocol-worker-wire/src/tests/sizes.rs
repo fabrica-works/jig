@@ -12,22 +12,23 @@ fn the_largest_turn_kept_body_is_twenty_bytes() {
 fn the_engine_cap_for_one_slot_is_the_hand_summed_bytes() {
     // Assignment346, message64, relayed58, kept20, ack16, cancel16, grants2*77;
     // eight frame headers add64:354+72+66+28+24+24+170=738.
-    assert_eq!(engine_cap(&SIZES_ONE_SLOT), Some(Cap { bytes: 738, frames: 8 }));
+    // Sources84 + two checks44 + two sign-outs44 add260 and five frames.
+    assert_eq!(engine_cap(&SIZES_ONE_SLOT), Some(Cap { bytes: 998, frames: 13 }));
 }
 
 #[test]
 fn the_worker_cap_for_one_slot_is_the_hand_summed_bytes() {
     // Hello125 + turn71 + answer136 + call85 + unauthorized28 + limited29
     // + account refused60; seven headers56 + fact reserve16 =606.
-    // Reserve16 fits no25-byte fact.
-    assert_eq!(worker_cap(&SIZES_ONE_SLOT), Some(WorkerCap { cap: Cap { bytes: 606, frames: 7 }, facts: 16 }));
+    // Reserve16 fits no25-byte fact. Sources add Logins158 + two SignedOut66.
+    assert_eq!(worker_cap(&SIZES_ONE_SLOT), Some(WorkerCap { cap: Cap { bytes: 896, frames: 10 }, facts: 16 }));
 }
 
 #[test]
 fn the_worker_cap_reserves_the_facts_share_last() {
     let sizes = Sizes { facts: 75, ..SIZES_ONE_SLOT };
-    // Mandatory frames590 bytes + reserve75 =665; three shortest facts25 each.
-    assert_eq!(worker_cap(&sizes), Some(WorkerCap { cap: Cap { bytes: 665, frames: 10 }, facts: 75 }));
+    // Mandatory frames880 bytes + reserve75 =955; three shortest facts25 each.
+    assert_eq!(worker_cap(&sizes), Some(WorkerCap { cap: Cap { bytes: 955, frames: 13 }, facts: 75 }));
 }
 
 #[test]
@@ -62,6 +63,7 @@ fn the_largest_grant_body_holds_a_four_kib_credential() {
 #[test]
 fn sizes_past_a_ceiling_give_no_codec_limits() {
     for (field, sizes) in [
+        ("program sources", Sizes { program_sources: 65_537, ..SIZES_ONE_SLOT }),
         ("charter", Sizes { charter: 67_108_865, ..SIZES_ONE_SLOT }),
         ("transcript", Sizes { transcript: 8_388_609, ..SIZES_ONE_SLOT }),
         ("turn", Sizes { turn: 8_388_609, ..SIZES_ONE_SLOT }),

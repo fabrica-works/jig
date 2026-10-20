@@ -4,6 +4,8 @@ use crate::{Kind, v3};
 /// Bounds supplied by the domains and the application's protocol layer.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Sizes {
+    /// Whole program sources per worker, independent of run slots.
+    pub program_sources: u32,
     pub charter: u32,
     /// The whole resumed window, including each turn's four-byte length.
     pub transcript: u32,
@@ -55,6 +57,15 @@ pub struct WorkerCap {
 #[must_use]
 pub fn limits(sizes: &Sizes) -> Option<v3::Limits> {
     let limits = v3::Limits {
+        program_source_name: 32,
+        sources_sources: sizes.program_sources,
+        check_name: 32,
+        sign_out_name: 32,
+        source_failed_detail: sizes.detail,
+        login_otherwise_method: 32,
+        login_name: 32,
+        logins_logins: sizes.program_sources,
+        signed_out_name: 32,
         credential_name: sizes.name,
         credential_secret: sizes.secret,
         model_bound_name: sizes.model_name,
@@ -123,6 +134,11 @@ fn body(limits: &v3::Limits, kind: Kind) -> Option<u32> {
         Kind::TurnBusy => v3::TurnBusy::worst_case_bytes(limits),
         Kind::Acknowledge => v3::Acknowledge::worst_case_bytes(limits),
         Kind::Cancel => v3::Cancel::worst_case_bytes(limits),
+        Kind::Sources => v3::Sources::worst_case_bytes(limits),
+        Kind::Check => v3::Check::worst_case_bytes(limits),
+        Kind::SignOut => v3::SignOut::worst_case_bytes(limits),
+        Kind::Logins => v3::Logins::worst_case_bytes(limits),
+        Kind::SignedOut => v3::SignedOut::worst_case_bytes(limits),
         Kind::Grant => v3::Granted::worst_case_bytes(limits),
     }?;
     u32::try_from(bytes).ok()
@@ -145,7 +161,13 @@ pub fn engine_cap(sizes: &Sizes) -> Option<Cap> {
     bytes = bytes.checked_add(grants.checked_mul(frame(&limits, Kind::Grant)?)?)?;
     let frames = 3_u32.checked_add(sizes.inbox)?.checked_add(sizes.calls)?.checked_add(sizes.turns)?;
     let frames = frames.checked_add(grants)?.checked_mul(sizes.slots)?;
-    Some(Cap { bytes: bytes.checked_mul(sizes.slots)?, frames })
+    let sources = frame(&limits, Kind::Sources)?;
+    let commands =
+        sizes.program_sources.checked_mul(frame(&limits, Kind::Check)?.checked_add(frame(&limits, Kind::SignOut)?)?)?;
+    Some(Cap {
+        bytes: bytes.checked_mul(sizes.slots)?.checked_add(sources)?.checked_add(commands)?,
+        frames: frames.checked_add(1)?.checked_add(sizes.program_sources.checked_mul(2)?)?,
+    })
 }
 
 #[must_use]
@@ -164,5 +186,9 @@ pub fn worker_cap(sizes: &Sizes) -> Option<WorkerCap> {
     let run_frames = sizes.turns.checked_add(1)?.checked_add(sizes.calls)?;
     let mut frames = 1_u32.checked_add(sizes.slots.checked_mul(run_frames)?)?;
     frames = frames.checked_add(sizes.accounts.checked_mul(3)?)?.checked_add(fact_frames)?;
+    bytes = bytes
+        .checked_add(frame(&limits, Kind::Logins)?)?
+        .checked_add(sizes.program_sources.checked_mul(frame(&limits, Kind::SignedOut)?)?)?;
+    frames = frames.checked_add(1)?.checked_add(sizes.program_sources)?;
     Some(WorkerCap { cap: Cap { bytes: bytes.checked_add(sizes.facts)?, frames }, facts: sizes.facts })
 }

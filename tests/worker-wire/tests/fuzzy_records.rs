@@ -30,6 +30,8 @@ fn fuzzy_up_decoders_never_panic_and_reencode_what_they_read() {
         check!(&bytes, Unauthorized);
         check!(&bytes, Limited);
         check!(&bytes, AccountRefused);
+        check!(&bytes, Logins);
+        check!(&bytes, SignedOut);
     }
 }
 
@@ -46,5 +48,8 @@ fn fuzzy_down_decoders_never_panic_and_reencode_what_they_read() {
         check!(&bytes, Acknowledge);
         check!(&bytes, Cancel);
         check!(&bytes, Granted);
+        check!(&bytes, Sources);
+        check!(&bytes, Check);
+        check!(&bytes, SignOut);
     }
 }

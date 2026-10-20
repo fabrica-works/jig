@@ -41,3 +41,5 @@ pub use facts::Fact;
 pub use limits::{Limits, worst_case};
 
 pub use link::{Bounds, Hello, LinkDown, LinkUp, ModelBound, Relayed};
+
+pub use link::{Login, LoginMethod, LoginState, SignOutResult, SourceFailure, SourceName};

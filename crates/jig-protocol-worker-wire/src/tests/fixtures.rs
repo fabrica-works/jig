@@ -10,6 +10,15 @@ pub const WORKER_B: &[u8] = b"worker-b";
 pub const MODEL_SMALL: &[u8] = b"small";
 
 pub const LIMITS: v3::Limits = v3::Limits {
+    program_source_name: 32,
+    sources_sources: 2,
+    check_name: 32,
+    sign_out_name: 32,
+    source_failed_detail: 16,
+    login_otherwise_method: 32,
+    login_name: 32,
+    logins_logins: 2,
+    signed_out_name: 32,
     credential_name: 16,
     credential_secret: 32,
     model_bound_name: 16,
@@ -317,6 +326,7 @@ pub fn assignment_resumed() -> crate::Assignment {
 }
 
 pub const SIZES_ONE_SLOT: crate::sizes::Sizes = crate::sizes::Sizes {
+    program_sources: 2,
     charter: 16,
     transcript: 16,
     turn: 16,
@@ -351,6 +361,7 @@ pub const SIZES_ONE_SLOT: crate::sizes::Sizes = crate::sizes::Sizes {
 };
 
 pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
+    program_sources: 2,
     charter: 67_108_864,
     transcript: 8_388_608,
     turn: 8_388_608,

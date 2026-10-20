@@ -130,3 +130,17 @@ record TurnBusy { task: u64 attempt: u64 number: u32 }
 record Acknowledge { task: u64 attempt: u64 }
 record Cancel { task: u64 attempt: u64 }
 record Granted { task: u64 attempt: u64 grant: Grant }
+
+# Host-wide program sources (protocol/channel.md, 5). Every Logins is whole.
+record ProgramSource { name: text 32 }
+record Sources { sources: list 65536 ProgramSource }
+record Check { name: text 32 }
+record SignOut { name: text 32 }
+enum SourceFailure { missing, deadline, unreadable, exited, unconfigured, unknown, closed }
+record SourceFailed { reason: SourceFailure detail: bytes 4096 }
+record LoginOtherwise { method: text 32 }
+enum LoginState { usable, not_signed_in, signed_in_otherwise: LoginOtherwise, failed: SourceFailed }
+record Login { name: text 32 state: LoginState }
+record Logins { logins: list 65536 Login }
+enum SignOutResult { signed_out, failed: SourceFailed }
+record SignedOut { name: text 32 result: SignOutResult }

@@ -398,7 +398,12 @@ pub(crate) fn down(
             }
         }
         // TurnBusy is decoded below the hub by the component; up kinds are invalid here.
-        wire::Kind::TurnBusy
+        wire::Kind::Sources
+        | wire::Kind::Check
+        | wire::Kind::SignOut
+        | wire::Kind::Logins
+        | wire::Kind::SignedOut
+        | wire::Kind::TurnBusy
         | wire::Kind::Hello
         | wire::Kind::Turn
         | wire::Kind::Call

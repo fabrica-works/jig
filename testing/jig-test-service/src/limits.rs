@@ -175,6 +175,7 @@ fn workers(jig: &jig_protocol_config::Limits) -> jig_protocol_engine_workers::Li
     let link = jig.link;
     let ceilings = jig_protocol_worker_wire::CEILINGS;
     let sizes = jig_protocol_worker_wire::sizes::Sizes {
+        program_sources: 2,
         charter: u32::try_from(hub.charter_bytes).expect("channel byte bound"),
         transcript: u32::try_from(hub.transcript_bytes).expect("channel byte bound"),
         turn: u32::try_from(hub.turn_bytes).expect("channel byte bound"),

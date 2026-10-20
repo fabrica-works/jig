@@ -10,6 +10,7 @@ pub const SECRET_B: &[u8] = b"secret-b";
 pub const PAYLOAD: u32 = 3;
 pub const OTHER_PAYLOAD: u32 = 4;
 pub const SIZES: jig_protocol_worker_wire::sizes::Sizes = jig_protocol_worker_wire::sizes::Sizes {
+    program_sources: 2,
     charter: 16,
     transcript: 16,
     turn: 16,

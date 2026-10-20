@@ -95,3 +95,103 @@ pub struct Hello {
     pub hosting: Box<[Hosting]>,
     pub bounds: Bounds,
 }
+
+/// A configuration-directory name (accounts.md, 3.4), never an account number.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct SourceName {
+    length: u8,
+    bytes: [u8; 32],
+}
+impl SourceName {
+    #[must_use]
+    pub fn new(value: &[u8]) -> Option<Self> {
+        if value.is_empty() || value.len() > 32 {
+            return None;
+        }
+        for byte in value {
+            if !byte.is_ascii_lowercase() && !byte.is_ascii_digit() && *byte != b'-' {
+                return None;
+            }
+        }
+        let mut bytes = [0; 32];
+        bytes.get_mut(..value.len())?.copy_from_slice(value);
+        Some(Self { length: u8::try_from(value.len()).ok()?, bytes })
+    }
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.bytes.get(..usize::from(self.length)).expect("validated name")
+    }
+}
+/// The program's bounded, printable payment method, without login contents.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct LoginMethod {
+    length: u8,
+    bytes: [u8; 32],
+}
+impl LoginMethod {
+    #[must_use]
+    pub fn new(value: &[u8]) -> Option<Self> {
+        if value.is_empty() || value.len() > 32 {
+            return None;
+        }
+        for byte in value {
+            if !(0x21..=0x7e).contains(byte) {
+                return None;
+            }
+        }
+        let mut bytes = [0; 32];
+        bytes.get_mut(..value.len())?.copy_from_slice(value);
+        Some(Self { length: u8::try_from(value.len()).ok()?, bytes })
+    }
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.bytes.get(..usize::from(self.length)).expect("validated method")
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SourceFailure {
+    Missing,
+    Deadline,
+    Unreadable,
+    Exited,
+    Unconfigured,
+    Unknown,
+    Closed,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum LoginState {
+    Usable,
+    NotSignedIn,
+    SignedInOtherwise(LoginMethod),
+    Failed { reason: SourceFailure, detail: Box<[u8]> },
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Login {
+    pub name: SourceName,
+    pub state: LoginState,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum SignOutResult {
+    SignedOut,
+    Failed { reason: SourceFailure, detail: Box<[u8]> },
+}
+
+#[cfg(test)]
+mod source_tests {
+    use super::{LoginMethod, SourceName};
+    #[test]
+    fn source_names_and_methods_have_separate_grammars() {
+        for value in [b"a".as_slice(), b"source-123", &[b'z'; 32]] {
+            assert_eq!(SourceName::new(value).expect("source name").as_bytes(), value);
+        }
+        for value in [b"".as_slice(), b"A", b"../a", b"a_b", &[b'a'; 33], b"\x80"] {
+            assert!(SourceName::new(value).is_none(), "{value:?}");
+        }
+        for value in [b"!~".as_slice(), b"claude.ai", &[b'X'; 32]] {
+            assert_eq!(LoginMethod::new(value).expect("printable method").as_bytes(), value);
+        }
+        for value in [b"".as_slice(), b"two words", b"\x7f", b"\n", &[b'x'; 33]] {
+            assert!(LoginMethod::new(value).is_none(), "{value:?}");
+        }
+    }
+}

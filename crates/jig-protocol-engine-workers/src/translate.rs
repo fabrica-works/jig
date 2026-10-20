@@ -81,7 +81,12 @@ pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v3::Limits) -> Optio
         wire::Kind::Unauthorized => Some(Up::Unauthorized(wire::Unauthorized::decode(limits, reader).ok()?)),
         wire::Kind::Limited => Some(Up::Limited(wire::Limited::decode(limits, reader).ok()?)),
         wire::Kind::AccountRefused => Some(Up::AccountRefused(wire::AccountRefused::decode(limits, reader).ok()?)),
-        wire::Kind::Hello
+        wire::Kind::Sources
+        | wire::Kind::Check
+        | wire::Kind::SignOut
+        | wire::Kind::Logins
+        | wire::Kind::SignedOut
+        | wire::Kind::Hello
         | wire::Kind::Assignment
         | wire::Kind::Message
         | wire::Kind::Relayed

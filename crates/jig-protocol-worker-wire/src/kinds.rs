@@ -21,6 +21,11 @@ pub enum Kind {
     Acknowledge,
     Cancel,
     Grant,
+    Sources,
+    Check,
+    SignOut,
+    Logins,
+    SignedOut,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -41,6 +46,8 @@ pub const KINDS: &[KindRule] = &[
     KindRule { kind: 0x0105, direction: Direction::FromInitiator, body: Kind::Unauthorized },
     KindRule { kind: 0x0106, direction: Direction::FromInitiator, body: Kind::Limited },
     KindRule { kind: 0x0107, direction: Direction::FromInitiator, body: Kind::AccountRefused },
+    KindRule { kind: 0x0108, direction: Direction::FromInitiator, body: Kind::Logins },
+    KindRule { kind: 0x0109, direction: Direction::FromInitiator, body: Kind::SignedOut },
     KindRule { kind: 0x0180, direction: Direction::FromResponder, body: Kind::Assignment },
     KindRule { kind: 0x0181, direction: Direction::FromResponder, body: Kind::Message },
     KindRule { kind: 0x0182, direction: Direction::FromResponder, body: Kind::Relayed },
@@ -49,6 +56,9 @@ pub const KINDS: &[KindRule] = &[
     KindRule { kind: 0x0185, direction: Direction::FromResponder, body: Kind::Acknowledge },
     KindRule { kind: 0x0186, direction: Direction::FromResponder, body: Kind::Cancel },
     KindRule { kind: 0x0187, direction: Direction::FromResponder, body: Kind::Grant },
+    KindRule { kind: 0x0188, direction: Direction::FromResponder, body: Kind::Sources },
+    KindRule { kind: 0x0189, direction: Direction::FromResponder, body: Kind::Check },
+    KindRule { kind: 0x018a, direction: Direction::FromResponder, body: Kind::SignOut },
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -76,6 +86,11 @@ pub fn schema(limits: &v3::Limits) -> Result<Schema, Overflow> {
             Kind::TurnBusy => v3::TurnBusy::worst_case_bytes(limits),
             Kind::Acknowledge => v3::Acknowledge::worst_case_bytes(limits),
             Kind::Cancel => v3::Cancel::worst_case_bytes(limits),
+            Kind::Sources => v3::Sources::worst_case_bytes(limits),
+            Kind::Check => v3::Check::worst_case_bytes(limits),
+            Kind::SignOut => v3::SignOut::worst_case_bytes(limits),
+            Kind::Logins => v3::Logins::worst_case_bytes(limits),
+            Kind::SignedOut => v3::SignedOut::worst_case_bytes(limits),
             Kind::Grant => v3::Granted::worst_case_bytes(limits),
         };
         let largest = largest.ok_or(Overflow::Body)?;
