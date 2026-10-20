@@ -30,8 +30,7 @@ const ENGINE: &[u8] = br#"{
 "accounts": [{
 "number": 1,
 "source": {"handed_in": {"file": "accounts/chat.json"}}
-}],
-"records": "accounts/records"
+}]
 },
 "hosts": {
 "workers": [
@@ -347,9 +346,6 @@ pub fn workers_document() -> Box<[u8]> {
 }
 pub fn config() -> jig_protocol_config::Engine {
     config_document(ENGINE)
-}
-pub fn signed_config() -> jig_protocol_config::Engine {
-    config_document(&with(ENGINE, br#"{"handed_in": {"file": "accounts/chat.json"}}"#, SIGNED_SOURCE))
 }
 fn config_document(input: &[u8]) -> jig_protocol_config::Engine {
     let bounds = jig_protocol_config::DocumentLimits { bytes: 8192, tokens: 4096, depth: 32 };

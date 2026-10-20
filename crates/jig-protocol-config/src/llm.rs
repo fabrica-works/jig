@@ -14,7 +14,6 @@ pub struct Llm {
     /// LLM providers, absent for none (configuration.md, 3).
     pub providers: Box<[Provider]>,
     pub accounts: Box<[Account]>,
-    pub records: Box<[u8]>,
 }
 mod providers;
 pub use providers::{Provider, Registration};
@@ -138,14 +137,12 @@ pub(crate) fn parse(
         }
     }
     let providers = providers::parse(&mut object, document, path, models.as_slice(), problems);
-    let records = check::text(&mut object, document, b"records", path, problems);
     object.finish(document, path, problems);
     Some(Llm {
         endpoints: endpoints.into_boxed(),
         models: models.into_boxed(),
         providers: providers.into_boxed(),
         accounts: accounts.into_boxed(),
-        records: records?,
     })
 }
 fn endpoint(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Endpoint> {

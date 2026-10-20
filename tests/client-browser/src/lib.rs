@@ -102,7 +102,7 @@ impl Tier {
     #[must_use]
     pub fn new(name: &str) -> Self {
         let scratch = skein_scratch::Scratch::new(name);
-        for name in ["accounts", "accounts/records", "secrets", "charters", "state"] {
+        for name in ["accounts", "secrets", "charters", "state"] {
             fs::create_dir(scratch.path().join(name)).expect("deployment directory");
         }
         for (name, bytes) in FILES {

@@ -292,7 +292,7 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         return;
     }
     if let Some(accounts) = &mut engine.accounts {
-        accounts.iterate(now, wall, &mut engine.values, &mut engine.events);
+        accounts.iterate(now, wall, &mut engine.values, &mut engine.events, &mut engine.store);
     }
     if let Some(workers) = &mut engine.workers {
         workers.iterate(now, &mut engine.events);

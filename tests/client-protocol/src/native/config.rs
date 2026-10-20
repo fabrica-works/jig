@@ -24,8 +24,7 @@ const ENGINE: &[u8] = br#"{
 "accounts": [{
 "number": 1,
 "source": {"handed_in": {"file": "accounts/chat.json"}}
-}],
-"records": "accounts/records"
+}]
 },
 "hosts": {
 "workers": [

@@ -32,7 +32,7 @@ pub fn agent_configuration(directory: &Path) {
     private(&directory.join("agent.json"), &serde_json::to_vec(&value).expect("agent JSON"));
 }
 pub fn configuration(directory: &Path) {
-    for name in ["accounts", "accounts/records", "secrets", "charters", "state", "agent-root"] {
+    for name in ["accounts", "secrets", "charters", "state", "agent-root"] {
         fs::create_dir(directory.join(name)).expect("deployment directory");
     }
     for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {

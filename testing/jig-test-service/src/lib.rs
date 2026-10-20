@@ -444,23 +444,8 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
                 break;
             }
             let complete = service.completions.pop().expect("completion count");
-            let file_pending = pending_files(match &service.engine {
-                Some(engine) => engine.accounts.as_ref(),
-                None => None,
-            });
-            let (files, complete) = service.kernel.complete(complete, &service.raw_submissions, file_pending);
-            if files {
-                service
-                    .engine
-                    .as_mut()
-                    .expect("file operation has engine")
-                    .accounts
-                    .as_mut()
-                    .expect("file operation has accounts")
-                    .complete(complete);
-            } else {
-                service.complete_record(complete);
-            }
+            let complete = service.kernel.complete(complete, &service.raw_submissions);
+            service.complete_record(complete);
         }
         if service.completions.is_empty() {
             for _ in 0..service.io_env.limits.sockets.checked_mul(2).expect("io timers") {
@@ -498,7 +483,7 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     for index in 0..service.workers.len() {
         let worker = service.workers.get_mut(index).expect("worker index");
         worker.close_root();
-        service.kernel.publish(false, &mut worker.submitted, &mut service.submissions);
+        service.kernel.publish(&mut worker.submitted, &mut service.submissions);
     }
     if service.engine.is_none() && service.ended.is_none() && service.workers_empty() {
         service.ended = Some(End::Drained);
@@ -508,26 +493,12 @@ pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
         engine.abort_if_ended();
     }
     service.route_components();
-    service.kernel.publish(false, &mut service.raw_submissions, &mut service.submissions);
-    if let Some(engine) = &mut service.engine
-        && let Some(accounts) = &mut engine.accounts
-    {
-        service.kernel.publish(true, &mut accounts.submitted, &mut service.submissions);
-    }
+    service.kernel.publish(&mut service.raw_submissions, &mut service.submissions);
     service.io.reclaim();
 }
 
 #[cfg(test)]
 mod tests;
-
-fn account_submissions(accounts: &accounts::Accounts) -> &Queue<Submit> {
-    &accounts.submitted
-}
-
-fn pending_files(accounts: Option<&accounts::Accounts>) -> Option<&Queue<Submit>> {
-    let accounts = accounts?;
-    Some(account_submissions(accounts))
-}
 
 fn route_events(service: &mut Service, now: Time) {
     for _ in 0..service.told.len() {

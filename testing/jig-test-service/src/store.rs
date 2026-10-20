@@ -27,6 +27,8 @@ pub(super) struct Store {
     pub(super) above: Queue<protocol::Event>,
     pub(super) routed: Queue<Up>,
     pub(super) secrets: Queue<protocol::Event>,
+    /// The answers to the accounts' records' loads and writes (store.md 9).
+    pub(super) sources: Queue<protocol::Event>,
     below: protocol::Below,
     drivers: [Driver; 3],
     pub(super) submitted: Queue<Submit>,
@@ -79,6 +81,7 @@ impl Store {
             above: Queue::with_capacity(room),
             routed: Queue::with_capacity(room),
             secrets: Queue::with_capacity(room),
+            sources: Queue::with_capacity(room),
             below: protocol::Below {
                 store: Queue::with_capacity(room),
                 secrets: Queue::with_capacity(room),
@@ -151,11 +154,10 @@ impl Store {
     /// Get answers stay in this pass; secret writes' terminals are handed to their owner.
     pub(super) fn secrets(&mut self, owner: Token, request: protocol::Secrets) -> Option<protocol::Event> {
         let immediate = match &request {
-            protocol::Secrets::Get { .. } => true,
-            protocol::Secrets::Keep { .. }
-            | protocol::Secrets::Replace { .. }
-            | protocol::Secrets::Erase { .. }
-            | protocol::Secrets::Load { .. } => false,
+            protocol::Secrets::Get { .. } | protocol::Secrets::Load { .. } => true,
+            protocol::Secrets::Keep { .. } | protocol::Secrets::Replace { .. } | protocol::Secrets::Erase { .. } => {
+                false
+            }
         };
         protocol::down(
             &mut self.component,
@@ -168,7 +170,8 @@ impl Store {
         if immediate {
             for _ in 0..self.above.len() {
                 let event = self.above.pop().expect("store terminals");
-                if let protocol::Event::Secret { owner: found, .. } = &event
+                if let protocol::Event::Secret { owner: found, .. }
+                | protocol::Event::SecretsLoaded { owner: found, .. } = &event
                     && *found == owner
                 {
                     answer = Some(event);
@@ -181,6 +184,7 @@ impl Store {
     }
     pub(super) fn room(&self) -> bool {
         self.secrets.room() >= protocol::MAX_OUT_DOWN
+            && self.sources.room() >= protocol::MAX_OUT_DOWN
             && self.above.room() >= protocol::MAX_OUT_DOWN
             && self.routed.room() >= protocol::MAX_OUT_DOWN
             && self.below.store.room() >= protocol::MAX_OUT_DOWN
@@ -195,7 +199,12 @@ impl Store {
         next
     }
     pub(super) fn work_pending(&self, now: Time) -> bool {
-        if !self.secrets.is_empty() || !self.above.is_empty() || !self.routed.is_empty() || !self.submitted.is_empty() {
+        if !self.secrets.is_empty()
+            || !self.sources.is_empty()
+            || !self.above.is_empty()
+            || !self.routed.is_empty()
+            || !self.submitted.is_empty()
+        {
             return true;
         }
         for index in 0..3 {
@@ -226,6 +235,7 @@ impl Store {
     pub(super) fn idle(&self) -> bool {
         (self.closing || self.routes.idle())
             && self.secrets.is_empty()
+            && self.sources.is_empty()
             && self.above.is_empty()
             && self.routed.is_empty()
             && self.submitted.is_empty()
@@ -245,6 +255,9 @@ impl Store {
         }
         for _ in 0..self.secrets.len() {
             let _terminal = self.secrets.pop();
+        }
+        for _ in 0..self.sources.len() {
+            let _terminal = self.sources.pop();
         }
         for index in 0..3 {
             for _ in 0..self.queue(index).len() {
@@ -439,11 +452,17 @@ pub(super) fn answer(engine: &mut crate::Engine) {
         match event {
             protocol::Event::Opened { .. } => engine.store.opened = true,
             protocol::Event::OpenRefused { .. } => crate::stop::unavailable(engine, b"deployment"),
-            event @ (protocol::Event::Kept { .. }
-            | protocol::Event::Stale { .. }
-            | protocol::Event::Erased { .. }
-            | protocol::Event::Secret { .. }
-            | protocol::Event::SecretsLoaded { .. }) => engine.store.secrets.push(event),
+            event @ (protocol::Event::Kept { owner }
+            | protocol::Event::Stale { owner }
+            | protocol::Event::Erased { owner }
+            | protocol::Event::Secret { owner, .. }
+            | protocol::Event::SecretsLoaded { owner, .. }) => {
+                if crate::accounts::owns(owner) {
+                    engine.store.sources.push(event);
+                } else {
+                    engine.store.secrets.push(event);
+                }
+            }
             other @ (protocol::Event::Committed { .. }
             | protocol::Event::Failed { .. }
             | protocol::Event::Restored { .. }
@@ -490,7 +509,7 @@ pub(super) fn worst_case(limits: &protocol::Limits, room: u32) -> Option<u64> {
         .checked_add(FileIo::worst_case(handles(limits), max_read(limits), 32, max_read(limits))?.checked_mul(3)?)?
         .checked_add(Queue::<file::Request>::worst_case(room)?.checked_mul(3)?)?
         .checked_add(Queue::<file::Event>::worst_case(room)?.checked_mul(3)?)?
-        .checked_add(Queue::<protocol::Event>::worst_case(room)?.checked_mul(2)?)?
+        .checked_add(Queue::<protocol::Event>::worst_case(room)?.checked_mul(3)?)?
         .checked_add(Queue::<Up>::worst_case(room)?)?
         .checked_add(Queue::<Submit>::worst_case(room)?)?
         .checked_add(Map::<Token, ()>::worst_case(handles(limits))?.checked_mul(3)?)?

@@ -1,44 +1,58 @@
-//! The accounts driver, its private keeper and secret-free translation (llm.md, 5).
+//! The accounts driver, its records in the secrets' store and secret-free
+//! translation (llm.md, 5; store.md, 9).
 use crate::{Files, Seeds, values::Values};
 use alloc::boxed::Box;
 use jig_domain_accounts as domain;
 use jig_domain_core as core;
-use jig_protocol_accounts::{handed_in, table, translate};
+use jig_protocol_accounts::{handed_in, records, table, translate};
 use jig_protocol_config::{self as config, Path, Problems, Segment, What};
+use jig_protocol_store as store;
 use jig_test_domain as root;
 use skein_io::{
-    self as io, file, file_layer,
-    kernel::{Complete, Fd, Op, Submit},
+    self as io,
+    kernel::{Complete, Op, Submit},
 };
-use skein_lib::{CryptoRng, Decimal, Env, List, Map, Queue, Secret, Time, Token, Wall};
+use skein_lib::{CryptoRng, Env, List, Map, Queue, Secret, Time, Token, Wall};
 use skein_oauth as oauth;
 use skein_oauth_accounts as driver;
 
 pub(super) const PREFIX: u64 = 3_u64 << 60;
+/// The store's answer to the load of the sources' records; a replace is
+/// answered under its source's number.
+const LOAD: Token = Token::new(PREFIX | (1_u64 << 32_u32));
 #[derive(Debug)]
 pub struct AccountsRuntime {
-    pub root: Fd,
-    pub effective_user: u32,
     pub issuers: List<(u32, driver::Endpoint)>,
     /// Bounds of all prepared trust roots, supplied by their shell owner.
     pub trust_roots: u32,
     pub trust_root_bytes: u32,
 }
+/// Until the store's records are read the driver is not made; until the
+/// handed-in records are kept no request reaches it (llm.md 5.1, 5.4).
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one phase per service, and the sources it loads move once into the driver"
+)]
+enum Phase {
+    Loading { configured: List<driver::Account>, crypto: CryptoRng, after: Option<u64>, asked: bool },
+    HandingIn,
+    Running,
+}
 pub(super) struct Accounts {
-    component: driver::Component,
+    component: Option<driver::Component>,
+    phase: Phase,
     env: Env<driver::Limits>,
     ids: List<Secret>,
-    loads: Map<Token, u32>,
+    records: records::Records,
+    handed: Queue<(u32, oauth::SavedToken)>,
+    early: Queue<driver::Request>,
     pub(super) io: Queue<io::Request>,
     above: Queue<driver::Event>,
+    /// Empty: each source's keeper is the owner, so the driver files nothing.
     files: Queue<driver::FileLower>,
-    pending: Queue<(file::Request, Time)>,
-    pub(super) submitted: Queue<Submit>,
-    filed: Queue<file::Event>,
-    keeper: Option<file_layer::FileIo>,
-    root: Option<Token>,
+    /// Aborted: the store is closing, and takes no more records.
+    aborting: bool,
     closed: bool,
-    initial: Option<Box<[driver::Request]>>,
 }
 fn problem(index: usize, what: What) -> Problems {
     let mut found = Problems::empty();
@@ -63,13 +77,10 @@ impl Files {
         None
     }
 }
-fn private_keeper(
-    runtime: Option<&AccountsRuntime>,
-    limits: &driver::Limits,
-    seeds: &Seeds,
-) -> Result<(Option<file_layer::FileIo>, Option<Token>), Problems> {
+fn issuers(runtime: Option<AccountsRuntime>, limits: &driver::Limits) -> Result<Map<u32, driver::Endpoint>, Problems> {
+    let mut issuers = Map::with_capacity(limits.accounts);
     let Some(runtime) = runtime else {
-        return Ok((None, None));
+        return Ok(issuers);
     };
     if runtime.issuers.len() > limits.accounts {
         return Err(problem(0, What::Bound));
@@ -81,39 +92,64 @@ fn private_keeper(
             return Err(problem(0, What::Bound));
         }
     }
-    let mut keeper = file_layer::FileIo::with_whole_limit(
-        limits.accounts.checked_add(2).expect("private roots"),
-        limits.http.read,
-        1,
-        limits.client.document.record_bytes,
-        limits.file_stall,
-    )
-    .with_effective_user(runtime.effective_user);
-    keeper.seed_randomness(seeds.seed);
-    let adopted = keeper.adopt_root(runtime.root).expect("root slot");
-    Ok((Some(keeper), Some(adopted)))
+    for (number, endpoint) in runtime.issuers.into_boxed() {
+        issuers.insert(number, endpoint).or(Err(problem(0, What::Bound)))?;
+    }
+    Ok(issuers)
+}
+/// A copy of a configured source, without a record, for the check at
+/// start; configured sources name no origins.
+fn unkept(account: &driver::Account) -> driver::Account {
+    match account {
+        driver::Account::HandedIn => driver::Account::HandedIn,
+        driver::Account::SignIn { registration, endpoint, keeper: _, shared, origins: _ } => driver::Account::SignIn {
+            registration: oauth::Registration {
+                authorization_url: registration.authorization_url.clone(),
+                token_endpoint: registration.token_endpoint.clone(),
+                client_id: registration.client_id.clone(),
+                redirect_uri: registration.redirect_uri.clone(),
+                scope: registration.scope.clone(),
+                wire: registration.wire,
+                client_secret: registration.client_secret.clone(),
+                pkce_for_confidential: registration.pkce_for_confidential,
+                metadata_claim: registration.metadata_claim.clone(),
+                terms: registration.terms.clone(),
+            },
+            endpoint: driver::Endpoint {
+                address: endpoint.address,
+                transport: match &endpoint.transport {
+                    driver::Transport::Tls { server_name, trust } => {
+                        driver::Transport::Tls { server_name: server_name.clone(), trust: trust.clone() }
+                    }
+                    driver::Transport::Plaintext => driver::Transport::Plaintext,
+                },
+            },
+            keeper: driver::Keeper::Owner { kept: None },
+            shared: *shared,
+            origins: List::with_capacity(0),
+        },
+    }
 }
 impl Accounts {
+    /// Checks the configured sources and makes them ready to start; the
+    /// driver is made once the secrets' store's records are read.
     pub fn new(
         config: &config::Engine,
         files: &Files,
         seeds: &Seeds,
         runtime: Option<AccountsRuntime>,
         room: u32,
+        secret_bytes: u32,
     ) -> Result<Self, Problems> {
         let mut limits = config.limits.driver;
         limits.accounts = config.limits.core.accounts.accounts.checked_add(1).expect("numbered account slots");
-
-        let (keeper, file_root) = private_keeper(runtime.as_ref(), &limits, seeds)?;
-        let mut issuers = Map::with_capacity(limits.accounts);
-        if let Some(runtime) = runtime {
-            for (number, endpoint) in runtime.issuers.into_boxed() {
-                issuers.insert(number, endpoint).or(Err(problem(0, What::Bound)))?;
-            }
+        if limits.client.document.record_bytes > secret_bytes {
+            return Err(problem(0, What::Bound));
         }
+        let mut issuers = issuers(runtime, &limits)?;
         let mut configured = List::with_capacity(limits.accounts);
         let mut ids = List::with_capacity(limits.accounts);
-        let mut records = List::with_capacity(limits.accounts);
+        let mut handed = Queue::with_capacity(limits.accounts);
         for _ in 0..limits.accounts {
             configured.push(driver::Account::HandedIn).or(Err(problem(0, What::Bound)))?;
             ids.push(Secret::new(Box::default())).expect("account id slots");
@@ -135,22 +171,18 @@ impl Accounts {
                         }
                         account_id = Secret::new(id.clone());
                     }
-                    records
-                        .push(
-                            handed_in::hand_in(
-                                account.number,
-                                record.token,
-                                record.lapses,
-                                record.account_id,
-                                &limits.client.document,
-                            )
-                            .or(Err(problem(index, What::Bound)))?,
-                        )
-                        .or(Err(problem(index, What::Bound)))?;
+                    let record = handed_in::record(
+                        account.number,
+                        record.token,
+                        record.lapses,
+                        record.account_id,
+                        &limits.client.document,
+                    )
+                    .or(Err(problem(index, What::Bound)))?;
+                    handed.push((account.number, record));
                     driver::Account::HandedIn
                 }
                 config::Source::SignIn(source) => {
-                    let private_root = file_root.ok_or(problem(index, What::Refers))?;
                     let endpoint = issuers.remove(&account.number).ok_or(problem(index, What::Refers))?;
                     let secret = match &source.secret {
                         Some(path) => Some(files.contents(path).ok_or(problem(index, What::Unreadable))?.into()),
@@ -172,11 +204,7 @@ impl Accounts {
                             terms: None,
                         },
                         endpoint,
-                        keeper: driver::Keeper::Private {
-                            root: private_root,
-                            directory: config.llm.records.clone(),
-                            file: Decimal::of(u64::from(account.number)).as_bytes().into(),
-                        },
+                        keeper: driver::Keeper::Owner { kept: None },
                     }
                 }
             };
@@ -184,27 +212,42 @@ impl Accounts {
             *ids.get_mut(account.number).expect("account id slot") = account_id;
         }
         let crypto = CryptoRng::new(&seeds.crypto, 1).ok_or(problem(0, What::Bound))?;
-        let component = driver::Component::new(configured, &limits, crypto).or(Err(problem(0, What::Form)))?;
-        let value = Self {
-            component,
+        let mut check = List::with_capacity(limits.accounts);
+        for account in &configured {
+            check.push(unkept(account)).or(Err(problem(0, What::Bound)))?;
+        }
+        let checked = driver::Component::new(check, &limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
+        drop(checked);
+        Ok(Self {
+            component: None,
+            phase: Phase::Loading { configured, crypto, after: None, asked: false },
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             ids,
-            loads: Map::with_capacity(limits.accounts),
+            records: records::Records::new(limits.accounts),
+            handed,
+            early: Queue::with_capacity(room),
             io: Queue::with_capacity(room),
             above: Queue::with_capacity(room),
             files: Queue::with_capacity(room),
-            pending: Queue::with_capacity(room),
-            submitted: Queue::with_capacity(room),
-            filed: Queue::with_capacity(room),
-            keeper,
-            root: file_root,
+            aborting: false,
             closed: false,
-            initial: Some(records.into_boxed()),
-        };
-        Ok(value)
+        })
     }
     fn down(&mut self, request: driver::Request) {
-        self.component.down(&self.env, request, &mut self.above, &mut self.io, &mut self.files);
+        if let Some(component) = &mut self.component {
+            component.down(&self.env, request, &mut self.above, &mut self.io, &mut self.files);
+        }
+    }
+    fn down_room(&self) -> bool {
+        self.above.room() >= driver::MAX_OUT_DOWN.above
+            && self.io.room() >= driver::MAX_OUT_DOWN.io
+            && self.files.room() >= driver::MAX_OUT_DOWN.files
+    }
+    fn running(&self) -> bool {
+        match self.phase {
+            Phase::Running => self.early.is_empty(),
+            Phase::Loading { .. } | Phase::HandingIn => false,
+        }
     }
     pub fn up_room(&self) -> bool {
         self.above.room() >= driver::MAX_OUT_UP.above && self.io.room() >= driver::MAX_OUT_UP.io
@@ -213,10 +256,17 @@ impl Accounts {
         self.above.room() >= batch.checked_mul(driver::MAX_OUT_DOWN.above).expect("account above room")
             && self.io.room() >= batch.checked_mul(driver::MAX_OUT_DOWN.io).expect("account io room")
             && self.files.room() >= batch.checked_mul(driver::MAX_OUT_DOWN.files).expect("account files room")
+            && (self.running() || self.early.room() >= batch)
     }
+    /// The domain's request: to the driver once it runs, held until then.
     pub fn request(&mut self, request: domain::Request) {
         if let domain::Request::Component(request) = request {
-            self.down(translate::down(request));
+            let request = translate::down(request);
+            if self.running() {
+                self.down(request);
+            } else {
+                self.early.push(request);
+            }
         }
     }
     pub fn clock(&mut self, now: Time, wall: Wall) {
@@ -224,99 +274,77 @@ impl Accounts {
         self.env.wall = wall;
     }
     pub fn up(&mut self, event: io::Event) {
-        self.component.up(&self.env, event, &mut self.above, &mut self.io, &mut self.files);
-    }
-    pub fn complete(&mut self, completion: Complete) {
-        file_layer::up(
-            self.keeper.as_mut().expect("file operation has keeper"),
-            completion,
-            &mut self.filed,
-            &mut self.submitted,
-        );
+        if let Some(component) = &mut self.component {
+            component.up(&self.env, event, &mut self.above, &mut self.io, &mut self.files);
+        }
     }
     pub fn is_empty(&self) -> bool {
-        self.closed
-            && self.loads.is_empty()
-            && self.root.is_none()
-            && self.io.is_empty()
-            && self.above.is_empty()
-            && self.pending.is_empty()
-            && self.files.is_empty()
-            && self.submitted.is_empty()
-            && self.filed.is_empty()
-            && match &self.keeper {
-                Some(keeper) => keeper_empty(keeper),
-                None => true,
-            }
+        self.closed && self.io.is_empty() && self.above.is_empty() && self.files.is_empty() && self.early.is_empty()
     }
     pub fn next_deadline(&self) -> Option<Time> {
-        let mut next = self.component.next_deadline();
-        if let Some(keeper) = &self.keeper {
-            next = earliest(next, keeper.next_deadline());
+        match &self.component {
+            Some(component) => component.next_deadline(),
+            None => None,
         }
-        for (_, deadline) in &self.pending {
-            next = earliest(next, Some(*deadline));
-        }
-        next
     }
     pub fn work_pending(&self, now: Time) -> bool {
-        self.component.has_work()
+        let starting = match &self.phase {
+            Phase::Loading { asked, .. } => !*asked,
+            Phase::HandingIn => !self.handed.is_empty() || !self.records.keeping(),
+            Phase::Running => !self.early.is_empty(),
+        };
+        starting
             || !self.above.is_empty()
             || !self.io.is_empty()
             || !self.files.is_empty()
-            || !self.filed.is_empty()
-            || !self.submitted.is_empty()
-            || (match &self.keeper {
-                Some(keeper) => keeper.takes(),
+            || match &self.component {
+                Some(component) => component.has_work(),
                 None => false,
-            } && !self.pending.is_empty())
+            }
             || match self.next_deadline() {
                 Some(deadline) => deadline <= now,
                 None => false,
             }
     }
     pub fn abort(&mut self) {
-        self.down(driver::Request::Abort);
+        self.aborting = true;
+        if self.component.is_some() {
+            self.down(driver::Request::Abort);
+        } else {
+            self.closed = true;
+        }
+        self.phase = Phase::Running;
+        for _ in 0..self.handed.len() {
+            let _unkept = self.handed.pop();
+        }
+        for _ in 0..self.early.len() {
+            let _unasked = self.early.pop();
+        }
     }
-    pub fn iterate(&mut self, now: Time, wall: Wall, values: &mut Values, events: &mut Queue<root::Event>) {
+    pub fn iterate(
+        &mut self,
+        now: Time,
+        wall: Wall,
+        values: &mut Values,
+        events: &mut Queue<root::Event>,
+        store: &mut crate::store::Store,
+    ) {
         self.clock(now, wall);
-        if let Some(records) = self.initial.take() {
-            for record in records {
-                self.down(record);
-            }
-        }
-        if self.above.room() >= 3 && self.io.room() >= 3 && self.files.room() >= 1 {
-            self.component.fire(&self.env, &mut self.above, &mut self.io, &mut self.files);
-        }
-        self.drive_files();
-        for _ in 0..self.filed.len() {
-            if self.above.room() < 3 || self.io.room() < 3 || self.files.room() < 1 {
-                break;
-            }
-            let mut event = self.filed.pop().expect("file events");
-            let expected = self.loads.remove(&event.owner());
-            if let Some(expected) = expected
-                && let file::Event::Loaded { bytes, .. } = &mut event
-                && let Ok(record) = oauth::decode_record(bytes, &self.env.limits.client.document)
-                && record.key == expected
-            {
-                let id = record.metadata.unwrap_or_default();
-                if id.len() > usize::try_from(table::ACCOUNT_ID_BYTES).expect("account id bound") {
-                    *bytes = Box::default();
-                } else {
-                    *self.ids.get_mut(expected).expect("configured account id slot") = Secret::new(id);
-                }
-            }
-            if event.owner() != Token::new(u64::MAX) {
-                self.component.filed(&self.env, event, &mut self.above, &mut self.io, &mut self.files);
-            }
+        self.answers(store);
+        self.start(store);
+        if let Some(component) = &mut self.component
+            && self.above.room() >= 3
+            && self.io.room() >= 3
+            && self.files.room() >= 1
+        {
+            component.fire(&self.env, &mut self.above, &mut self.io, &mut self.files);
         }
         for _ in 0..self.above.len() {
-            if events.room() == 0 {
+            if events.room() == 0 || !store.room() || !self.down_room() {
                 break;
             }
             let event = self.above.pop().expect("account events");
-            let event = match translate::up(event, now) {
+            let event = match self.records.up(event, now) {
                 translate::Up::Granted { event, account, generation, value, expires } => {
                     values
                         .accounts
@@ -333,8 +361,15 @@ impl Accounts {
                     event
                 }
                 translate::Up::Child(event) => event,
-                translate::Up::Keep { account: _, record: _ } => {
-                    unreachable!("the private keeper keeps its own records")
+                translate::Up::Keep { account, record } => {
+                    if self.aborting {
+                        continue;
+                    }
+                    match self.records.keep(account, record.0, &self.env.limits.client.document) {
+                        records::Next::Driver(request) => self.down(request),
+                        records::Next::Store(keep) => replace(store, keep),
+                    }
+                    continue;
                 }
             };
             match &event {
@@ -345,63 +380,139 @@ impl Accounts {
             }
             events.push(root::Event::Core(core::Event::Account(domain::Event::Component(event))));
         }
+        assert!(self.files.is_empty(), "owner keepers file nothing");
         values.accounts.expire(now);
-        self.component.reclaim();
-    }
-    fn drive_files(&mut self) {
-        for _ in 0..self.files.len() {
-            match self.files.pop().expect("private requests") {
-                driver::FileLower::Request { request, deadline } => {
-                    if let file::Request::Load { owner, path, .. } = &request {
-                        let number = crate::tools::number(path).expect("private record named by configured account");
-                        self.loads.insert(*owner, number).expect("one load per configured account");
-                    }
-                    self.pending.push((request, deadline));
-                }
-                driver::FileLower::Remove { .. } => unreachable!("the owner never signs out or removes an account"),
-                driver::FileLower::Cancel { owner } => {
-                    for _ in 0..self.pending.len() {
-                        let (request, deadline) = self.pending.pop().expect("queued files");
-                        if file_owner(&request) == owner {
-                            self.filed.push(file::Event::Cancelled { owner });
-                        } else {
-                            self.pending.push((request, deadline));
-                        }
-                    }
-                    if let Some(keeper) = &mut self.keeper {
-                        file_layer::cancel(keeper, owner, &mut self.submitted);
-                    }
-                }
-            }
+        if let Some(component) = &mut self.component {
+            component.reclaim();
         }
-        if let Some(keeper) = &mut self.keeper {
-            file_layer::expire(keeper, self.env.now, &mut self.submitted);
-            if keeper.takes() {
-                if let Some((request, deadline)) = self.pending.pop() {
-                    if deadline <= self.env.now {
-                        self.filed.push(file::Event::Failed {
-                            owner: file_owner(&request),
-                            error: io::kernel::Error::TimedOut,
-                            committed: false,
-                            residue: None,
-                        });
-                    } else {
-                        file_layer::down_until(keeper, deadline, request, &mut self.filed, &mut self.submitted);
+    }
+    /// The store's answers: the records it holds, and whether each write was
+    /// kept (store.md 9).
+    fn answers(&mut self, store: &mut crate::store::Store) {
+        for _ in 0..store.sources.len() {
+            if !self.down_room() {
+                break;
+            }
+            match store.sources.pop().expect("source answers") {
+                store::Event::SecretsLoaded { owner: _, rows, next } => self.loaded(rows, next),
+                store::Event::Kept { owner } => {
+                    if let Some(request) = self.records.kept(source(owner)) {
+                        self.down(request);
                     }
-                } else if self.closed
-                    && let Some(file) = self.root.take()
-                {
-                    file_layer::down(
-                        keeper,
-                        self.env.now,
-                        file::Request::Close { owner: Token::new(u64::MAX), file },
-                        &mut self.filed,
-                        &mut self.submitted,
-                    );
+                }
+                store::Event::Stale { owner } => {
+                    if let Some(request) = self.records.stale(source(owner)) {
+                        self.down(request);
+                    }
+                }
+                store::Event::Erased { .. } | store::Event::Secret { .. } => {
+                    unreachable!("the accounts only load and replace their records")
+                }
+                store::Event::Opened { .. }
+                | store::Event::OpenRefused { .. }
+                | store::Event::Committed { .. }
+                | store::Event::Failed { .. }
+                | store::Event::Restored { .. }
+                | store::Event::Loaded { .. }
+                | store::Event::Read { .. }
+                | store::Event::Got { .. }
+                | store::Event::Turns { .. }
+                | store::Event::Unread { .. }
+                | store::Event::Corrupt { .. } => {
+                    unreachable!("the store hands the accounts only their secrets' answers")
                 }
             }
         }
     }
+    /// One page of the store's records; after the last, the driver starts
+    /// from them (llm.md 5.1).
+    fn loaded(&mut self, rows: Box<[store::SecretRow]>, next: Option<u64>) {
+        let Phase::Loading { configured, after, asked, .. } = &mut self.phase else {
+            return;
+        };
+        for row in rows {
+            if row.owner != store::SecretOwner::Source {
+                continue;
+            }
+            let Ok(account) = u32::try_from(row.number) else {
+                continue;
+            };
+            let Some(record) = self.records.load(account, row.value.expose(), &self.env.limits.client.document) else {
+                continue;
+            };
+            if let Some(driver::Account::SignIn { keeper, .. }) = configured.get_mut(account) {
+                let id = match &record.metadata {
+                    Some(id) => Secret::new(id.clone()),
+                    None => Secret::new(Box::default()),
+                };
+                *self.ids.get_mut(account).expect("configured account id slot") = id;
+                *keeper = driver::Keeper::Owner { kept: Some(record) };
+            }
+        }
+        if let Some(next) = next {
+            *after = Some(next);
+            *asked = false;
+            return;
+        }
+        let Phase::Loading { configured, crypto, .. } = ::core::mem::replace(&mut self.phase, Phase::HandingIn) else {
+            unreachable!("loading");
+        };
+        let Ok(component) = driver::Component::new(configured, &self.env.limits, crypto) else {
+            unreachable!("startup checked the sources, and each record read encodes");
+        };
+        self.component = Some(component);
+    }
+    /// Asks for the next page of records, hands in the handed-in records
+    /// once kept, then lets the domain's requests through.
+    fn start(&mut self, store: &mut crate::store::Store) {
+        match &mut self.phase {
+            Phase::Loading { after, asked, .. } => {
+                if !*asked && store.opened && store.room() {
+                    *asked = true;
+                    let load = store::Secrets::Load { owner: store::SecretOwner::Source, after: *after };
+                    if let Some(store::Event::SecretsLoaded { owner: _, rows, next }) = store.secrets(LOAD, load) {
+                        self.loaded(rows, next);
+                    }
+                }
+            }
+            Phase::HandingIn => {
+                for _ in 0..self.handed.len() {
+                    if !store.room() || !self.down_room() {
+                        break;
+                    }
+                    let (account, record) = self.handed.pop().expect("handed-in records");
+                    match self.records.hand_in(account, record, &self.env.limits.client.document) {
+                        Ok(records::Next::Driver(request)) => self.down(request),
+                        Ok(records::Next::Store(keep)) => replace(store, keep),
+                        Err(handed_in::Unfit) => unreachable!("startup encoded each handed-in record"),
+                    }
+                }
+                if self.handed.is_empty() && !self.records.keeping() {
+                    self.phase = Phase::Running;
+                }
+            }
+            Phase::Running => {
+                for _ in 0..self.early.len() {
+                    if !self.down_room() {
+                        break;
+                    }
+                    let request = self.early.pop().expect("early requests");
+                    self.down(request);
+                }
+            }
+        }
+    }
+}
+/// Asks the store to keep a source's record in place of the one it holds.
+fn replace(store: &mut crate::store::Store, keep: records::Keep) {
+    let records::Keep { account, value, replaces } = keep;
+    let _later = store.secrets(
+        Token::new(PREFIX | u64::from(account)),
+        store::Secrets::Replace { owner: store::SecretOwner::Source, number: u64::from(account), value, replaces },
+    );
+}
+fn source(owner: Token) -> u32 {
+    u32::try_from(owner.raw() & !(15_u64 << 60)).expect("a source's number")
 }
 pub(super) fn earliest(left: Option<Time>, right: Option<Time>) -> Option<Time> {
     match right {
@@ -412,39 +523,11 @@ pub(super) fn earliest(left: Option<Time>, right: Option<Time>) -> Option<Time> 
         None => left,
     }
 }
-fn file_owner(request: &file::Request) -> Token {
-    match request {
-        file::Request::MakeDirectory { owner, .. }
-        | file::Request::OpenPrivate { owner, .. }
-        | file::Request::Create { owner, .. }
-        | file::Request::CreateNoFollow { owner, .. }
-        | file::Request::OpenRead { owner, .. }
-        | file::Request::OpenReadNoFollow { owner, .. }
-        | file::Request::OpenWrite { owner, .. }
-        | file::Request::OpenWriteNoFollow { owner, .. }
-        | file::Request::OpenDirectory { owner, .. }
-        | file::Request::Load { owner, .. }
-        | file::Request::Scan { owner, .. }
-        | file::Request::Store { owner, .. }
-        | file::Request::Stat { owner, .. }
-        | file::Request::WriteAt { owner, .. }
-        | file::Request::ReadAt { owner, .. }
-        | file::Request::Cut { owner, .. }
-        | file::Request::Sync { owner, .. }
-        | file::Request::Close { owner, .. }
-        | file::Request::SyncDirectory { owner, .. }
-        | file::Request::Rename { owner, .. }
-        | file::Request::Remove { owner, .. }
-        | file::Request::List { owner, .. }
-        | file::Request::ListPage { owner, .. }
-        | file::Request::Lock { owner, .. } => *owner,
-    }
-}
 
 #[derive(Debug)]
 pub(super) struct Kernel {
-    routes: Map<Token, (bool, Token, Option<Token>)>,
-    retired: Map<(bool, Token), Token>,
+    routes: Map<Token, (Token, Option<Token>)>,
+    retired: Map<Token, Token>,
     next: u64,
 }
 impl Kernel {
@@ -454,7 +537,7 @@ impl Kernel {
     pub fn is_empty(&self) -> bool {
         self.routes.is_empty() && self.retired.is_empty()
     }
-    pub fn publish(&mut self, files: bool, source: &mut Queue<Submit>, target: &mut Queue<Submit>) {
+    pub fn publish(&mut self, source: &mut Queue<Submit>, target: &mut Queue<Submit>) {
         for _ in 0..source.len() {
             if target.room() == 0 || self.routes.len() == self.routes.capacity() {
                 break;
@@ -464,37 +547,31 @@ impl Kernel {
             if let Op::Cancel { target } = &mut submit.kind {
                 cancel = Some(*target);
                 let mut found = None;
-                for (external, (owner, internal, _)) in &self.routes {
-                    if *owner == files && *internal == *target {
+                for (external, (internal, _)) in &self.routes {
+                    if *internal == *target {
                         found = Some(*external);
                         break;
                     }
                 }
                 *target = match found {
                     Some(external) => external,
-                    None => self.retired.remove(&(files, *target)).expect("cancel names submitted operation"),
+                    None => self.retired.remove(target).expect("cancel names submitted operation"),
                 };
             }
             let external = Token::new(self.next);
             self.next = self.next.checked_add(1).expect("kernel operation ids");
-            self.routes.insert(external, (files, submit.op, cancel)).expect("kernel route room");
+            self.routes.insert(external, (submit.op, cancel)).expect("kernel route room");
             submit.op = external;
             target.push(submit);
         }
     }
-    pub fn complete(
-        &mut self,
-        mut complete: Complete,
-        sockets: &Queue<Submit>,
-        files_queue: Option<&Queue<Submit>>,
-    ) -> (bool, Complete) {
-        let (files, internal, cancel) = self.routes.remove(&complete.op).expect("submitted operation route");
-        let source = if files { files_queue.expect("file route has queue") } else { sockets };
-        for queued in source {
+    pub fn complete(&mut self, mut complete: Complete, sockets: &Queue<Submit>) -> Complete {
+        let (internal, cancel) = self.routes.remove(&complete.op).expect("submitted operation route");
+        for queued in sockets {
             if let Op::Cancel { target } = queued.kind
                 && target == internal
             {
-                self.retired.insert((files, internal), complete.op).expect("pending cancellation route");
+                self.retired.insert(internal, complete.op).expect("pending cancellation route");
                 break;
             }
         }
@@ -504,7 +581,7 @@ impl Kernel {
         {
             *target = internal;
         }
-        (files, complete)
+        complete
     }
 }
 
@@ -551,22 +628,22 @@ pub(super) fn untag(mut event: io::Event) -> io::Event {
     }
     event
 }
+/// The accounts' bytes beside the driver's own: their queues, the sources
+/// as configured until the store's records are read, the handed-in records
+/// until kept, and each source's record on its way to the store.
 pub(super) fn worst_case(limits: &driver::Limits, io: &io::Limits, room: u32) -> Option<u64> {
+    let record = u64::from(limits.client.document.record_bytes);
     Queue::<io::Request>::worst_case(room)?
         .checked_add(Queue::<driver::Event>::worst_case(room)?)?
         .checked_add(Queue::<driver::FileLower>::worst_case(room)?)?
-        .checked_add(Queue::<(file::Request, Time)>::worst_case(room)?)?
-        .checked_add(Queue::<Submit>::worst_case(room)?)?
-        .checked_add(Queue::<file::Event>::worst_case(room)?)?
+        .checked_add(Queue::<driver::Request>::worst_case(room)?)?
+        .checked_add(List::<driver::Account>::worst_case(limits.accounts)?)?
+        .checked_add(Queue::<(u32, oauth::SavedToken)>::worst_case(limits.accounts)?)?
+        .checked_add(u64::from(limits.accounts).checked_mul(record)?)?
+        .checked_add(records::worst_case(limits.accounts, &limits.client.document)?)?
         .checked_add(List::<Secret>::worst_case(limits.accounts)?)?
-        .checked_add(Map::<Token, u32>::worst_case(limits.accounts)?)?
         .checked_add(u64::from(limits.accounts).checked_mul(u64::from(table::ACCOUNT_ID_BYTES))?)?
-        .checked_add(u64::from(room).checked_mul(u64::from(limits.client.document.record_bytes).checked_add(4096)?)?)?
-        .checked_add(List::<driver::Request>::worst_case(limits.accounts)?)?
-        .checked_add(Map::<Token, (bool, Token, Option<Token>)>::worst_case(io::operations(io)?.checked_add(2)?)?)?
-        .checked_add(Map::<(bool, Token), Token>::worst_case(io::operations(io)?.checked_add(2)?)?)
-}
-
-fn keeper_empty(keeper: &file_layer::FileIo) -> bool {
-    keeper.takes() && keeper.open_files() == 0
+        .checked_add(u64::from(room).checked_mul(record.checked_add(4096)?)?)?
+        .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(io::operations(io)?.checked_add(2)?)?)?
+        .checked_add(Map::<Token, Token>::worst_case(io::operations(io)?.checked_add(2)?)?)
 }

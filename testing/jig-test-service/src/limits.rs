@@ -109,12 +109,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             u64::from(limits.root.connector.value_bytes)
                 .checked_mul(u64::from(limits.root.core.accounts.credentials))?,
         )?
-        .checked_add(skein_io::file_layer::FileIo::worst_case(
-            limits.accounts.accounts.checked_add(2)?,
-            limits.accounts.http.read,
-            1,
-            limits.accounts.client.document.record_bytes,
-        )?)?
         .checked_add(crate::accounts::worst_case(&limits.accounts, &limits.io, queue.checked_mul(3)?)?)?
         .checked_add(crate::tools::worst_case(&limits.root.core)?)?
         .checked_add(Queue::<Box<root::Event>>::worst_case(

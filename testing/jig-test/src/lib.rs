@@ -115,7 +115,7 @@ fn agent(worker: &config::Worker) -> Result<service::Agent, String> {
         },
     })
 }
-fn accounts(engine: &config::Engine, owned: &mut Vec<Fd>, user: u32) -> Result<service::AccountsRuntime, String> {
+fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String> {
     let mut issuers = List::with_capacity(u32::try_from(engine.llm.accounts.len()).expect("account count"));
     let mut trust_roots = 0_u32;
     let mut trust_root_bytes = 0_u32;
@@ -177,10 +177,7 @@ fn accounts(engine: &config::Engine, owned: &mut Vec<Fd>, user: u32) -> Result<s
                 .expect("configured account count");
         }
     }
-    // The keeper resolves its configured record directory beneath this root.
-    let root = skein_shell::open_root(Path::new(".")).map_err(|errno| format!("account root: errno {errno}"))?;
-    owned.push(root);
-    Ok(service::AccountsRuntime { root, effective_user: user, issuers, trust_roots, trust_root_bytes })
+    Ok(service::AccountsRuntime { issuers, trust_roots, trust_root_bytes })
 }
 fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
     let document =
@@ -233,8 +230,7 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String
                 read::text(&document, *at, 32).map_err(|why| format!("component: {why:?}"))?.as_ref() == b"accounts";
         }
     }
-    let runtime =
-        if accounts_enabled { engine.as_ref().map(|engine| accounts(engine, owned, user)).transpose()? } else { None };
+    let runtime = if accounts_enabled { engine.as_ref().map(accounts).transpose()? } else { None };
     let seed = skein_shell::seed().map_err(|errno| format!("random seed: errno {errno}"))?;
     let crypto = skein_shell::crypto_seed().map_err(|errno| format!("cryptographic seed: errno {errno}"))?;
     let mut deployment = [0_u8; 16];

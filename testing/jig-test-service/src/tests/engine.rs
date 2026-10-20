@@ -173,26 +173,30 @@ fn a_keyed_retry_keeps_the_first_result() {
 }
 
 #[test]
-fn a_handed_in_account_is_lent_and_its_value_stays_out_of_the_root() {
-    use jig_domain_accounts::{FromComponent, Request, ToComponent};
-    let config = fixtures::config();
-    let mut accounts = crate::accounts::Accounts::new(&config, &fixtures::files(&[]), &fixtures::seeds(), None, 64)
-        .expect("handed-in account");
-    let mut values = fixtures::values();
-    let mut events = skein_lib::Queue::with_capacity(8);
-    let wall = skein_lib::Wall::from_nanos(1_000_000_000);
-    accounts.iterate(skein_lib::Time::ZERO, wall, &mut values, &mut events);
-    accounts.request(Request::Component(ToComponent::Want { account: 1 }));
-    accounts.iterate(skein_lib::Time::ZERO, wall, &mut values, &mut events);
-    let event = events.pop().expect("root account event");
-    let jig_test_domain::Event::Core(core::Event::Account(jig_domain_accounts::Event::Component(
-        FromComponent::Granted { account, generation, valid },
-    ))) = event
+fn a_handed_in_record_is_kept_before_its_value_is_lent() {
+    use jig_protocol_store::{SecretOwner, Secrets};
+    let mut service = fixtures::started(&fixtures::accounts_document());
+    let get = || Secrets::Get { owner: SecretOwner::Source, number: 1 };
+    for _ in 0_u32..8 {
+        fixtures::turn(&mut service);
+        let engine = fixtures::engine(&mut service);
+        let lent = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).is_some();
+        let Some(StoreEvent::Secret { value, .. }) = engine.store.secrets(skein_lib::Token::new(99), get()) else {
+            panic!("a get is answered at once");
+        };
+        assert!(!lent || value.is_some(), "no value is lent before its record is kept");
+    }
+    let engine = fixtures::engine(&mut service);
+    let Some(StoreEvent::Secret { value: Some(kept), .. }) = engine.store.secrets(skein_lib::Token::new(99), get())
     else {
-        panic!("typed account event contains metadata only");
+        panic!("the handed-in record is kept");
     };
-    assert_eq!((account, generation, valid), (1, 1, skein_lib::Duration::from_secs(119)));
-    let value = values.accounts.value(1, 1, skein_lib::Time::ZERO).expect("lent value");
+    let Ok(record) = skein_oauth::decode_record(kept.expose(), &fixtures::config().limits.driver.client.document)
+    else {
+        panic!("a kept record decodes");
+    };
+    assert_eq!((record.key, &*record.access_token), (1, fixtures::TOKEN));
+    let value = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).expect("lent value");
     assert_eq!(value.token.expose(), fixtures::TOKEN);
     assert_eq!(value.account_id.expose(), b"acc");
 }
@@ -313,9 +317,14 @@ fn the_workers_listener_opens_before_the_restart() {
     assert!(!fixtures::engine(&mut service).workers.as_ref().expect("workers").opened());
     fixtures::turn(&mut service);
     assert!(fixtures::engine(&mut service).workers.as_ref().expect("workers").opened());
-    let Some(StoreEvent::Restored { .. }) = fixtures::engine(&mut service).store.above.pop() else {
-        panic!("restart follows listener");
-    };
+    // The handed-in record's `Kept` may come in the same pass.
+    let mut restored = false;
+    for event in &fixtures::engine(&mut service).store.above {
+        if let StoreEvent::Restored { .. } = event {
+            restored = true;
+        }
+    }
+    assert!(restored, "restart follows listener");
 }
 #[test]
 fn a_result_that_does_not_decode_fails_its_attempt_as_invalid() {
@@ -358,40 +367,23 @@ const IDENTITY: [u8; 16] = [227, 220, 92, 103, 122, 9, 131, 161, 162, 47, 205, 1
 fn kernel_operations_are_routed_back_to_their_owner() {
     use skein_io::kernel::{Complete, Done, Error, Fd, Op, Submit};
     use skein_lib::{Queue, Token};
-    for (owner, external) in [(false, 1), (true, 2)] {
-        let mut kernel = crate::accounts::Kernel::new(4);
-        let mut sockets = Queue::with_capacity(2);
-        let mut files = Queue::with_capacity(2);
-        sockets.push(Submit { op: Token::new(1), kind: Op::Close { fd: Fd::new(6) } });
-        files.push(Submit { op: Token::new(1), kind: Op::Close { fd: Fd::new(7) } });
-        let mut output = Queue::with_capacity(4);
-        kernel.publish(false, &mut sockets, &mut output);
-        kernel.publish(true, &mut files, &mut output);
-        let socket = output.pop().expect("socket operation");
-        let file = output.pop().expect("file operation");
-        let request = if owner { file } else { socket };
-        let pending = if owner { &mut files } else { &mut sockets };
-        pending.push(Submit { op: Token::new(2), kind: Op::Cancel { target: Token::new(1) } });
-        let (routed, complete) = kernel.complete(
-            Complete { op: request.op, kind: request.kind, result: Ok(Done::Nothing) },
-            &sockets,
-            Some(&files),
-        );
-        assert_eq!(routed, owner);
-        assert_eq!(complete.op, Token::new(1));
-        let pending = if owner { &mut files } else { &mut sockets };
-        kernel.publish(owner, pending, &mut output);
-        let cancel = output.pop().expect("cancel after target completion");
-        assert_eq!(cancel.kind, Op::Cancel { target: Token::new(external) });
-        let (routed, complete) = kernel.complete(
-            Complete { op: cancel.op, kind: cancel.kind, result: Err(Error::TooLate) },
-            &sockets,
-            Some(&files),
-        );
-        assert_eq!(routed, owner);
-        assert_eq!(complete.op, Token::new(2));
-        assert_eq!(complete.kind, Op::Cancel { target: Token::new(1) });
-    }
+    let mut kernel = crate::accounts::Kernel::new(4);
+    let mut sockets = Queue::with_capacity(2);
+    sockets.push(Submit { op: Token::new(1), kind: Op::Close { fd: Fd::new(6) } });
+    let mut output = Queue::with_capacity(4);
+    kernel.publish(&mut sockets, &mut output);
+    let request = output.pop().expect("socket operation");
+    sockets.push(Submit { op: Token::new(2), kind: Op::Cancel { target: Token::new(1) } });
+    let complete =
+        kernel.complete(Complete { op: request.op, kind: request.kind, result: Ok(Done::Nothing) }, &sockets);
+    assert_eq!(complete.op, Token::new(1));
+    kernel.publish(&mut sockets, &mut output);
+    let cancel = output.pop().expect("cancel after target completion");
+    assert_eq!(cancel.kind, Op::Cancel { target: request.op });
+    let complete =
+        kernel.complete(Complete { op: cancel.op, kind: cancel.kind, result: Err(Error::TooLate) }, &sockets);
+    assert_eq!(complete.op, Token::new(2));
+    assert_eq!(complete.kind, Op::Cancel { target: Token::new(1) });
 }
 
 fn tools(config: &jig_protocol_config::Engine) -> crate::tools::Tools {
@@ -432,41 +424,6 @@ fn a_call_s_terminal_is_rendered_back_with_its_name() {
         assert_eq!(call.answer, core::SettledAnswer::Host { error: false, body: b"Done".as_slice().into() });
     }
 }
-fn account_runtime() -> crate::AccountsRuntime {
-    let mut issuers = skein_lib::List::with_capacity(1);
-    issuers
-        .push((
-            1,
-            skein_oauth_accounts::Endpoint {
-                address: ::core::net::SocketAddr::from(([127, 0, 0, 1], 7101)),
-                transport: skein_oauth_accounts::Transport::Plaintext,
-            },
-        ))
-        .expect("issuer");
-    crate::AccountsRuntime {
-        root: skein_io::kernel::Fd::new(7),
-        effective_user: 1000,
-        issuers,
-        trust_roots: 0,
-        trust_root_bytes: 0,
-    }
-}
-#[test]
-fn a_signed_in_source_uses_its_runtime_private_keeper() {
-    let config = fixtures::signed_config();
-    let mut accounts =
-        crate::accounts::Accounts::new(&config, &fixtures::files(&[]), &fixtures::seeds(), Some(account_runtime()), 64)
-            .expect("signed-in runtime");
-    let mut values = fixtures::values();
-    let mut events = skein_lib::Queue::with_capacity(8);
-    accounts.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut values, &mut events);
-    let open = accounts.submitted.pop().expect("private root opens");
-    let skein_io::kernel::Op::Open { root, .. } = open.kind else {
-        panic!("private root opens");
-    };
-    assert_eq!(root, skein_io::kernel::Fd::new(7), "the keeper uses the shell's root");
-}
-
 #[test]
 fn a_store_refusal_at_open_ends_the_start() {
     let mut service = fixtures::started(&fixtures::engine_document());
