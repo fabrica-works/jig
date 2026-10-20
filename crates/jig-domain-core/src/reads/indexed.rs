@@ -127,7 +127,8 @@ pub(super) fn is_update(key: &Key) -> bool {
         )
         | Key::Core(_)
         | Key::People(_)
-        | Key::Notes(_) => false,
+        | Key::Notes(_)
+        | Key::Accounts(_) => false,
     }
 }
 
@@ -160,7 +161,8 @@ pub(super) fn ended_delegate_row(
         )
         | crate::Record::Core(_)
         | crate::Record::People(_)
-        | crate::Record::Notes(_) => return Ok(None),
+        | crate::Record::Notes(_)
+        | crate::Record::Accounts(_) => return Ok(None),
     };
     let Some(owner) = &row.owner else { return Ok(None) };
     if edge.requester != requester || edge.task != owner.number || owner.requester != tasks::Party::Task(requester) {

@@ -53,7 +53,8 @@ fn project(world: &mut World, sign_in: u64) -> documents::Project {
 fn a_first_start_seeds_the_policy_and_owner_before_the_owner_signs_in() {
     let mut world = cold();
     assert!(world.domain.ready());
-    assert_eq!(world.store.applied, 1, "one first-start decision");
+    assert_eq!(world.store.applied, 2, "one first-start decision, and the accounts' counter saved at their want");
+    assert!(world.store.rows.contains_key(&root::Key::Core(core::Key::Accounts(jig_domain_accounts::Key::Next))));
     assert_eq!(
         world.store.rows[&root::Key::Core(core::Key::People(people::Key::Roles(1)))],
         root::Record::Core(core::Record::People(people::Stored::Roles {
@@ -88,7 +89,7 @@ fn a_restart_seeds_nothing_and_keeps_the_saved_policy_and_owner() {
     world.restart_with(configuration);
     assert!(world.domain.ready());
     assert_eq!(world.store.rows, rows);
-    assert_eq!(world.store.applied, 1);
+    assert_eq!(world.store.applied, 2, "the restored counter has not moved");
     assert_eq!(world.commits.len(), commits);
     let (person, sign_in) = sign_in(&mut world, 7);
     assert_eq!(person, 1);

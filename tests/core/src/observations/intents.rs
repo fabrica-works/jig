@@ -162,9 +162,11 @@ impl Intents {
                 }
                 Vec::new()
             }
-            core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
-                Vec::new()
-            }
+            core::Record::Core(_)
+            | core::Record::Tasks(_)
+            | core::Record::People(_)
+            | core::Record::Notes(_)
+            | core::Record::Accounts(_) => Vec::new(),
         }
     }
 }

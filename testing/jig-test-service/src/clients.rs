@@ -550,7 +550,8 @@ fn ended(key: &root::Key) -> Option<u64> {
             )
             | core::Key::Core(..)
             | core::Key::Tasks(..)
-            | core::Key::Notes(..),
+            | core::Key::Notes(..)
+            | core::Key::Accounts(..),
         )
         | root::Key::Connector { .. } => None,
     }

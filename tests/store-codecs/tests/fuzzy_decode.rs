@@ -33,6 +33,11 @@ fn accounts(bytes: &[u8]) {
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
     }
+    if let Ok(row) = accounts_v1::Row::decode(&accounts_v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
 }
 fn arbitrary(seed: u64, check: fn(&[u8])) {
     let mut rng = Rng::new(seed);

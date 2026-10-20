@@ -244,7 +244,7 @@ pub(super) const IO: skein_io::Limits = skein_io::Limits {
     retry: Duration::from_millis(250),
 };
 pub(super) const JOURNAL: skein_lib::JournalLimits =
-    skein_lib::JournalLimits { commits: 3, writes: 18_498, held: 55_494, now: 256, release: 256 };
+    skein_lib::JournalLimits { commits: 3, writes: 18_501, held: 55_503, now: 256, release: 256 };
 pub(super) const LIMITS: Limits = Limits {
     core: CORE,
     store: STORE,
@@ -339,13 +339,13 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
     value: 1_305_143,
-    ops: 36_999,
-    commit: 345_689_394,
+    ops: 37_005,
+    commit: 345_701_922,
     queued: 3,
-    queued_bytes: 1_037_068_182,
+    queued_bytes: 1_037_105_766,
     budget: 268_435_456,
-    segment: 691_378_788,
-    snapshot_after: 345_689_394,
+    segment: 691_403_844,
+    snapshot_after: 345_701_922,
     chunk: 1_307_242,
     page: skein_kv::Page { rows: 2, bytes: 1_307_222 },
     deadline: Duration::from_secs(30),

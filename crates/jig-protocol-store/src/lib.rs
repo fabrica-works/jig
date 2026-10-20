@@ -130,6 +130,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(tasks_v5::Row::worst_case_heap(&codec.tasks)?)?
         .checked_add(people_v5::Row::worst_case_heap(&codec.people)?)?
         .checked_add(notes_v1::Row::worst_case_heap(&codec.notes)?)?
+        .checked_add(accounts_v1::Row::worst_case_heap(&accounts_v1::CEILINGS)?)?
         .checked_add(u64::try_from(size_of::<jig_domain_tasks::TaskRecord>()).ok()?)?
         .checked_mul(2)?;
     // One byte per encoded row bounds carrier counts. Count wire values and

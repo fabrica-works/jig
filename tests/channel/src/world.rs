@@ -533,8 +533,9 @@ fn launch(
 
     if matches!(script.story, crate::stories::Story::DurableRestart) {
         // After the turn's transcript is written and its commit held; the
-        // handed-in record's write and sync to the secrets' store come first.
-        harness.cut(0, 82, skein_world::Cut::Kill);
+        // handed-in record's write and sync to the secrets' store, and the
+        // commit that keeps the accounts' counter, come first.
+        harness.cut(0, 83, skein_world::Cut::Kill);
     }
     if let crate::stories::Story::Restart { before } = script.story {
         harness.cut(0, before, skein_world::Cut::Kill);

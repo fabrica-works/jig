@@ -569,6 +569,8 @@ fn put_key(w: &mut Writer, value: &Key) -> Option<()> {
             w.byte(3)?;
             put_note_key(w, value)?;
         }
+        // No read pages the accounts' family, so no cursor carries its key.
+        Key::Accounts(_) => return None,
     }
     Some(())
 }

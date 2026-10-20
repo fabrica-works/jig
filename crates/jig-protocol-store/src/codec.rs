@@ -43,6 +43,7 @@ pub fn encode(row: &domain::Record, limits: &Limits, names: &[Box<[u8]>]) -> Opt
         domain::Record::Tasks(row) => tasks::encode(row, &limits.tasks).ok(),
         domain::Record::People(row) => people::encode(row, &limits.people, names).ok(),
         domain::Record::Notes(row) => notes::encode(row, &limits.notes).ok(),
+        domain::Record::Accounts(row) => accounts::encode(row).ok(),
     }
 }
 
@@ -55,6 +56,7 @@ pub fn decode(key: &domain::Key, bytes: &[u8], limits: &Limits, names: &[Box<[u8
         domain::Key::Tasks(_) => Some(domain::Record::Tasks(tasks::decode(bytes, &limits.tasks).ok()?)),
         domain::Key::People(_) => Some(domain::Record::People(people::decode(bytes, &limits.people, names).ok()?)),
         domain::Key::Notes(_) => Some(domain::Record::Notes(notes::decode(bytes, &limits.notes).ok()?)),
+        domain::Key::Accounts(_) => Some(domain::Record::Accounts(accounts::decode(bytes).ok()?)),
     }
 }
 

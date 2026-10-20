@@ -89,7 +89,9 @@ fn an_own_subject_after_a_restart_names_the_restored_sign_ins_party() {
             Record::Core(record) => {
                 assert_ne!(restored.restore_core(record, &limits), Restored::Rejected);
             }
-            Record::Tasks(_) | Record::Notes(_) => panic!("sign-in saves only its people and header"),
+            Record::Tasks(_) | Record::Notes(_) | Record::Accounts(_) => {
+                panic!("sign-in saves only its people and header")
+            }
         }
     }
     drop(watch_outputs(&mut restored, &limits, Event::People(people::Event::Restored)));

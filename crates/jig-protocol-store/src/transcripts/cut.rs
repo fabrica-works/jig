@@ -54,7 +54,8 @@ fn next(store: &mut Store, below: &mut Below) -> Result<bool, ()> {
         )
         | Record::Tasks(_)
         | Record::People(_)
-        | Record::Notes(_) => return Err(()),
+        | Record::Notes(_)
+        | Record::Accounts(_) => return Err(()),
     };
     store.transcripts.cut.after = Some(row.key);
     let key = keys::encode_own(&keys::Own::Transcript { task }, store.limits.store.key).ok_or(())?;

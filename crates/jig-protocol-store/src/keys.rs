@@ -2,6 +2,7 @@
 use alloc::boxed::Box;
 use jig_domain_core as domain;
 use skein_kv::{KeyReader, KeyWriter};
+mod accounts;
 mod core;
 mod notes;
 mod own;
@@ -65,6 +66,10 @@ pub fn encode(key: &domain::Key, limit: u32) -> Option<Box<[u8]>> {
             writer.tag(3);
             notes::write(&mut writer, key);
         }
+        domain::Key::Accounts(key) => {
+            writer.tag(ACCOUNTS);
+            accounts::write(&mut writer, key);
+        }
     }
     writer.finish()
 }
@@ -79,6 +84,7 @@ pub fn decode(bytes: &[u8]) -> Option<domain::Key> {
         1 => domain::Key::Tasks(tasks::read(&mut reader)?),
         2 => domain::Key::People(people::read(&mut reader)?),
         3 => domain::Key::Notes(notes::read(&mut reader, bytes.len())?),
+        ACCOUNTS => domain::Key::Accounts(accounts::read(&mut reader)?),
         _ => return None,
     };
     if !reader.is_empty() {

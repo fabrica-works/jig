@@ -125,6 +125,7 @@ fn people_interval(range: &Restore) -> Option<u32> {
                 match range {
                     jig_domain_core::RestoreRange::People => people = Some(interval),
                     jig_domain_core::RestoreRange::Deployment
+                    | jig_domain_core::RestoreRange::Accounts
                     | jig_domain_core::RestoreRange::Tasks
                     | jig_domain_core::RestoreRange::Core
                     | jig_domain_core::RestoreRange::Census(_) => {}

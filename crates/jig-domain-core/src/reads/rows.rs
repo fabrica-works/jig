@@ -282,7 +282,8 @@ pub fn row_key(row: &Row) -> Option<Position> {
             CoreRecord::Deployment(_) | CoreRecord::RunProof(_) | CoreRecord::Call(_) | CoreRecord::Projection(_),
         )
         | Record::People(_)
-        | Record::Notes(notes::Record::Line(_)) => None,
+        | Record::Notes(notes::Record::Line(_))
+        | Record::Accounts(_) => None,
     }?;
     if let Record::Tasks(tasks::Stored::Update(_)) = &row.value {
         return Some(Position::Owner(key));
@@ -610,7 +611,8 @@ fn object(
             )
             | Record::Core(_)
             | Record::People(_)
-            | Record::Notes(_) => Ok(None),
+            | Record::Notes(_)
+            | Record::Accounts(_) => Ok(None),
         },
         Scope::Escalation { task } => {
             let Some(decision) = escalation(&row.value) else {
@@ -811,7 +813,8 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                 )
                 | Record::Core(_)
                 | Record::People(_)
-                | Record::Notes(_) => Ok(None),
+                | Record::Notes(_)
+                | Record::Accounts(_) => Ok(None),
             }
         }
         Scope::Activity { task } => {
@@ -930,7 +933,8 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
         )
         | Record::Core(_)
         | Record::People(_)
-        | Record::Notes(_) => match row_owner(row) {
+        | Record::Notes(_)
+        | Record::Accounts(_) => match row_owner(row) {
             Some(owner) => owner.number,
             None => return Ok(None),
         },
@@ -979,7 +983,8 @@ fn inbox_row(
         )
         | Record::Core(_)
         | Record::People(_)
-        | Record::Notes(_) => {}
+        | Record::Notes(_)
+        | Record::Accounts(_) => {}
     }
     let Some(owner) = row_owner(&row) else {
         return Ok(None);
@@ -1209,7 +1214,8 @@ fn proposal_decision(record: &Record) -> Option<&crate::ProposalDecisionRecord> 
         )
         | Record::Tasks(_)
         | Record::Notes(_)
-        | Record::People(_) => None,
+        | Record::People(_)
+        | Record::Accounts(_) => None,
     }
 }
 
@@ -1237,7 +1243,8 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
         )
         | Record::Core(_)
         | Record::People(_)
-        | Record::Notes(_) => None,
+        | Record::Notes(_)
+        | Record::Accounts(_) => None,
     }
 }
 
@@ -1265,7 +1272,8 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
         )
         | Record::Core(_)
         | Record::Notes(_)
-        | Record::People(_) => None,
+        | Record::People(_)
+        | Record::Accounts(_) => None,
     }
 }
 
@@ -1283,7 +1291,8 @@ fn escalation(record: &Record) -> Option<&crate::EscalationDecisionRecord> {
         )
         | Record::Tasks(_)
         | Record::Notes(_)
-        | Record::People(_) => None,
+        | Record::People(_)
+        | Record::Accounts(_) => None,
     }
 }
 
@@ -1301,14 +1310,19 @@ fn turn_record(record: &Record) -> Option<&crate::TurnRecord> {
         )
         | Record::Tasks(_)
         | Record::Notes(_)
-        | Record::People(_) => None,
+        | Record::People(_)
+        | Record::Accounts(_) => None,
     }
 }
 
 fn note(record: &Record) -> Option<&notes::Entry> {
     match record {
         Record::Notes(notes::Record::Entry(value)) => Some(value),
-        Record::Tasks(_) | Record::Core(_) | Record::Notes(notes::Record::Line(_)) | Record::People(_) => None,
+        Record::Tasks(_)
+        | Record::Core(_)
+        | Record::Notes(notes::Record::Line(_))
+        | Record::People(_)
+        | Record::Accounts(_) => None,
     }
 }
 
@@ -1335,7 +1349,8 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
         )
         | Record::Core(_)
         | Record::Notes(_)
-        | Record::People(_) => None,
+        | Record::People(_)
+        | Record::Accounts(_) => None,
     }
 }
 
@@ -1407,11 +1422,15 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                 Scope::Tasks { query } => super::ended::position(query, key),
                 Scope::EndedDelegates { task } => match key {
                     Key::Tasks(tasks::Key::EndedDelegate { requester, .. }) => requester == task,
-                    Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+                    Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) | Key::Accounts(_) => false,
                 },
                 Scope::Notes { .. } | Scope::ScopedNotes { .. } => match key {
                     Key::Notes(notes::Key::Line { .. }) => true,
-                    Key::Notes(notes::Key::Entry { .. }) | Key::Tasks(_) | Key::Core(_) | Key::People(_) => false,
+                    Key::Notes(notes::Key::Entry { .. })
+                    | Key::Tasks(_)
+                    | Key::Core(_)
+                    | Key::People(_)
+                    | Key::Accounts(_) => false,
                 },
                 Scope::Spend { project } => kind == KeyKind::Ledger(*project),
                 Scope::Inbox { group, .. } => group.updates() && super::indexed::is_update(key),
@@ -1477,7 +1496,7 @@ fn key_kind(key: &Key) -> KeyKind {
             notes::Key::Entry { .. } => KeyKind::Note,
             notes::Key::Line { .. } => KeyKind::Unsupported,
         },
-        Key::People(_) => KeyKind::Unsupported,
+        Key::People(_) | Key::Accounts(_) => KeyKind::Unsupported,
     }
 }
 
@@ -1583,7 +1602,8 @@ fn terminal_record(record: &Record) -> Option<&crate::TerminalRecord> {
         )
         | Record::Tasks(_)
         | Record::People(_)
-        | Record::Notes(_) => None,
+        | Record::Notes(_)
+        | Record::Accounts(_) => None,
     }
 }
 

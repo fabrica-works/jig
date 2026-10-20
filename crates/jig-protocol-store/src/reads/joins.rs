@@ -29,7 +29,8 @@ pub(super) fn as_task(value: &core::Record) -> Option<&tasks::TaskRecord> {
         )
         | core::Record::Core(_)
         | core::Record::People(_)
-        | core::Record::Notes(_) => None,
+        | core::Record::Notes(_)
+        | core::Record::Accounts(_) => None,
     }
 }
 

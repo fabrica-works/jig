@@ -370,6 +370,12 @@ impl Domain {
         self.core.effect_deadline()
     }
 
+    /// The accounts child, for a world that reads what a restart restored.
+    #[must_use]
+    pub const fn accounts(&self) -> &jig_domain_accounts::Domain {
+        &self.core.accounts
+    }
+
     /// Install the application's fixed hold vocabulary before its first input.
     pub fn configure_holds(&mut self, env: &Env<Limits>, connector: u16, kinds: Box<[tasks::Kind]>) {
         let mut out = Queue::with_capacity(tasks::max_out(&env.limits.core.tasks));
@@ -473,7 +479,6 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
                 core::RestartRequest::Step(step) => domain.restart_load = Some(step),
                 core::RestartRequest::Idle | core::RestartRequest::Refused { .. } => {}
             }
-            decide(domain, env, Work::Core(core::Event::Account(jig_domain_accounts::Event::Want)));
         }
         Event::RestartDone(step) => {
             let request = domain.core.restart_done(step);
@@ -676,8 +681,13 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                             event: connector::Event::Restart(connector::RestartStep::SettleOutbox),
                         });
                     }
+                    core::RestartStep::LoadInbox => {
+                        // The accounts' records came with the core's ranges:
+                        // want each configured account once they are restored.
+                        work.push(Work::Core(core::Event::Account(jig_domain_accounts::Event::Want)));
+                        hold(&mut decision, Delivery::Restart(step));
+                    }
                     core::RestartStep::LoadCore
-                    | core::RestartStep::LoadInbox
                     | core::RestartStep::RestoreConnector { .. }
                     | core::RestartStep::ReadAfresh { .. } => hold(&mut decision, Delivery::Restart(step)),
                 },
@@ -1025,6 +1035,18 @@ pub fn restore_record(domain: &mut Domain, env: &Env<Limits>, record: Record) ->
             out.is_empty()
         }
         Record::Core(core::Record::Notes(_)) => true,
+        Record::Core(core::Record::Accounts(record)) => {
+            // A record breaking the child's rules is counted there and
+            // dropped; it never refuses the start (store.md 4.4 item 9).
+            let mut out = Queue::with_capacity(jig_domain_accounts::max_out(&env.limits.core.accounts));
+            jig_domain_accounts::step(
+                &mut domain.core.accounts,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.core.accounts },
+                jig_domain_accounts::Event::Restore { record },
+                &mut out,
+            );
+            out.is_empty()
+        }
         Record::Connector { number, record } => restore_connector(domain, env, number, record),
     }
 }

@@ -47,7 +47,7 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
         Scope::Reply { task, activity } => key == &Key::Tasks(TaskKey::Activity { task: *task, position: *activity }),
         Scope::History { task, subtree: false } => match key {
             Key::Tasks(TaskKey::History { task: owner, .. } | TaskKey::Milestone { task: owner, .. }) => owner == task,
-            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) | Key::Accounts(_) => false,
         },
         Scope::Proposal { proposer: Proposer::Party(owner), proposal } => {
             *owner == party
@@ -56,14 +56,14 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
         }
         Scope::EndedDelegates { task } => match key {
             Key::Tasks(TaskKey::EndedDelegate { requester, .. }) => requester == task,
-            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) | Key::Accounts(_) => false,
         },
         Scope::Spend { project } => match key {
             Key::Tasks(
                 TaskKey::Ledger(Funder::Period { project: owner, .. })
                 | TaskKey::ClosedLedger(Funder::Period { project: owner, .. }),
             ) => owner == project,
-            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) | Key::Accounts(_) => false,
         },
         Scope::Notes { project } => match key {
             Key::Notes(notes::Key::Line { scope, .. }) => match scope {
@@ -72,15 +72,15 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
                 | notes::Scope::Goal { project: owner, .. }
                 | notes::Scope::Resources { project: owner, .. } => owner == project,
             },
-            Key::Notes(_) | Key::Tasks(_) | Key::Core(_) | Key::People(_) => false,
+            Key::Notes(_) | Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Accounts(_) => false,
         },
         Scope::ScopedNotes { scope: wanted, .. } => match key {
             Key::Notes(notes::Key::Line { scope, .. }) => scope == wanted,
-            Key::Notes(_) | Key::Tasks(_) | Key::Core(_) | Key::People(_) => false,
+            Key::Notes(_) | Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Accounts(_) => false,
         },
         Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. } => match key {
             Key::Tasks(TaskKey::Update { party: owner, .. }) => *owner == party,
-            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) | Key::Accounts(_) => false,
         },
         Scope::Tasks { .. }
         | Scope::Proposal { proposer: Proposer::Task(_), .. }

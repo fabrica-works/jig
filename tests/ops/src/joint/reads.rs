@@ -22,9 +22,11 @@ fn row(store: &Store, value: &core::Record, task: &tasks::TaskRecord) -> reads::
             line: tasks::Line::Turn { attempt, turn, .. },
             ..
         })) => core::CoreKey::Turn { task: task.number, attempt: *attempt, turn: *turn },
-        core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
-            core::CoreKey::Terminal { task: task.number, attempt: task.attempt }
-        }
+        core::Record::Core(_)
+        | core::Record::Tasks(_)
+        | core::Record::People(_)
+        | core::Record::Notes(_)
+        | core::Record::Accounts(_) => core::CoreKey::Terminal { task: task.number, attempt: task.attempt },
     };
     let related = store.rows.get(&root::Key::Core(core::Key::Core(related_key))).and_then(|record| match record {
         root::Record::Core(value) => Some(value.clone()),

@@ -59,6 +59,18 @@ fn a_key_past_its_limit_is_none() {
     assert_eq!(keys::encode_own(&keys::Own::Format, 1), None);
 }
 #[test]
+fn the_installations_key_names_no_account_and_an_accounts_key_reads_its_numbers() {
+    let installation = keys::installation(fixtures::KEY_LIMIT).expect("within the key limit");
+    assert_eq!(keys::decode(&installation), None);
+    let source = Key::Accounts(jig_domain_accounts::Key::Source { account: 3, number: 4 });
+    let bytes = keys::encode(&source, fixtures::KEY_LIMIT).expect("within the key limit");
+    assert_eq!(&*bytes, &[1, 4, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4]);
+    let mut wide = bytes.clone();
+    *wide.get_mut(10).expect("the account's low byte") = 0;
+    *wide.get_mut(6).expect("past a u32") = 1;
+    assert_eq!(keys::decode(&wide), None, "a number past the child's u32 names no source");
+}
+#[test]
 fn an_application_key_carries_tag_two_and_strips_back() {
     let bytes = keys::application(&[0, 1, 255], 4).expect("at the key limit");
     assert_eq!(&*bytes, &[2, 0, 1, 255]);

@@ -58,7 +58,8 @@ impl Census {
                 | jig_domain_people::Key::Policy(_)
                 | jig_domain_people::Key::Answer(_),
             )
-            | Key::Notes(_) => None,
+            | Key::Notes(_)
+            | Key::Accounts(_) => None,
         }
     }
 }

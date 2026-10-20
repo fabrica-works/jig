@@ -63,7 +63,8 @@ pub(crate) fn operations(
                 )
                 | Record::Tasks(_)
                 | Record::People(_)
-                | Record::Notes(_),
+                | Record::Notes(_)
+                | Record::Accounts(_),
             )
             | Write::Erase(_)
             | Write::Put { .. }
@@ -126,7 +127,8 @@ fn header_id(write: &Write) -> Option<[u8; 16]> {
             )
             | Record::Tasks(_)
             | Record::People(_)
-            | Record::Notes(_),
+            | Record::Notes(_)
+            | Record::Accounts(_),
         )
         | Write::Erase(_)
         | Write::Put { .. }

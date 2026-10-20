@@ -11,6 +11,8 @@ pub use census::{Census, ReadResults};
 pub enum RestoreRange {
     /// The deployment header, first.
     Deployment,
+    /// The accounts' counter, accounts and sources, before the child starts.
+    Accounts,
     /// All people's live families.
     People,
     /// The tasks child's live families.
@@ -23,20 +25,21 @@ pub enum RestoreRange {
 
 impl RestoreRange {
     /// The fixed order of `LoadCore`'s ranges.
-    pub const LIVE: [Self; 4] = [Self::Deployment, Self::People, Self::Tasks, Self::Core];
+    pub const LIVE: [Self; 5] = [Self::Deployment, Self::Accounts, Self::People, Self::Tasks, Self::Core];
 
     /// Predicate checked against the store's intervals (protocol/store.md, 4.3).
     #[must_use]
     pub fn admits(&self, key: &crate::Key) -> bool {
         match self {
             Self::Census(census) => return census.admits(key),
-            Self::Deployment | Self::People | Self::Tasks | Self::Core => {}
+            Self::Deployment | Self::Accounts | Self::People | Self::Tasks | Self::Core => {}
         }
         match key {
             crate::Key::Core(crate::CoreKey::Deployment) => *self == Self::Deployment,
             crate::Key::Core(key) => *self == Self::Core && key.live(),
             crate::Key::People(key) => *self == Self::People && key.live(),
             crate::Key::Tasks(key) => *self == Self::Tasks && key.live(),
+            crate::Key::Accounts(_) => *self == Self::Accounts,
             crate::Key::Notes(_) => false,
         }
     }

@@ -263,6 +263,8 @@ pub enum Record {
     People(jig_domain_people::Stored),
     /// Scoped note entries and index lines.
     Notes(jig_domain_notes::Record),
+    /// The accounts' counter, accounts and their sources (protocol/store.md, 4.4).
+    Accounts(jig_domain_accounts::Stored),
 }
 
 impl Record {
@@ -274,6 +276,7 @@ impl Record {
             Self::Tasks(row) => Key::Tasks(row.key()),
             Self::People(row) => Key::People(row.key()),
             Self::Notes(row) => Key::Notes(row.key()),
+            Self::Accounts(row) => Key::Accounts(row.key()),
         }
     }
 }
@@ -289,6 +292,8 @@ pub enum Key {
     People(jig_domain_people::Key),
     /// Scoped note address.
     Notes(jig_domain_notes::Key),
+    /// Accounts address.
+    Accounts(jig_domain_accounts::Key),
 }
 
 /// Result of restoring one core-owned row during the live-range startup.

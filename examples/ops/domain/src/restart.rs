@@ -2,6 +2,7 @@
 //! reads or settlement; the root never advances it by guessing (domain/root.md, 8).
 use crate::domain::{Work, held};
 use crate::{Domain, Limits, Output, Range, Record, Store, Write};
+use jig_domain_accounts as accounts;
 use jig_domain_core as core;
 use jig_domain_notes as notes;
 use jig_domain_people as people;
@@ -21,15 +22,15 @@ pub(crate) fn route(
     match request {
         core::RestartRequest::Idle | core::RestartRequest::Refused { .. } => {}
         core::RestartRequest::Step(step) => match step {
-            core::RestartStep::LoadCore => {
+            core::RestartStep::LoadCore => held(decision, Output::Load { step, range: Range::Core }),
+            core::RestartStep::LoadInbox => {
+                // The accounts' records came with the core's ranges: want
+                // each configured account once they are restored.
                 let requests = core::want_accounts(
                     &mut domain.core,
                     &Env { now: env.now, wall: env.wall, limits: env.limits.core },
                 );
                 crate::route::core_out(domain, env, decision, requests, work);
-                held(decision, Output::Load { step, range: Range::Core });
-            }
-            core::RestartStep::LoadInbox => {
                 let census = domain.core.census(&env.limits.core);
                 held(decision, Output::Load { step, range: Range::Census(census) });
             }
@@ -169,6 +170,7 @@ pub(crate) fn store(
                         work.push(Work::Core(core::Event::Notes(notes::Event::Restore { record: row })));
                         true
                     }
+                    Record::Core(core::Record::Accounts(record)) => restore_accounts(domain, env, record),
                     Record::Infrastructure(record) => {
                         let valid = restore_roles(domain, env, &record);
                         if valid {
@@ -187,6 +189,19 @@ pub(crate) fn store(
             }
         }
     }
+}
+
+/// A record breaking the accounts child's rules is counted there and dropped;
+/// it never refuses the start.
+fn restore_accounts(domain: &mut Domain, env: &Env<Limits>, record: accounts::Stored) -> bool {
+    let mut out = Queue::with_capacity(accounts::max_out(&env.limits.core.accounts));
+    accounts::step(
+        &mut domain.core.accounts,
+        &Env { now: env.now, wall: env.wall, limits: env.limits.core.accounts },
+        accounts::Event::Restore { record },
+        &mut out,
+    );
+    out.is_empty()
 }
 
 /// Preserve connector-owned project adoption before the core admits live claims.

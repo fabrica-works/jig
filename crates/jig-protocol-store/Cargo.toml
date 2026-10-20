@@ -16,13 +16,13 @@ jig-domain-core.workspace = true
 jig-domain-tasks.workspace = true
 jig-domain-people.workspace = true
 jig-domain-notes.workspace = true
+jig-domain-accounts.workspace = true
 
 jig-domain-authority.workspace = true
 jig-domain-fleet.workspace = true
 
 [dev-dependencies]
 jig-domain-brief.workspace = true
-jig-domain-accounts.workspace = true
 jig-domain-views.workspace = true
 
 [lints]

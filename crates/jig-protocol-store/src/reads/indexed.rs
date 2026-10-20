@@ -33,7 +33,8 @@ fn owner_number(key: &core::Key) -> Result<u64, Failure> {
         )
         | core::Key::Core(_)
         | core::Key::People(_)
-        | core::Key::Notes(_) => Err(Failure::Corrupt),
+        | core::Key::Notes(_)
+        | core::Key::Accounts(_) => Err(Failure::Corrupt),
     }
 }
 
@@ -104,7 +105,8 @@ fn update(value: &core::Record) -> Option<tasks::Update> {
         )
         | core::Record::Core(_)
         | core::Record::People(_)
-        | core::Record::Notes(_) => None,
+        | core::Record::Notes(_)
+        | core::Record::Accounts(_) => None,
     }
 }
 
@@ -132,7 +134,8 @@ fn delegate(value: &core::Record) -> Option<tasks::Edge> {
         )
         | core::Record::Core(_)
         | core::Record::People(_)
-        | core::Record::Notes(_) => None,
+        | core::Record::Notes(_)
+        | core::Record::Accounts(_) => None,
     }
 }
 

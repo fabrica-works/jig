@@ -4,7 +4,7 @@
 use super::people_routes::tag_people;
 use super::route_room;
 use super::task_routes::tag_tasks;
-use crate::{Ask, Core, CoreRecord, Held, Limits, Now, Record, Request, Requests, Write};
+use crate::{Ask, Core, CoreRecord, Held, Key, Limits, Now, Record, Request, Requests, Write};
 use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
@@ -381,9 +381,10 @@ pub(super) fn tag_account(core: &mut Core, env: &Env<Limits>, mut child: Queue<a
             request @ (accounts::Request::Component(_) | accounts::Request::Closed) => {
                 out.push(Request::Now(Box::new(Now::Account(request))));
             }
-            // The store keeps no accounts family yet (protocol/store.md, 4.4 item 9): until it
-            // does, the core commits none of the child's records and a restart restores none.
-            accounts::Request::Save { .. } | accounts::Request::Erase { .. } => {}
+            // The accounts family (protocol/store.md, 4.4 item 9) keeps each record in the
+            // decision that changes it.
+            accounts::Request::Save { record } => out.push(Request::Write(Write::Save(Record::Accounts(record)))),
+            accounts::Request::Erase { key } => out.push(Request::Write(Write::Erase(Key::Accounts(key)))),
         }
     }
     out.push(Request::Decided);

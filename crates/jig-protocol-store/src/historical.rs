@@ -152,7 +152,8 @@ fn ended(row: Option<Record>) -> Option<Box<tasks::TaskRecord>> {
         )
         | Record::Core(_)
         | Record::People(_)
-        | Record::Notes(_) => None,
+        | Record::Notes(_)
+        | Record::Accounts(_) => None,
     }
 }
 
@@ -170,7 +171,8 @@ fn proposal_row(row: Option<Record>) -> Option<core::ProposalDecisionRecord> {
         )
         | Record::Tasks(_)
         | Record::People(_)
-        | Record::Notes(_) => None,
+        | Record::Notes(_)
+        | Record::Accounts(_) => None,
     }
 }
 
@@ -188,7 +190,8 @@ fn escalation_row(row: Option<Record>) -> Option<core::EscalationDecisionRecord>
         )
         | Record::Tasks(_)
         | Record::People(_)
-        | Record::Notes(_) => None,
+        | Record::Notes(_)
+        | Record::Accounts(_) => None,
     }
 }
 

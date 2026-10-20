@@ -81,11 +81,20 @@ pub fn people_key(rng: &mut Rng) -> people::Key {
     }
 }
 pub fn key(rng: &mut Rng) -> core::Key {
-    match rng.below(4) {
+    match rng.below(5) {
         0 => core::Key::Core(core_key(rng)),
         1 => core::Key::Tasks(tasks_key(rng)),
         2 => core::Key::People(people_key(rng)),
-        _ => core::Key::Notes(notes_key(rng)),
+        3 => core::Key::Notes(notes_key(rng)),
+        _ => core::Key::Accounts(accounts_key(rng)),
+    }
+}
+pub fn accounts_key(rng: &mut Rng) -> jig_domain_accounts::Key {
+    use jig_domain_accounts::Key;
+    match rng.below(3) {
+        0 => Key::Next,
+        1 => Key::Account { number: narrow(rng) },
+        _ => Key::Source { account: narrow(rng), number: narrow(rng) },
     }
 }
 

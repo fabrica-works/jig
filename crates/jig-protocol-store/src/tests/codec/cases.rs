@@ -50,6 +50,18 @@ fn component_rows_read_back_as_written() {
 }
 
 #[test]
+fn accounts_rows_read_back_as_written() {
+    table([
+        ("each_accounts_record_reads_back_at_its_bounds", each_accounts_record_reads_back_at_its_bounds),
+        ("the_accounts_ceilings_are_the_childs_bounds", the_accounts_ceilings_are_the_childs_bounds),
+        (
+            "an_accounts_record_of_another_version_or_the_installation_does_not_decode",
+            an_accounts_record_of_another_version_or_the_installation_does_not_decode,
+        ),
+    ]);
+}
+
+#[test]
 fn notes_rows_keep_their_fields() {
     table([
         ("a_party_authored_note_reads_back_in_each_scope", a_party_authored_note_reads_back_in_each_scope),

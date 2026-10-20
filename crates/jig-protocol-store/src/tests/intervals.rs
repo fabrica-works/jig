@@ -30,7 +30,7 @@ fn each_restart_range_holds_the_keys_it_admits_and_no_others() {
 }
 #[test]
 fn the_restart_reads_its_ranges_in_the_cores_order() {
-    let expected = [&[1, 0, 0][..], &[1, 2, 0], &[1, 1, 0], &[1, 0, 1]];
+    let expected = [&[1, 0, 0][..], &[1, 4, 0], &[1, 2, 0], &[1, 1, 0], &[1, 0, 1]];
     for (range, start) in RestoreRange::LIVE.into_iter().zip(expected) {
         let actual = intervals::restore(&range);
         assert_eq!(actual.first().expect("one live interval").start.as_ref(), start);
@@ -46,7 +46,9 @@ fn a_notes_load_holds_exactly_its_scopes_lines() {
         let key = fixtures::key(&mut rng);
         let admitted = match &key {
             Key::Notes(notes::Key::Line { scope, name }) => scope == &wanted && *name > 1,
-            Key::Notes(notes::Key::Entry { .. }) | Key::Core(_) | Key::People(_) | Key::Tasks(_) => false,
+            Key::Notes(notes::Key::Entry { .. }) | Key::Core(_) | Key::People(_) | Key::Tasks(_) | Key::Accounts(_) => {
+                false
+            }
         };
         let bytes = key_bytes(&key);
         assert_eq!(fixtures::within(&intervals, &bytes), admitted, "{key:?}");
@@ -249,10 +251,24 @@ fn a_requesters_delegates_interval_holds_its_edges_only() {
         for (requester, interval) in &mappings {
             let admitted = match &key {
                 Key::Tasks(TaskKey::Delegate { requester: owner, .. }) => owner == requester,
-                Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+                Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) | Key::Accounts(_) => false,
             };
             assert_eq!(admitted, fixtures::within(core::slice::from_ref(interval), &bytes), "{requester}, {key:?}");
         }
+    }
+}
+
+#[test]
+fn the_accounts_restore_range_stops_before_the_installations_row() {
+    let ranges = intervals::restore(&RestoreRange::Accounts);
+    let installation = keys::installation(fixtures::KEY_LIMIT).expect("within the key limit");
+    assert!(!fixtures::within(&ranges, &installation), "tag 3 is no domain record");
+    for key in [
+        jig_domain_accounts::Key::Next,
+        jig_domain_accounts::Key::Account { number: u32::MAX },
+        jig_domain_accounts::Key::Source { account: u32::MAX, number: u32::MAX },
+    ] {
+        assert!(fixtures::within(&ranges, &key_bytes(&Key::Accounts(key))), "{key:?}");
     }
 }
 

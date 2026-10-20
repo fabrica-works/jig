@@ -11,6 +11,11 @@ use skein_lib::List;
 pub fn restore(range: &RestoreRange) -> Box<[Range]> {
     Box::new([match range {
         RestoreRange::Deployment => Range::prefix(&[keys::JIG, 0, 0]),
+        // The counter, accounts and sources (tags 0 to 2), short of the installation's row (3).
+        RestoreRange::Accounts => Range {
+            start: Box::new([keys::JIG, keys::ACCOUNTS, 0]),
+            end: Some(Box::new([keys::JIG, keys::ACCOUNTS, 3])),
+        },
         RestoreRange::People => Range { start: Box::new([keys::JIG, 2, 0]), end: Some(Box::new([keys::JIG, 2, 7])) },
         RestoreRange::Tasks => Range { start: Box::new([keys::JIG, 1, 0]), end: Some(Box::new([keys::JIG, 1, 6])) },
         RestoreRange::Core => Range { start: Box::new([keys::JIG, 0, 1]), end: Some(Box::new([keys::JIG, 0, 4])) },

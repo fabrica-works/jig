@@ -395,7 +395,8 @@ pub(crate) fn row_owner(row: &Row) -> Option<&tasks::TaskRecord> {
         )
         | Record::Core(_)
         | Record::People(_)
-        | Record::Notes(_) => row.owner.as_deref(),
+        | Record::Notes(_)
+        | Record::Accounts(_) => row.owner.as_deref(),
     }
 }
 
@@ -437,7 +438,7 @@ pub(crate) fn row_visible(core: &Core, party: u64, row: &Row) -> bool {
             Some(owner) => core.people.role(party, owner.project).is_some(),
             None => false,
         },
-        Record::People(_) | Record::Notes(notes::Record::Line(_)) => false,
+        Record::People(_) | Record::Notes(notes::Record::Line(_)) | Record::Accounts(_) => false,
     }
 }
 
@@ -474,7 +475,8 @@ pub(crate) fn record_bytes(value: &Record) -> Option<u64> {
             CoreRecord::Deployment(_) | CoreRecord::RunProof(_) | CoreRecord::Call(_) | CoreRecord::Projection(_),
         )
         | Record::People(_)
-        | Record::Notes(notes::Record::Line(_)) => return None,
+        | Record::Notes(notes::Record::Line(_))
+        | Record::Accounts(_) => return None,
     };
     carrier.checked_add(owned)
 }

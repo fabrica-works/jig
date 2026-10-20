@@ -314,8 +314,10 @@ pub(crate) fn sweep(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Even
     if !store.secret_state.sweeping || store.secret_state.waiting || store.phase == Phase::Stopped {
         return;
     }
-    // People's family alone: a source's record is swept once the accounts'
-    // family is restored (store.md 9), which no restart does yet.
+    // People's family alone. The accounts' family keeps no row for a
+    // configured account's signed-in source until its hold changes, though
+    // its record is kept here, so the sources handed up do not name every
+    // source that holds a record (store.md 9).
     let mut range = skein_kv::Range::prefix(&[1]);
     if let Some(after) = store.secret_state.after.take() {
         range.start = after;

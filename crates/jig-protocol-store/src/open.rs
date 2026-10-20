@@ -89,7 +89,8 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, be
         )
         | Record::Tasks(_)
         | Record::People(_)
-        | Record::Notes(_) => corrupt(store, owner, above),
+        | Record::Notes(_)
+        | Record::Accounts(_) => corrupt(store, owner, above),
     }
 }
 

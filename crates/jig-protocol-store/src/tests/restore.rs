@@ -126,6 +126,72 @@ fn ended_tasks_history_and_notes_are_never_read_at_start() {
     );
 }
 
+fn accounts_rows() -> [Record; 3] {
+    use jig_domain_accounts::{Held, Holder, Kind, Stored};
+    [
+        Record::Accounts(Stored::Next { number: 3 }),
+        Record::Accounts(Stored::Account {
+            number: 1,
+            provider: 1,
+            holder: Holder::Party(ALICE),
+            subject: Box::from(&b"alice@example"[..]),
+            display: Box::from(&b"Alice"[..]),
+        }),
+        Record::Accounts(Stored::Source {
+            account: 1,
+            number: 2,
+            place: 0,
+            kind: Kind::SignIn,
+            name: Box::new([]),
+            held: Some(Held::Limited { reset: Some(skein_lib::Wall::from_nanos(5)) }),
+        }),
+    ]
+}
+
+#[test]
+fn the_accounts_rows_follow_the_header_without_the_installations_row() {
+    let mut store = live_store();
+    let [next, account, source] = accounts_rows();
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(2),
+            fixtures::save(source.clone()),
+            fixtures::save(account.clone()),
+            fixtures::save(next.clone()),
+        ]),
+    );
+    let (rows, after) = page(live_page(&mut store, None, 8, 65_536));
+    assert_eq!(after, None);
+    assert_eq!(
+        jig_rows(rows).as_ref(),
+        &[fixtures::header_record(2), next, account, source, fixtures::person(ALICE), fixtures::live_task(LIVE)],
+    );
+}
+
+#[test]
+fn an_erased_accounts_row_is_not_restored() {
+    let mut store = live_store();
+    let [next, account, source] = accounts_rows();
+    fixtures::committed(
+        &mut store,
+        Box::new([fixtures::header(2), fixtures::save(next.clone()), fixtures::save(account), fixtures::save(source)]),
+    );
+    fixtures::committed(
+        &mut store,
+        Box::new([
+            fixtures::header(3),
+            Write::Erase(jig_domain_core::Key::Accounts(jig_domain_accounts::Key::Source { account: 1, number: 2 })),
+            Write::Erase(jig_domain_core::Key::Accounts(jig_domain_accounts::Key::Account { number: 1 })),
+        ]),
+    );
+    let (rows, _) = page(live_page(&mut store, None, 8, 65_536));
+    assert_eq!(
+        jig_rows(rows).as_ref(),
+        &[fixtures::header_record(3), next, fixtures::person(ALICE), fixtures::live_task(LIVE)],
+    );
+}
+
 #[test]
 fn a_restore_page_goes_on_into_the_next_interval() {
     let mut store = live_store();
@@ -134,7 +200,7 @@ fn a_restore_page_goes_on_into_the_next_interval() {
     assert_eq!(
         next,
         Some(Cursor {
-            interval: 1,
+            interval: 2,
             after: keys::encode(&fixtures::person(ALICE).key(), fixtures::KEY_LIMIT).expect("key fits")
         }),
     );

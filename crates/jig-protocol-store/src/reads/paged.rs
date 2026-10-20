@@ -187,7 +187,8 @@ pub(super) fn notes(store: &mut Store, range: &reads::Range, spent: &mut Spent) 
             core::Record::Notes(notes::Record::Entry(_))
             | core::Record::Core(_)
             | core::Record::Tasks(_)
-            | core::Record::People(_) => return Err(Failure::Corrupt),
+            | core::Record::People(_)
+            | core::Record::Accounts(_) => return Err(Failure::Corrupt),
         };
         let position =
             reads::Position::Owner(core::Key::Notes(notes::Key::Line { scope: line.scope.clone(), name: line.name }));

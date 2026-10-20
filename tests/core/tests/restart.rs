@@ -322,12 +322,33 @@ fn a_restart_restores_people_before_live_tasks_and_core_rows() {
         world.restore_ranges,
         [
             core::RestoreRange::Deployment,
+            core::RestoreRange::Accounts,
             core::RestoreRange::People,
             core::RestoreRange::Tasks,
             core::RestoreRange::Core,
         ]
     );
     assert!(world.domain.ready());
+}
+
+#[test]
+fn a_limited_source_keeps_its_reset_across_a_restart() {
+    let mut world = World::new(121, false);
+    account(&mut world);
+    let reset = world.clocks().0.saturating_add(Duration::from_secs(300));
+    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Limited {
+        account: 1,
+        reset: Some(reset),
+    })));
+    let limited = jig_domain_accounts::State::Limited { until: Some(reset) };
+    assert_eq!(world.domain.accounts().source(1).expect("the configured source").state, limited);
+    let row = root::Key::Core(core::Key::Accounts(jig_domain_accounts::Key::Source { account: 1, number: 1 }));
+    assert!(world.store.rows.contains_key(&row), "the hold is committed with the decision that limits it");
+    world.restart(121, false);
+    assert!(world.domain.ready());
+    let restored = world.domain.accounts();
+    assert_eq!(restored.source(1).expect("the configured source").state, limited, "the same reset after the restart");
+    assert_eq!(restored.unrestored(), 0);
 }
 
 fn restored_task(world: &World, task: u64) -> &tasks::TaskRecord {
