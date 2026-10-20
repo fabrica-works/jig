@@ -94,6 +94,7 @@ struct Client<A: App> {
     root: A::Root,
     view: A::View,
     model: Model,
+    out: Queue<A::Request>,
     patches: Queue<skein_ui::Patch>,
     kept: Vec<A::Record>,
     deferred: Vec<StoreWrite<A::Record, A::Key>>,
@@ -231,11 +232,13 @@ impl<A: App, F: Front<A>> World<A, F> {
         let (root, view) = constructor(self.rng.next_u64());
         let id = ClientId(self.clients.len());
         let patches = Queue::with_capacity(A::patch_limit(&view));
+        let out = Queue::with_capacity(A::max_out(&limits));
         self.clients.push(Client {
             constructor,
             limits,
             heap_bound,
             patches,
+            out,
             root,
             view,
             model: Model::default(),
@@ -563,19 +566,18 @@ impl<A: App, F: Front<A>> World<A, F> {
             wall: Wall::from_nanos(1_000_000_000_000 + self.now.as_nanos()),
             limits: c.limits.clone(),
         };
-        let mut out = Queue::with_capacity(A::max_out(&env.limits));
         match event {
-            Some(event) => A::step(&mut c.root, &env, event, &mut out),
-            None => A::fire(&mut c.root, &env, &mut out),
+            Some(event) => A::step(&mut c.root, &env, event, &mut c.out),
+            None => A::fire(&mut c.root, &env, &mut c.out),
         }
-        A::take(&mut c.root, &env, &mut out);
+        A::take(&mut c.root, &env, &mut c.out);
         let mut wires = Vec::new();
         let mut shows = Vec::new();
         let mut signs = 0;
         let mut sign_outs = 0;
         let mut failed = self.quota_failure;
         self.quota_failure = false;
-        while let Some(request) = out.pop() {
+        while let Some(request) = c.out.pop() {
             match A::duty(request) {
                 Duty::Store(write) => c.deferred.push(write),
                 Duty::Wire(request) => wires.push(request),
