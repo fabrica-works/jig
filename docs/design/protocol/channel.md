@@ -249,7 +249,11 @@ answer, and a **notice** is not answered.
   unauthorized, each naming the account and source by the grant's
   number. They are LLM accounts' only (section 8), and the core decides
   what each changes (`../domain/accounts.md`, 3.5). Unsupported is the
-  run's failure, never a notice.
+  run's failure, never a notice. A limited notice preserves an absent
+  reset as absent; an explicit zero span is a supplied reset. The core
+  converts a supplied span to engine time once on receipt, and the accounts
+  child keeps its wall reset across restarts (`../domain/accounts.md`,
+  3.5). Ruling 130's absent-reset-to-zero mapping is retired.
 
 ### 5.2 Down, engine to worker
 

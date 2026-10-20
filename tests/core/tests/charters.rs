@@ -321,7 +321,11 @@ fn a_task_created_without_an_llm_choice_records_its_default_and_its_run_uses_it(
         })
         .expect("durable chat");
     let default = tasks::ModelEffort { model: 0, effort: Some(0) };
-    assert_eq!(chat.llm, Some(tasks::LlmChoice { main: default, subagents: Box::new([]) }), "recorded as given");
+    assert_eq!(
+        chat.llm,
+        Some(tasks::LlmChoice { account: None, main: default, subagents: Box::new([]) }),
+        "recorded as given"
+    );
     assert_eq!(assignment.run.policy.model.name.as_ref(), b"scripted");
     assert_eq!(assignment.run.policy.model.effort.as_deref(), Some(b"low".as_slice()), "its first declared effort");
 }

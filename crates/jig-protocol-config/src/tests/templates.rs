@@ -173,6 +173,7 @@ fn a_templates_llm_choice_names_configured_models_and_their_efforts() {
     assert_eq!(
         chat.llm,
         Some(LlmChoice {
+            account: None,
             main: ModelEffort { model: 0, effort: Some(1) },
             subagents: Box::from([ModelEffort { model: 1, effort: None }]),
         })

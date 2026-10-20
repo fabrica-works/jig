@@ -20,7 +20,15 @@ fn hold_origin_survives_restart_terminal_and_release_in_exact_milestones() {
     let mut h = Harness::new();
     h.make([task(1, &[])].into());
     h.send(Event::Prepare { reply_to: to(), task: 1 });
-    h.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    h.send(Event::Claim {
+        account: None,
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     h.env.wall = Wall::from_nanos(10);
     h.send(Event::HoldFrom { task: 1, why: Hold::Drift, source: Box::new(resource(b"original")) });
     let first = h.domain.task(1).unwrap().clone();

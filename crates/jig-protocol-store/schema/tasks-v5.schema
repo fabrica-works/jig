@@ -33,7 +33,7 @@ enum Contract { approval: Approval, report: Report, verdict: Choices, change: Ch
 record Tools { bits: u64 }
 record Models { bits: u64 }
 record ModelEffort { model: u8 effort: option u8 }
-record LlmChoice { main: ModelEffort subagents: list 64 ModelEffort }
+record LlmChoice { main: ModelEffort subagents: list 64 ModelEffort account: option u32 }
 record Scopes { bits: u8 }
 record AuthoritySegment { bytes: bytes 4096 }
 enum Last { exact: AuthoritySegment, open: AuthoritySegment }
@@ -268,6 +268,7 @@ record TaskDefinition {
     depth: u32
     executor: Executor
     llm: option LlmChoice
+    kept_account: option u32
     taken_by: option u64
     person_answer: option PersonAnswer
     person_wait: option PersonWait

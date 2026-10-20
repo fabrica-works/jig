@@ -14,7 +14,7 @@ fn effort(model: u8, effort: Option<u8>) -> ModelEffort {
 }
 
 fn choice(main: ModelEffort, subagents: &[ModelEffort]) -> LlmChoice {
-    LlmChoice { main, subagents: subagents.into() }
+    LlmChoice { account: None, main, subagents: subagents.into() }
 }
 
 fn allowing(models: u64) -> Authority {

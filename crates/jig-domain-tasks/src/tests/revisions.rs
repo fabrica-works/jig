@@ -409,7 +409,15 @@ fn activity_keeps_whole_words_after_a_committed_turn_takes_them() {
     test.make(vec![task(1, &[])]);
     write(&mut test, 1, 1);
     test.send(Event::Prepare { reply_to: to(), task: 1 });
-    test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    test.send(Event::Claim {
+        account: None,
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     test.send(Event::Started { task: 1, attempt: 1 });
     test.send(Event::Turn {
         refused: Box::new([]),
@@ -561,7 +569,15 @@ fn words_release_a_stop_before_its_cancelled_run_answers() {
     let mut test = Harness::new();
     test.make(vec![task(1, &[])]);
     test.send(Event::Prepare { reply_to: to(), task: 1 });
-    test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    test.send(Event::Claim {
+        account: None,
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     test.send(Event::Started { task: 1, attempt: 1 });
     test.send(Event::Hold { task: 1, why: Hold::StoppedBy { party: 9 } });
     let word = crate::Word {
@@ -606,7 +622,15 @@ fn words_release_a_stop_before_its_cancelled_run_answers() {
     test.restart();
     assert_eq!(test.domain.task(1).unwrap().due_reason, crate::Why::Released);
     test.send(Event::Prepare { reply_to: to(), task: 1 });
-    test.send(Event::Claim { reply_to: to(), task: 1, attempt: 2, resumed: false, budget: 10, writes: Box::new([]) });
+    test.send(Event::Claim {
+        account: None,
+        reply_to: to(),
+        task: 1,
+        attempt: 2,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     test.send(Event::Started { task: 1, attempt: 2 });
     let mut change = amendment();
     let mut authority = test.domain.task(1).unwrap().authority.clone();
@@ -825,7 +849,15 @@ fn lifecycle_wall_times_keep_the_first_start_through_duplicate_reports_holds_and
     h.env.wall = Wall::from_nanos(5);
     h.send(Event::Prepare { reply_to: to(), task: 1 });
     h.env.wall = Wall::from_nanos(7);
-    h.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    h.send(Event::Claim {
+        account: None,
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     assert_eq!(h.domain.task(1).unwrap().run_since, None);
     h.env.wall = Wall::from_nanos(11);
     h.send(Event::Started { task: 1, attempt: 1 });
@@ -857,7 +889,15 @@ fn retry_observations_distinguish_attempt_failures_from_preparation_refusals_and
     let mut h = Harness::new();
     h.make(vec![task(1, &[]), task(2, &[])]);
     h.send(Event::Prepare { reply_to: to(), task: 1 });
-    h.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    h.send(Event::Claim {
+        account: None,
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     h.env.wall = Wall::from_nanos(20);
     h.send(Event::Activation {
         reply_to: to(),

@@ -31,7 +31,15 @@ fn question_lines_keep_the_newest_within_inbox_messages() {
     h.env.limits.inbox_messages = 2;
     h.env.limits.run_inbox = 2;
     h.send(Event::Prepare { reply_to: to(), task: 2 });
-    h.send(Event::Claim { reply_to: to(), task: 2, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    h.send(Event::Claim {
+        account: None,
+        reply_to: to(),
+        task: 2,
+        attempt: 1,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     h.send(Event::Started { task: 2, attempt: 1 });
     question_cycles(&mut h);
     assert_eq!(

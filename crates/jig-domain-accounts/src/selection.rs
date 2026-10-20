@@ -9,14 +9,16 @@ pub struct Coverage {
     pub account: u32,
     pub serves: bool,
 }
-/// Positive program-login and host-rule evidence for a source on this host. An absent or false
-/// fact permits only host-local fallback; it never overrules a global source hold.
+/// Source availability on this candidate host, including its holder rule. A program requires
+/// positive login evidence; a direct source is available unless explicitly excluded. Only a
+/// program's host-local unavailability permits the next source; global holds always win.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct HostSource {
     pub source: u32,
     pub usable: bool,
 }
 /// A limited old account excludes its holder's other accounts of that provider on re-choice.
+/// A still-serving preferred account wins before this fresh-choice exclusion.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Excluded {
     pub holder: Holder,
@@ -41,7 +43,8 @@ impl Domain {
     /// account; when still eligible it wins even while unusable. Other accounts are considered
     /// in payer/explicit/deployment order, preserving each holder's order, with number ties.
     /// Inputs are bounded by this child's account/source capacities. Duplicate evidence fails
-    /// closed. The query allocates nothing; at most accounts squared plus sources times host facts are visited.
+    /// closed. The query allocates nothing. Work is bounded by accounts squared plus host facts
+    /// squared plus sources times host facts, all within the configured capacities.
     #[must_use]
     #[expect(clippy::too_many_arguments, reason = "one concrete read-only selection check")]
     pub fn select(
@@ -75,7 +78,7 @@ impl Domain {
         }
         if let Some(number) = preferred
             && let Some(account) = self.accounts.get(&number)
-            && eligible(number, account, provider, excluded, coverage)
+            && eligible(number, account, provider, None, coverage)
         {
             return self.select_source(number, account, host, now);
         }
@@ -129,20 +132,16 @@ impl Domain {
             if globally_held {
                 return Selection::Wait { account: number, source: Some(*source), why: WaitWhy::Source(fact.state) };
             }
+            let on_host = host_allows(host, *source, fact.kind);
             let usable = match fact.kind {
                 Kind::None => fact.usable,
                 Kind::SignIn | Kind::Key => self.source_grant(*source, now).is_some(),
-                Kind::Program => {
-                    let mut positive = false;
-                    for proof in host {
-                        if proof.source == *source && proof.usable {
-                            positive = true;
-                        }
-                    }
-                    positive
-                }
+                Kind::Program => on_host,
             };
             if usable {
+                if !on_host {
+                    return Selection::Wait { account: number, source: Some(*source), why: WaitWhy::Host };
+                }
                 return Selection::Chosen { account: number, source: *source };
             }
             match fact.kind {
@@ -165,6 +164,16 @@ impl Domain {
             },
         }
     }
+}
+
+fn host_allows(host: &[HostSource], source: u32, kind: Kind) -> bool {
+    let mut allowed = kind != Kind::Program;
+    for proof in host {
+        if proof.source == source {
+            allowed = proof.usable;
+        }
+    }
+    allowed
 }
 
 fn eligible(number: u32, account: &Account, provider: u32, excluded: Option<Excluded>, coverage: &[Coverage]) -> bool {

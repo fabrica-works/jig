@@ -149,7 +149,10 @@ it is live:
   so that a conversation stays on one account's cache and replay, until
   a change of its payer or of that LLM provider chooses again
   (accounts.md, 4.3). The accounts its sub-agents use are each run's,
-  recorded in its claim (engine.md, 7.1, step 3).
+  recorded in its claim (engine.md, 7.1, step 3). This kept number is separate
+  from the creator's optional preference. Only a successful claim changes it,
+  in the same decision as its reservation and phase; a refused claim leaves
+  it unchanged, and clearing the optional preference alone retains it.
 - **Its authority** (authority.md, section 3), and the numbers kept
   against it: spent by itself, spent by the ended tasks it funded,
   reserved for the live tasks it funds, and who funded its own budget.

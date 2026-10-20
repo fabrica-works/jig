@@ -2,6 +2,9 @@ use jig_domain_tasks::{Active, End, Event, Key, Party, Phase, Refusal, Stored, T
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::Wall;
 
+const BEFORE_CLAIM_ACCOUNT: u32 = 71;
+const DURABLE_CLAIM_ACCOUNT: u32 = 72;
+
 #[test]
 fn make_and_claim_have_independent_before_and_after_durable_cuts() {
     let mut w = World::new(20, LIMITS);
@@ -20,19 +23,37 @@ fn make_and_claim_have_independent_before_and_after_durable_cuts() {
     let reply_to = w.to();
     w.send(Event::Prepare { reply_to, task: 2 });
     let reply_to = w.to();
-    w.stage(Event::Claim { reply_to, task: 2, attempt: 10, resumed: false, budget: 100, writes: Box::new([]) });
+    w.stage(Event::Claim {
+        account: Some(BEFORE_CLAIM_ACCOUNT),
+        reply_to,
+        task: 2,
+        attempt: 10,
+        resumed: false,
+        budget: 100,
+        writes: Box::new([]),
+    });
     assert!(w.runs.is_empty());
     w.restart();
     assert_eq!(w.record(2).attempt, 0);
+    assert_eq!(w.record(2).kept_account, None);
     assert!(w.activations.contains(&2));
     let reply_to = w.to();
     w.send(Event::Prepare { reply_to, task: 2 });
     let reply_to = w.to();
-    w.stage(Event::Claim { reply_to, task: 2, attempt: 11, resumed: false, budget: 100, writes: Box::new([]) });
+    w.stage(Event::Claim {
+        account: Some(DURABLE_CLAIM_ACCOUNT),
+        reply_to,
+        task: 2,
+        attempt: 11,
+        resumed: false,
+        budget: 100,
+        writes: Box::new([]),
+    });
     w.durable();
     assert!(w.runs.is_empty());
     w.restart();
     assert_eq!(w.runs.get(&2), Some(&11));
+    assert_eq!(w.record(2).kept_account, Some(DURABLE_CLAIM_ACCOUNT));
     assert_eq!(w.record(2).phase, Phase::Active(Active::Claimed { attempt: 11 }));
     w.finish(2);
     w.settle(2);
@@ -44,7 +65,15 @@ fn stale_claims_and_replayed_terminal_are_and_do_not_mutate() {
     w.make(Party::Person(1), vec![task(1, &[])]);
     w.claim(1, 4);
     let reply_to = w.to();
-    w.send(Event::Claim { reply_to, task: 1, attempt: 4, resumed: false, budget: 100, writes: Box::new([]) });
+    w.send(Event::Claim {
+        account: None,
+        reply_to,
+        task: 1,
+        attempt: 4,
+        resumed: false,
+        budget: 100,
+        writes: Box::new([]),
+    });
     assert!(
         matches!(w.replies.last_key_value().expect("reply").1, Reply::Refused(problem) if problem.why == Refusal::Attempt)
     );

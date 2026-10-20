@@ -1,5 +1,10 @@
 //! Pure people/accounts joins; no run or core-world routing is needed.
-#![allow(clippy::disallowed_types, clippy::disallowed_macros, reason = "test tables are ordinary Rust")]
+#![allow(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    reason = "test tables are ordinary Rust"
+)]
 use super::accounts_document::{account, fixture, source};
 use super::*;
 const ALICE: u64 = 1;
@@ -9,7 +14,7 @@ const ACCOUNT: u32 = 20;
 const SOURCE: u32 = 21;
 const PROJECT: u32 = 0;
 
-fn prepared(plan: bool, holder: accounts::Holder, uses: Option<Vec<accounts::Use>>) -> (Core, Env<Limits>) {
+fn prepared(plan: bool, holder: accounts::Holder, uses: Option<Vec<Use>>) -> (Core, Env<Limits>) {
     let mut row = account(ACCOUNT, holder);
     if let accounts::Stored::Account { uses: kept, .. } = &mut row {
         *kept = uses.map(Vec::into_boxed_slice);
@@ -18,7 +23,7 @@ fn prepared(plan: bool, holder: accounts::Holder, uses: Option<Vec<accounts::Use
         fixture(vec![row, source(ACCOUNT, SOURCE, 0, if plan { accounts::Kind::SignIn } else { accounts::Kind::Key })]);
     (core, env)
 }
-fn serves(core: &Core, payer: accounts::Use) -> bool {
+fn serves(core: &Core, payer: Use) -> bool {
     crate::coverage::serves(&core.people, core.accounts.account(ACCOUNT).unwrap(), payer)
 }
 fn roster(core: &mut Core, env: &Env<Limits>, members: &[u64]) {

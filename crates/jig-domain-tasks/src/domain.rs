@@ -622,8 +622,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::recurring::after_delegate(domain, env, task, out);
         }
         Event::Prepare { reply_to, task } => crate::run::prepare(domain, env, reply_to, task, out),
-        Event::Claim { reply_to, task, attempt, resumed, budget, writes } => {
-            crate::run::claim(domain, env, reply_to, task, attempt, resumed, budget, &writes, out);
+        Event::Claim { reply_to, task, attempt, resumed, budget, account, writes } => {
+            crate::run::claim(domain, env, reply_to, task, attempt, resumed, budget, account, &writes, out);
         }
         Event::ReadAfresh { resource } => crate::writers::read_afresh(domain, env, &resource, out),
         Event::ChargeEffect { funder, maximum } => crate::funders::charge_effect(domain, env, funder, maximum, out),
@@ -1186,6 +1186,7 @@ pub(crate) fn make_admitted(
                 proposal_rows: Box::new([]),
                 instructions: None,
                 llm: new.llm,
+                kept_account: None,
                 refused: Box::new([]),
                 grace: None,
                 created_at: env.wall,

@@ -69,6 +69,7 @@ pub(crate) fn claim(
     attempt: u64,
     resumed: bool,
     budget: u64,
+    account: Option<u32>,
     writes: &[crate::Name],
     out: &mut Queue<Request>,
 ) {
@@ -98,6 +99,9 @@ pub(crate) fn claim(
     let task = task_mut(domain, number).expect("entrance names task");
     task.record.numbers.reserved = task.record.numbers.reserved.checked_add(budget).expect("available budget");
     task.record.run_reserved = budget;
+    if let Some(account) = account {
+        task.record.kept_account = Some(account);
+    }
     task.record.attempt = attempt;
     task.record.run_since = None;
     task.record.retry_notice = None;

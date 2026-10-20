@@ -919,6 +919,8 @@ pub struct TaskRecord {
     /// An agent task's LLM choice, kept as given and changed only by an amendment
     /// (domain/tasks.md, sections 3 and 7).
     pub llm: Option<crate::LlmChoice>,
+    /// Main account from the last successful checked claim, independent of its preference.
+    pub kept_account: Option<u32>,
     /// Messages the current attempt's run refused; untaken by later fences of that attempt.
     pub refused: Box<[u64]>,
     /// A cancel asked this task to finish by a durable deadline.
@@ -1523,6 +1525,8 @@ pub enum Event {
         resumed: bool,
         /// Root-checked allowance reserved from the task at this claim.
         budget: u64,
+        /// Checked main account; success keeps it in this same claim decision.
+        account: Option<u32>,
         /// Complete set of held resources this run will write, in one atomic claim.
         writes: Box<[Name]>,
     },

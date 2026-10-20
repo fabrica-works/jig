@@ -292,7 +292,7 @@ fn choice(
         }
     }
     match main {
-        Some(main) if whole => Ok(Some(tasks::LlmChoice { main, subagents: subagents.into_boxed() })),
+        Some(main) if whole => Ok(Some(tasks::LlmChoice { account: None, main, subagents: subagents.into_boxed() })),
         Some(_) | None => Err(What::Refers),
     }
 }

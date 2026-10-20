@@ -17,6 +17,7 @@ pub fn task_record() -> jig_domain_tasks::TaskRecord {
     use skein_lib::{Duration, Wall};
     let new = task_creation(17);
     task::TaskRecord {
+        kept_account: Some(u32::MAX - 1),
         label: 7,
         flags: task::Flags { conversation: true, listed: false, retention: task::Retention::Kept },
         last_activity: Wall::from_nanos(19),

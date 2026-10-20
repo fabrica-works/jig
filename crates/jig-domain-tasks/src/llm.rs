@@ -30,10 +30,12 @@ pub struct ModelEffort {
     pub effort: Option<u8>,
 }
 
-/// What an agent task's runs' LLMs are (domain/tasks.md, section 3). T10 adds the one LLM account
-/// its creator wants in particular (domain/accounts.md, section 4.3).
+/// What an agent task's runs' LLMs are, including its creator's optional account preference
+/// (domain/tasks.md, section 3; domain/accounts.md, section 4.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct LlmChoice {
+    /// Creator preference, distinct from the task's successfully claimed account.
+    pub account: Option<u32>,
     /// The model its runs use, and their check holds its most costly completion (authority.md,
     /// section 8.3).
     pub main: ModelEffort,
@@ -188,6 +190,6 @@ impl Domain {
                 Some(_) => subagents.push(chosen).expect("one per charter model"),
             }
         }
-        Some(LlmChoice { main: main?, subagents: subagents.into_boxed() })
+        Some(LlmChoice { account: None, main: main?, subagents: subagents.into_boxed() })
     }
 }

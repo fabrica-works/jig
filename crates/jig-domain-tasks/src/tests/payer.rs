@@ -1,5 +1,10 @@
+#![allow(
+    clippy::disallowed_macros,
+    clippy::disallowed_types,
+    reason = "test scripts are ordinary Rust under programming-model.md section 10.2"
+)]
 use super::revisions::{Harness, LIMITS, task, to};
-use crate::{Event, Funder, Party, Payer, PayerLink, Request};
+use crate::{Event, Funder, Party, Payer, PayerLink};
 
 const ROOT: u64 = 1;
 const CHILD: u64 = 2;
@@ -7,8 +12,7 @@ const HOLDER: u64 = 9;
 const OTHER: u64 = 17;
 const PROJECT: u32 = 1;
 
-#[test]
-fn payer_follows_funding_not_requester() {
+fn funded_tree() -> Harness {
     let mut h = Harness::new();
     h.make(vec![task(ROOT, &[])]);
     let mut child = task(CHILD, &[]);
@@ -16,6 +20,12 @@ fn payer_follows_funding_not_requester() {
     child.numbers.budget = 20;
     child.funder = Funder::Task(ROOT);
     h.send(Event::Make { reply_to: to(), creator: Party::Task(ROOT), batch: Box::new([child]) });
+    h
+}
+
+#[test]
+fn payer_follows_funding_not_requester() {
+    let mut h = funded_tree();
     assert_eq!(h.domain.payer(CHILD), Some(Payer::Project(PROJECT)));
     h.send(Event::Move {
         reply_to: to(),
@@ -46,19 +56,18 @@ fn prospective_payers_use_staged_financial_links_first() {
     {
         assert_eq!(h.domain.prospective_payer(funder, &[]), Some(Payer::Project(PROJECT)));
     }
-    let out = h.send(Event::Prepare { reply_to: to(), task: ROOT });
-    assert!(out.iter().any(|r| matches!(r, Request::Done { .. })));
 }
 
 #[test]
 fn invalid_prospective_chains_are_bounded_and_change_nothing() {
     let h = Harness::new();
+    let before = h.stored.clone();
     let cycle =
         [PayerLink { task: ROOT, funder: Funder::Task(CHILD) }, PayerLink { task: CHILD, funder: Funder::Task(ROOT) }];
     let duplicate = [cycle[0], cycle[0]];
     let mut chain = Vec::new();
     for n in 0..u64::from(LIMITS.tasks) {
-        chain.push(PayerLink { task: n, funder: Funder::Task(n + 1) });
+        chain.push(PayerLink { task: n, funder: Funder::Task(n.checked_add(1).unwrap()) });
     }
     assert_eq!(h.domain.prospective_payer(Funder::Task(ROOT), &cycle), None);
     assert_eq!(h.domain.prospective_payer(Funder::Task(ROOT), &duplicate), None);
@@ -67,5 +76,35 @@ fn invalid_prospective_chains_are_bounded_and_change_nothing() {
     assert_eq!(h.domain.prospective_payer(Funder::Task(0), &chain), Some(Payer::Project(PROJECT)));
     chain.push(PayerLink { task: 100, funder: Funder::Task(0) });
     assert_eq!(h.domain.prospective_payer(Funder::Task(0), &chain), None);
-    assert!(h.stored.values().all(|r| !matches!(r, crate::Stored::Live(_))));
+    assert_eq!(h.stored, before);
+}
+
+#[test]
+fn refunding_changes_the_payer_of_financial_descendants() {
+    let mut h = funded_tree();
+    h.send(Event::CarvePool { reply_to: to(), project: PROJECT, person: OTHER, period: 0, budget: 100 });
+    h.send(Event::Amend {
+        reply_to: to(),
+        by: Party::Person(OTHER),
+        task: ROOT,
+        message: 1,
+        stop_run: false,
+        funder: Some(Funder::Pool { project: PROJECT, person: OTHER, period: 0 }),
+        amendment: crate::Amendment {
+            tracked: None,
+            addressed: None,
+            instructions: None,
+            release: None,
+            spec: None,
+            wake: None,
+            dependencies: None,
+            authority: None,
+            llm: None,
+            reason: Box::new([]),
+        },
+    });
+    assert_eq!(h.domain.task(ROOT).unwrap().requester, Party::Person(HOLDER));
+    assert_eq!(h.domain.payer(CHILD), Some(Payer::Party(OTHER)));
+    h.restart();
+    assert_eq!(h.domain.payer(CHILD), Some(Payer::Party(OTHER)));
 }

@@ -415,6 +415,10 @@ fn original_stored_ancestry_fits_at_depth_and_one_under_refuses_the_whole_page()
 
 #[test]
 fn inbox_context_memory_prices_every_reserved_container_and_complete_document_envelope() {
+    // The template envelopes now carry each optional account preference:
+    // 16 document lines × 16 templates × 8 bytes adds 2,048 to 987,136.
+    const TEMPLATE_ENVELOPES: u64 = 989_184;
+
     let (mut core, limits) = fixture();
     waiting(
         &mut core,
@@ -437,7 +441,7 @@ fn inbox_context_memory_prices_every_reserved_container_and_complete_document_en
     assert!(roots > u64::try_from(size_of_val(contexts.get(0).unwrap().goals.as_slice())).unwrap());
     assert_eq!(
         document_with_context_worst_case(&limits),
-        Some(document_worst_case(&limits.documents).unwrap() + bound + 987_136)
+        Some(document_worst_case(&limits.documents).unwrap() + bound + TEMPLATE_ENVELOPES)
     );
     assert!(reads::answer_worst_case(&limits).unwrap() >= document_with_context_worst_case(&limits).unwrap());
     assert!(worst_case(&limits).is_some());

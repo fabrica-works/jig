@@ -78,7 +78,7 @@ pub(crate) fn choice(value: Option<&people::LlmChoice>) -> Option<tasks::LlmChoi
     for subagent in &value.subagents {
         subagents.push(model_effort(*subagent)).expect("same number of sub-agents");
     }
-    Some(tasks::LlmChoice { main: model_effort(value.main), subagents: subagents.into_boxed() })
+    Some(tasks::LlmChoice { account: None, main: model_effort(value.main), subagents: subagents.into_boxed() })
 }
 
 fn model_effort(value: people::ModelEffort) -> tasks::ModelEffort {

@@ -59,6 +59,7 @@ fn a_recurring_task_continues_across_a_period_reset() {
 fn an_occurrence_keeps_its_members_llm_choice() {
     let mut world = World::new(217, LIMITS);
     let llm = LlmChoice {
+        account: None,
         main: ModelEffort { model: 0, effort: Some(1) },
         subagents: Box::new([ModelEffort { model: 2, effort: Some(0) }]),
     };

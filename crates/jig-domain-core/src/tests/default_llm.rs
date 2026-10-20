@@ -6,7 +6,11 @@ use super::*;
 const FUNDER: tasks::Funder = tasks::Funder::Period { project: 1, period: 1 };
 
 fn chosen(effort: u8) -> tasks::LlmChoice {
-    tasks::LlmChoice { main: tasks::ModelEffort { model: 0, effort: Some(effort) }, subagents: Box::new([]) }
+    tasks::LlmChoice {
+        account: None,
+        main: tasks::ModelEffort { model: 0, effort: Some(effort) },
+        subagents: Box::new([]),
+    }
 }
 
 #[test]

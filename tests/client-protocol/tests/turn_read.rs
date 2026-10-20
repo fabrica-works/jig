@@ -110,7 +110,7 @@ fn a_page_sized_turn_is_read_whole_once() {
     );
     let (mut story, mut archive) = committed_turn(story);
     let (single, activity) = story.turn_row_costs(&archive, body);
-    assert!(single <= fixtures::TURN_OVERLAP_BYTES);
+    assert!(single <= fixtures::TURN_OVERLAP_BYTES, "single row: {single}, activity: {activity}");
     assert!(fixtures::TURN_OVERLAP_BYTES < activity);
     assert_eq!(archive.turn, c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge { bytes } });
     let single_turn = read_archive(&mut story, &archive);

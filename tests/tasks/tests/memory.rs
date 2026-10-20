@@ -83,6 +83,7 @@ impl Measured {
         self.event(Event::Prepare { reply_to, task: number });
         let reply_to = self.to();
         self.event(Event::Claim {
+            account: None,
             reply_to,
             task: number,
             attempt: number,
@@ -157,6 +158,7 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
             m.event(Event::Prepare { reply_to, task: number });
             let reply_to = m.to();
             m.event(Event::Claim {
+                account: None,
                 reply_to,
                 task: number,
                 attempt: number + 10,

@@ -482,6 +482,7 @@ pub(super) fn route_claim_prepared(
         };
         let resumed = earlier_transcript && turned;
         work.push(Event::Tasks(tasks::Event::Claim {
+            account: None,
             reply_to: ReplyTo::new(Token::new(task)),
             task,
             attempt,

@@ -248,7 +248,9 @@ fn grant(core: &mut Core, env: &Env<Limits>, source: u32) {
 }
 #[test]
 fn usable_follows_a_source_the_party_or_the_deployment_holds() {
-    let (mut core, env) = fixture(mixed());
+    let mut records = own_records();
+    records.extend([account(DEPLOYMENT, accounts::Holder::Deployment), source(DEPLOYMENT, 41, 0, accounts::Kind::Key)]);
+    let (mut core, env) = fixture(records);
     assert!(!document(&core, &env, ALICE).usable);
     grant(&mut core, &env, FIRST_SOURCE);
     assert!(document(&core, &env, ALICE).usable);

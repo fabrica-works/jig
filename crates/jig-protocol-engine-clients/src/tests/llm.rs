@@ -9,6 +9,7 @@ use skein_lib::{Queue, Reader, Writer};
 
 fn choice() -> t::LlmChoice {
     t::LlmChoice {
+        account: None,
         main: t::ModelEffort { model: 0, effort: Some(1) },
         subagents: Box::new([t::ModelEffort { model: 1, effort: None }]),
     }

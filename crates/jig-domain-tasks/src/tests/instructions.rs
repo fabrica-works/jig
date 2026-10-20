@@ -47,7 +47,15 @@ fn an_instruction_amendment_is_heard_whole_and_keeps_immutable_settings_across_r
     let mut h = Harness::new();
     h.make(Vec::from([task(1, &[])]));
     h.send(Event::Prepare { reply_to: to(), task: 1 });
-    h.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    h.send(Event::Claim {
+        account: None,
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     h.send(Event::Started { task: 1, attempt: 1 });
     let out = amend(&mut h, change(b"Use the new evidence"));
     assert!(out.iter().any(|r| match r {

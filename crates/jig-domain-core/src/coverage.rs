@@ -14,6 +14,10 @@ pub(crate) const fn payer(value: tasks::Payer) -> accounts::Use {
 /// Explicit uses replace defaults, including an empty list. Membership is read now, so a
 /// project becoming shared cannot keep using a person's plan through an old `SetUses`.
 pub(crate) fn serves(people: &people::Domain, account: &accounts::Account, payer: accounts::Use) -> bool {
+    match account.holder() {
+        accounts::Holder::Party(holder) if people.kind(holder) != Some(people::Kind::Person) => return false,
+        accounts::Holder::Party(_) | accounts::Holder::Deployment => {}
+    }
     let known = match payer {
         accounts::Use::Party(party) => people.kind(party).is_some(),
         accounts::Use::Project(project) => people.project_members(project).is_some(),
@@ -56,7 +60,7 @@ pub(crate) fn serves(people: &people::Domain, account: &accounts::Account, payer
         }
         accounts::Use::Project(project) => {
             let Some(members) = people.project_members(project) else { return false };
-            if members.is_empty() {
+            if members.is_empty() && !explicit {
                 return false;
             }
             for member in members {

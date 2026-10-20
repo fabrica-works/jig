@@ -182,6 +182,10 @@ of paying. The tool keeps the status, body, error code and request id.
 | a refresh's `invalid_grant`, `invalid_refresh_token`, `token_expired`, `refresh_token_expired`, `refresh_token_invalidated`, `refresh_token_reused` | clear the unusable tokens; sign in again with the issued client id |
 | a refresh's `invalid_client` | fix the client's configuration |
 
+- **An unknown limit reset stays unknown.** No new grant or restart lifts
+  it: its holder resumes it, replaces the LLM key or signs in again
+  (accounts.md, 3.5). An explicit zero is a supplied reset; an absent reset
+  is not zero. This supersedes ruling 130's mapping, with no guessed delay.
 - **Never erase credentials** for a temporary network or service
   failure.
 

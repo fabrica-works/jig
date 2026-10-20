@@ -243,7 +243,11 @@ A source's state is one of:
 - **limited:** the LLM provider says it is spent, with when it resets
   where the provider says, and never a guess (providers.md, 2.5). No new
   run starts on it until then, or, with no time given, until its holder
-  resumes it. Text a person reads says "limited";
+  resumes it, replaces its LLM key or signs in again. An absent reset remains
+  absent across new grants and restarts; it is never converted to zero or
+  a guessed retry deadline. An explicit zero is a supplied reset. This
+  retires ruling 130's absent-reset-to-zero mapping. Text a person reads
+  says "limited";
 - **refused:** the LLM provider refuses the account for what is asked:
   not eligible, a scope not granted, plan usage declined at sign-in, a
   key it does not take. It stays so until its holder acts: signs in
@@ -329,8 +333,12 @@ naming it.
 
 A run's task has one funder, and the chain of funders ends at a party's
 pool or a project's period (authority.md, section 7). That end is the
-run's **payer**: the party who started the work, or the project whose
-automatic work it is.
+run's **payer**: that pool's party, or that period's project. A recurring
+allotment pays as its project. Financial links decide it, independently of
+the requester and delegation tree; a Move or refunding changes it for every
+descendant funded through the changed task. Prospective checks follow
+staged financial links before live ones, within the tasks child's bounds,
+and refuse unknown or cyclic task chains without writing anything.
 
 ### 4.2 Uses
 

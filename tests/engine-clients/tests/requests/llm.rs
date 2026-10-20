@@ -115,6 +115,7 @@ fn a_create_naming_a_model_and_its_effort_keeps_them_by_configuration_s_indices(
     assert_eq!(
         live_row(&world, created.first()).llm,
         Some(tasks::LlmChoice {
+            account: None,
             main: tasks::ModelEffort { model: SCRIPTED, effort: Some(HIGH) },
             subagents: Box::new([tasks::ModelEffort { model: SCRIPTED, effort: Some(LOW) }]),
         })
@@ -144,15 +145,21 @@ fn a_model_the_core_refuses_comes_back_by_its_name() {
 fn an_amend_naming_a_choice_changes_the_one_the_task_s_next_run_takes() {
     let (mut peer, mut world, bearer) = amendment_setup(363);
     let before = live_row(&world, 2);
-    let default =
-        tasks::LlmChoice { main: tasks::ModelEffort { model: SCRIPTED, effort: Some(LOW) }, subagents: Box::new([]) };
+    let default = tasks::LlmChoice {
+        account: None,
+        main: tasks::ModelEffort { model: SCRIPTED, effort: Some(LOW) },
+        subagents: Box::new([]),
+    };
     assert_eq!(before.llm, Some(default), "the charter's default, recorded at creation");
     let revision = before.revisions.spec;
     let llm = choice((b"scripted", Some(b"high")), &[]);
     let socket = peer.post(b"/jig/v1/request", keyed([65; 16], &amend(revision, llm)), Some(&bearer));
     assert_eq!(route_real_core(&mut peer, &mut world), [[65; 16]], "core reply: {:?}", world.people_answers.last());
     let w::Final::Done(_) = final_answer(&peer, socket) else { panic!("amended") };
-    let chosen =
-        tasks::LlmChoice { main: tasks::ModelEffort { model: SCRIPTED, effort: Some(HIGH) }, subagents: Box::new([]) };
+    let chosen = tasks::LlmChoice {
+        account: None,
+        main: tasks::ModelEffort { model: SCRIPTED, effort: Some(HIGH) },
+        subagents: Box::new([]),
+    };
     assert_eq!(live_row(&world, 2).llm, Some(chosen));
 }

@@ -200,6 +200,7 @@ pub fn creation_spec() -> jig_domain_tasks::Spec {
 pub fn task_llm() -> jig_domain_tasks::LlmChoice {
     use jig_domain_tasks::ModelEffort;
     jig_domain_tasks::LlmChoice {
+        account: Some(u32::MAX),
         main: ModelEffort { model: 63, effort: Some(u8::MAX) },
         subagents: Box::new([ModelEffort { model: 0, effort: None }, ModelEffort { model: 7, effort: Some(1) }]),
     }

@@ -266,9 +266,9 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
 fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
-    // Account changes and the enlarged routing room, plus one people-pending-sized
-    // map of LLM key flights in the core.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_651_695_583 });
+    // Account-change/key-flight routing plus task preferences/pins, payer contexts,
+    // template carriers, codec bounds and coverage proofs.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_653_205_375 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

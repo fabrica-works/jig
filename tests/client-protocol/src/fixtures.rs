@@ -252,8 +252,9 @@ pub const TURN_TOOL: &[u8] = b"read";
 pub const TURN_INPUT: &[u8] = b"{ \"path\": \"a\" }";
 // The source text and call fields together fit the ordinary 32-byte text budget.
 pub const TURN_TEXT: &[u8] = b"abc";
-// The measured single row fits this budget; its joined activity line does not.
-pub const TURN_OVERLAP_BYTES: u64 = 2352;
+// The single row's task owner adds 16 bytes for its preference and kept account to the
+// previous measured 2,352 bytes; its joined activity line remains past this budget.
+pub const TURN_OVERLAP_BYTES: u64 = 2368;
 #[must_use]
 pub fn turn_overlap_limits() -> jig_test_domain::Limits {
     let mut limits = owner_limits();

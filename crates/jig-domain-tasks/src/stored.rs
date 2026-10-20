@@ -601,6 +601,15 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             return false;
         }
     }
+    if task.kept_account.is_some() {
+        if task.attempt == 0 {
+            return false;
+        }
+        match task.executor {
+            Executor::Agent { .. } => {}
+            Executor::Procedure { .. } | Executor::Person(_) => return false,
+        }
+    }
     if let Some(choice) = &task.llm {
         // Restore checks the choice's shape; configuration is checked as a choice is given.
         let agent = match task.executor {
