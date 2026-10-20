@@ -318,10 +318,10 @@ handles, as every presentation does (sections 7 and 8).
   - *is bounded:* requests held, and their bytes, a family's included. A
     `Send` past them is answered at once, refused by the client's limit,
     and never queued.
-- **A request carrying a value,** an LLM account's key added or
-  replaced (contract.md, 3.2), is sent once and never kept, so that no
-  value is ever in the small store (`../../protocol/client.md`, section
-  5):
+- **A request carrying a value,** such as an LLM account's key added or
+  replaced (contract.md, 3.2), or an application's request's credential,
+  is sent once and never kept, so that no value is ever in the small
+  store (`../../protocol/client.md`, section 5):
   - *beside the table:* it carries a name, the engine key its caller
     gives and never makes from the value (contract.md, 3.1), and goes
     as one exchange: never in a `Save`, never parked, never sent again

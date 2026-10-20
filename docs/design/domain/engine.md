@@ -525,7 +525,8 @@ When an agent task is due (tasks.md, 5.2), the core:
      it is sent, or a program source's name, which has its agent run the
      program backend (smith's `protocol/programs.md`, section 3); and
      the application's credentials its connectors named (12.1).
-     Each names whose table the protocol layer fills its value from.
+     Each names its form; the form selects the table the protocol layer
+     fills its value from (`../protocol/channel.md`, section 8).
 
 ### 7.2 Transcripts
 
@@ -1122,7 +1123,8 @@ them beside LLM accounts, and lends them as it lends a source's value
   valid (authority.md, 8.3).
 - **Lent to runs:** a connector names those a run's workspace needs as
   it gathers its items (connectors.md, section 10); the assignment
-  carries them as grants, each naming the application's table (7.1;
+  carries them as grants, each naming the application form, which
+  selects the application's table (7.1;
   `../protocol/channel.md`, section 8); and they follow their attempts
   as an account's do (section 8).
 - **Unauthorized, limited and refused are LLM accounts' only.** A

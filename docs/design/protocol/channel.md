@@ -255,14 +255,14 @@ answer, and a **notice** is not answered.
 
 | Record | Fields | Shape |
 |---|---|---|
-| assignment | task, attempt; the run's identity, 16 bytes (section 7); the workstream key and the workspace's items, the application's bytes; whether to save unfinished work; the ask for live content, a boolean for each kind (`../domain/hosts.md`, section 2); the charter, smith's bytes; the transcript, when the run resumes: its current window's turns, smith's bytes, from the last that opens a window (6.1); the calls committed since its last turn, each with its name, its tool and its answer; the start's messages: those waiting in the task's inbox, oldest first, as many as the run's inbox takes, each with its name, its sender's label and its words, the rest relayed as message records as the run reads (`../domain/tasks.md`, 8.2); its credential grants, each naming whose table its value comes from, with their values: a credential with its scheme, or a program source's name (section 8) | call |
+| assignment | task, attempt; the run's identity, 16 bytes (section 7); the workstream key and the workspace's items, the application's bytes; whether to save unfinished work; the ask for live content, a boolean for each kind (`../domain/hosts.md`, section 2); the charter, smith's bytes; the transcript, when the run resumes: its current window's turns, smith's bytes, from the last that opens a window (6.1); the calls committed since its last turn, each with its name, its tool and its answer; the start's messages: those waiting in the task's inbox, oldest first, as many as the run's inbox takes, each with its name, its sender's label and its words, the rest relayed as message records as the run reads (`../domain/tasks.md`, 8.2); its credential grants, each naming its form, which selects the table its value comes from, with their values: a credential with its scheme, or a program source's name (section 8) | call |
 | message | task, attempt; the message's name; its sender's label; its words | notice |
 | relayed | task, attempt; the call's name; the engine's answer: its text for the LLM and whether it is an error, or busy, to ask again after a backoff | answer to a call |
 | turn kept | task, attempt; the turn's number | notice |
 | turn busy | task, attempt; the turn's number: send it again after a backoff | notice |
 | acknowledge | task, attempt: the answer is durable, or not wanted | notice |
 | cancel | task, attempt | notice, at most one per attempt |
-| grant | task, attempt; whose table its value comes from, jig's accounts' or the application's; its number there, generation, how long it is valid, if it lapses; its value: a credential with its scheme, a program source's name, or the application's secret (section 8) | notice |
+| grant | task, attempt; its form, which selects the table its value comes from, jig's accounts' or the application's; its number there, generation, how long it is valid, if it lapses; its value: a credential with its scheme, a program source's name, or the application's secret (section 8) | notice |
 | sources | the program sources this worker may be given, each by its name, the whole list: a source not in it is none of the worker's | notice, after each hello and on each change |
 | check | a program source's name: check its login now, at its holder's asking | notice; `logins` follows |
 | sign out | a program source's name: run the program's own sign-out in the source's configuration directory (smith's `protocol/hosts.md`, section 2) | call, answered by `signed out` |
@@ -498,15 +498,16 @@ holds, and neither of its components reads them.
 
 - **The domains name a credential grant** by its number (an LLM
   account's source, or the application's for one of its credentials)
-  and a generation, with how long it is valid where it lapses, and never
-  hold its value (`../domain/engine.md`, section 12).
+  and a generation, with its form and how long it is valid where it
+  lapses, and never hold its value (`../domain/engine.md`, section 12).
 - **Tables of the protocol layer hold the values:** jig's accounts'
   table, LLM accounts' (`llm.md`, 5.3), and the application's own table,
   its credentials' (below). `jig-protocol-engine-workers` fills a grant's
   value in as it encodes an assignment or a grant record, reading it from
-  the table the grant names, through its protocol layer. A grant whose
-  generation the table no longer holds is left out as it is encoded: a
-  newer one follows it.
+  the table its form selects, through its protocol layer. A value whose
+  arm or credential scheme differs from the grant's form is not sent.
+  A grant whose generation the table no longer holds is left out as it
+  is encoded: a newer one follows it.
 - **A value crosses as one of:** a credential, its scheme, `bearer` or
   `key`, and its bytes, secret, with no account's id (`llm.md`, 5.3);
   a program source's name, which is no secret and names the source's
@@ -533,9 +534,11 @@ holds, and neither of its components reads them.
   12.1; `../domain/connectors.md`, section 10). Their values are the
   application's protocol layer's, in its table on the engine, from a
   source of its own, and are taken out on the worker into its table
-  there, for its workspace. A grant names whose table its value comes
-  from: jig's accounts' or the application's. The notices limited,
-  refused and unauthorized are LLM accounts' only
+  there, for its workspace. A grant names its form, from which its table
+  follows: jig's accounts' for an LLM credential, the application's for
+  the application form. The worker's link derives the form from the
+  value as it decodes it, and hands that form to smith with the grant.
+  The notices limited, refused and unauthorized are LLM accounts' only
   (`../domain/engine.md`, section 12). A worker's configuration holds no
   credential but its own secret; a program's login is the program's own,
   in its configuration directory, which the worker never reads

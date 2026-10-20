@@ -155,14 +155,15 @@ Section 9 lists what the engine's domain owes the client, and where
   at once, and nothing is kept or sent (client.md, section 6).
 - **A compound request is one keyed request** (3.4): one key, one ask,
   one answer.
-- **A request carrying a value,** an LLM account's key added or replaced
-  (3.2), is never kept by the client (client.md, section 6): it carries
-  a name, goes once, and its caller asks again under that name. The
+- **A request carrying a value,** such as an LLM account's key added or
+  replaced (3.2), or an application's request's credential, is never
+  kept by the client (client.md, section 6): it carries a name, goes
+  once, and its caller asks again under that name. The
   engine keeps the value in its secrets' store before the domain sees
-  the request, so the request, its answer and every document name it
-  only by the request that carried it (`../../protocol/client.md`,
-  section 5). Its name is its caller's, never made from the value, so
-  that a name carries no secret. It is never in a compound request.
+  the request, handing the domain only a reference to the value and
+  its digest (`../../protocol/client.md`, section 5).
+  Its name is its caller's, never made from the value, so that a name
+  carries no secret. It is never in a compound request.
 
 ### 3.2 jig's requests
 
