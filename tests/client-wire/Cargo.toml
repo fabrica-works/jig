@@ -8,6 +8,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dev-dependencies]
+jig-client-test-records = { path = "../../testing/jig-client-test-records" }
 jig-client-domain.workspace = true
 jig-client-test-domain.workspace = true
 jig-core-world = { path = "../core" }

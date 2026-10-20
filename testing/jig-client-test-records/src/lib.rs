@@ -384,7 +384,9 @@ pub fn fact_bytes(value: &w::Fact) -> Box<[u8]> {
 
 mod live;
 pub use live::*;
+mod accounts;
 mod live_values;
+pub use accounts::*;
 pub use live_values::*;
 
 mod objects;

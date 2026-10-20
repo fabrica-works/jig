@@ -40,7 +40,35 @@ enum OwnerAccountPlace { directory, file }
 enum OwnerAccountUnread { unreadable, refused, failed, stalled, too_large }
 record OwnerAccountStateUnloaded { at: OwnerAccountPlace why: OwnerAccountUnread }
 enum OwnerAccountState { asking, granted, later: OwnerAccountStateLater, sign_in_again, misconfigured, unloaded: OwnerAccountStateUnloaded, cancelled, closing }
-record OwnerAccount { number: u32 generation: option u64 state: OwnerAccountState usable: bool expiring: bool attention: bool spent_until: option u64 runs: bytes 16777216 waiting: bytes 16777216 cut: bool }
+record OwnerAccountUseParty { party: u64 }
+record OwnerAccountUseProject { project: u32 }
+enum OwnerAccountUse { party: OwnerAccountUseParty, project: OwnerAccountUseProject }
+record OwnerAccountHolderParty { party: u64 }
+enum OwnerAccountHolder { deployment, party: OwnerAccountHolderParty }
+enum OwnerAccountKind { sign_in, key, program, none }
+enum OwnerAccountBound { accounts, holder_accounts, sources, sign_ins }
+enum OwnerAccountKeyFailure { too_long, not_stored }
+record OwnerAccountRefusalNotKept { why: OwnerAccountKeyFailure }
+record OwnerAccountRefusalLimit { bound: OwnerAccountBound }
+record OwnerAccountRefusalHeld { provider: u32 }
+record OwnerAccountRefusalProvider { provider: u32 }
+record OwnerAccountRefusalKind { kind: OwnerAccountKind }
+enum OwnerAccountRefusal { configured, not_limited, uses, not_kept: OwnerAccountRefusalNotKept, limit: OwnerAccountRefusalLimit, held: OwnerAccountRefusalHeld, provider: OwnerAccountRefusalProvider, subject, unknown, numbers, kind: OwnerAccountRefusalKind, closing, not_started }
+record OwnerAccountFailureLater { after: option duration }
+record OwnerAccountFailureMissingScope { scope: u32 }
+record OwnerAccountFailureUnloaded { at: OwnerAccountPlace why: OwnerAccountUnread }
+enum OwnerAccountFailure { later: OwnerAccountFailureLater, sign_in_again, missing_scope: OwnerAccountFailureMissingScope, misconfigured, unloaded: OwnerAccountFailureUnloaded, cancelled }
+record OwnerAccountEndMade { account: u32 declined: bool }
+record OwnerAccountEndRenewed { account: u32 declined: bool }
+record OwnerAccountEndRefused { refusal: OwnerAccountRefusal }
+record OwnerAccountEndFailed { failure: OwnerAccountFailure }
+enum OwnerAccountEnd { made: OwnerAccountEndMade, renewed: OwnerAccountEndRenewed, refused: OwnerAccountEndRefused, failed: OwnerAccountEndFailed }
+record OwnerAccountSource { place: u32 number: u32 kind: OwnerAccountKind state: OwnerAccountState usable: bool expiring: bool attention: bool spent_until: option u64 }
+record OwnerAccountLine { number: u32 place: u32 uses: option list 16 OwnerAccountUse plan: bool provider: option u32 display: DocumentText holder: OwnerAccountHolder sources: bytes 16777216 cut: bool }
+record OwnerAccountSignIn { source: u32 provider: u32 holder: OwnerAccountHolder }
+record OwnerAccountLastEnd { source: u32 end: OwnerAccountEnd }
+record OwnerAccounts { accounts: bytes 16777216 signing: bytes 16777216 last_end: option OwnerAccountLastEnd usable: bool settled: bool cut: bool }
+record OwnerAccount { number: u32 place: u32 uses: option list 16 OwnerAccountUse plan: bool provider: option u32 display: DocumentText holder: OwnerAccountHolder sources: bytes 16777216 generation: option u64 state: OwnerAccountState usable: bool expiring: bool attention: bool spent_until: option u64 runs: bytes 16777216 waiting: bytes 16777216 cut: bool }
 record OwnerDeployment { store: StoreFill hosts: bytes 16777216 attempts: bytes 16777216 accounts: bytes 16777216 tasks: OwnerCapacity workers: OwnerCapacity attempts_capacity: OwnerCapacity waiting_attempts: u32 proposals: OwnerCapacity projects: list 32 OwnerProjectCapacity grace_bound: duration hello_refusals: list 32 OwnerHelloRefusalLine hosts_forgotten: u64 hello_refusals_forgotten: u64 person_room_refusals: list 32 OwnerPersonCapacityRefusal person_room_refusals_forgotten: u64 person_answer_retention: duration task_room_refusals: list 32 OwnerTaskCapacityRefusal task_room_refusals_forgotten: u64 cut: bool connectors: list 32 u16 connectors_cut: bool }
 # Small store (protocol/client.md, 10); TableEntry.request has Keyed.request's ceiling.
 versioned record Kept { store_version: u16 record: bytes 65536 }
@@ -54,4 +82,4 @@ record Chips { rows: bytes 16777216 }
 record OwnerInbox { party: u64 needs: bytes 16777216 updates: bytes 16777216 next: option OwnerInboxCursor cached_needs: u32 cached_updates: Count results_seen: u64 updates_time_complete: bool selection: option bytes 16777216 }
 
 # A delivery preserves its contract variant and the whole document (ruling 211).
-enum DeliveryValue { owner_project: OwnerProject, me: Me, task: boxed Task, owner_proposal: OwnerProposal, tree: Tree, owner_tree: OwnerTree, chips: Chips, inbox: Inbox, owner_inbox: OwnerInbox, tasks: Tasks, run: RunText, run_state: RunState, deployment: Deployment, owner_deployment: OwnerDeployment }
+enum DeliveryValue { owner_project: OwnerProject, me: Me, task: boxed Task, owner_proposal: OwnerProposal, tree: Tree, owner_tree: OwnerTree, chips: Chips, inbox: Inbox, owner_inbox: OwnerInbox, tasks: Tasks, run: RunText, run_state: RunState, deployment: Deployment, owner_deployment: OwnerDeployment, owner_accounts: OwnerAccounts }

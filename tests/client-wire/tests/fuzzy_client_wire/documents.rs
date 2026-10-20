@@ -241,5 +241,34 @@ fn account_records(bytes: &[u8]) {
     check!(OwnerAccountStateUnloaded, bytes);
     check!(OwnerAccountState, bytes);
     check!(OwnerAccount, bytes);
+    check!(OwnerAccountUseParty, bytes);
+    check!(OwnerAccountUseProject, bytes);
+    check!(OwnerAccountUse, bytes);
+    check!(OwnerAccountHolderParty, bytes);
+    check!(OwnerAccountHolder, bytes);
+    check!(OwnerAccountKind, bytes);
+    check!(OwnerAccountBound, bytes);
+    check!(OwnerAccountKeyFailure, bytes);
+    check!(OwnerAccountRefusalNotKept, bytes);
+    check!(OwnerAccountRefusalLimit, bytes);
+    check!(OwnerAccountRefusalHeld, bytes);
+    check!(OwnerAccountRefusalProvider, bytes);
+    check!(OwnerAccountRefusalKind, bytes);
+    check!(OwnerAccountRefusal, bytes);
+    check!(OwnerAccountFailureLater, bytes);
+    check!(OwnerAccountFailureMissingScope, bytes);
+    check!(OwnerAccountFailureUnloaded, bytes);
+    check!(OwnerAccountFailure, bytes);
+    check!(OwnerAccountEndMade, bytes);
+    check!(OwnerAccountEndRenewed, bytes);
+    check!(OwnerAccountEndRefused, bytes);
+    check!(OwnerAccountEndFailed, bytes);
+    check!(OwnerAccountEnd, bytes);
+    check!(OwnerAccountSource, bytes);
+    check!(OwnerAccountLine, bytes);
+    check!(OwnerAccountSignIn, bytes);
+    check!(OwnerAccountLastEnd, bytes);
+    check!(OwnerAccounts, bytes);
+
     check!(OwnerDeployment, bytes);
 }

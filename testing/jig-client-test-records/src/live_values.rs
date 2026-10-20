@@ -1,6 +1,6 @@
 use super::{limits, owner_chip_records, w};
 use skein_lib::{Duration, List, Writer};
-fn rows<T>(items: impl IntoIterator<Item = T>) -> List<T> {
+pub(super) fn rows<T>(items: impl IntoIterator<Item = T>) -> List<T> {
     let items: Vec<_> = items.into_iter().collect();
     let mut out = List::with_capacity(u32::try_from(items.len()).expect("fixture size"));
     for item in items {
@@ -8,12 +8,12 @@ fn rows<T>(items: impl IntoIterator<Item = T>) -> List<T> {
     }
     out
 }
-fn encoded(measure: u32, write: impl FnOnce(&mut Writer) -> Result<(), skein_lib::Overflow>) -> Box<[u8]> {
+pub(super) fn encoded(measure: u32, write: impl FnOnce(&mut Writer) -> Result<(), skein_lib::Overflow>) -> Box<[u8]> {
     let mut writer = Writer::new(usize::try_from(measure).expect("fixture size"));
     write(&mut writer).expect("literal record encodes");
     writer.finish()
 }
-fn pieces(values: impl IntoIterator<Item = Box<[u8]>>) -> Box<[u8]> {
+pub(super) fn pieces(values: impl IntoIterator<Item = Box<[u8]>>) -> Box<[u8]> {
     let values: Vec<_> = values.into_iter().collect();
     let size = values.iter().map(|v| v.len().checked_add(4).expect("literal piece size")).sum();
     let mut writer = Writer::new(size);
@@ -342,12 +342,18 @@ pub fn deployment_rows_record() -> w::OwnerDeployment {
         &l,
         w::OwnerAccountParts {
             number: 41,
+            place: 0,
+            uses: None,
+            provider: Some(3),
+            display: super::wire_text(b"Deployment account"),
+            holder: w::OwnerAccountHolder::Deployment,
+            sources: Box::from([]),
             generation: Some(43),
             state: w::OwnerAccountState::Later(
                 w::OwnerAccountStateLater::new(&l, w::OwnerAccountStateLaterParts { until: Some(47) })
                     .expect("literal"),
             ),
-            skein_bools: [false, true, false, true],
+            skein_bools: [false, false, true, false, true],
             spent_until: Some(53),
             runs: pieces([encoded(chip.measure(), |w| chip.encode(w))]),
             waiting: pieces([encoded(chip.measure(), |w| chip.encode(w))]),

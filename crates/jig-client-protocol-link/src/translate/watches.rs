@@ -91,6 +91,7 @@ pub fn delivery(bytes: &[u8], limits: &Limits) -> Result<c::Delivery, Undecodabl
         Err(problem) => return Err(documents::classify(problem)),
     };
     Ok(match value {
+        w::DeliveryValue::OwnerAccounts(_) => return Err(Undecodable::Malformed),
         w::DeliveryValue::OwnerProject(value) => {
             c::Delivery::OwnerProject(Box::new(documents::owner_project(value, limits)?))
         }

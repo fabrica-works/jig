@@ -608,6 +608,7 @@ dependencies = [
  "jig-client-protocol-wire",
  "jig-client-test-domain",
  "jig-client-test-protocol-wire",
+ "jig-client-test-records",
  "jig-core-world",
  "skein-codegen",
  "skein-lib",

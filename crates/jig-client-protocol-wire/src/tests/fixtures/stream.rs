@@ -169,9 +169,16 @@ pub fn owner_account(limits: &Limits, state: OwnerAccountState) -> OwnerAccount 
         limits,
         OwnerAccountParts {
             number: u32::MAX,
+            place: 0,
+            uses: None,
+            provider: None,
+            display: DocumentText::new(limits, DocumentTextParts { bytes: Box::from([]), cut: false })
+                .expect("empty display"),
+            holder: OwnerAccountHolder::Deployment,
+            sources: Box::from([]),
             generation: Some(u64::MAX),
             state,
-            skein_bools: [true, false, true, true],
+            skein_bools: [false, true, false, true, true],
             spent_until: None,
             runs: Box::from([]),
             waiting: Box::from([]),
