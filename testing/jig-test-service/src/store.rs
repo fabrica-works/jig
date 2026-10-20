@@ -152,7 +152,10 @@ impl Store {
     pub(super) fn secrets(&mut self, owner: Token, request: protocol::Secrets) -> Option<protocol::Event> {
         let immediate = match &request {
             protocol::Secrets::Get { .. } => true,
-            protocol::Secrets::Keep { .. } | protocol::Secrets::Erase { .. } | protocol::Secrets::Load { .. } => false,
+            protocol::Secrets::Keep { .. }
+            | protocol::Secrets::Replace { .. }
+            | protocol::Secrets::Erase { .. }
+            | protocol::Secrets::Load { .. } => false,
         };
         protocol::down(
             &mut self.component,
@@ -437,6 +440,7 @@ pub(super) fn answer(engine: &mut crate::Engine) {
             protocol::Event::Opened { .. } => engine.store.opened = true,
             protocol::Event::OpenRefused { .. } => crate::stop::unavailable(engine, b"deployment"),
             event @ (protocol::Event::Kept { .. }
+            | protocol::Event::Stale { .. }
             | protocol::Event::Erased { .. }
             | protocol::Event::Secret { .. }
             | protocol::Event::SecretsLoaded { .. }) => engine.store.secrets.push(event),

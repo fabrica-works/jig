@@ -148,3 +148,62 @@ fn the_sweep_continues_one_bounded_page_per_fire() {
         assert_eq!(get(&mut store, SecretOwner::SignIn, number), None);
     }
 }
+fn record(byte: u8) -> Secret {
+    Secret::new(Box::new([byte; 48]))
+}
+fn digest(byte: u8) -> [u8; 32] {
+    skein_lib::sha256::digest(record(byte).expose())
+}
+fn replace(store: &mut Store, value: u8, replaces: Option<[u8; 32]>) -> Box<[Event]> {
+    ask(store, Secrets::Replace { owner: SecretOwner::Source, number: 4, value: record(value), replaces })
+}
+#[test]
+fn a_record_replaces_the_one_whose_digest_it_states() {
+    let mut store = fixtures::opened();
+    let [Event::Kept { owner: OWNER }] = &*replace(&mut store, 1, None) else {
+        panic!("the first record kept");
+    };
+    let [Event::Kept { owner: OWNER }] = &*replace(&mut store, 2, Some(digest(1))) else {
+        panic!("its successor kept");
+    };
+    assert_eq!(get(&mut store, SecretOwner::Source, 4), Some(record(2)));
+    assert_eq!(get(&mut store, SecretOwner::SignIn, 4), None);
+}
+#[test]
+fn a_replace_stating_another_digest_is_stale_and_writes_nothing() {
+    let mut store = fixtures::opened();
+    replace(&mut store, 1, None);
+    for (label, stated) in [("another record", Some(digest(3))), ("no record", None)] {
+        let [Event::Stale { owner: OWNER }] = &*replace(&mut store, 2, stated) else {
+            panic!("stale: {label}");
+        };
+        assert_eq!(get(&mut store, SecretOwner::Source, 4), Some(record(1)), "{label}");
+    }
+    assert_eq!(store.stores.secrets.last(), 1);
+    let [Event::Stale { owner: OWNER }] = &*replace(&mut fixtures::opened(), 2, Some(digest(1))) else {
+        panic!("stale: nothing held");
+    };
+}
+#[test]
+fn a_replace_past_its_value_bound_stops_before_its_digest_is_read() {
+    let mut store = fixtures::opened();
+    store.limits.secrets.value = 47;
+    assert!(replace(&mut store, 2, Some(digest(1))).is_empty());
+    assert_eq!(store.phase, Phase::Stopped);
+}
+#[test]
+fn a_sources_records_page_apart_from_digests_and_outlive_the_sweep() {
+    let mut store = kept();
+    replace(&mut store, 1, None);
+    let events = ask(&mut store, Secrets::Load { owner: SecretOwner::Source, after: None });
+    let [Event::SecretsLoaded { rows, next: None, .. }] = &*events else {
+        panic!("one page: {events:?}");
+    };
+    let [row] = &**rows else {
+        panic!("the source's record alone");
+    };
+    assert_eq!((row.owner, row.number, &row.value), (SecretOwner::Source, 4, &record(1)));
+    restore_people(&mut store);
+    assert_eq!(get(&mut store, SecretOwner::SignIn, 4), None);
+    assert_eq!(get(&mut store, SecretOwner::Source, 4), Some(record(1)));
+}

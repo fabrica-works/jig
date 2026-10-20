@@ -649,6 +649,7 @@ impl Clients {
                 kit::SecretsAnswer::Got { owner, value }
             }
             Event::SecretsLoaded { .. }
+            | Event::Stale { .. }
             | Event::Opened { .. }
             | Event::OpenRefused { .. }
             | Event::Committed { .. }

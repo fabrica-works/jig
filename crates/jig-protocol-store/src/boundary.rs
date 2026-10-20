@@ -99,15 +99,41 @@ pub enum SecretOwner {
     Service,
     /// The application's own record, under its tag, by its number.
     Application,
+    /// A signed-in source's record, as skein's accounts driver hands it to
+    /// keep, by the source's number: today the account's, one source to
+    /// each account.
+    Source,
 }
 
 /// A request to the secrets' store (store.md, section 9).
 #[derive(Debug)]
 pub enum Secrets {
-    Keep { owner: SecretOwner, number: u64, value: Secret },
-    Erase { owner: SecretOwner, number: u64 },
-    Get { owner: SecretOwner, number: u64 },
-    Load { owner: SecretOwner, after: Option<u64> },
+    Keep {
+        owner: SecretOwner,
+        number: u64,
+        value: Secret,
+    },
+    /// Keep `value` in place of the value whose digest is `replaces`, none
+    /// when nothing is held: `Kept` once durable, or `Stale`, nothing
+    /// written, when another value is held, durable or on its way.
+    Replace {
+        owner: SecretOwner,
+        number: u64,
+        value: Secret,
+        replaces: Option<[u8; 32]>,
+    },
+    Erase {
+        owner: SecretOwner,
+        number: u64,
+    },
+    Get {
+        owner: SecretOwner,
+        number: u64,
+    },
+    Load {
+        owner: SecretOwner,
+        after: Option<u64>,
+    },
 }
 
 #[derive(Debug)]
@@ -213,6 +239,10 @@ pub enum Event {
         owner: Token,
     },
     Kept {
+        owner: Token,
+    },
+    /// A replace that named another value than the one held.
+    Stale {
         owner: Token,
     },
     Erased {

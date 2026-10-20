@@ -365,7 +365,29 @@ impl World {
         rows.iter().map(|row| row.value.clone()).collect()
     }
 
+    /// One secrets' request, its file operations counted from zero.
     pub fn secret(&mut self, request: Secrets) -> Vec<Event> {
-        self.request(Request::Secrets { owner: OWNER, request })
+        self.secrets(vec![request])
+    }
+
+    /// Secrets' requests asked together, before any of their files is
+    /// written; their operations counted from zero.
+    pub fn secrets(&mut self, requests: Vec<Secrets>) -> Vec<Event> {
+        self.operations = 0;
+        for request in requests {
+            jig_protocol_store::down(
+                &mut self.store,
+                &self.env,
+                Request::Secrets { owner: OWNER, request },
+                &mut self.above,
+                &mut self.below,
+            );
+        }
+        self.drive();
+        let mut events = Vec::new();
+        while let Some(event) = self.above.pop() {
+            events.push(event);
+        }
+        events
     }
 }

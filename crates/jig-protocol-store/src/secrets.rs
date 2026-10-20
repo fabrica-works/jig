@@ -1,12 +1,18 @@
 //! Private values kept before their owners use them (store.md, section 9).
 use crate::{Below, Event, Limits, Phase, SecretOwner, SecretRow, Secrets, Store, directory, keys, open};
 use alloc::boxed::Box;
-use skein_lib::{Env, List, Map, Queue, Secret, Token};
+use skein_lib::{Env, List, Map, Queue, Secret, Token, sha256};
 
 #[derive(Debug)]
 enum Pending {
-    Keep(Token),
-    Erase(Token),
+    /// A keep or an erase on its way: its asker, its key, and the digest of
+    /// what the key holds once it is durable, none once erased, which a
+    /// replace of the key states before then.
+    Write {
+        owner: Token,
+        key: Box<[u8]>,
+        holds: Option<[u8; 32]>,
+    },
     Sweep,
 }
 #[derive(Debug)]
@@ -32,6 +38,7 @@ impl State {
 }
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     Map::<u64, Pending>::worst_case(limits.secrets.queued)?
+        .checked_add(u64::from(limits.secrets.key).checked_mul(u64::from(limits.secrets.queued))?)?
         .checked_add(u64::from(limits.secrets.key))?
         .checked_add(List::<SecretRow>::worst_case(limits.secrets.page.rows)?)?
         .checked_add(List::<skein_kv::Row>::worst_case(limits.secrets.page.rows)?)?
@@ -45,6 +52,7 @@ fn prefix(owner: SecretOwner) -> [u8; 2] {
         SecretOwner::SignIn => [1, 0],
         SecretOwner::Service => [1, 1],
         SecretOwner::Application => [2, 0],
+        SecretOwner::Source => [3, 0],
     }
 }
 fn key(owner: SecretOwner, number: u64, limit: u32) -> Option<Box<[u8]>> {
@@ -63,11 +71,11 @@ fn read_key(key: &[u8]) -> Option<(SecretOwner, u64)> {
             1 => SecretOwner::Service,
             _ => return None,
         },
-        2 => {
+        2 | 3 => {
             if kind != 0 {
                 return None;
             }
-            SecretOwner::Application
+            if tag == 2 { SecretOwner::Application } else { SecretOwner::Source }
         }
         _ => return None,
     };
@@ -141,9 +149,47 @@ pub(crate) fn committed(store: &mut Store, owner: Token, above: &mut Queue<Event
         return;
     };
     match pending {
-        Pending::Keep(owner) => above.push(Event::Kept { owner }),
-        Pending::Erase(owner) => above.push(Event::Erased { owner }),
+        Pending::Write { owner, holds: Some(_), .. } => above.push(Event::Kept { owner }),
+        Pending::Write { owner, holds: None, .. } => above.push(Event::Erased { owner }),
         Pending::Sweep => store.secret_state.waiting = false,
+    }
+}
+/// The durable value under `key`; `Err` when the store answered otherwise.
+fn durable(store: &mut Store, env: &Env<Limits>, key: Box<[u8]>, below: &mut Below) -> Result<Option<Box<[u8]>>, ()> {
+    let kv_env = directory::env(store, env, true);
+    let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
+    skein_kv::down(
+        &mut store.stores.secrets,
+        &kv_env,
+        skein_kv::Request::Get { owner: Token::new(0), key },
+        &mut events,
+        &mut below.secrets,
+    );
+    match events.pop().expect("a secret get answers in its step") {
+        skein_kv::Event::Got { value, .. } => Ok(value),
+        skein_kv::Event::Opened { .. }
+        | skein_kv::Event::Committed { .. }
+        | skein_kv::Event::Refused { .. }
+        | skein_kv::Event::Failed { .. }
+        | skein_kv::Event::Loaded { .. }
+        | skein_kv::Event::Closed { .. }
+        | skein_kv::Event::OpenFailed { .. }
+        | skein_kv::Event::Recovered { .. }
+        | skein_kv::Event::RecoveryFailed { .. } => Err(()),
+    }
+}
+/// The digest of what `key` holds: the latest write on its way, else the
+/// durable value; none when nothing is held.
+fn held(store: &mut Store, env: &Env<Limits>, key: &[u8], below: &mut Below) -> Result<Option<[u8; 32]>, ()> {
+    for (_, pending) in store.secret_state.pending.iter().rev() {
+        match pending {
+            Pending::Write { key: written, holds, .. } if **written == *key => return Ok(*holds),
+            Pending::Write { .. } | Pending::Sweep => {}
+        }
+    }
+    match durable(store, env, Box::from(key), below)? {
+        Some(value) => Ok(Some(sha256::digest(&value))),
+        None => Ok(None),
     }
 }
 pub(crate) fn secrets(
@@ -159,8 +205,9 @@ pub(crate) fn secrets(
         Phase::Closed | Phase::Stopped => return,
     }
     match request {
-        Secrets::Keep { owner: kind, number, value } => {
-            if value.len() > usize::try_from(store.limits.secrets.value).expect("secret limit fits usize") {
+        Secrets::Keep { owner: kind, number, value } => keep(store, env, owner, (kind, number), value, above, below),
+        Secrets::Replace { owner: kind, number, value, replaces } => {
+            if too_large(store, &value) {
                 store.phase = Phase::Stopped;
                 return;
             }
@@ -168,44 +215,33 @@ pub(crate) fn secrets(
                 store.phase = Phase::Stopped;
                 return;
             };
-            let ops = Box::new([skein_kv::Op::Put { key, value: Box::from(value.expose()) }]);
-            submit(store, env, ops, Pending::Keep(owner), above, below);
+            let Ok(holds) = held(store, env, &key, below) else {
+                store.phase = Phase::Stopped;
+                return;
+            };
+            if holds == replaces {
+                keep(store, env, owner, (kind, number), value, above, below);
+            } else {
+                above.push(Event::Stale { owner });
+            }
         }
         Secrets::Erase { owner: kind, number } => {
             let Some(key) = key(kind, number, store.limits.secrets.key) else {
                 store.phase = Phase::Stopped;
                 return;
             };
-            submit(store, env, Box::new([skein_kv::Op::Erase { key }]), Pending::Erase(owner), above, below);
+            let ops = Box::new([skein_kv::Op::Erase { key: key.clone() }]);
+            submit(store, env, ops, Pending::Write { owner, key, holds: None }, above, below);
         }
         Secrets::Get { owner: kind, number } => {
             let Some(key) = key(kind, number, store.limits.secrets.key) else {
                 store.phase = Phase::Stopped;
                 return;
             };
-            let kv_env = directory::env(store, env, true);
-            let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
-            skein_kv::down(
-                &mut store.stores.secrets,
-                &kv_env,
-                skein_kv::Request::Get { owner, key },
-                &mut events,
-                &mut below.secrets,
-            );
-            match events.pop().expect("a secret get answers in its step") {
-                skein_kv::Event::Got { value, .. } => match value {
-                    Some(value) => above.push(Event::Secret { owner, value: Some(Secret::new(value)) }),
-                    None => above.push(Event::Secret { owner, value: None }),
-                },
-                skein_kv::Event::Opened { .. }
-                | skein_kv::Event::Committed { .. }
-                | skein_kv::Event::Refused { .. }
-                | skein_kv::Event::Failed { .. }
-                | skein_kv::Event::Loaded { .. }
-                | skein_kv::Event::Closed { .. }
-                | skein_kv::Event::OpenFailed { .. }
-                | skein_kv::Event::Recovered { .. }
-                | skein_kv::Event::RecoveryFailed { .. } => store.phase = Phase::Stopped,
+            match durable(store, env, key, below) {
+                Ok(Some(value)) => above.push(Event::Secret { owner, value: Some(Secret::new(value)) }),
+                Ok(None) => above.push(Event::Secret { owner, value: None }),
+                Err(()) => store.phase = Phase::Stopped,
             }
         }
         Secrets::Load { owner: kind, after } => {
@@ -245,6 +281,30 @@ pub(crate) fn secrets(
         }
     }
 }
+fn too_large(store: &Store, value: &Secret) -> bool {
+    value.len() > usize::try_from(store.limits.secrets.value).expect("secret limit fits usize")
+}
+fn keep(
+    store: &mut Store,
+    env: &Env<Limits>,
+    owner: Token,
+    (kind, number): (SecretOwner, u64),
+    value: Secret,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    if too_large(store, &value) {
+        store.phase = Phase::Stopped;
+        return;
+    }
+    let Some(key) = key(kind, number, store.limits.secrets.key) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    let holds = Some(sha256::digest(value.expose()));
+    let ops = Box::new([skein_kv::Op::Put { key: key.clone(), value: Box::from(value.expose()) }]);
+    submit(store, env, ops, Pending::Write { owner, key, holds }, above, below);
+}
 pub(crate) fn start_sweep(store: &mut Store) {
     if !store.secret_state.swept {
         store.secret_state.sweeping = true;
@@ -254,6 +314,8 @@ pub(crate) fn sweep(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Even
     if !store.secret_state.sweeping || store.secret_state.waiting || store.phase == Phase::Stopped {
         return;
     }
+    // People's family alone: a source's record is swept once the accounts'
+    // family is restored (store.md 9), which no restart does yet.
     let mut range = skein_kv::Range::prefix(&[1]);
     if let Some(after) = store.secret_state.after.take() {
         range.start = after;
@@ -275,7 +337,7 @@ pub(crate) fn sweep(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Even
         let people = match kind {
             SecretOwner::SignIn => jig_domain_people::Key::SignIn(number),
             SecretOwner::Service => jig_domain_people::Key::Person(number),
-            SecretOwner::Application => {
+            SecretOwner::Application | SecretOwner::Source => {
                 store.phase = Phase::Stopped;
                 return;
             }

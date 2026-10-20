@@ -301,6 +301,7 @@ impl Store {
             | Event::Turns { .. }
             | Event::Unread { .. }
             | Event::Kept { .. }
+            | Event::Stale { .. }
             | Event::Erased { .. }
             | Event::Secret { .. }
             | Event::SecretsLoaded { .. }) => self.route(event, requests),
