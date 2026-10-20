@@ -96,6 +96,23 @@ the application's main (its shell)
 | connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5); none takes the number the core keeps for its own procedures (below) | the core |
 | limits | a profile, and any limit overridden by name (section 6) | every child and component of jig's |
 
+The LLM provider's `name` is nonempty UTF-8 without control characters,
+at most 256 bytes. Bidi controls U+061C, U+200E–200F, U+202A–202E,
+U+2066–2069 and invisible formatting U+00AD, U+180E, U+200B–200D,
+U+2060–2065, U+206A–206F, U+FEFF, U+FFF9–FFFB are refused.
+`signed_in_plan` is a required boolean for an offered sign-in. Without a
+sign-in it may be absent or false; true requires an offered sign-in. `manage_usage`, when present, is a
+whole public HTTPS address, at most 2,048 ASCII bytes, with a nonempty
+authority and no user information, query, fragment, whitespace or markup.
+The address check is syntactic: private and loopback hosts are accepted;
+uppercase `HTTPS://` is refused.
+A signed-in plan or an offered program requires that address. Other
+providers may omit it. These are public facts, independent of a sign-in's
+registration. A program source remains a plan even when `signed_in_plan`
+is false; account classification is recomputed from its remaining sources
+on removal and from current configuration on restore. No separate plan
+display name is configured.
+
 - **Each connector's own configuration** (its system's address, its
   credentials' files, the address of its webhooks' listener, its
   procedures' settings and texts) is the application's, in its own

@@ -537,6 +537,22 @@ served is held, kept and unsent, for its owner's version (client.md,
 - **Its last activity** is when it last heard words, replied, or had a
   delegate end: a wall time, kept on every task, by which lists order.
 
+An account row in the party's `accounts` or owners' deployment document
+also carries its provider's configured name and optional manage-usage
+address. The name uses the document's cut-aware text bound; the address
+is whole, at most 2,048 bytes. The client link rejects addresses outside
+`valid_manage_usage`'s ASCII HTTPS subset before publishing either account
+document form. This subset is safe for the view's external-link builder;
+configuration applies stricter host-label and port checks.
+Provider and account numbers remain whole.
+The account's plan flag follows its current sources and configured
+signed-in-plan flag; program sources remain plans. These facts require no
+read of another holder's accounts. Deployment capacity history labels
+account sign-in, sign-out and change without their provider, holder,
+subject, source, key or digest payloads, and includes the accounts',
+holder's accounts', sources' and sign-ins' room limits under the same
+keyed retention and bounded entrance-history rules as other actions.
+
 ### 5.2 Revisions
 
 - **One for each thing a party decides about,** which moves only when
