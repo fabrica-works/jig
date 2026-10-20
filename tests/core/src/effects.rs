@@ -330,6 +330,9 @@ impl World {
                     root::Request::Now(core::Now::Account(accounts::Request::Component(request))) => {
                         self.account_request(request);
                     }
+                    root::Request::Now(core::Now::Account(accounts::Request::Signing(signing))) => {
+                        self.account_signing(signing);
+                    }
                     root::Request::Now(
                         now @ (core::Now::SeenConversation { .. }
                         | core::Now::LoadEndedRead { .. }

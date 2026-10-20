@@ -3000,6 +3000,7 @@ fn an_answer_payload_for_a_replaced_attempt_is_dropped() {
     assert!(core.current_proof(1, 7), "the replacement proof remains current");
 }
 
+mod account_signing;
 mod credentials;
 
 mod funding_fixtures;

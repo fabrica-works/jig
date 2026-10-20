@@ -680,6 +680,7 @@ impl Core {
         }
         for _ in 0..limits.accounts.facts {
             let _fact = self.accounts.pop_fact();
+            let _ended = self.accounts.pop_ended();
         }
         for _ in 0..limits.views.facts {
             let _fact = self.views.pop_fact();

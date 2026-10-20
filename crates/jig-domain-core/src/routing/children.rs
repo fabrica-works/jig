@@ -378,16 +378,17 @@ pub(super) fn tag_account(core: &mut Core, env: &Env<Limits>, mut child: Queue<a
                     }
                 }
             }
-            request @ (accounts::Request::Component(_) | accounts::Request::Closed) => {
+            // The accounts' component starts a party's sign-in and revokes a signed-out
+            // record (accounts.md, 3.3 and section 5), as it grants and releases.
+            request @ (accounts::Request::Component(_) | accounts::Request::Signing(_) | accounts::Request::Closed) => {
                 out.push(Request::Now(Box::new(Now::Account(request))));
             }
             // The accounts family (protocol/store.md, 4.4 item 9) keeps each record in the
             // decision that changes it.
             accounts::Request::Save { record } => out.push(Request::Write(Write::Save(Record::Accounts(record)))),
             accounts::Request::Erase { key } => out.push(Request::Write(Write::Erase(Key::Accounts(key)))),
-            // No party asks the child to sign in or out yet, so it asks nothing of the component
-            // and answers no one.
-            accounts::Request::Signing(_) | accounts::Request::Answer { .. } => {}
+            // No party asks the child to sign in or out yet, so no answer has one to reach.
+            accounts::Request::Answer { .. } => {}
         }
     }
     out.push(Request::Decided);

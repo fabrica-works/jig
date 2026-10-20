@@ -1,6 +1,9 @@
 //! Accounts component and transcript fixture responses for admission stories.
 use super::{World, accounts, core, root};
 use skein_lib::Duration;
+
+/// The subject and display name every sign-in at the fake accounts' component answers with.
+const SIGNED_IN: &[u8] = b"signed-in";
 impl World {
     pub(super) fn transcript_loaded(&mut self, now: core::Now) {
         if self.fail_account_before_workspace {
@@ -38,5 +41,21 @@ impl World {
         if let Some(response) = response {
             self.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(response))));
         }
+    }
+
+    /// The accounts' component's side of a party's sign-in and sign-out, which JP6 wires: each
+    /// provider's sign-in answers with [`SIGNED_IN`]'s subject, and each revocation is confirmed.
+    pub(super) fn account_signing(&mut self, signing: accounts::Signing) {
+        let event = match signing {
+            accounts::Signing::SignIn { source, .. } => accounts::Event::SignedIn {
+                source,
+                subject: Box::from(SIGNED_IN),
+                display: Box::from(SIGNED_IN),
+                declined: false,
+            },
+            accounts::Signing::SignOut { source } => accounts::Event::SignedOut { source, confirmed: true },
+            accounts::Signing::Replaced { .. } => return,
+        };
+        self.events.push_back(root::Event::Core(core::Event::Account(event)));
     }
 }
