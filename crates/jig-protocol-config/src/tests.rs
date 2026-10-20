@@ -6,6 +6,7 @@ mod hosts;
 mod llm;
 mod overrides;
 mod profile;
+mod providers;
 mod read;
 mod templates;
 mod worker;

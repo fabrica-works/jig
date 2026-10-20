@@ -46,6 +46,8 @@ pub enum What {
     Unique,
     Refers,
     Plaintext,
+    Confidential,
+    NoProvider,
     Digest,
     HandedIn,
     Reserve { charter: u32 },

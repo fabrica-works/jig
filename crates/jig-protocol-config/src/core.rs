@@ -40,6 +40,17 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
             ProviderKind::Link | ProviderKind::Application => {}
         }
     }
+    let mut llm_providers =
+        List::with_capacity(u32::try_from(engine.llm.providers.len()).expect("checked providers fit u32"));
+    for provider in &engine.llm.providers {
+        let offers = accounts::Offers {
+            sign_in: provider.sign_in.is_some(),
+            key: provider.keys,
+            programs: provider.programs.clone(),
+        };
+        let value = accounts::Provider { number: provider.number, models: provider.models.clone(), offers };
+        llm_providers.push(value).expect("one per configured provider");
+    }
     let mut workers_in_process = false;
     for address in &engine.hosts.listener {
         match address {
@@ -60,7 +71,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
             charters: engine.charters.clone(),
             resume_bytes: limits.resume_bytes,
             tools: domain::ToolFamilies::JIG,
-            llm_providers: accounts::Providers::default(),
+            llm_providers: accounts::Providers { providers: llm_providers.into_boxed() },
         },
         projects,
         permission_roles,

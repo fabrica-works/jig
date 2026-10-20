@@ -11,9 +11,13 @@ pub(crate) const MODELS: u32 = 64;
 pub struct Llm {
     pub endpoints: Box<[Endpoint]>,
     pub models: Box<[Model]>,
+    /// LLM providers, absent for none (configuration.md, 3).
+    pub providers: Box<[Provider]>,
     pub accounts: Box<[Account]>,
     pub records: Box<[u8]>,
 }
+mod providers;
+pub use providers::{Provider, Registration};
 #[derive(Debug)]
 pub struct Endpoint {
     pub name: Box<[u8]>,
@@ -133,11 +137,13 @@ pub(crate) fn parse(
             }
         }
     }
+    let providers = providers::parse(&mut object, document, path, models.as_slice(), problems);
     let records = check::text(&mut object, document, b"records", path, problems);
     object.finish(document, path, problems);
     Some(Llm {
         endpoints: endpoints.into_boxed(),
         models: models.into_boxed(),
+        providers: providers.into_boxed(),
         accounts: accounts.into_boxed(),
         records: records?,
     })
