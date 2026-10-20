@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v9 as w;
+use jig_client_protocol_wire::v10 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};
@@ -46,7 +46,7 @@ fn keyed() -> Box<[u8]> {
     let mut bytes = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
     ask.encode(&mut bytes).expect("ask bytes");
     let record =
-        w::Keyed::new(&lim, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 9, request: bytes.finish() })
+        w::Keyed::new(&lim, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 10, request: bytes.finish() })
             .expect("keyed");
     let mut bytes = Writer::new(usize::try_from(record.measure()).expect("keyed size"));
     record.encode(&mut bytes).expect("keyed bytes");
@@ -97,7 +97,7 @@ fn after_stop_a_read_is_served() {
     let value = w::Read::Me;
     let mut bytes = Writer::new(usize::try_from(value.measure()).expect("read size"));
     value.encode(&mut bytes).expect("read bytes");
-    let record = w::Owned::new(&lim, w::OwnedParts { owner: w::Owner::Jig, version: 9, record: bytes.finish() })
+    let record = w::Owned::new(&lim, w::OwnedParts { owner: w::Owner::Jig, version: 10, record: bytes.finish() })
         .expect("read owner");
     let mut bytes = Writer::new(usize::try_from(record.measure()).expect("owner size"));
     record.encode(&mut bytes).expect("owner bytes");
@@ -121,7 +121,7 @@ fn after_stop_a_new_watch_is_ended_as_stopping() {
     let mut peer = signed();
     let stream = peer.open_stream();
     let lim = fixtures::limits().wire;
-    let owned = w::Owned::new(&lim, w::OwnedParts { owner: w::Owner::Jig, version: 9, record: Box::new([0]) })
+    let owned = w::Owned::new(&lim, w::OwnedParts { owner: w::Owner::Jig, version: 10, record: Box::new([0]) })
         .expect("frame subject");
     let open = w::Open::new(&lim, w::OpenParts { stream, watch: 1, subject: owned }).expect("watch open");
     let mut bytes = Writer::new(usize::try_from(open.measure()).expect("open size"));

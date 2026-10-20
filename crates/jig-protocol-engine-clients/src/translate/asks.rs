@@ -1,7 +1,7 @@
 //! Wire asks into the people vocabulary (client/domain/contract.md, 3).
 use super::Untranslatable;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v9 as w;
+use jig_client_protocol_wire::v10 as w;
 use jig_domain_people as p;
 use skein_lib::{List, Reader, Wall};
 #[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]

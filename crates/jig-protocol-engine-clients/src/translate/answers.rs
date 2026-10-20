@@ -1,7 +1,7 @@
 //! Durable keyed answers (protocol/client.md, section 5; contract.md, 4).
 use super::refusals;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v9 as w;
+use jig_client_protocol_wire::v10 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::KeyedAnswer, w::Problem> {

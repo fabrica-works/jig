@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v9 as w;
+use jig_client_protocol_wire::v10 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};
@@ -26,7 +26,7 @@ fn request() -> Box<[u8]> {
     let mut out = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
     ask.encode(&mut out).expect("ask bytes");
     let record =
-        w::Keyed::new(&limits, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 9, request: out.finish() })
+        w::Keyed::new(&limits, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 10, request: out.finish() })
             .expect("keyed request");
     let mut out = Writer::new(usize::try_from(record.measure()).expect("record size"));
     record.encode(&mut out).expect("request bytes");
@@ -62,7 +62,7 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
         panic!("final answer");
     };
     assert_eq!(answer.owner(), &w::Owner::Jig);
-    assert_eq!(answer.version(), 9);
+    assert_eq!(answer.version(), 10);
     let outcome = w::Outcome::Owner(
         w::OutcomeOwner::new(
             &limits,
@@ -128,7 +128,7 @@ fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
     ask.encode(&mut out).expect("ask bytes");
     let keyed = w::Keyed::new(
         &limits,
-        w::KeyedParts { key: [61; 16], owner: w::Owner::Jig, version: 9, request: out.finish() },
+        w::KeyedParts { key: [61; 16], owner: w::Owner::Jig, version: 10, request: out.finish() },
     )
     .expect("keyed");
     let mut out = Writer::new(usize::try_from(keyed.measure()).expect("keyed size"));

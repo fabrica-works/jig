@@ -19,7 +19,7 @@ pub fn not_served(owner: w::Owner) -> w::NotServed {
     let lim = wire();
     let family = w::Owner::Family(w::Family::new(&lim, w::FamilyParts { number: 9 }).expect("family"));
     let mut served = List::with_capacity(2);
-    for (owner, first, last) in [(w::Owner::Jig, 9, 9), (family, 2, 2)] {
+    for (owner, first, last) in [(w::Owner::Jig, 10, 10), (family, 2, 2)] {
         served.push(w::Served::new(&lim, w::ServedParts { owner, first, last }).expect("range")).expect("range slot");
     }
     w::NotServed::new(&lim, w::NotServedParts { owner, served }).expect("refusal")

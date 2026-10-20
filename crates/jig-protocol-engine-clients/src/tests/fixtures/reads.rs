@@ -27,7 +27,7 @@ pub fn value_answer(value: &w::ReadValue) -> w::ReadAnswer {
     value.encode(&mut out).expect("value bytes");
     let limits = w::Limits { owned_record: 4096, ..wire() };
     w::ReadAnswer::Value(
-        w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: 9, record: out.finish() })
+        w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: 10, record: out.finish() })
             .expect("value envelope"),
     )
 }
@@ -71,7 +71,7 @@ pub fn held_reads() -> [(&'static str, w::Read, reads::Read, reads::Answer, w::R
 }
 impl Exchange {
     pub fn read(&mut self, value: &w::Read) -> (Token, ReplyTo, reads::Read) {
-        let owner = self.send(crate::Message::Read(owned_read(w::Owner::Jig, 9, encoded_read(value))));
+        let owner = self.send(crate::Message::Read(owned_read(w::Owner::Jig, 10, encoded_read(value))));
         self.authenticate();
         let Some(Request::Core(event)) = self.out.pop() else { panic!("core read") };
         let core::Event::Read { reply, sign_in, read } = *event else { panic!("read") };

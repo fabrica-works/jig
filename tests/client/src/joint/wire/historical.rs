@@ -139,7 +139,7 @@ pub fn read(query: &client::Read, source: &reads::Historical, limits: &Limits) -
     Ok(value)
 }
 
-// The v9 discriminator, archive scalars, optional-read tag and carried byte length.
+// The v10 discriminator, archive scalars, optional-read tag and carried byte length.
 const ARCHIVE_BYTES: u64 = 43;
 
 /// Preserve a single read's archive identity, complete document admission and decoder terminal.
@@ -182,9 +182,9 @@ fn person_proposal(value: &tasks::PersonProposal, limits: &Limits) -> Result<cli
         number: value.number,
         proposer: value.proposer,
         project: value.project,
-        goal: historical_goal::goal(value.batch().first().expect("one v9 goal"), limits)?,
+        goal: historical_goal::goal(value.batch().first().expect("one v10 goal"), limits)?,
         state: match &value.state {
-            tasks::PersonProposalState::Withdrawn { .. } => unreachable!("no v9 withdrawal"),
+            tasks::PersonProposalState::Withdrawn { .. } => unreachable!("no v10 withdrawal"),
             tasks::PersonProposalState::Pending { since } => {
                 client::OwnerPersonProposalState::Pending { since: *since }
             }

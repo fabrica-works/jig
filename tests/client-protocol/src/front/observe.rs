@@ -1,7 +1,7 @@
 //! Facts decoded independently at the byte boundary, before the root sees them.
 use crate::native::Received;
 use jig_client::{Message, Request as ClientRequest, contract as c};
-use jig_client_protocol_wire::v9 as w;
+use jig_client_protocol_wire::v10 as w;
 use jig_client_test_domain::{Event, Request};
 use jig_client_world::harness::{Receipt, Sent};
 use skein_lib::{Reader, RequestEnvelope, Token};

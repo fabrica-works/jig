@@ -160,7 +160,7 @@ impl Scripted {
                 (
                     client,
                     crate::test::up(jig_client::Up::Served {
-                        served: self.engine.versions().contains(9),
+                        served: self.engine.versions().contains(10),
                         versions: None,
                     }),
                 )

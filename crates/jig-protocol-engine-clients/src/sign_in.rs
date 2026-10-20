@@ -1,7 +1,7 @@
 //! One live link, fresh bearer tokens, and durable digest admission (client.md, 8).
 use crate::{Kept, SecretOwner, routes::Route};
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v9 as w;
+use jig_client_protocol_wire::v10 as w;
 use skein_lib::{CryptoRng, Map, Secret, Time, Token, Writer};
 #[derive(Debug)]
 pub(crate) struct Link {
