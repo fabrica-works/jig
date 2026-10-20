@@ -135,14 +135,14 @@ fn an_unknown_reset_wait_has_no_readiness_spin_after_a_long_advance() {
     core.run_now = Time::ZERO.saturating_add(Duration::from_secs(1_000_000));
     core.due.push(core.tasks.run_context(TASK).unwrap());
     assert!(!core.due_ready());
-    assert!(matches!(
+    assert_eq!(
         core.run_choice(TASK),
         Err(RunWait::Account {
             account: Some(1),
             source: Some(1),
             why: accounts::WaitWhy::Source(accounts::State::Limited { until: None })
         })
-    ));
+    );
 }
 
 #[test]

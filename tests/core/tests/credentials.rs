@@ -595,10 +595,10 @@ fn a_carried_llm_key_is_returned_unused_while_stopping() {
 }
 
 fn own_key_run(seed: u64) -> (World, u32, u32) {
-    const LEGACY_INPUT: u32 = 99;
+    const CONFIGURED_ACCOUNT: u32 = 99;
     let (mut config, limits) = signing_configuration(seed);
-    config.core.settings.models[0].account = LEGACY_INPUT;
-    config.core.settings.charters[0].policy.model.account = LEGACY_INPUT;
+    config.core.settings.models[0].account = CONFIGURED_ACCOUNT;
+    config.core.settings.charters[0].policy.model.account = CONFIGURED_ACCOUNT;
     let mut world = World::configured_unassigned(seed, false, config, limits);
     carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
     let Some(people::Reply::Outcome(people::Outcome::AccountKeyKept { source })) = world.people_answers.last().cloned()

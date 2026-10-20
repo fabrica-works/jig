@@ -17,7 +17,7 @@ fn source() -> Charter {
         output: 128,
         effort: Some(Box::from(&b"low"[..])),
     };
-    let source = Charter {
+    Charter {
         instructions: Box::from(&b"help"[..]),
         tools: Box::new([Tool {
             name: Box::from(&b"read"[..]),
@@ -46,8 +46,7 @@ fn source() -> Charter {
         models: Box::new([]),
         waiting: Duration::ZERO,
         resumes: true,
-    };
-    source
+    }
 }
 
 #[test]

@@ -48,5 +48,7 @@ fn a_run_waits_while_a_credential_it_needs_is_unusable() {
         &mut out,
     );
     let context = core.take_due().expect("credential frees the waiting task");
-    assert!(matches!(core.run_admission(&context, Wall::EPOCH, Box::new([])), RunAdmission::Allow(_)));
+    let RunAdmission::Allow(_) = core.run_admission(&context, Wall::EPOCH, Box::new([])) else {
+        panic!("credential permits the current allowance")
+    };
 }

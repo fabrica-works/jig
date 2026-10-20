@@ -1309,20 +1309,15 @@ fn run_allowance_retains_exact_bindings_and_checked_spend() {
 #[test]
 fn run_evidence_waits_for_main_host_source_and_credentials() {
     let domain = domain();
-    let mut asks = Vec::new();
     let mut missing = selected_run();
     missing.main_provider = 29;
-    asks.push(missing);
     let mut unusable = selected_run();
     unusable.accounts[0].usable = false;
-    asks.push(unusable);
     let mut host = selected_run();
     host.accounts[0].host_eligible = false;
-    asks.push(host);
     let mut credential = selected_run();
     credential.credentials[0] = false;
-    asks.push(credential);
-    for ask in asks {
+    for ask in [missing, unusable, host, credential] {
         let mut why = findings(&domain);
         assert_eq!(check_run(&domain, &ask, &mut why), crate::RunAnswer::Wait);
     }
@@ -1331,17 +1326,13 @@ fn run_evidence_waits_for_main_host_source_and_credentials() {
 #[test]
 fn malformed_or_over_bound_run_evidence_is_refused() {
     let domain = domain();
-    let mut asks = Vec::new();
     let mut duplicate = selected_run();
     duplicate.accounts[1] = duplicate.accounts[0];
-    asks.push(duplicate);
     let mut accounts = selected_run();
-    accounts.accounts = vec![accounts.accounts[0]; 3].into();
-    asks.push(accounts);
+    accounts.accounts = Box::new([accounts.accounts[0]; 3]);
     let mut credentials = selected_run();
     credentials.credentials = Box::new([true; 3]);
-    asks.push(credentials);
-    for ask in asks {
+    for ask in [duplicate, accounts, credentials] {
         let mut why = findings(&domain);
         assert_eq!(check_run(&domain, &ask, &mut why), crate::RunAnswer::Refuse);
     }

@@ -85,9 +85,7 @@ fn a_crash_keeps_the_task_pin_and_claim_bindings_together() {
     use jig_domain_core::{CoreKey, Key};
     let count = operations(account_claim());
     let writes = account_claim();
-    let [_, Write::Save(task), Write::Save(proof)] = writes.as_ref() else {
-        unreachable!("claim writes")
-    };
+    let [_, Write::Save(task), Write::Save(proof)] = writes.as_ref() else { unreachable!("claim writes") };
     for cut in 0..=count {
         let (restored, acknowledged) = checked_cut(cut, account_claim(), "account claim");
         assert_eq!(
