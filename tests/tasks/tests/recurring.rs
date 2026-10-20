@@ -1,6 +1,6 @@
 use jig_domain_tasks::{
-    self as tasks, Cause, Contract, Event, Executor, Funder, Key, New, Numbers, Party, RecurringOverlap,
-    RecurringTemplate, Stored, Subscription, SubscriptionKind,
+    self as tasks, Cause, Contract, Event, Executor, Funder, Key, LlmChoice, ModelEffort, Models, New, Numbers, Party,
+    RecurringOverlap, RecurringTemplate, Stored, Subscription, SubscriptionKind,
 };
 use jig_tasks_world::{LIMITS, Reply, World, task};
 
@@ -53,6 +53,27 @@ fn a_recurring_task_continues_across_a_period_reset() {
     world.restart();
     assert_eq!(world.record(11).funder, Funder::Recurring { project: 1, task: 9, period: 2 });
     assert_eq!(world.record(9).recurring.as_ref().expect("template").last_batch.as_ref(), [11]);
+}
+
+#[test]
+fn an_occurrence_keeps_its_members_llm_choice() {
+    let mut world = World::new(217, LIMITS);
+    let llm = LlmChoice {
+        main: ModelEffort { model: 0, effort: Some(1) },
+        subagents: Box::new([ModelEffort { model: 2, effort: Some(0) }]),
+    };
+    let mut master = recurring(9, RecurringOverlap::Skip);
+    master.authority.models = Models(0b101);
+    let template = master.recurring.as_mut().expect("template");
+    let member = template.batch.first_mut().expect("member");
+    member.authority.models = Models(0b101);
+    member.llm = Some(llm.clone());
+    assert_eq!(world.make(Party::Deployment { project: 1 }, vec![master]), Reply::Made(vec![9]));
+    world.open_period(1, 100_000);
+    batch(&mut world, 9, 1, 10);
+    assert_eq!(world.record(10).llm, Some(llm.clone()));
+    world.restart();
+    assert_eq!(world.record(10).llm, Some(llm));
 }
 
 #[test]
