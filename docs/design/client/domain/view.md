@@ -854,6 +854,8 @@ read by the application: ui.sections(), ui.shown()
   - *leaving:* it was decided, answered, withdrawn or ended, by this
     person or another; the card says what happened, by whom and when,
     and leaves after a linger.
+    The task page's own header returns to open when its linger ends,
+    keeping its final task document and the chip's terminal phase.
 - **Leaving, whichever comes first.** A card leaves on its request's
   answer ("you accepted it"), or when no document of the page names it.
   In the second case, a read of the object's document says how it ended

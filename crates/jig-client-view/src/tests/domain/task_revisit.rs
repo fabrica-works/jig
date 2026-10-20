@@ -1,13 +1,15 @@
 use super::{objects, spine::drive};
-use crate::tests::fixtures::{Ended, Fixture, ReadPage};
+use crate::tests::fixtures::{AnsweredByEngine, Ended, Fixture, ReadPage, Tick, Watched, one};
 use crate::{
     Event, Request,
+    action::Act,
     address::{Address, Place, TaskSection},
-    objects::Body,
+    fields::Purpose,
+    objects::{Body, Card, Object},
     page::Page,
 };
 use jig_client::contract::*;
-use skein_lib::{List, Time};
+use skein_lib::{Id, List, Time, Wall};
 
 fn task_watch(domain: &mut Fixture, task: u64) -> jig_client::Handle {
     let output = drive(domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(task)) });
@@ -76,6 +78,93 @@ fn historical() -> OwnerHistorical {
         at: None,
         by: None,
     }
+}
+fn cancelled_task() -> Task {
+    let mut task = super::confirmation::task();
+    let mut details = super::chip_facts::details();
+    details.ending = Some(cancelled_ending());
+    details.ended_at = Some(Wall::EPOCH);
+    task.chip.phase = Phase::Ended;
+    task.chip.details = Box::new(ChipPhase::Owner { phase: OwnerChipPhase::Ended, details: Box::new(details) });
+    task.context = None;
+    task.result = Some(TaskResult::Ending(Box::new(cancelled_ending())));
+    task
+}
+fn cancelled_ending() -> OwnerChipEnding {
+    OwnerChipEnding::Cancelled {
+        reason: DocumentText::complete(objects::text(b"cancelled")),
+        result: None,
+        by: OwnerRequester::Person(CANCELLING_PARTY),
+        at: Wall::EPOCH,
+    }
+}
+fn cancelled_historical() -> OwnerHistorical {
+    let mut facts = historical();
+    let OwnerHistoricalValue::Task { document, result } = &mut facts.value else {
+        unreachable!("historical fixture holds a task");
+    };
+    **document = cancelled_task();
+    result.task = document.chip.clone();
+    result.ending = Ending::Task(Box::new(cancelled_ending()));
+    result.value = None;
+    facts
+}
+// The engine answers a retained Read::Task with its whole historical carrier.
+fn final_cancelled_read(domain: &mut Fixture, read: jig_client::Handle) -> OwnerHistorical {
+    let facts = cancelled_historical();
+    drive(
+        domain,
+        Time::ZERO,
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(facts.clone()))) },
+    );
+    facts
+}
+fn keeps_header_after_linger(domain: &mut Fixture, id: Id<Object>, facts: OwnerHistorical) {
+    let now = Time::from_nanos(super::spine::LIMITS.linger.as_nanos());
+    while let Some(deadline) = domain.next_deadline() {
+        if deadline > now {
+            break;
+        }
+        drive(domain, now, Tick);
+    }
+    assert_eq!(domain.task_page().header, Some(id));
+    let kept = domain.objects().get(id).expect("the page keeps its own task");
+    assert_eq!(kept.card, Card::Open);
+    assert_eq!(kept.body, Some(Body::Historical(Box::new(facts))));
+}
+#[test]
+fn an_ended_task_keeps_its_page_header_after_the_linger() {
+    let (mut domain, _) = objects::live();
+    let watch = task_watch(&mut domain, PAGE_TASK);
+    let read = task_read(&terminal(&mut domain, watch, WatchEnd::SubjectEnded));
+    let facts = final_cancelled_read(&mut domain, read);
+    let id = domain.task_page().header.unwrap();
+    keeps_header_after_linger(&mut domain, id, facts);
+}
+#[test]
+fn a_confirmed_cancel_keeps_its_page_header_after_the_linger() {
+    let (mut domain, _) = objects::live();
+    let watch = task_watch(&mut domain, PAGE_TASK);
+    let mut task = super::confirmation::task();
+    task.acts = one(Offered { effect: None, act: ActKind::Cancel, admission: Admission::Allowed });
+    drive(&mut domain, Time::ZERO, Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) });
+    let id = domain.task_page().header.unwrap();
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Intend { object: id.token(), act: ActKind::Cancel } });
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { action: Act::Edit { field: Purpose::Reason, text: objects::text(b"cancelled") } },
+    );
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
+    let Request::Client { asked: jig_client::Event::Send { key: request, .. } } = &sent[0] else {
+        panic!("confirmed cancellation sends a request");
+    };
+    let request = *request;
+    let outcome = Outcome::Owner(OwnerOutcome::Cancelled { task: PAGE_TASK });
+    let read = task_read(&terminal(&mut domain, watch, WatchEnd::SubjectEnded));
+    drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: Answer::Done(outcome) });
+    let facts = final_cancelled_read(&mut domain, read);
+    keeps_header_after_linger(&mut domain, id, facts);
 }
 #[test]
 fn a_fresh_unknown_task_watch_reads_the_whole_retained_task_and_independent_result() {
@@ -192,3 +281,6 @@ fn an_unknown_non_task_page_watch_does_not_issue_a_retained_task_read() {
 }
 
 const UTF8_TEXT: &[u8] = b"~\0\x07";
+// The task and signed-in person supplied by confirmation::task and objects::live.
+const PAGE_TASK: u64 = 8;
+const CANCELLING_PARTY: u64 = 7;

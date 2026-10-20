@@ -876,7 +876,12 @@ pub fn fire(domain: &mut Ui, env: &Env<Limits>, out: &mut Queue<Request>, lent: 
                     crate::objects::Card::Leaving { until, .. } => {
                         if until <= env.now {
                             let key = object.key;
-                            domain.objects.remove(key);
+                            if domain.task_page.header == Some(id) {
+                                domain.objects.get_mut(id).expect("lingering header exists").card =
+                                    crate::objects::Card::Open;
+                            } else {
+                                domain.objects.remove(key);
+                            }
                             domain.changed();
                         }
                     }

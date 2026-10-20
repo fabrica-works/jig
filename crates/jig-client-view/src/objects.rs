@@ -13,7 +13,8 @@
 //! | deciding | last source drops it | deciding | nothing |
 //! | deciding | durable answer | refused or leaving | notice only if hidden |
 //! | leaving/looking | terminal document | leaving/ended | linger armed |
-//! | leaving | linger expires | gone | nothing |
+//! | leaving task page header | linger expires | open, keeping final document | nothing |
+//! | other leaving card | linger expires | gone | nothing |
 use crate::intents::Progress;
 use alloc::boxed::Box;
 use jig_client::contract::{
@@ -86,7 +87,8 @@ pub enum Left {
 /// A card follows its request until its durable answer.
 /// Open/refused + source drop -> leaving/looking + terminal read;
 /// deciding + source drop -> deciding; answer -> refused or leaving;
-/// leaving + terminal document -> leaving/ended; linger -> removed.
+/// leaving + terminal document -> leaving/ended; linger -> open for the task
+/// page's header, removed otherwise.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Card {
     NotSent {
