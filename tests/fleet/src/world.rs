@@ -891,7 +891,7 @@ impl World {
                 let answer = match said.kind {
                     Kind::Ended => Answer::Ended,
                     Kind::Parked => Answer::Parked,
-                    Kind::Failed => Answer::Failed,
+                    Kind::Failed => Answer::Failed { turned: None },
                     Kind::Busy => Answer::Busy,
                     Kind::Invalid => Answer::Invalid,
                 };
@@ -944,7 +944,7 @@ impl World {
                 self.payloads.end(skein_lib::Reader::new(&call.input).u64().expect("body token"));
             }
             Request::Grant { channel, run, attempt, grant } => self.record_grant(channel, run, attempt, grant),
-            Request::Rejected { .. } | Request::Exhausted { .. } => {}
+            Request::Unauthorized { .. } | Request::Limited { .. } | Request::AccountRefused { .. } => {}
             Request::Assign { channel, run, attempt, .. } => self.assignment_sent(channel, run, attempt),
             Request::Inbound { channel, run, attempt, message } => {
                 assert_eq!(
@@ -1302,8 +1302,9 @@ fn describe(event: &Event) -> String {
         }
         Event::Inbound { .. }
         | Event::Grant { .. }
-        | Event::Rejected { .. }
-        | Event::Exhausted { .. }
+        | Event::Unauthorized { .. }
+        | Event::Limited { .. }
+        | Event::AccountRefused { .. }
         | Event::Turn { .. }
         | Event::TurnKept { .. }
         | Event::TurnBusy { .. }

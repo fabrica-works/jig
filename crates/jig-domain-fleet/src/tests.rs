@@ -37,6 +37,7 @@ const R3: Token = Token::new(3);
 const A1: Token = Token::new(11);
 const A2: Token = Token::new(12);
 const A3: Token = Token::new(13);
+const FAILED: Answer = Answer::Failed { turned: None };
 
 /// The parent's call for a run's attempt: one per attempt in these tests.
 const fn to(attempt: Token) -> ReplyTo {
@@ -635,7 +636,7 @@ fn a_cancelled_attempt_is_fenced_but_its_answer_ends_its_call() {
         &[Request::DropCall { call: host_call(Token::new(7), payload(6)) }]
     );
     assert_eq!(&*active_report(&mut h, C1), &[]);
-    assert_eq!(&*h.answer(C1, R1, A1, Answer::Failed, 8), &[answered(A1, R1, Answer::Failed, 8)]);
+    assert_eq!(&*h.answer(C1, R1, A1, FAILED, 8), &[answered(A1, R1, FAILED, 8)]);
     // Answered: a cancel changes nothing.
     assert!(h.step(Event::Cancel { run: R1, attempt: A1 }).is_empty());
     assert_eq!(&*h.acknowledge(R1, A1), &[ack(C1, R1, A1)]);
@@ -740,22 +741,48 @@ fn unowned_worker_inputs(h: &mut Harness, channel: Token) {
         &[Request::DropCall { call: host_call(Token::new(8), payload(8)) }]
     );
     assert_eq!(&*active_report(h, channel), &[]);
-    assert!(h.step(Event::Rejected { channel, run: R1, attempt: A1, account: 7, generation: 4 }).is_empty());
+    assert!(h.step(Event::Unauthorized { channel, run: R1, attempt: A1, account: 7, generation: 4 }).is_empty());
     assert!(
-        h.step(Event::Exhausted { channel, run: R1, attempt: A1, account: 7, retry_after: Duration::from_secs(5) })
+        h.step(Event::Limited { channel, run: R1, attempt: A1, account: 7, reset: Some(Duration::from_secs(5)) })
             .is_empty()
     );
+    assert!(h.step(account_refused(channel)).is_empty());
+}
+
+fn account_refused(channel: Token) -> Event {
+    Event::AccountRefused {
+        channel,
+        run: R1,
+        attempt: A1,
+        account: 7,
+        code: Box::from(&b"forbidden"[..]),
+        reason: Box::from(&b"suspended"[..]),
+    }
 }
 
 fn owned_worker_notices(h: &mut Harness, channel: Token) {
     assert_eq!(&*active_report(h, channel), &[Request::Observed { run: R1, attempt: A1 }]);
     assert_eq!(
-        &*h.step(Event::Rejected { channel, run: R1, attempt: A1, account: 7, generation: 4 }),
-        &[Request::Rejected { run: R1, attempt: A1, account: 7, generation: 4 }]
+        &*h.step(Event::Unauthorized { channel, run: R1, attempt: A1, account: 7, generation: 4 }),
+        &[Request::Unauthorized { run: R1, attempt: A1, account: 7, generation: 4 }]
     );
     assert_eq!(
-        &*h.step(Event::Exhausted { channel, run: R1, attempt: A1, account: 7, retry_after: Duration::from_secs(5) }),
-        &[Request::Exhausted { run: R1, attempt: A1, account: 7, retry_after: Duration::from_secs(5) }]
+        &*h.step(Event::Limited { channel, run: R1, attempt: A1, account: 7, reset: Some(Duration::from_secs(5)) }),
+        &[Request::Limited { run: R1, attempt: A1, account: 7, reset: Some(Duration::from_secs(5)) }]
+    );
+    assert_eq!(
+        &*h.step(Event::Limited { channel, run: R1, attempt: A1, account: 7, reset: None }),
+        &[Request::Limited { run: R1, attempt: A1, account: 7, reset: None }]
+    );
+    assert_eq!(
+        &*h.step(account_refused(channel)),
+        &[Request::AccountRefused {
+            run: R1,
+            attempt: A1,
+            account: 7,
+            code: Box::from(&b"forbidden"[..]),
+            reason: Box::from(&b"suspended"[..]),
+        }]
     );
 }
 
@@ -861,7 +888,7 @@ fn a_worker_back_within_the_grace_keeps_what_is_claimed_and_cancels_the_rest() {
         &*h.step(Event::Inbound { run: R1, attempt: A1, message: message(event) }),
         &[Request::Inbound { channel: C2, run: R1, attempt: A1, message: message(event) }]
     );
-    assert_eq!(&*h.answer(C2, R2, A2, Answer::Failed, 2), &[answered(A2, R2, Answer::Failed, 2)]);
+    assert_eq!(&*h.answer(C2, R2, A2, FAILED, 2), &[answered(A2, R2, FAILED, 2)]);
 }
 
 #[test]
@@ -876,7 +903,7 @@ fn an_answer_held_while_the_channel_was_down_follows_the_hello() {
     h.start(R2, A2, 2);
     // Its answer keeps the slot until the parent has it durably.
     assert!(h.settle().is_empty());
-    assert_eq!(&*h.answer(C2, R1, A1, Answer::Failed, 1), &[answered(A1, R1, Answer::Failed, 1)]);
+    assert_eq!(&*h.answer(C2, R1, A1, FAILED, 1), &[answered(A1, R1, FAILED, 1)]);
     assert!(h.settle().is_empty());
     assert_eq!(&*h.acknowledge(R1, A1), &[ack(C2, R1, A1)]);
     assert_eq!(&*h.settle(), &[assign(C2, R2, A2), placed(R2, A2)]);
@@ -907,7 +934,7 @@ fn a_fenced_attempt_listed_again_is_cancelled_again() {
     assert_eq!(&*h.hello(C2, 2, &[], &[hosted(R1, A1, Phase::Active)]), &[cancel(C2, R1, A1)]);
     // A2 waits for A1, wherever it is.
     assert!(h.settle().is_empty());
-    assert_eq!(&*h.answer(C2, R1, A1, Answer::Failed, 1), &[ack(C2, R1, A1), drop(1)]);
+    assert_eq!(&*h.answer(C2, R1, A1, FAILED, 1), &[ack(C2, R1, A1), drop(1)]);
     assert_eq!(&*h.settle(), &[assign(C2, R1, A2), placed(R1, A2)]);
 }
 
@@ -930,7 +957,7 @@ fn an_attempt_listed_for_a_run_claimed_otherwise_is_fenced_at_once() {
     h.start(R1, A2, 1);
     assert_eq!(&*h.hello(C1, 2, &[], &[hosted(R1, A1, Phase::Active)]), &[cancel(C1, R1, A1)]);
     assert!(h.settle().is_empty());
-    assert_eq!(&*h.answer(C1, R1, A1, Answer::Failed, 1), &[ack(C1, R1, A1), drop(1)]);
+    assert_eq!(&*h.answer(C1, R1, A1, FAILED, 1), &[ack(C1, R1, A1), drop(1)]);
     assert_eq!(&*h.settle(), &[assign(C1, R1, A2), placed(R1, A2)]);
 }
 
@@ -1037,7 +1064,7 @@ fn a_run_no_claim_adopts_is_cancelled_after_the_grace() {
     assert_eq!(&*h.adopt(R1, A1), &[lost(R1, A1)]);
     h.start(R1, A2, 1);
     assert!(h.settle().is_empty());
-    assert_eq!(&*h.answer(C1, R1, A1, Answer::Failed, 1), &[ack(C1, R1, A1), drop(1)]);
+    assert_eq!(&*h.answer(C1, R1, A1, FAILED, 1), &[ack(C1, R1, A1), drop(1)]);
     assert_eq!(&*h.settle(), &[assign(C1, R1, A2), placed(R1, A2)]);
 }
 
@@ -1081,7 +1108,7 @@ fn an_adopted_claim_cancelled_is_cancelled_once_found() {
     h.adopt(R1, A1);
     assert!(h.step(Event::Cancel { run: R1, attempt: A1 }).is_empty());
     assert_eq!(&*h.hello(C1, 2, &[], &[hosted(R1, A1, Phase::Active)]), &[cancel(C1, R1, A1)]);
-    assert_eq!(&*h.answer(C1, R1, A1, Answer::Failed, 1), &[answered(A1, R1, Answer::Failed, 1)]);
+    assert_eq!(&*h.answer(C1, R1, A1, FAILED, 1), &[answered(A1, R1, FAILED, 1)]);
 }
 
 // Facts and memory.

@@ -213,19 +213,33 @@ pub enum Event {
     Grant {
         grant: Grant,
     },
-    Rejected {
+    /// From a worker: the provider rejected the account's credential of
+    /// `generation`.
+    Unauthorized {
         channel: Token,
         run: Token,
         attempt: Token,
         account: u32,
         generation: u64,
     },
-    Exhausted {
+    /// From a worker: the account reached its provider limit; `reset`, when
+    /// the provider gave one, is how long until it lifts.
+    Limited {
         channel: Token,
         run: Token,
         attempt: Token,
         account: u32,
-        retry_after: Duration,
+        reset: Option<Duration>,
+    },
+    /// From a worker: the provider refused the account, with its code and
+    /// reason.
+    AccountRefused {
+        channel: Token,
+        run: Token,
+        attempt: Token,
+        account: u32,
+        code: Box<[u8]>,
+        reason: Box<[u8]>,
     },
     /// From a worker, first on its channel: its slots, the workstreams it
     /// holds workspaces for, and the runs it hosts or holds answers of.
@@ -334,17 +348,30 @@ pub enum Request {
         attempt: Token,
         grant: Grant,
     },
-    Rejected {
+    /// To the parent: a worker's notice that the provider rejected the
+    /// account's credential of `generation`.
+    Unauthorized {
         run: Token,
         attempt: Token,
         account: u32,
         generation: u64,
     },
-    Exhausted {
+    /// To the parent: a worker's notice that the account reached its
+    /// provider limit, `reset` from now when the provider gave one.
+    Limited {
         run: Token,
         attempt: Token,
         account: u32,
-        retry_after: Duration,
+        reset: Option<Duration>,
+    },
+    /// To the parent: a worker's notice that the provider refused the
+    /// account.
+    AccountRefused {
+        run: Token,
+        attempt: Token,
+        account: u32,
+        code: Box<[u8]>,
+        reason: Box<[u8]>,
     },
     /// To a worker: cancel the attempt `attempt` of the run `run`. Sent
     /// again on every channel whose hello lists it unanswered, the first
@@ -507,8 +534,9 @@ pub enum Answer {
     Ended,
     /// It parked.
     Parked,
-    /// It failed.
-    Failed,
+    /// It failed, `turned` naming the account the run failed on, when the
+    /// provider limited or refused it.
+    Failed { turned: Option<Turned> },
     /// Refused at the entrance, every slot taken or the worker shutting
     /// down: the fleet places the attempt again, and nothing more on that
     /// worker until it frees a slot. Never handed to the parent.
@@ -516,6 +544,16 @@ pub enum Answer {
     /// Refused at the entrance: the assignment does not fit the worker's
     /// limits.
     Invalid,
+}
+
+/// The account a run failed on, when the provider limited or refused it.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Turned {
+    /// The account reached its provider limit; `reset`, when the provider
+    /// gave one, is how long until it lifts.
+    Limited { account: u32, reset: Option<Duration> },
+    /// The provider refused the account.
+    Refused { account: u32 },
 }
 
 /// Why an inbound event reached no worker.

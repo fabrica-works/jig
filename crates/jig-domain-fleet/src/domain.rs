@@ -354,22 +354,30 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Relayed { to, answer } => call::relayed(domain, to, answer, out),
         Event::Acknowledge { run, attempt } => attempt::acknowledge(domain, run, attempt, out),
         Event::Grant { grant } => crate::grants::renew(domain, env, grant, out),
-        Event::Rejected { channel, run, attempt, account, generation } => {
+        Event::Unauthorized { channel, run, attempt, account, generation } => {
             call::credential_notice(
                 domain,
                 channel,
                 run,
                 attempt,
-                Request::Rejected { run, attempt, account, generation },
+                Request::Unauthorized { run, attempt, account, generation },
                 out,
             );
         }
-        Event::Exhausted { channel, run, attempt, account, retry_after } => call::credential_notice(
+        Event::Limited { channel, run, attempt, account, reset } => call::credential_notice(
             domain,
             channel,
             run,
             attempt,
-            Request::Exhausted { run, attempt, account, retry_after },
+            Request::Limited { run, attempt, account, reset },
+            out,
+        ),
+        Event::AccountRefused { channel, run, attempt, account, code, reason } => call::credential_notice(
+            domain,
+            channel,
+            run,
+            attempt,
+            Request::AccountRefused { run, attempt, account, code, reason },
             out,
         ),
         Event::Loaded => attempt::loaded(domain, env),

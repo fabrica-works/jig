@@ -69,7 +69,7 @@ mod turn;
 
 pub use boundary::{
     Answer, Assignment, AttemptState, AttemptView, Call, Event, Grant, GrantName, GrantTable, Hello, HostKind,
-    HostView, Hosted, Kinds, Message, Phase, Placement, Refusal, Request, Undelivered, Withdrawal,
+    HostView, Hosted, Kinds, Message, Phase, Placement, Refusal, Request, Turned, Undelivered, Withdrawal,
 };
 pub use domain::{Domain, fire, max_out, resume, step};
 pub use facts::Fact;

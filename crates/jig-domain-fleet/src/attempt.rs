@@ -560,7 +560,7 @@ pub(crate) fn answer(
                 resent(payload, &mut domain.facts, out);
                 State::Adopted { to, until }
             }
-            Answer::Ended | Answer::Parked | Answer::Failed | Answer::Invalid => {
+            Answer::Ended | Answer::Parked | Answer::Failed { .. } | Answer::Invalid => {
                 handed(to, answer, payload, on, names, &mut domain.facts, out)
             }
         },
@@ -570,7 +570,7 @@ pub(crate) fn answer(
                 let serial = next_serial(&mut domain.serial);
                 State::Waiting { to, workstream, kinds, charter, serial }
             }
-            Answer::Ended | Answer::Parked | Answer::Failed | Answer::Invalid => {
+            Answer::Ended | Answer::Parked | Answer::Failed { .. } | Answer::Invalid => {
                 handed(to, answer, payload, on, names, &mut domain.facts, out)
             }
         },
@@ -579,7 +579,7 @@ pub(crate) fn answer(
                 refused(payload, &mut domain.facts, out);
                 withdrawn(to, Withdrawal::Cancelled, names, out)
             }
-            Answer::Ended | Answer::Parked | Answer::Failed | Answer::Invalid => {
+            Answer::Ended | Answer::Parked | Answer::Failed { .. } | Answer::Invalid => {
                 handed(to, answer, payload, on, names, &mut domain.facts, out)
             }
         },
@@ -605,7 +605,7 @@ pub(crate) fn answer(
     match answer {
         // After the attempt has left its slot, which would lift the draining.
         Answer::Busy => channel::drain(domain, from),
-        Answer::Ended | Answer::Parked | Answer::Failed | Answer::Invalid => {}
+        Answer::Ended | Answer::Parked | Answer::Failed { .. } | Answer::Invalid => {}
     }
 }
 
@@ -904,7 +904,7 @@ fn handed(
     out.push(Request::Answered { to, run: names.run, attempt: names.attempt, answer, payload });
     match answer {
         Answer::Invalid => State::Closed,
-        Answer::Ended | Answer::Parked | Answer::Failed => State::Handed { at },
+        Answer::Ended | Answer::Parked | Answer::Failed { .. } => State::Handed { at },
         Answer::Busy => unreachable!("a busy refusal is placed again, not handed on"),
     }
 }

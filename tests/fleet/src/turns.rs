@@ -256,8 +256,9 @@ impl World {
                 | Request::DropCall { .. }
                 | Request::Undelivered { .. }
                 | Request::Grant { .. }
-                | Request::Rejected { .. }
-                | Request::Exhausted { .. }
+                | Request::Unauthorized { .. }
+                | Request::Limited { .. }
+                | Request::AccountRefused { .. }
                 | Request::NotStarted { .. }
                 | Request::Lost { .. }
                 | Request::Withdrawn { .. }

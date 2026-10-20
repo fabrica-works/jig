@@ -368,7 +368,7 @@ fn every_entry_point_stays_within_the_worst_case() {
             channel: channel(1),
             run: r3,
             attempt: a3,
-            answer: Answer::Failed,
+            answer: Answer::Failed { turned: None },
             payload: Token::new(raw),
         };
         fleet.step(answer);

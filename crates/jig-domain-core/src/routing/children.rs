@@ -11,7 +11,7 @@ use jig_domain_brief as brief;
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Env, Queue, ReplyTo, Token};
+use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token};
 
 pub(super) fn append_people(core: &mut Core, env: &Env<Limits>, event: people::Event, out: &mut Queue<Request>) {
     super::view_routes::touch_people_event(core, &env.limits, &event);
@@ -274,13 +274,17 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 let _pending = core.relaying.remove(&run.raw());
                 Request::Now(Box::new(Now::Undelivered { run, attempt, message }))
             }
-            fleet::Request::Rejected { account, generation, .. } => {
+            fleet::Request::Unauthorized { account, generation, .. } => {
                 append_account(core, env, accounts::Event::Unauthorized { account, generation }, &mut out);
                 continue;
             }
-            fleet::Request::Exhausted { account, retry_after, .. } => {
-                let reset = Some(env.now.saturating_add(retry_after));
+            fleet::Request::Limited { account, reset, .. } => {
+                let reset = reset_at(env.now, reset);
                 append_account(core, env, accounts::Event::Limited { account, reset }, &mut out);
+                continue;
+            }
+            fleet::Request::AccountRefused { account, code, reason, .. } => {
+                append_account(core, env, accounts::Event::Refused { account, code, reason }, &mut out);
                 continue;
             }
             fleet::Request::Grant { channel, run, attempt, grant } => {
@@ -306,10 +310,13 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
             fleet::Request::Answered { payload, .. } if core.stopping => {
                 Request::Now(Box::new(Now::DropPayload { payload }))
             }
-            fleet::Request::Answered { run, attempt, payload, to, .. } => {
+            fleet::Request::Answered { run, attempt, payload, to, answer } => {
                 let _answered = to.into_token();
                 let _: Option<u64> = core.unreported_restored.remove(&run.raw());
                 assert!(core.current_proof(run.raw(), attempt.raw()), "current answer has reserved proof");
+                if let fleet::Answer::Failed { turned: Some(turned) } = answer {
+                    append_account(core, env, run_failed(env.now, turned), &mut out);
+                }
                 Request::Now(Box::new(Now::AnswerPayload { run, attempt, payload }))
             }
         };
@@ -317,6 +324,26 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
     }
     out.push(Request::Decided);
     Requests::Out(out)
+}
+
+/// A worker's limit reset, a span from its notice, as a time on the
+/// engine's clock.
+#[expect(clippy::manual_map, reason = "the strict subset uses an exhaustive match rather than a closure")]
+fn reset_at(now: Time, reset: Option<Duration>) -> Option<Time> {
+    match reset {
+        Some(reset) => Some(now.saturating_add(reset)),
+        None => None,
+    }
+}
+
+/// The account a failed run turned on, for the accounts child.
+fn run_failed(now: Time, turned: fleet::Turned) -> accounts::Event {
+    match turned {
+        fleet::Turned::Limited { account, reset } => {
+            accounts::Event::RunFailed { account, turned: accounts::Turned::Limited { reset: reset_at(now, reset) } }
+        }
+        fleet::Turned::Refused { account } => accounts::Event::RunFailed { account, turned: accounts::Turned::Refused },
+    }
 }
 
 fn append_account(core: &mut Core, env: &Env<Limits>, event: accounts::Event, out: &mut Queue<Request>) {
@@ -422,8 +449,9 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
         | fleet::Event::Relay { .. }
         | fleet::Event::Relayed { .. }
         | fleet::Event::Grant { .. }
-        | fleet::Event::Rejected { .. }
-        | fleet::Event::Exhausted { .. }
+        | fleet::Event::Unauthorized { .. }
+        | fleet::Event::Limited { .. }
+        | fleet::Event::AccountRefused { .. }
         | fleet::Event::Turn { .. }
         | fleet::Event::TurnKept { .. }
         | fleet::Event::TurnBusy { .. }

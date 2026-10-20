@@ -101,7 +101,7 @@ pub fn up(domain: &mut Domain, channel: Token, up: host::LinkUp) -> core::Event 
             let kind = match answer.ending {
                 host::Ending::Ended { .. } => fleet::Answer::Ended,
                 host::Ending::Parked { .. } => fleet::Answer::Parked,
-                host::Ending::Failed { .. } => fleet::Answer::Failed,
+                host::Ending::Failed { .. } => fleet::Answer::Failed { turned: None },
                 host::Ending::Refused(host::Refusal::Busy) => fleet::Answer::Busy,
                 host::Ending::Refused(host::Refusal::Invalid(_)) => fleet::Answer::Invalid,
             };
@@ -125,10 +125,10 @@ pub fn up(domain: &mut Domain, channel: Token, up: host::LinkUp) -> core::Event 
             call: fleet::Call { name: call, tool, writes, input, deadline },
         },
         host::LinkUp::Rejected { run, attempt, account, generation } => {
-            fleet::Event::Rejected { channel, run, attempt, account, generation }
+            fleet::Event::Unauthorized { channel, run, attempt, account, generation }
         }
         host::LinkUp::Exhausted { run, attempt, account, retry_after } => {
-            fleet::Event::Exhausted { channel, run, attempt, account, retry_after }
+            fleet::Event::Limited { channel, run, attempt, account, reset: Some(retry_after) }
         }
         host::LinkUp::Activity { run, attempt, activity } => {
             fleet::Event::Observe { channel, run, attempt, report: report(activity) }

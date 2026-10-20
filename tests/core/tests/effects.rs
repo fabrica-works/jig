@@ -513,7 +513,7 @@ fn a_stale_claim_keeps_its_effect_deadline_until_the_due_right_is_consumed_witho
 }
 
 #[test]
-fn a_rejected_grant_reaches_the_accounts_child() {
+fn an_unauthorized_grant_reaches_the_accounts_child() {
     use jig_domain_fleet as fleet;
     use skein_lib::Token;
     let (config, limits) = jig_core_world::world::two_charters(151);
@@ -521,7 +521,7 @@ fn a_rejected_grant_reaches_the_accounts_child() {
     let before = assignment(&world).grants[0];
     assert_eq!(before.generation, 1);
     let current = assignment(&world);
-    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Rejected {
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Unauthorized {
         channel: Token::new(7),
         run: Token::new(current.task),
         attempt: Token::new(current.attempt),
@@ -532,6 +532,35 @@ fn a_rejected_grant_reaches_the_accounts_child() {
     assert_eq!(world.assignments.len(), 2, "the notice is observed through a fresh assignment");
     let grant = assignment(&world).grants[0];
     assert_eq!((grant.account, grant.generation), (before.account, 2));
+}
+
+#[test]
+fn a_workers_limit_reaches_the_accounts_child_and_holds_its_charter_until_the_reset() {
+    use jig_domain_fleet as fleet;
+    use skein_lib::{Duration, Token, Wall};
+    let (config, limits) = jig_core_world::world::two_charters(152);
+    let mut world = World::configured(152, false, config, limits);
+    let (run, attempt, account) = {
+        let current = assignment(&world);
+        (current.task, current.attempt, current.grants[0].account)
+    };
+    let reset = Duration::from_secs(5);
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Limited {
+        channel: Token::new(7),
+        run: Token::new(run),
+        attempt: Token::new(attempt),
+        account,
+        reset: Some(reset),
+    })));
+    let assigned = world.assignments.len();
+    world.delegate_agent(1, b"wait out the limit");
+    assert_eq!(world.assignments.len(), assigned, "the limited account starts nothing");
+    let (now, wall) = world.clocks();
+    let (now, wall) = (now.saturating_add(reset), Wall::from_nanos(wall.as_nanos().saturating_add(reset.as_nanos())));
+    assert!(world.next_due().is_some_and(|due| due <= now), "the reset is armed");
+    world.fire_due(now, wall);
+    assert_eq!(world.assignments.len(), assigned + 1, "the limit ends at its reset");
+    assert_eq!(assignment(&world).grants[0].account, account);
 }
 
 fn assignment(world: &World) -> &root::Assignment {
