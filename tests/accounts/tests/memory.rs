@@ -39,6 +39,7 @@ fn granted(source: u32) -> FromComponent {
 /// many sources as are kept, each account's signed-in source renewed and signed out in turn, every
 /// sign-in's end kept, and a sign-in under way.
 #[test]
+#[expect(clippy::too_many_lines, reason = "one metered saturation story exercises every retained account state")]
 fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
     let mut out = Queue::with_capacity(max_out(&LIMITS));
     let providers = providers(vec![provider(1, true, true)]);

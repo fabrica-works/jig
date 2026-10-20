@@ -452,32 +452,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 crate::restore::restore(domain, env, record);
             }
         }
-        Event::Want => {
-            if domain.phase != Phase::New {
-                return;
-            }
-            domain.phase = Phase::Wanted;
-            crate::restore::finish(domain, env);
-            crate::ordering::normalize(domain, env, out);
-            none_accounts(domain, env, out);
-            domain.counted(out);
-            for (number, source) in &domain.sources {
-                if (source.kind == Kind::SignIn || source.kind == Kind::Key) && source.account != *number {
-                    let account = domain.accounts.get(&source.account).expect("a source's account");
-                    out.push(Request::Signing(Signing::Restore {
-                        source: *number,
-                        provider: account.provider.expect("party source has a provider"),
-                        kind: source.kind,
-                    }));
-                }
-            }
-            out.push(Request::Signing(Signing::Restored));
-            for (number, source) in &domain.sources {
-                if source.kind == Kind::SignIn || source.kind == Kind::Key {
-                    out.push(Request::Component(ToComponent::Want { account: *number }));
-                }
-            }
-        }
+        Event::Want => want(domain, env, out),
         Event::Credential { number, generation, valid } => credential(domain, env, number, generation, valid, out),
         Event::Close => close(domain, env, out),
         Event::Component(FromComponent::Closed) => {
@@ -526,7 +501,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::signing::sign_in(domain, env, request, holder, by, provider, out);
         }
         Event::SignOut { request, holder, source } => {
-            crate::signing::sign_out(domain, env, request, holder, source, out)
+            crate::signing::sign_out(domain, env, request, holder, source, out);
         }
         Event::Visited { source, address } => {
             if domain.phase == Phase::Wanted {
@@ -547,6 +522,33 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             if domain.phase == Phase::Wanted {
                 crate::signing::signed_out(domain, source, confirmed, out);
             }
+        }
+    }
+}
+/// Finish restoration and name every party source before the component is asked for grants.
+fn want(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    if domain.phase != Phase::New {
+        return;
+    }
+    domain.phase = Phase::Wanted;
+    crate::restore::finish(domain, env);
+    crate::ordering::normalize(domain, env, out);
+    none_accounts(domain, env, out);
+    domain.counted(out);
+    for (number, source) in &domain.sources {
+        if (source.kind == Kind::SignIn || source.kind == Kind::Key) && source.account != *number {
+            let account = domain.accounts.get(&source.account).expect("a source's account");
+            out.push(Request::Signing(Signing::Restore {
+                source: *number,
+                provider: account.provider.expect("party source has a provider"),
+                kind: source.kind,
+            }));
+        }
+    }
+    out.push(Request::Signing(Signing::Restored));
+    for (number, source) in &domain.sources {
+        if source.kind == Kind::SignIn || source.kind == Kind::Key {
+            out.push(Request::Component(ToComponent::Want { account: *number }));
         }
     }
 }

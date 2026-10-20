@@ -357,6 +357,7 @@ impl Accounts {
         match request {
             domain::Request::Component(request) => self.down(translate::down(request)),
             domain::Request::Signing(signing) => {
+                // w1c wires LLM-key keeps and the restart inventory into the component.
                 match signing {
                     domain::Signing::Keep { .. }
                     | domain::Signing::Forget { .. }
@@ -499,8 +500,8 @@ impl Accounts {
                     let granted_form = self.granted(account, generation, value, expires, values);
                     match &mut event {
                         domain::FromComponent::Granted { form, .. } => *form = granted_form,
-                        domain::FromComponent::KeepFailed { .. }
-                        | domain::FromComponent::Expiring { .. }
+                        domain::FromComponent::Expiring { .. }
+                        | domain::FromComponent::KeepFailed { .. }
                         | domain::FromComponent::Failed { .. }
                         | domain::FromComponent::Closed => unreachable!("a lent value accompanies its grant"),
                     }

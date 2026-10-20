@@ -219,6 +219,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
     for _ in 0..16_u32 {
         for output in take(&mut domain, &env) {
             match output {
+                Output::Now(core::Now::Account(accounts::Request::Signing(accounts::Signing::Restored))) => {}
                 Output::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Want {
                     account,
                 }))) => {

@@ -341,7 +341,13 @@ fn change_account(core: &mut Core, env: &Env<Limits>, holder: accounts::Holder, 
         accounts::Event::Change { request: Token::new(70), holder, change },
         &mut out,
     );
-    assert!(out.iter().any(|r| matches!(r, accounts::Request::Answer { answer: accounts::Answer::Done, .. })));
+    let mut answered = false;
+    while let Some(request) = out.pop() {
+        if let accounts::Request::Answer { answer: accounts::Answer::Done, .. } = request {
+            answered = true;
+        }
+    }
+    assert!(answered);
 }
 #[test]
 fn the_accounts_document_shows_uses_and_order() {
@@ -353,7 +359,7 @@ fn the_accounts_document_shows_uses_and_order() {
         source(DEPLOYMENT, 41, 0, accounts::Kind::Key),
     ]);
     let (mut core, env) = fixture(records);
-    let uses = Box::new([accounts::Use::Party(BOB), accounts::Use::Project(0)]);
+    let uses = Box::new([Use::Party(BOB), Use::Project(0)]);
     change_account(
         &mut core,
         &env,
@@ -372,16 +378,13 @@ fn the_accounts_document_shows_uses_and_order() {
         rows.iter().map(|r| (r.number, r.place, r.plan)).collect::<Vec<_>>(),
         vec![(25, 0, false), (OWN, 1, true)]
     );
-    assert_eq!(
-        rows[0].uses.as_ref().expect("explicit uses").as_slice(),
-        &[accounts::Use::Party(BOB), accounts::Use::Project(0)]
-    );
+    assert_eq!(rows[0].uses.as_ref().expect("explicit uses").as_slice(), &[Use::Party(BOB), Use::Project(0)]);
     assert_eq!(rows[1].uses, None);
     change_account(
         &mut core,
         &env,
         accounts::Holder::Deployment,
-        accounts::Change::SetUses { account: DEPLOYMENT, uses: Some(Box::new([accounts::Use::Party(ALICE)])) },
+        accounts::Change::SetUses { account: DEPLOYMENT, uses: Some(Box::new([Use::Party(ALICE)])) },
     );
     let Document::Deployment(deployment) =
         make(&core, &env.limits, ALICE, &Subject::Deployment, &window(), env.wall).expect("owner deployment")
@@ -390,7 +393,7 @@ fn the_accounts_document_shows_uses_and_order() {
     };
     let row = deployment.accounts.get(0).expect("deployment account");
     assert_eq!((row.number, row.place, row.plan), (DEPLOYMENT, 0, false));
-    assert_eq!(row.uses.as_ref().expect("deployment uses").as_slice(), &[accounts::Use::Party(ALICE)]);
+    assert_eq!(row.uses.as_ref().expect("deployment uses").as_slice(), &[Use::Party(ALICE)]);
     let mut short = env;
     short.limits.documents.lines = 1;
     let cut = document(&core, &short, ALICE);
@@ -425,8 +428,8 @@ fn serves_work_follows_the_uses() {
     );
     for (uses, alice, bob) in [
         (None, true, false),
-        (Some(vec![accounts::Use::Party(BOB)]), false, true),
-        (Some(vec![accounts::Use::Project(0)]), false, false),
+        (Some(vec![Use::Party(BOB)]), false, true),
+        (Some(vec![Use::Project(0)]), false, false),
         (Some(vec![]), false, false),
     ] {
         change_account(
@@ -448,7 +451,7 @@ fn serves_work_follows_the_uses() {
         &mut core,
         &env,
         accounts::Holder::Deployment,
-        accounts::Change::SetUses { account: DEPLOYMENT, uses: Some(Box::new([accounts::Use::Party(ALICE)])) },
+        accounts::Change::SetUses { account: DEPLOYMENT, uses: Some(Box::new([Use::Party(ALICE)])) },
     );
     assert!(document(&core, &env, ALICE).usable);
     assert!(!document(&core, &env, BOB).usable);

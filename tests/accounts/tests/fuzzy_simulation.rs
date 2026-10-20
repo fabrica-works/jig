@@ -161,22 +161,7 @@ fn changes(seed: u64) -> Vec<Request> {
         if source != u32::MAX && rng.chance(20) {
             trace.extend(world.step(Event::Limited { account: source, reset: None }));
         }
-        let views = world.views();
-        let mut places = Vec::new();
-        for view in &views {
-            let account = world.domain.account(view.account).expect("account view");
-            places.push(account.place());
-            assert_eq!(
-                account.sources().iter().map(|(p, _)| *p).collect::<Vec<_>>(),
-                (0..account.sources().len()).collect::<Vec<_>>()
-            );
-            if let Some(uses) = account.uses() {
-                assert!(uses.len() <= 16);
-            }
-        }
-        places.sort_unstable();
-        assert_eq!(places, (0..world.domain.accounts()).collect::<Vec<_>>());
-        assert!(world.domain.accounts() <= jig_accounts_world::LIMITS.accounts);
+        dense_and_bounded(&world);
         // Counter records carry only numbers; LLM-key values never enter the trace.
         for output in &trace {
             if let Request::Save { record: Stored::Next { number } } = output {
@@ -188,6 +173,24 @@ fn changes(seed: u64) -> Vec<Request> {
     trace.extend(world.step(Event::Component(FromComponent::Closed)));
     assert_eq!(world.domain.accounts(), 0);
     trace
+}
+fn dense_and_bounded(world: &World) {
+    let views = world.views();
+    let mut places = Vec::new();
+    for view in &views {
+        let account = world.domain.account(view.account).expect("account view");
+        places.push(account.place());
+        assert_eq!(
+            account.sources().iter().map(|(p, _)| *p).collect::<Vec<_>>(),
+            (0..account.sources().len()).collect::<Vec<_>>()
+        );
+        if let Some(uses) = account.uses() {
+            assert!(uses.len() <= 16);
+        }
+    }
+    places.sort_unstable();
+    assert_eq!(places, (0..world.domain.accounts()).collect::<Vec<_>>());
+    assert!(world.domain.accounts() <= jig_accounts_world::LIMITS.accounts);
 }
 #[test]
 fn seeded_account_changes_replay() {

@@ -74,12 +74,12 @@ pub(crate) fn change(
         Change::SetUses { account: number, uses } => match account(domain, holder, number) {
             Err(refusal) => Err(refusal),
             Ok(()) => {
-                if !crate::records::valid_uses(uses.as_deref()) {
-                    Err(Refusal::Uses)
-                } else {
+                if crate::records::valid_uses(uses.as_deref()) {
                     domain.accounts.get_mut(&number).expect("checked account").uses = uses;
                     out.push(Request::Save { record: crate::ordering::account_record(domain, number) });
                     Ok(())
+                } else {
+                    Err(Refusal::Uses)
                 }
             }
         },

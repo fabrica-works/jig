@@ -415,10 +415,11 @@ pub(super) fn remember_due(core: &mut Core, context: Box<tasks::RunContext>) {
 }
 
 /// Determine the concerned party before the step removes an ended sign-in.
+// Pending sign-in facts name their asker; account state can serve other parties through uses.
 fn account_party(core: &Core, event: &accounts::Event) -> Option<u64> {
     match event {
         accounts::Event::SignIn { by, .. } => Some(*by),
-        accounts::Event::SignedIn { source, .. } | accounts::Event::SignInFailed { source, .. } => {
+        accounts::Event::SignInFailed { source, .. } => {
             for pending in &core.accounts.pending() {
                 if pending.source == *source {
                     return match pending.holder {
@@ -429,11 +430,10 @@ fn account_party(core: &Core, event: &accounts::Event) -> Option<u64> {
             }
             None
         }
-        accounts::Event::SignOut { holder, .. } | accounts::Event::Change { holder, .. } => match holder {
-            accounts::Holder::Party(party) => Some(*party),
-            accounts::Holder::Deployment => None,
-        },
-        accounts::Event::Restore { .. }
+        accounts::Event::SignedIn { .. }
+        | accounts::Event::SignOut { .. }
+        | accounts::Event::Change { .. }
+        | accounts::Event::Restore { .. }
         | accounts::Event::Want
         | accounts::Event::Component(_)
         | accounts::Event::Unauthorized { .. }

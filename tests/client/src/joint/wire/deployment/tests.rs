@@ -26,6 +26,7 @@ fn source_run() -> documents::HostRun {
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "one complete deployment fixture exercises every document field")]
 pub(crate) fn source() -> documents::Deployment {
     let mut run = source_run();
     run.state = fleet::AttemptState::Kept;

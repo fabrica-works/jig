@@ -302,7 +302,7 @@ pub(crate) fn signed_out(domain: &mut Domain, source: u32, confirmed: bool, out:
     if let Some(leaving) = domain.signing_out.remove(&source) {
         match leaving {
             crate::changes::Leaving::Source(request) => {
-                out.push(Request::Answer { request, answer: Answer::SignedOut { confirmed } })
+                out.push(Request::Answer { request, answer: Answer::SignedOut { confirmed } });
             }
             crate::changes::Leaving::Account(account) => crate::changes::signed_out(domain, account, confirmed, out),
         }
