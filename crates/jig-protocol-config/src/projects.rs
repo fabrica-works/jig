@@ -2,6 +2,7 @@
 use crate::{Path, Problems, What, check, domain, read};
 use alloc::boxed::Box;
 use jig_domain_authority as authority;
+use jig_domain_core::Model;
 use jig_domain_people::PermissionRole;
 use skein_json::Document;
 use skein_lib::{List, Wall};
@@ -19,11 +20,12 @@ pub(crate) fn rules(
     at: u32,
     path: &Path,
     limits: &authority::Limits,
+    configured: &[Model],
     problems: &mut Problems,
 ) -> Option<authority::Rules> {
     let mut object = check::object(document, at, path, problems)?;
     let at = object.required(document, b"ceiling", path, problems);
-    let ceiling = value(document, at, &path.member(b"ceiling"), limits, problems);
+    let ceiling = value(document, at, &path.member(b"ceiling"), limits, Some(configured), problems);
     let period_spend = check::integer(&mut object, document, b"period_spend", path, problems);
     let minimum_run_spend = check::integer(&mut object, document, b"minimum_run_spend", path, problems);
     let maximum_run_spend = check::integer(&mut object, document, b"maximum_run_spend", path, problems);
@@ -48,6 +50,7 @@ pub(crate) fn projects(
     at: u32,
     path: &Path,
     limits: &crate::Limits,
+    configured: &[Model],
     problems: &mut Problems,
 ) -> Option<Box<[Project]>> {
     let items = domain::items(document, at, limits.core.authority.projects, path, problems)?;
@@ -57,7 +60,7 @@ pub(crate) fn projects(
         let Some(mut object) = check::object(document, *at, &path, problems) else { continue };
         let number = check::count(&mut object, document, b"number", &path, problems);
         let at = object.required(document, b"policy", &path, problems);
-        let policy = policy(document, at, &path.member(b"policy"), limits, problems);
+        let policy = policy(document, at, &path.member(b"policy"), limits, configured, problems);
         let roles = permissions(&mut object, document, &path, limits, problems);
         object.finish(document, &path, problems);
         if let Some(number) = number
@@ -116,6 +119,7 @@ fn policy(
     at: Option<u32>,
     path: &Path,
     limits: &crate::Limits,
+    configured: &[Model],
     problems: &mut Problems,
 ) -> Option<(authority::Policy, Box<[jig_domain_people::TemplateOverride]>)> {
     let mut object = check::object(document, at?, path, problems)?;
@@ -126,7 +130,7 @@ fn policy(
     let escalation = check::optional(&mut object, document, b"escalation_role", path, problems);
     let escalation_role = optional_count(escalation, &path.member(b"escalation_role"), problems);
     let at = object.required(document, b"ceiling", path, problems);
-    let ceiling = value(document, at, &path.member(b"ceiling"), limits, problems);
+    let ceiling = value(document, at, &path.member(b"ceiling"), limits, Some(configured), problems);
     let projections = grants(&mut object, document, b"projections", path, limits, problems);
     let period_spend = check::integer(&mut object, document, b"period_spend", path, problems);
     let roles = roles(&mut object, document, path, limits, problems);
@@ -158,7 +162,7 @@ fn roles(
         let Some(mut object) = check::object(document, *at, &path, problems) else { continue };
         let number = check::count(&mut object, document, b"number", &path, problems);
         let at = object.required(document, b"authority", &path, problems);
-        let authority = value(document, at, &path.member(b"authority"), limits, problems);
+        let authority = value(document, at, &path.member(b"authority"), limits, None, problems);
         let period_spend = check::integer(&mut object, document, b"period_spend", &path, problems);
         let requests = check::short(&mut object, document, b"requests", &path, problems);
         let decides = check::short(&mut object, document, b"decides", &path, problems);
@@ -193,15 +197,22 @@ fn roles(
     }
     Some(roles.into_boxed())
 }
+/// An authority's form. A ceiling, given the configured models, may name fewer of them; a role's
+/// names no models yet, and so narrows none.
 fn value(
     document: &Document,
     at: Option<u32>,
     path: &Path,
     limits: &authority::Limits,
+    configured: Option<&[Model]>,
     problems: &mut Problems,
 ) -> Option<authority::Authority> {
     let mut object = check::object(document, at?, path, problems)?;
     let tools = check::integer(&mut object, document, b"tools", path, problems);
+    let models = match configured {
+        Some(configured) => models(&mut object, document, path, configured, problems),
+        None => Some(authority::Models::ALL),
+    };
     let grants = grants(&mut object, document, b"grants", path, limits, problems);
     let at = object.required(document, b"delegation", path, problems);
     let delegation = delegation(document, at, &path.member(b"delegation"), limits, problems);
@@ -216,13 +227,67 @@ fn value(
     }
     Some(authority::Authority {
         tools: authority::Tools(tools?),
-        models: authority::Models::ALL,
+        models: models?,
         grants: grants?,
         delegation: delegation?,
         budget: budget?,
         notes: authority::Scopes(u8::try_from(notes).ok()?),
         note_resources: note_resources?,
     })
+}
+/// The configured models a ceiling's `models` names, one bit each in configuration's order;
+/// absent, every configured model.
+fn models(
+    object: &mut read::Object,
+    document: &Document,
+    path: &Path,
+    configured: &[Model],
+    problems: &mut Problems,
+) -> Option<authority::Models> {
+    let Some(at) = object.member(document, b"models") else {
+        let count = u32::try_from(configured.len()).unwrap_or(u32::MAX);
+        return Some(authority::Models(u64::MAX.checked_shr(u64::BITS.saturating_sub(count)).unwrap_or(0)));
+    };
+    let path = path.member(b"models");
+    let items = match read::list(document, at, crate::llm::MODELS) {
+        Ok(items) => items,
+        Err(what) => {
+            problems.push(path, what);
+            return None;
+        }
+    };
+    let mut models = authority::Models::NONE;
+    let mut named = true;
+    for (index, at) in items.iter().enumerate() {
+        let path = check::index(&path, index);
+        let name = match read::text(document, *at, 4_096) {
+            Ok(name) => name,
+            Err(what) => {
+                problems.push(path, what);
+                named = false;
+                continue;
+            }
+        };
+        let mut bit = None;
+        for (number, model) in configured.iter().enumerate() {
+            if model.name == name {
+                bit = 1_u64.checked_shl(u32::try_from(number).unwrap_or(u32::MAX));
+                break;
+            }
+        }
+        match bit {
+            Some(bit) if models.0 & bit == 0 => models.0 |= bit,
+            Some(_) => {
+                problems.push(path, What::Unique);
+                named = false;
+            }
+            None => {
+                problems.push(path, What::Refers);
+                named = false;
+            }
+        }
+    }
+    if named { Some(models) } else { None }
 }
 fn budget(document: &Document, at: Option<u32>, path: &Path, problems: &mut Problems) -> Option<authority::Budget> {
     let mut object = check::object(document, at?, path, problems)?;

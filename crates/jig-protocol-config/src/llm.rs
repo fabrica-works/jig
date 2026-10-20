@@ -4,6 +4,9 @@ use alloc::boxed::Box;
 use jig_domain_core::Model;
 use skein_json::Document;
 use skein_lib::{Duration, List};
+/// The most models configuration names: authority keeps a party's models one bit each
+/// (configuration.md, section 6).
+pub(crate) const MODELS: u32 = 64;
 #[derive(Debug)]
 pub struct Llm {
     pub endpoints: Box<[Endpoint]>,
@@ -116,7 +119,7 @@ pub(crate) fn parse(
         }
     }
     let mut models = List::<Model>::with_capacity(document.len());
-    if let Some(items) = check::list(&mut object, document, b"models", document.len(), path, problems) {
+    if let Some(items) = check::list(&mut object, document, b"models", MODELS, path, problems) {
         for (index, at) in items.iter().enumerate() {
             let path = path.member(b"models").child(Segment::Index(u32::try_from(index).expect("list bounded by u32")));
             if let Some(value) = model(document, *at, &path, endpoints.as_slice(), problems) {

@@ -154,6 +154,47 @@ fn a_connector_numbered_as_the_cores_own_is_refused() {
     refuses(br#""connectors": [1]"#, br#""connectors": [65535]"#, What::Bound);
 }
 #[test]
+fn a_ceiling_without_models_takes_every_configured_model() {
+    let engine = engine();
+    assert_eq!(engine.rules.ceiling.models, jig_domain_authority::Models(0b1));
+    assert_eq!(engine.projects[0].policy.ceiling.models, jig_domain_authority::Models(0b1));
+}
+#[test]
+fn a_ceilings_models_name_the_configured_models_it_keeps() {
+    let ceiling = br#""ceiling": {"tools": 1023,"#;
+    let named = fixtures::engine(&fixtures::with(
+        fixtures::ENGINE_SMALL,
+        ceiling,
+        br#""ceiling": {"tools": 1023, "models": ["small"],"#,
+    ));
+    assert_eq!(named.unwrap().rules.ceiling.models, jig_domain_authority::Models(0b1));
+    let none = fixtures::engine(&fixtures::with(
+        fixtures::ENGINE_SMALL,
+        ceiling,
+        br#""ceiling": {"tools": 1023, "models": [],"#,
+    ));
+    assert_eq!(none.unwrap().rules.ceiling.models, jig_domain_authority::Models::NONE);
+}
+fn a_ceiling_naming_an_unknown_model_is_refused() {
+    fixtures::refuses(
+        br#""ceiling": {"tools": 1023,"#,
+        br#""ceiling": {"tools": 1023, "models": ["large"],"#,
+        fixtures::path(&[b"rules", b"ceiling", b"models"]).child(crate::Segment::Index(0)),
+        What::Refers,
+    );
+}
+fn a_ceiling_naming_a_model_twice_is_refused() {
+    fixtures::refuses(
+        br#""ceiling": {"tools": 1023,"#,
+        br#""ceiling": {"tools": 1023, "models": ["small", "small"],"#,
+        fixtures::path(&[b"rules", b"ceiling", b"models"]).child(crate::Segment::Index(1)),
+        What::Unique,
+    );
+}
+fn a_roles_models_member_is_refused_as_unknown() {
+    refuses(br#""authority": {"tools": 1023,"#, br#""authority": {"tools": 1023, "models": ["small"],"#, What::Unknown);
+}
+#[test]
 fn each_owner_owns_every_seeded_project() {
     let engine = fixtures::engine(&two_projects(b'2')).unwrap();
     assert_eq!(engine.owners.len(), 2);
@@ -253,6 +294,9 @@ fn domain_configuration_problems_name_the_invalid_fields() {
             "an_implication_table_not_transitively_closed_is_refused",
             an_implication_table_not_transitively_closed_is_refused,
         ),
+        ("a_ceiling_naming_an_unknown_model_is_refused", a_ceiling_naming_an_unknown_model_is_refused),
+        ("a_ceiling_naming_a_model_twice_is_refused", a_ceiling_naming_a_model_twice_is_refused),
+        ("a_roles_models_member_is_refused_as_unknown", a_roles_models_member_is_refused_as_unknown),
     ]);
 }
 

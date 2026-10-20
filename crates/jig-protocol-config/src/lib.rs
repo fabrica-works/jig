@@ -104,13 +104,18 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     if let Some(at) = object.required(document, b"providers", &path, &mut problems) {
         providers = domain::providers(document, at, &path.member(b"providers"), &mut problems);
     }
+    let configured = match &llm {
+        Some(llm) => &*llm.models,
+        None => &[],
+    };
     let mut rules = None;
     if let Some(at) = object.required(document, b"rules", &path, &mut problems) {
-        rules = projects::rules(document, at, &path.member(b"rules"), &limits.core.authority, &mut problems);
+        let authority = &limits.core.authority;
+        rules = projects::rules(document, at, &path.member(b"rules"), authority, configured, &mut problems);
     }
     let mut projects = None;
     if let Some(at) = object.required(document, b"projects", &path, &mut problems) {
-        projects = projects::projects(document, at, &path.member(b"projects"), &limits, &mut problems);
+        projects = projects::projects(document, at, &path.member(b"projects"), &limits, configured, &mut problems);
     }
     let mut connectors = None;
     if let Some(at) = object.required(document, b"connectors", &path, &mut problems) {
