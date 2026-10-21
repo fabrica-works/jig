@@ -102,6 +102,40 @@ fn pick(random: &mut Rng, choices: &[u64]) -> u64 {
     *choices.get(usize::try_from(random.below(choices.len() as u64)).expect("small draw")).expect("nonempty choices")
 }
 
+// A done stub can disappear at the next removal of its last live name.
+// Draw a new add while it is available, across all possible dependents.
+fn draw_met(world: &World, random: &mut Rng) -> Option<Operation> {
+    let mut choices = Vec::new();
+    for (_, record) in world.records.range(Key::Stub(0)..=Key::Stub(u64::MAX)) {
+        if let Stored::Stub(stub) = record
+            && stub.phase == Status::Done
+        {
+            for task in live(world) {
+                if !world.record(task).dependencies.contains(&stub.task) {
+                    choices.push((task, stub.task));
+                }
+            }
+        }
+    }
+    if choices.is_empty() {
+        return None;
+    }
+    let (task, dependency) = *choices
+        .get(usize::try_from(random.below(choices.len() as u64)).expect("small draw"))
+        .expect("nonempty choices");
+    let mut dependencies = world.record(task).dependencies.to_vec();
+    dependencies.push(dependency);
+    Some(Operation::Amend { task, dependencies })
+}
+
+fn done(world: &World, dependency: u64) -> bool {
+    if let Some(Stored::Stub(stub)) = world.records.get(&Key::Stub(dependency)) {
+        return stub.phase == Status::Done;
+    }
+    matches!(world.records.get(&Key::Ended(dependency)),
+        Some(Stored::Ended(row)) if matches!(row.phase, Phase::Ended(jig_domain_tasks::Ending::Done(_))))
+}
+
 fn draw(world: &World, random: &mut Rng) -> Operation {
     let task = pick(random, &live(world));
     match random.below(13) {
@@ -118,19 +152,14 @@ fn draw(world: &World, random: &mut Rng) -> Operation {
                     dependencies.pop();
                 }
                 2 => {
-                    dependencies.clear();
-                    // Prefer a new done stub when one is visible, so compound
-                    // draws do not crowd out the already-met admission marker.
-                    let mut met = Vec::new();
-                    for (_, record) in world.records.range(Key::Stub(0)..=Key::Stub(u64::MAX)) {
-                        if let Stored::Stub(stub) = record
-                            && stub.phase == Status::Done
-                            && !world.record(task).dependencies.contains(&stub.task)
-                        {
-                            met.push(stub.task);
-                        }
+                    if random.chance(500)
+                        && let Some(operation) = draw_met(world, random)
+                    {
+                        return operation;
                     }
-                    dependencies.push(if met.is_empty() { random.below(6) + 1 } else { pick(random, &met) });
+                    dependencies.clear();
+                    // Ended names deliberately exercise both met and refusal.
+                    dependencies.push(random.below(6) + 1);
                 }
                 _ => unreachable!(),
             }
@@ -214,10 +243,7 @@ fn amend(world: &mut World, task: u64, dependencies: &[u64], seen: &mut BTreeSet
                 seen.insert(Reached::QueueLeft);
             }
             for dependency in dependencies {
-                if !before.dependencies.contains(dependency)
-                    && let Some(Stored::Ended(row)) = world.records.get(&Key::Ended(*dependency))
-                    && matches!(row.phase, Phase::Ended(jig_domain_tasks::Ending::Done(_)))
-                {
+                if !before.dependencies.contains(dependency) && done(world, *dependency) {
                     assert!(!after.waiting_on.contains(dependency));
                     let mut recorded = false;
                     for added in &after.added {
