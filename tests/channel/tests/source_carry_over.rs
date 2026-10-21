@@ -47,6 +47,7 @@ fn opening() -> record::Opening {
     record::Opening {
         window_llm: None,
         spec: session::Spec {
+            backend: record::Backend::Direct,
             // Both grants may belong to one billing account; smith sees source identities.
             account: Some(13),
             final_turn: None,
