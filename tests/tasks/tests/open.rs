@@ -41,15 +41,19 @@ fn raw_finish() -> End {
 }
 
 fn replied(flags: Flags) -> World {
-    let mut w = claimed(flags);
-    commit_turn(&mut w, 1, None);
-    w.terminal(
-        1,
+    after_turn(
+        flags,
         End::Finished {
             result: TaskResult::Verdict { fields: Box::new([]), code: 0, words: Box::new([]) },
             cancel_delegates: false,
         },
-    );
+    )
+}
+
+fn after_turn(flags: Flags, end: End) -> World {
+    let mut w = claimed(flags);
+    commit_turn(&mut w, 1, None);
+    w.terminal(1, end);
     w
 }
 
@@ -73,10 +77,11 @@ fn past_backoff(w: &mut World) {
     w.elapse(longest.saturating_add(Duration::from_nanos(1)));
 }
 
-fn say(w: &mut World, number: u64) {
+fn say(w: &mut World, number: u64) -> Reply {
     let reply_to = w.to();
+    let call = reply_to.into_token().raw();
     w.send(Event::Message {
-        reply_to,
+        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
         project: 1,
         task: 1,
         word: Word {
@@ -89,6 +94,7 @@ fn say(w: &mut World, number: u64) {
             eligible: true,
         },
     });
+    w.replies[&call].clone()
 }
 
 #[test]
@@ -328,4 +334,131 @@ fn an_open_task_held_from_closing_drops_open() {
     let Stored::Ended(row) = &w.records[&Key::Ended(CHAT)] else { panic!("ended task record") };
     assert_eq!(row.last_reply, 1);
     run_ended(&w, ATTEMPT, EndKind::Cancelled);
+}
+
+#[test]
+fn an_open_runs_refused_end_backs_off_and_counts_a_refusal() {
+    const CHAT: u64 = 1;
+    const ATTEMPT: u64 = 1;
+    let mut w = claimed(Flags { conversation: true, ended_by: EndedBy::Requester, ..Flags::PLAIN });
+    commit_turn(&mut w, ATTEMPT, None);
+    assert_eq!(w.terminal(CHAT, End::Refused), Reply::Acknowledged(Accepted::New));
+    assert!(matches!(w.record(CHAT).phase, Phase::Active(Active::BackingOff { .. })));
+    assert_eq!(w.record(CHAT).refusals, 1);
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert_eq!(w.record(CHAT).last_answer, Some(ATTEMPT));
+    assert!(w.results.is_empty());
+    assert_eq!(w.activations(CHAT), 1);
+    committed_turn(&w);
+    run_ended(&w, ATTEMPT, EndKind::Refused);
+    past_backoff(&mut w);
+    assert_eq!(w.record(CHAT).phase, Phase::Active(Active::Due));
+    assert_eq!(w.record(CHAT).refusals, 1);
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert!(w.results.is_empty());
+    assert_eq!(w.activations(CHAT), 2);
+    committed_turn(&w);
+}
+
+#[test]
+fn an_open_runs_recheck_goes_due_without_a_try() {
+    const CHAT: u64 = 1;
+    const ATTEMPT: u64 = 1;
+    let mut w = claimed(Flags { conversation: true, ended_by: EndedBy::Requester, ..Flags::PLAIN });
+    commit_turn(&mut w, ATTEMPT, None);
+    assert_eq!(w.terminal(CHAT, End::Recheck), Reply::Acknowledged(Accepted::New));
+    assert_eq!(w.record(CHAT).phase, Phase::Active(Active::Due));
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert_eq!(w.record(CHAT).refusals, 0);
+    assert_eq!(w.record(CHAT).last_answer, Some(ATTEMPT));
+    assert_eq!(w.activations(CHAT), 2);
+    assert!(w.results.is_empty());
+    committed_turn(&w);
+    run_ended(&w, ATTEMPT, EndKind::Refused);
+}
+
+#[test]
+fn a_finish_grace_cancels_an_idle_open_task_at_once() {
+    const CHAT: u64 = 1;
+    const GRACE: Duration = Duration::from_secs(5);
+    const BEFORE_GRACE: Duration = Duration::from_secs(4);
+    const LAST_SECOND: Duration = Duration::from_secs(1);
+    let mut open = replied(Flags { conversation: true, ended_by: EndedBy::Requester, ..Flags::PLAIN });
+    let at = open.env.wall;
+    let now = open.env.now;
+    let cancel = Control::Cancel { reason: b"stop".as_slice().into(), grace: Some(GRACE), message: Some(1) };
+    assert_eq!(control(&mut open, cancel.clone()), Reply::Done);
+    assert!(open.record(CHAT).grace.is_none());
+    open.settle(CHAT);
+    cancelled(&open, &open.results[&CHAT], at, None);
+    assert_eq!(open.env.wall, at);
+    assert_eq!(open.env.now, now);
+    assert_eq!(open.activations(CHAT), 1);
+    let Stored::Ended(row) = &open.records[&Key::Ended(CHAT)] else { panic!("ended open task") };
+    assert_eq!(row.last_reply, 1);
+    assert_eq!(row.ended_at, Some(at));
+
+    let mut finite = after_turn(Flags::PLAIN, End::Parked);
+    let until = skein_lib::Wall::from_nanos(at.as_nanos() + GRACE.as_nanos());
+    assert_eq!(control(&mut finite, cancel), Reply::Done);
+    assert_eq!(finite.record(CHAT).grace.as_ref().expect("finite grace").until, until);
+    assert_eq!(finite.record(CHAT).inbox.len(), 1);
+    assert_eq!(finite.record(CHAT).inbox[0].number, 1);
+    assert_eq!(finite.record(CHAT).inbox[0].words.as_ref(), b"stop");
+    assert_eq!(finite.activations(CHAT), 2);
+    finite.elapse(BEFORE_GRACE);
+    assert_eq!(finite.record(CHAT).phase, Phase::Active(Active::Due));
+    assert!(finite.results.is_empty());
+    assert_eq!(finite.record(CHAT).tries, Tries::NONE);
+    committed_turn(&finite);
+    finite.elapse(LAST_SECOND);
+    finite.settle(CHAT);
+    cancelled(&finite, &finite.results[&CHAT], until, None);
+    assert_eq!(finite.env.wall, until);
+    assert_eq!(finite.env.now, now.saturating_add(GRACE));
+    assert_eq!(finite.activations(CHAT), 2);
+    let Stored::Ended(row) = &finite.records[&Key::Ended(CHAT)] else { panic!("ended finite task") };
+    assert_eq!(row.last_reply, 1);
+    assert_eq!(row.ended_at, Some(until));
+}
+
+#[test]
+fn an_open_chat_wakes_once_per_unread_message() {
+    const CHAT: u64 = 1;
+    const NEXT_ATTEMPT: u64 = 2;
+    const FIRST_MESSAGE: u64 = 1;
+    const NEXT_MESSAGE: u64 = 2;
+    let mut w = replied(Flags { conversation: true, ended_by: EndedBy::Requester, ..Flags::PLAIN });
+    assert_eq!(say(&mut w, FIRST_MESSAGE), Reply::Done);
+    assert_eq!(w.activations(CHAT), 2);
+    assert_eq!(w.record(CHAT).inbox.len(), 1);
+    assert_eq!(w.record(CHAT).inbox[0].words.as_ref(), b"again");
+    w.claim(CHAT, NEXT_ATTEMPT);
+    commit_turn(&mut w, NEXT_ATTEMPT, Some(FIRST_MESSAGE));
+    assert_eq!(w.terminal(CHAT, raw_finish()), Reply::Acknowledged(Accepted::New));
+    assert_eq!(w.record(CHAT).phase, Phase::Active(Active::Idle));
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert_eq!(w.record(CHAT).last_message, FIRST_MESSAGE);
+    assert_eq!(w.record(CHAT).last_reply, 2);
+    assert!(w.record(CHAT).inbox.is_empty());
+    assert_eq!(w.activations(CHAT), 2);
+    assert!(w.results.is_empty());
+    let before = w.records.clone();
+    assert_eq!(say(&mut w, FIRST_MESSAGE), Reply::Refused(Problem::new(Some(CHAT), Refusal::Read)));
+    assert_eq!(w.records, before);
+    assert_eq!(w.activations(CHAT), 2);
+    assert_eq!(say(&mut w, NEXT_MESSAGE), Reply::Done);
+    assert_eq!(w.record(CHAT).phase, Phase::Active(Active::Due));
+    assert_eq!(w.activations(CHAT), 3);
+    assert_eq!(w.record(CHAT).inbox.len(), 1);
+    assert_eq!(w.record(CHAT).inbox[0].number, NEXT_MESSAGE);
+    assert_eq!(w.record(CHAT).inbox[0].words.as_ref(), b"again");
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert_eq!(w.record(CHAT).last_reply, 2);
+    assert!(w.results.is_empty());
+    assert!(w.records.values().any(|row| matches!(row,
+        Stored::Activity(row) if row.task == CHAT && row.line == Line::Turn {
+            reply: 2, attempt: NEXT_ATTEMPT, turn: 1, read: Some(FIRST_MESSAGE),
+        }
+    )));
 }
