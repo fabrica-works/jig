@@ -274,6 +274,20 @@ fn a_procedures_done_step_is_refused_whole_while_kept_but_wait_and_failure_still
 }
 
 #[test]
+fn a_procedures_invalid_done_step_is_refused_as_kept() {
+    let mut world = World::new(852, LIMITS);
+    let mut new = task(1, &[]);
+    new.executor = Executor::Procedure { connector: 1, code: 1 };
+    new.contract = tasks::Contract::Report { words: 1 };
+    world.make(Party::Person(9), vec![new, task(2, &[])]);
+    keep(&mut world);
+    let before = world.records.clone();
+    let invalid = TaskResult::Report { words: Box::new([7, 8]) };
+    refused(procedure(&mut world, 1, ProcedureEnd::Result(invalid)), 1, Refusal::Kept, &[2]);
+    assert_eq!(world.records, before);
+}
+
+#[test]
 fn a_dependency_failing_later_holds_its_kept_dependent_and_stops_a_live_run() {
     let mut world = pair();
     world.claim(1, 1);

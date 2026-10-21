@@ -88,22 +88,22 @@ impl Kept {
         }
     }
 
-    /// Open refuses every raw finish before judgment. Dependency-only finishes
-    /// keep the existing valid-done policy; failures and invalid results still end.
-    pub(crate) fn parks(self, end: &End, contract: &crate::Contract, limits: &crate::Limits) -> bool {
-        match end {
-            End::Finished { result, .. } => {
-                self.open
-                    || self.dependencies && done(result) && super::invalid_result(contract, result, limits).is_none()
+    /// Open discards a run's raw finish before judgment; its run parks (tasks.md, 5.8).
+    pub(crate) fn discards(self, end: &End) -> bool {
+        self.open
+            && match end {
+                End::Finished { .. } | End::FinishedWithFollowups { .. } => true,
+                End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
             }
-            End::FinishedWithFollowups { result, followups } => {
-                self.open
-                    || self.dependencies
-                        && done(result)
-                        && super::invalid_followups(contract, result, followups, limits).is_none()
+    }
+
+    /// A judged done end waits until every dependency is met; a failure still ends (5.7).
+    pub(crate) fn parks(self, end: &End) -> bool {
+        self.dependencies
+            && match end {
+                End::Finished { result, .. } | End::FinishedWithFollowups { result, .. } => done(result),
+                End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
             }
-            End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
-        }
     }
 }
 

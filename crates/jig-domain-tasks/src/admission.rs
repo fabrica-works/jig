@@ -175,8 +175,18 @@ pub(crate) fn activation(
         Err(why) => return refused(to, Some(number), why, out),
     };
     let charge = cumulative.checked_sub(old.run_spent).expect("charge preflighted");
-    // The shared rule normalizes raw Open finishes before any result judgment.
-    let parked = crate::run::ends::kept(domain, number).parks(&end, &old.contract, &environment.limits);
+    // Admission must skip result follow-ups when the shared ending rule parks it.
+    let valid = match &end {
+        End::Finished { result, .. } => {
+            crate::run::invalid_result(&old.contract, result, &environment.limits).is_none()
+        }
+        End::FinishedWithFollowups { result, followups } => {
+            crate::run::invalid_followups(&old.contract, result, followups, &environment.limits).is_none()
+        }
+        End::Parked | End::Failed(_) | End::Refused | End::Recheck => true,
+    };
+    let kept = crate::run::ends::kept(domain, number);
+    let parked = kept.discards(&end) || valid && kept.parks(&end);
     let admitted_end = if parked { End::Parked } else { end.clone() };
     match &admitted_end {
         End::Finished { result, cancel_delegates } => {
