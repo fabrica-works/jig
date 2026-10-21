@@ -388,13 +388,14 @@ impl Domain {
         Some(crate::DelegationContext {
             project: record.project,
             requester: record.requester,
-            deciding: match record.phase {
-                Phase::Waiting | Phase::Active(_) => match record.executor {
-                    crate::Executor::Agent { .. } => true,
-                    crate::Executor::Procedure { .. } | crate::Executor::Person(_) => false,
+            deciding: !crate::run::ends::kept(self, task).blocks_claims()
+                && match record.phase {
+                    Phase::Waiting | Phase::Active(_) => match record.executor {
+                        crate::Executor::Agent { .. } => true,
+                        crate::Executor::Procedure { .. } | crate::Executor::Person(_) => false,
+                    },
+                    Phase::Closing(_) | Phase::Held { .. } | Phase::Ended(_) => false,
                 },
-                Phase::Closing(_) | Phase::Held { .. } | Phase::Ended(_) => false,
-            },
             authority: record.authority.clone(),
             numbers: record.numbers,
             tasks_left,
@@ -955,10 +956,11 @@ pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: 
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => None,
     };
     let became_held = held.is_some() && (task.observed_hold != held || source_changed);
-    let unavailable = match task.record.phase {
-        Phase::Held { .. } | Phase::Closing(_) | Phase::Ended(_) => true,
-        Phase::Waiting | Phase::Active(_) => false,
-    };
+    let unavailable = crate::run::ends::for_record(&task.record).blocks_claims()
+        || match task.record.phase {
+            Phase::Held { .. } | Phase::Closing(_) | Phase::Ended(_) => true,
+            Phase::Waiting | Phase::Active(_) => false,
+        };
     if became_held {
         task.record.revisions.hold = task.record.revisions.hold.checked_add(1).expect("hold revision room");
         task.record.escalation = crate::Escalation::Unheld { revision: task.record.revisions.hold };

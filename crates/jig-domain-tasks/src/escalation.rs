@@ -407,6 +407,8 @@ pub(crate) fn decide(
                     Was::Active(active) => Phase::Active(active),
                     Was::Closing(closing) => Phase::Closing(closing),
                 };
+                task.record.phase = crate::run::ends::pending(&task.record.waiting_on)
+                    .amended(task.record.executor, task.record.phase.clone());
             }
             EscalationDecision::Reject { reason } => {
                 task.record.escalation = Escalation::Rejected { revision, by, reason }

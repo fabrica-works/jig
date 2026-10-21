@@ -388,14 +388,11 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
             Status::Failed | Status::Cancelled => match &task.record.phase {
                 Phase::Closing(_) | Phase::Held { was: Was::Closing(_), .. } | Phase::Ended(_) => {}
                 Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => {
-                    task.record.phase = Phase::Held {
-                        was: crate::run::was(core::mem::replace(&mut task.record.phase, Phase::Waiting)),
-                        why: Hold::Dependency(number),
-                        source: None,
-                    };
+                    crate::run::hold(domain, env, dependent, Hold::Dependency(number), out);
                 }
             },
         }
+        let task = task_mut(domain, dependent).expect("dependent remains live");
         if crate::holds::queued(&task.record) {
             crate::holds::back(domain, env, dependent, out);
         } else {

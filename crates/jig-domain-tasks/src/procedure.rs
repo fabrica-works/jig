@@ -1,4 +1,4 @@
-//! Fenced procedure decisions at the tasks hub (domain/tasks.md, sections 5.3 and 8.2).
+//! Fenced procedure decisions at the tasks hub (domain/tasks.md, sections 5.3, 5.7 and 8.2).
 //! The owner keeps procedure state and chooses a step; tasks keeps only the
 //! executor identity, live topology, result contract and the step's offered inbox fence. It never
 //! knows connector facts or effects. A due step may make one whole batch,
@@ -165,6 +165,10 @@ fn check(
         return Err(problem(number, Refusal::Batch));
     }
     if let ProcedureEnd::Result(result) = &decision.end {
+        let end = crate::End::Finished { result: result.clone(), cancel_delegates: false };
+        if crate::run::ends::kept(domain, number).parks(&end) {
+            return Err(crate::Problem::naming(Some(number), Refusal::Kept, &task.waiting_on));
+        }
         if !task.delegates.is_empty() || !decision.batch.is_empty() {
             return Err(crate::Problem::live_delegates(number, &task.delegates));
         }
@@ -216,8 +220,8 @@ fn check_parts(
     }
     parent.delegates = delegates.into_boxed();
     for part in &decision.amendments {
-        if let Err(why) = crate::control::preview_amend(domain, env, Party::Task(number), part) {
-            return Err(problem(part.task, why));
+        if let Err(problem) = crate::control::preview_amend(domain, env, Party::Task(number), part) {
+            return Err(*problem);
         }
         if let Err(why) = crate::goals::room(domain, project, goals, &env.limits) {
             return Err(problem(part.task, why));

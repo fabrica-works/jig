@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum Seen {
     Batch { members: Vec<u64>, accepted: bool, made: Vec<u64> },
     Made { task: u64, parent: Party, dependencies: Vec<u64>, depth: u32 },
+    Amended { task: u64, dependencies: Vec<u64> },
     Durable { commit: u64 },
     Replied { call: u64, after: u64 },
     Assigned { task: u64, attempt: u64, after: u64, adopted: bool },
@@ -202,6 +203,10 @@ impl Expectations for Tasks {
 
     type Stimulus = Stimulus;
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive observation seam checks the independent lifecycle promises"
+    )]
     fn observe(&mut self, seen: Seen, judge: &mut Judge<Name, Stimulus>) {
         match seen {
             Seen::Batch { mut members, accepted, mut made } => {
@@ -228,6 +233,9 @@ impl Expectations for Tasks {
                     judge.fail("cycle through dependencies or delegates");
                 }
             }
+            Seen::Amended { task, dependencies } => {
+                self.dependencies.insert(task, dependencies);
+            }
             Seen::Durable { commit } => self.durable = commit,
             Seen::Replied { call, after } => {
                 if after > self.durable {
@@ -247,9 +255,11 @@ impl Expectations for Tasks {
                 if !adopted && self.attempts.get(&task).is_some_and(|old| *old >= attempt) {
                     judge.fail("attempt did not grow");
                 }
-                if self.dependencies.get(&task).is_some_and(|dependencies| {
-                    dependencies.iter().any(|number| self.ended.get(number) != Some(&Status::Done))
-                }) {
+                if !adopted
+                    && self.dependencies.get(&task).is_some_and(|dependencies| {
+                        dependencies.iter().any(|number| self.ended.get(number) != Some(&Status::Done))
+                    })
+                {
                     judge.fail("run before dependencies done");
                 }
                 self.runs.insert(task, attempt);
@@ -280,7 +290,16 @@ impl Expectations for Tasks {
                 }
                 self.settled.insert(task);
             }
-            Seen::Ended { task, status, after } => self.end(task, status, after, judge),
+            Seen::Ended { task, status, after } => {
+                if status == Status::Done
+                    && self.dependencies.get(&task).is_some_and(|dependencies| {
+                        dependencies.iter().any(|dependency| self.ended.get(dependency) != Some(&Status::Done))
+                    })
+                {
+                    judge.fail("kept task ended done");
+                }
+                self.end(task, status, after, judge);
+            }
             Seen::Cancelled { task } => {
                 for task in self.descendants(task) {
                     if self.cancelled.insert(task) {
@@ -293,7 +312,43 @@ impl Expectations for Tasks {
                     judge.fail("live task limit exceeded");
                 }
             }
-            Seen::Stored { live, limits } => stored(&live, &limits, judge),
+            Seen::Stored { live, limits } => {
+                stored(&live, &limits, judge);
+                for row in &live {
+                    let proposal_holder = match &row.proposal {
+                        Some(proposal) => match proposal.state {
+                            jig_domain_tasks::ProposalState::Pending {
+                                holder: jig_domain_tasks::ProposalHolder::Task(holder),
+                                ..
+                            } => Some(holder),
+                            jig_domain_tasks::ProposalState::Pending { .. }
+                            | jig_domain_tasks::ProposalState::Accepted { .. }
+                            | jig_domain_tasks::ProposalState::Rejected { .. }
+                            | jig_domain_tasks::ProposalState::Withdrawn => None,
+                        },
+                        None => None,
+                    };
+                    let escalation_holder = match row.escalation {
+                        jig_domain_tasks::Escalation::Waiting {
+                            holder: jig_domain_tasks::EscalationHolder::Task(holder),
+                            ..
+                        } => Some(holder),
+                        jig_domain_tasks::Escalation::Unheld { .. }
+                        | jig_domain_tasks::Escalation::Routing { .. }
+                        | jig_domain_tasks::Escalation::Waiting { .. }
+                        | jig_domain_tasks::Escalation::Rejected { .. } => None,
+                    };
+                    for holder in [proposal_holder, escalation_holder].into_iter().flatten() {
+                        if live.iter().any(|task| {
+                            task.number == holder
+                                && matches!(task.phase, Phase::Active(_))
+                                && !task.waiting_on.is_empty()
+                        }) {
+                            judge.fail("decision waits at kept task");
+                        }
+                    }
+                }
+            }
             Seen::Resources { live, pools, writers } => self.resources(&live, &pools, &writers, judge),
             Seen::Finished => {
                 if self.cancelled.iter().any(|task| !self.ended.contains_key(task)) {

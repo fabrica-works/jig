@@ -25,6 +25,8 @@ pub struct CompoundTask<'a> {
     pub spec: &'a crate::Spec,
     pub wake: crate::WakePolicy,
     pub dependencies: &'a [u64],
+    pub waiting_on: &'a [u64],
+    pub added: &'a [crate::Added],
     pub authority: &'a crate::Authority,
     pub llm: &'a Option<crate::LlmChoice>,
     pub kept_account: Option<u32>,
@@ -91,7 +93,11 @@ impl CompoundTask<'_> {
                 | crate::MessageKind::News { .. } => true,
             },
         };
-        if wakes && self.phase == Phase::Active(Active::Idle) {
+        let blocked = match self.executor {
+            Executor::Agent { .. } => crate::run::ends::pending(self.waiting_on).blocks_claims(),
+            Executor::Person(_) | Executor::Procedure { .. } => false,
+        };
+        if wakes && !blocked && self.phase == Phase::Active(Active::Idle) {
             self.phase = Phase::Active(Active::Due);
         }
     }
@@ -119,6 +125,8 @@ impl Staged {
             spec: &base.spec,
             wake: base.wake,
             dependencies: &base.dependencies,
+            waiting_on: &base.waiting_on,
+            added: &base.added,
             authority: &base.authority,
             llm: &base.llm,
             kept_account: base.kept_account,
@@ -348,6 +356,8 @@ fn project_amend<'a>(row: &mut CompoundTask<'a>, plan: &'a crate::control::Amend
     }
     if let Some(value) = &amendment.dependencies {
         row.dependencies = value;
+        row.waiting_on = &plan.waiting_on;
+        row.added = &plan.added;
     }
     if let Some(value) = &amendment.authority {
         row.authority = value;
@@ -355,6 +365,7 @@ fn project_amend<'a>(row: &mut CompoundTask<'a>, plan: &'a crate::control::Amend
     row.revision = row.revision.checked_add(1).expect("admission checked");
     row.revisions.spec = row.revisions.spec.checked_add(u64::from(plan.changed)).expect("admission checked");
     row.revisions.person = row.revisions.person.checked_add(u64::from(plan.person_changed)).expect("admission checked");
+    row.phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, row.phase.clone());
     row.last_message = plan.message;
     row.inbox = &plan.prepared.inbox;
     if plan.attempt.is_none() {

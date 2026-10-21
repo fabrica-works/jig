@@ -175,7 +175,19 @@ pub(crate) fn activation(
         Err(why) => return refused(to, Some(number), why, out),
     };
     let charge = cumulative.checked_sub(old.run_spent).expect("charge preflighted");
-    match &end {
+    // Admission must skip result follow-ups when the shared ending rule parks it.
+    let valid = match &end {
+        End::Finished { result, .. } => {
+            crate::run::invalid_result(&old.contract, result, &environment.limits).is_none()
+        }
+        End::FinishedWithFollowups { result, followups } => {
+            crate::run::invalid_followups(&old.contract, result, followups, &environment.limits).is_none()
+        }
+        End::Parked | End::Failed(_) | End::Refused | End::Recheck => true,
+    };
+    let parked = valid && crate::run::ends::kept(domain, number).parks(&end);
+    let admitted_end = if parked { End::Parked } else { end.clone() };
+    match &admitted_end {
         End::Finished { result, cancel_delegates } => {
             if crate::run::result_bytes(result)
                 > usize::try_from(environment.limits.result_bytes).expect("u32 fits usize")
@@ -242,7 +254,7 @@ pub(crate) fn activation(
         }
         End::Parked | End::Failed(_) | End::Refused | End::Recheck => {}
     }
-    let result_admitted = match &end {
+    let result_admitted = match &admitted_end {
         End::FinishedWithFollowups { result, followups } => {
             !old.narrowing
                 && crate::run::invalid_followups(&old.contract, result, followups, &environment.limits).is_none()

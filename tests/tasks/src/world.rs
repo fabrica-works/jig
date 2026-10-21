@@ -656,13 +656,26 @@ impl World {
 
     /// Commit state and requester results together before executor delivery
     /// (domain/tasks.md, 5; domain/engine.md, 7).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one commit records writes before observing topology, amendments and endings"
+    )]
     pub fn durable(&mut self) {
         self.commit += 1;
         let mut terminals = Vec::new();
         let mut ended = Vec::new();
+        let mut amended = Vec::new();
         for request in &self.pending {
             match request {
                 Request::Save { record } => {
+                    if let Stored::History(history) = record
+                        && let Some(amendment) = &history.amendment
+                    {
+                        amended.push(Seen::Amended {
+                            task: history.task,
+                            dependencies: amendment.after.dependencies.to_vec(),
+                        });
+                    }
                     self.records.insert(record.key(), record.clone());
                 }
                 Request::Erase { key } => {
@@ -740,6 +753,9 @@ impl World {
             })
             .collect::<Vec<_>>();
         for seen in made {
+            self.observe(seen);
+        }
+        for seen in amended {
             self.observe(seen);
         }
         for (task, attempt) in terminals {
@@ -858,6 +874,12 @@ impl World {
     #[must_use]
     pub fn live(&self) -> usize {
         self.records.keys().filter(|key| matches!(key, Key::Live(_))).count()
+    }
+
+    /// Current holder eligibility as the core reads it (domain/tasks.md, 5.7 and section 9).
+    #[must_use]
+    pub fn delegation(&self, number: u64) -> tasks::DelegationContext {
+        self.domain.delegation(number).expect("live task's delegation context")
     }
 
     #[must_use]

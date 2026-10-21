@@ -1,7 +1,9 @@
 //! Fenced agent-task preparation, claims, activation terminals and holds
-//! (domain/tasks.md, sections 5.2, 5.5 and 5.6). Root supplies run
+//! (domain/tasks.md, sections 5.2, 5.5–5.7). Root supplies run
 //! events; tasks checks lifecycle/result shape and emits bounded state changes.
 //! Priced inputs use combined accounting admission; exact replay is root-owned.
+pub(crate) mod ends;
+
 use crate::domain::{Domain, entrance, fact, publish, record, refused, task_mut};
 use crate::{
     Accepted, Active, Class, Closing, Contract, End, Ending, Fact, Hold, InvalidResult, Limits, Phase, Refusal,
@@ -45,6 +47,7 @@ pub(crate) fn prepare(domain: &mut Domain, env: &Env<Limits>, to: ReplyTo, numbe
         Ok(to) => to,
         Err((to, why)) => return refused(to, Some(number), why, out),
     };
+    let kept = ends::kept(domain, number);
     let task = task_mut(domain, number).expect("entrance names task");
     match task.record.executor {
         crate::Executor::Agent { .. } => {}
@@ -52,7 +55,7 @@ pub(crate) fn prepare(domain: &mut Domain, env: &Env<Limits>, to: ReplyTo, numbe
             return refused(to, Some(number), Refusal::Executor, out);
         }
     }
-    if task.record.phase != Phase::Active(Active::Due) {
+    if task.record.phase != Phase::Active(Active::Due) || kept.blocks_claims() {
         return refused(to, Some(number), Refusal::State, out);
     }
     task.record.phase = Phase::Active(Active::Preparing);
@@ -81,7 +84,7 @@ pub(crate) fn claim(
     if attempt <= task.attempt {
         return refused(to, Some(number), Refusal::Attempt, out);
     }
-    if task.phase != Phase::Active(Active::Preparing) {
+    if task.phase != Phase::Active(Active::Preparing) || ends::kept(domain, number).blocks_claims() {
         return refused(to, Some(number), Refusal::State, out);
     }
     let fits = match crate::funders::available(task.numbers) {
@@ -350,6 +353,7 @@ pub(crate) fn activation(
         | Phase::Ended(_) => None,
     };
     let narrowed = old.narrowing;
+    let kept = ends::kept(domain, number);
     let end = if narrowed { End::Parked } else { end };
     let result_followups = match &end {
         End::FinishedWithFollowups { .. } => true,
@@ -379,6 +383,8 @@ pub(crate) fn activation(
         }
         End::Parked | End::Failed(_) | End::Refused | End::Recheck => end,
     };
+    let parked = kept.parks(&end);
+    let end = if parked { End::Parked } else { end };
     let refuses_live = match &end {
         End::Finished { cancel_delegates, .. } => !cancel_delegates && !result_followups,
         End::FinishedWithFollowups { .. } => unreachable!("follow-ups normalized"),
@@ -423,11 +429,17 @@ pub(crate) fn activation(
                 let task = task_mut(domain, number).expect("terminal names live task");
                 task.record.tries = Tries::NONE;
                 task.record.refusals = 0;
-                if narrowed { Phase::Active(Active::Due) } else { Phase::Active(Active::Idle) }
+                if narrowed && !kept.blocks_claims() { Phase::Active(Active::Due) } else { Phase::Active(Active::Idle) }
             }
             End::Failed(class) => failure(domain, env, number, class),
             End::Refused => pause(domain, env, number),
-            End::Recheck => Phase::Active(Active::Due),
+            End::Recheck => {
+                if kept.blocks_claims() {
+                    Phase::Active(Active::Idle)
+                } else {
+                    Phase::Active(Active::Due)
+                }
+            }
         }
     };
     let task = task_mut(domain, number).expect("terminal names live task");
@@ -439,6 +451,10 @@ pub(crate) fn activation(
     task.record.narrowing = false;
     let spent = task.record.run_spent;
     crate::activity::append(&mut task.record, env.wall, crate::Line::RunEnded { attempt, end: end_kind, spent }, out);
+    if parked {
+        let pending = task.record.waiting_on.clone();
+        crate::activity::append(&mut task.record, env.wall, crate::Line::Kept { attempt, pending }, out);
+    }
     if let Some(tags) = saved {
         task.record.saved = tags;
     }
@@ -447,6 +463,11 @@ pub(crate) fn activation(
         None => next,
     };
     crate::writers::answered(domain, env, number, attempt, lost_writer, out);
+    if (parked || kept.blocks_claims() && end_kind == crate::EndKind::Parked)
+        && let Some(grace) = record(domain, number).expect("answered task live").grace.clone()
+    {
+        crate::closing::cancel_tree(domain, env, number, grace.by, &grace.reason, out);
+    }
     crate::wake::after_run(domain, env, number, out);
     publish(domain, env, number, out);
     if (narrowed || end_kind == crate::EndKind::Refused)
@@ -501,6 +522,7 @@ pub(crate) fn preparation_waiting(domain: &mut Domain, env: &Env<Limits>, number
     if domain.ready()
         && let Some(task) = record(domain, number)
         && task.phase == Phase::Active(Active::Preparing)
+        && !ends::kept(domain, number).blocks_claims()
     {
         task_mut(domain, number).expect("preparing task").record.phase = Phase::Active(Active::Due);
         publish(domain, env, number, out);

@@ -610,6 +610,20 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             | crate::SubscriptionKind::Topic { .. } => {}
         }
     }
+    // Amendment provenance is a subsequence of the current whole list
+    // (domain/tasks.md, 5.7 and section 7).
+    let mut remaining = task.added.iter();
+    let mut entry = remaining.next();
+    for dependency in &task.dependencies {
+        if let Some(added) = entry
+            && added.task == *dependency
+        {
+            entry = remaining.next();
+        }
+    }
+    if entry.is_some() {
+        return false;
+    }
     for number in &task.waiting_on {
         if !crate::batch::contains(&task.dependencies, *number) {
             return false;
@@ -972,16 +986,6 @@ fn links(domain: &Domain, env: &Env<Limits>, task: &TaskRecord) -> bool {
         {
             return false;
         }
-    }
-    let engaged = match &task.phase {
-        Phase::Active(_) | Phase::Held { was: Was::Active(_), .. } => true,
-        Phase::Waiting
-        | Phase::Closing(_)
-        | Phase::Held { was: Was::Waiting | Was::Closing(_), .. }
-        | Phase::Ended(_) => false,
-    };
-    if engaged && !task.waiting_on.is_empty() {
-        return false;
     }
     true
 }

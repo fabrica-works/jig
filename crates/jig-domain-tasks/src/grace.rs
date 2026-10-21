@@ -44,18 +44,21 @@ pub(crate) fn check_finish(
     {
         return Err(Refusal::Read);
     }
-    match old.phase {
-        Phase::Waiting | Phase::Held { .. } => {
-            let mut selected = skein_lib::List::with_capacity(env.limits.tasks);
-            for (child, _) in &domain.names {
-                if staged.descendant(domain, *child, number, env.limits.tasks) {
-                    selected.push(*child).expect("live subtree bound");
-                }
-            }
-            return Ok(FinishPlan::Cancel { finish, reason: reason.into(), selected: selected.into_boxed() });
+    let cancel = match old.phase {
+        Phase::Waiting | Phase::Held { .. } => true,
+        Phase::Active(_) => {
+            crate::run::ends::pending(old.waiting_on).blocks_claims() && crate::run::run_attempt(&old.phase).is_none()
         }
-        Phase::Active(_) => {}
         Phase::Closing(_) | Phase::Ended(_) => return Err(Refusal::State),
+    };
+    if cancel {
+        let mut selected = skein_lib::List::with_capacity(env.limits.tasks);
+        for (child, _) in &domain.names {
+            if staged.descendant(domain, *child, number, env.limits.tasks) {
+                selected.push(*child).expect("live subtree bound");
+            }
+        }
+        return Ok(FinishPlan::Cancel { finish, reason: reason.into(), selected: selected.into_boxed() });
     }
     if let Some(grace) = &old.grace {
         return Ok(if until < grace.until {

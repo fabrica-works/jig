@@ -39,6 +39,7 @@ pub struct Amendment {
     pub release: Option<u64>,
     pub spec: Option<Spec>,
     pub wake: Option<WakePolicy>,
+    /// Whole replacement dependency list, at any mutable phase (domain/tasks.md, 5.7 and section 7).
     pub dependencies: Option<Box<[u64]>>,
     pub authority: Option<Authority>,
     /// A new LLM choice for an agent task's next run; `None` keeps its choice (domain/tasks.md,
@@ -222,6 +223,9 @@ pub(crate) struct AmendPlan {
     pub(crate) before: Settings,
     pub(crate) prepared: crate::inbox::Prepared,
     pub(crate) release: Option<ReleasePlan>,
+    pub(crate) waiting_on: Box<[u64]>,
+    pub(crate) added: Box<[crate::Added]>,
+    pub(crate) met: Option<u64>,
 }
 
 pub(crate) fn amend(
@@ -242,12 +246,137 @@ pub(crate) fn amend(
             apply_amend(domain, env, by, plan, out);
             out.push(Request::Done { reply_to: to });
         }
-        Err(why) => refused(to, Some(number), why, out),
+        Err(problem) => out.push(Request::Refused { reply_to: to, problem: *problem }),
+    }
+}
+
+/// Check the whole dependency list at every mutable phase (domain/tasks.md, 5.7 and section 7).
+pub(crate) fn check_amend(
+    domain: &Domain,
+    staged: &crate::compound::Staged,
+    env: &Env<Limits>,
+    by: Party,
+    amendment: Amend,
+) -> Result<AmendPlan, Box<crate::Problem>> {
+    let number = amendment.number;
+    let mut plan = match check_amend_fields(domain, staged, env, by, amendment) {
+        Ok(plan) => plan,
+        Err(why) => return Err(Box::new(crate::Problem::new(Some(number), why))),
+    };
+    let old = staged.record(domain, number).expect("amendment task checked");
+    let dependencies = match &plan.amendment.dependencies {
+        Some(dependencies) => &**dependencies,
+        None => old.dependencies,
+    };
+    let mut waiting = skein_lib::List::with_capacity(env.limits.dependencies);
+    let mut added = skein_lib::List::with_capacity(env.limits.dependencies);
+    let mut pending = skein_lib::List::with_capacity(env.limits.dependencies);
+    for dependency in dependencies {
+        if crate::batch::contains(old.dependencies, *dependency) {
+            if crate::batch::contains(old.waiting_on, *dependency) {
+                waiting.push(*dependency).expect("dependency bound");
+            }
+            for entry in old.added {
+                if entry.task == *dependency {
+                    added.push(entry.clone()).expect("added subset bounded");
+                    break;
+                }
+            }
+            continue;
+        }
+        if record(domain, *dependency).is_none() && domain.stub(*dependency).is_none() {
+            return Err(Box::new(crate::Problem::new(Some(number), Refusal::Unknown)));
+        }
+        if !dependency_reached(domain, staged, env, by, old.project, number, *dependency) {
+            return Err(Box::new(crate::Problem::naming(Some(number), Refusal::Dependencies, &[*dependency])));
+        }
+        if record(domain, *dependency).is_some() {
+            waiting.push(*dependency).expect("dependency bound");
+            pending.push(*dependency).expect("pending adds bounded");
+        } else {
+            match domain.stub(*dependency) {
+                Some(stub) => match stub.phase {
+                    crate::Status::Done => {}
+                    how @ (crate::Status::Failed | crate::Status::Cancelled) => {
+                        return Err(Box::new(crate::Problem::naming(
+                            Some(number),
+                            Refusal::DependencyEnded { how },
+                            &[*dependency],
+                        )));
+                    }
+                },
+                None => return Err(Box::new(crate::Problem::new(Some(number), Refusal::Unknown))),
+            }
+        }
+        added.push(crate::Added { task: *dependency, at: env.wall, by }).expect("added subset bounded");
+    }
+    if !old.waiting_on.is_empty() && waiting.is_empty() {
+        for dependency in old.waiting_on {
+            if !crate::batch::contains(dependencies, *dependency) {
+                plan.met = Some(*dependency);
+                break;
+            }
+        }
+    }
+    plan.waiting_on = waiting.into_boxed();
+    plan.added = added.into_boxed();
+    if let Err(problem) = crate::waits::check_added(domain, &env.limits, number, pending.as_slice()) {
+        return Err(Box::new(problem));
+    }
+    Ok(plan)
+}
+
+/// A batch creator's reach, extended by a task amender's live subtree (domain/tasks.md, section 7).
+fn dependency_reached(
+    domain: &Domain,
+    staged: &crate::compound::Staged,
+    env: &Env<Limits>,
+    by: Party,
+    project: u32,
+    task: u64,
+    dependency: u64,
+) -> bool {
+    if task == dependency {
+        return true; // The wait judge names this as a circle.
+    }
+    match by {
+        Party::Person(_) => match record(domain, dependency) {
+            Some(row) => row.project == project,
+            None => {
+                // A stub is retained only while a live task names it. That task
+                // witnesses its project without loading the ended history.
+                for (number, _) in &domain.names {
+                    let row = record(domain, *number).expect("live task name");
+                    if row.project == project
+                        && (crate::batch::contains(&row.dependencies, dependency)
+                            || crate::batch::contains(&row.spec.inputs, dependency)
+                            || crate::batch::contains(&row.references, dependency))
+                    {
+                        return true;
+                    }
+                }
+                false
+            }
+        },
+        Party::Task(amender) => {
+            if record(domain, dependency).is_some() && below(domain, dependency, amender, env.limits.tasks) {
+                return true;
+            }
+            match staged.record(domain, amender) {
+                Some(parent) => {
+                    (crate::batch::contains(&parent.delegates, dependency)
+                        || staged.reference(domain, amender, dependency))
+                        && (record(domain, dependency).is_some() || domain.stub(dependency).is_some())
+                }
+                None => false,
+            }
+        }
+        Party::Deployment { .. } => false,
     }
 }
 
 #[expect(clippy::too_many_lines, reason = "whole amendment preflight remains together")]
-pub(crate) fn check_amend(
+fn check_amend_fields(
     domain: &Domain,
     staged: &crate::compound::Staged,
     env: &Env<Limits>,
@@ -312,20 +441,10 @@ pub(crate) fn check_amend(
         return Err(Refusal::Read);
     }
     if let Some(dependencies) = &amendment.dependencies {
-        let waiting = match old.phase {
-            Phase::Waiting | Phase::Held { was: Was::Waiting, .. } => true,
-            Phase::Active(_)
-            | Phase::Closing(_)
-            | Phase::Held { was: Was::Active(_) | Was::Closing(_), .. }
-            | Phase::Ended(_) => false,
-        };
-        if !waiting || dependencies.len() > usize::try_from(env.limits.dependencies).expect("u32 fits usize") {
+        if dependencies.len() > usize::try_from(env.limits.dependencies).expect("u32 fits usize") {
             return Err(Refusal::Dependencies);
         }
         for (at, dependency) in dependencies.iter().enumerate() {
-            if !crate::batch::contains(old.dependencies, *dependency) {
-                return Err(Refusal::Dependencies);
-            }
             for earlier in dependencies.iter().take(at) {
                 if earlier == dependency {
                     return Err(Refusal::Dependencies);
@@ -411,7 +530,21 @@ pub(crate) fn check_amend(
     let prepared =
         crate::inbox::prepare_staged(domain, staged, &env.limits, number, word, crate::inbox::Admission::Merged)
             .expect("authenticated amendment has a merged inbox slot");
-    Ok(AmendPlan { funding, number, message, amendment, changed, person_changed, attempt, before, prepared, release })
+    Ok(AmendPlan {
+        funding,
+        number,
+        message,
+        amendment,
+        changed,
+        person_changed,
+        attempt,
+        before,
+        prepared,
+        release,
+        waiting_on: Box::new([]),
+        added: Box::new([]),
+        met: None,
+    })
 }
 
 /// A new choice is checked as a batch's is, against the task's resulting authority; a kept one
@@ -433,6 +566,7 @@ fn check_llm(domain: &Domain, old: &crate::CompoundTask<'_>, amendment: &Amendme
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "one committed amendment applies its fields, queue transition and history")]
 pub(crate) fn apply_amend(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -451,6 +585,9 @@ pub(crate) fn apply_amend(
         before,
         prepared,
         release,
+        waiting_on,
+        added,
+        met: _,
     } = plan;
     if let Some((destination, budget)) = funding {
         crate::funders::refunding::apply(domain, env, number, destination, budget, out);
@@ -463,6 +600,7 @@ pub(crate) fn apply_amend(
     {
         crate::funders::resize(domain, env, number, authority.budget.spend, out);
     }
+    let was_queued = crate::holds::queued(record(domain, number).expect("amendment task live"));
     let task = task_mut(domain, number).expect("amendment task live");
     if let Some(tracked) = amendment.tracked {
         task.record.tracked = match tracked {
@@ -490,15 +628,10 @@ pub(crate) fn apply_amend(
         task.record.wake = wake;
     }
     if let Some(dependencies) = amendment.dependencies {
-        let mut waiting = skein_lib::List::with_capacity(env.limits.dependencies);
-        for dependency in &task.record.waiting_on {
-            if crate::batch::contains(&dependencies, *dependency) {
-                waiting.push(*dependency).expect("dependency subset bound");
-            }
-        }
-        task.record.waiting_on = waiting.into_boxed();
         task.record.dependencies = dependencies;
     }
+    task.record.waiting_on = waiting_on;
+    task.record.added = added;
     if let Some(authority) = amendment.authority {
         task.record.authority = authority;
     }
@@ -516,7 +649,13 @@ pub(crate) fn apply_amend(
         task.record.narrowing = true;
         task.record.due_reason = crate::Why::Narrowed;
     }
-    let after = settings(&task.record);
+    task.record.phase =
+        crate::run::ends::pending(&task.record.waiting_on).amended(task.record.executor, task.record.phase.clone());
+    let queued = crate::holds::queued(&task.record);
+    if was_queued && !queued {
+        crate::holds::leave(domain, number);
+    }
+    let after = settings(record(domain, number).expect("amendment task live"));
     save_history(
         domain,
         History {
@@ -531,7 +670,12 @@ pub(crate) fn apply_amend(
         },
         out,
     );
-    publish(domain, env, number, out);
+    crate::closing::prune_stubs(domain, env, out);
+    if !was_queued && queued {
+        crate::holds::back(domain, env, number, out);
+    } else {
+        publish(domain, env, number, out);
+    }
     if let Some(attempt) = attempt {
         out.push(Request::Stop { task: number, attempt });
     } else {
@@ -856,7 +1000,7 @@ pub(crate) fn preview_amend(
     env: &Env<Limits>,
     by: Party,
     part: &crate::ProcedureAmendment,
-) -> Result<(), Refusal> {
+) -> Result<(), Box<crate::Problem>> {
     let checked = check_amend(
         domain,
         &crate::compound::Staged::new(0),
@@ -915,6 +1059,8 @@ pub(crate) fn preview_amend(
     }
     if let Some(dependencies) = &amendment.dependencies {
         row.dependencies.clone_from(dependencies);
+        row.waiting_on = checked.waiting_on;
+        row.added = checked.added;
     }
     if let Some(authority) = &amendment.authority {
         row.authority = authority.clone();

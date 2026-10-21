@@ -239,8 +239,8 @@ pub(crate) fn propose_person(
     {
         return refused(to, None, Refusal::Read, out);
     }
-    if let Err(why) = crate::person_proposals::check(domain, env, &proposal) {
-        return refused(to, None, why, out);
+    if let Err(problem) = crate::person_proposals::check(domain, env, &proposal) {
+        return out.push(Request::Refused { reply_to: to, problem: *problem });
     }
     if domain.person_proposals.len() >= env.limits.tasks || domain.person_proposals.contains_key(&proposal.number) {
         if domain.person_proposals.len() >= env.limits.tasks && !domain.person_proposals.contains_key(&proposal.number)

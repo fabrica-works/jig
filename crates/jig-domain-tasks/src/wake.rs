@@ -165,9 +165,14 @@ pub(crate) fn after_message(
     if !ready {
         return;
     }
-    let phase = record(domain, number).expect("batch task live").phase.clone();
+    let row = record(domain, number).expect("batch task live");
+    let blocked = match row.executor {
+        crate::Executor::Agent { .. } => crate::run::ends::kept(domain, number).blocks_claims(),
+        crate::Executor::Procedure { .. } | crate::Executor::Person(_) => false,
+    };
+    let phase = row.phase.clone();
     match phase {
-        Phase::Active(Active::Idle) => {
+        Phase::Active(Active::Idle) if !blocked => {
             let row = &mut task_mut(domain, number).expect("idle task live").record;
             row.due_reason = crate::Why::Message { message: word.number };
             row.phase = Phase::Active(Active::Due);
@@ -178,7 +183,7 @@ pub(crate) fn after_message(
             out.push(Request::Relay { task: number, attempt, previous, word });
         }
         Phase::Waiting
-        | Phase::Active(Active::Due | Active::Preparing | Active::BackingOff { .. })
+        | Phase::Active(Active::Idle | Active::Due | Active::Preparing | Active::BackingOff { .. })
         | Phase::Closing(_)
         | Phase::Held { .. }
         | Phase::Ended(_) => {}

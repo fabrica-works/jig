@@ -118,16 +118,17 @@ pub(crate) fn ended(domain: &mut Domain, env: &Env<Limits>, task: u64, out: &mut
     }
 }
 
-pub(crate) fn check(domain: &Domain, env: &Env<Limits>, proposal: &PersonProposal) -> Result<(), Refusal> {
+pub(crate) fn check(domain: &Domain, env: &Env<Limits>, proposal: &PersonProposal) -> Result<(), Box<crate::Problem>> {
     let PersonAction::Amend { task, amendment, .. } = &proposal.action else { return Ok(()) };
-    let row = crate::domain::record(domain, *task).ok_or(Refusal::Unknown)?;
+    let row =
+        crate::domain::record(domain, *task).ok_or(Box::new(crate::Problem::new(Some(*task), Refusal::Unknown)))?;
     if row.project != proposal.project {
-        return Err(Refusal::Unknown);
+        return Err(Box::new(crate::Problem::new(Some(*task), Refusal::Unknown)));
     }
     let mut amendment = *amendment.clone();
     // Its authority is bounded above; its source is checked at acceptance.
     amendment.authority = None;
-    let message = row.last_message.checked_add(1).ok_or(Refusal::Read)?;
+    let message = row.last_message.checked_add(1).ok_or(Box::new(crate::Problem::new(Some(*task), Refusal::Read)))?;
     crate::control::check_amend(
         domain,
         &crate::compound::Staged::new(0),

@@ -1,4 +1,4 @@
-//! Person-task lifecycle at the tasks hub (domain/tasks.md, section 5.4;
+//! Person-task lifecycle at the tasks hub (domain/tasks.md, sections 5.4 and 5.7;
 //! domain/people.md, section 8). Root authenticates people and role membership;
 //! this child retains the durable role claim, active waiting interval and one
 //! numbered stall notice. The task alarm projects its durable wall deadline;
@@ -92,6 +92,12 @@ pub(crate) fn answer(
     };
     if !addressed || !active(&row.phase) {
         return refused(to, Some(number), Refusal::State, out);
+    }
+    if crate::run::ends::kept(domain, number).blocks_claims() {
+        return out.push(Request::Refused {
+            reply_to: to,
+            problem: crate::Problem::naming(Some(number), Refusal::Kept, &row.waiting_on),
+        });
     }
     if !row.delegates.is_empty() {
         return out

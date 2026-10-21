@@ -164,18 +164,31 @@ fn room_staged(
     let Some(total_count) = record.inbox.len().checked_add(reserved) else {
         return false;
     };
-    let mut finish_count = 0;
-    let mut finish_bytes = 0;
+    // Amendment, grace and Met each have a separately priced slot. A notice
+    // that the task may go on cannot consume a sender's room (domain/tasks.md, 5.7 and 8.2).
+    let mut extra_count = 0_usize;
+    let mut extra_bytes = 0_usize;
     for word in record.inbox {
-        if match &record.grace {
-            Some(grace) => grace.message == word.number,
-            None => false,
-        } {
-            finish_count = 1;
-            finish_bytes = word.words.len();
+        match word.kind {
+            MessageKind::Amendment { .. } | MessageKind::Met { .. } => {
+                extra_count = extra_count.checked_add(1).expect("bounded merged slots");
+                extra_bytes = extra_bytes.checked_add(word.words.len()).expect("bounded amendment bytes");
+            }
+            MessageKind::EffectNotMade { .. }
+            | MessageKind::Words
+            | MessageKind::Question
+            | MessageKind::Answer { .. }
+            | MessageKind::Proposal { .. }
+            | MessageKind::Escalation { .. }
+            | MessageKind::ProposalDecision { .. }
+            | MessageKind::PersonStalled { .. }
+            | MessageKind::Result(_)
+            | MessageKind::Notice { .. }
+            | MessageKind::Timer { .. }
+            | MessageKind::News { .. } => {}
         }
     }
-    let total_count = total_count.saturating_sub(finish_count);
+    let total_count = total_count.saturating_sub(extra_count);
     let Some(total_count) = total_count.checked_add(subscription_count) else { return false };
     let Some(total_count) = total_count.checked_add(usize::try_from(count).expect("u32 fits usize")) else {
         return false;
@@ -199,7 +212,7 @@ fn room_staged(
     else {
         return false;
     };
-    let total_bytes = total_bytes.checked_sub(finish_bytes).expect("finish included");
+    let total_bytes = total_bytes.checked_sub(extra_bytes).expect("separate slots included");
     let Some(total_bytes) = total_bytes.checked_add(result_bytes) else { return false };
     let Some(total_bytes) = total_bytes.checked_add(answer_bytes) else {
         return false;
