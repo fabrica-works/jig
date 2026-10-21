@@ -1,6 +1,6 @@
 //! Method and route dispatch (protocol/client.md, 17.1).
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v10 as w;
+use jig_client_protocol_wire::v11 as w;
 use jig_protocol_engine_clients::Message;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Route {

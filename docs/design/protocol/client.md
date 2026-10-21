@@ -198,13 +198,13 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   from its clock and its wall when it makes the document, so a client
   shows it as it shows every other moment.
 
-Authority selectors in client v10 preserve omission, ALL and named sets
+Authority selectors in client v11 preserve omission, ALL and named sets
 (including empty), at most 64 names of 4,096 UTF-8 bytes each. Both public
 authority forms carry them. Authority documents carry `cut` independently
 from the whole authority payload used for edits (`../client/domain/contract.md`,
 3.2); decoding retains the flag, and `whole()` refuses a cut projection.
 
-Client v10 appends the public provider catalogue and startup key bound to `me`,
+Client v11 appends the public provider catalogue and startup key bound to `me`,
 and provider/payer readiness to `accounts`. Deployment includes the same
 catalogue and viewer readiness for the reference fragment. The `position`
 hello refusal names a worker position that is unconfigured or held by a live

@@ -1,7 +1,7 @@
 //! Family scopes and windows outside the application's opaque records (contract.md, 7.5).
 use alloc::boxed::Box;
 use jig_client_domain::{Family, contract as c};
-use jig_client_protocol_wire::v10 as w;
+use jig_client_protocol_wire::v11 as w;
 use skein_lib::{Reader, Writer, bytes};
 pub(crate) fn scope(value: c::Scope, limits: &w::Limits) -> Result<w::Scope, w::Problem> {
     Ok(match value {

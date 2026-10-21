@@ -1,6 +1,6 @@
 //! A valid person task would put its specification in the person's inbox.
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v10 as w;
+use jig_client_protocol_wire::v11 as w;
 use skein_lib::{List, Writer};
 
 const PROJECT: u32 = 1;

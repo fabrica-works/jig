@@ -1,6 +1,6 @@
 use super::fixtures::{self as f, Exchange};
 use crate::{Event, Request, SecretsRequest};
-use jig_client_protocol_wire::v10 as w;
+use jig_client_protocol_wire::v11 as w;
 use jig_domain_people as p;
 use skein_lib::{Reader, ReplyTo, Token};
 #[test]

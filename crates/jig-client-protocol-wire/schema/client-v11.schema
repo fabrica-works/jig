@@ -1,4 +1,4 @@
-family jig-client-wire 10
+family jig-client-wire 11
 # OwnerAccounts.accounts/signing, OwnerAccountLine.sources and OwnerAccount.sources: jig_client_view::Limits::document_bytes; each item is a length-prefixed piece
 # OwnerAccountLine.uses and OwnerAccount.uses: jig_domain_accounts::USES (16)
 # OwnerOutcomeAccountSignInStarted.address: jig_domain_people::ADDRESS (2048 bytes).

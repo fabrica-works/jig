@@ -405,7 +405,7 @@ numbers, file by file:
   `jig-domain-tasks/src/index.rs:167`,
   `jig-protocol-config/src/llm.rs:354`,
   `tests/client-protocol/src/native/world.rs:95`, four comments of
-  `jig-client-protocol-wire/schema/client-v10-part1.schema` and
+  `jig-client-protocol-wire/schema/client-v11-part1.schema` and
   `.config/nextest.toml:9`. A reader finds the rule in the design
   section a ruling applies, not in the ruling.
 
@@ -524,7 +524,7 @@ real side.
 
 - **Generated volume:** 233,576 lines in 11 files (`find . -path ./target
   -prune -o -path '*/generated/*' -name '*.rs' -print | xargs wc -l`),
-  106,267 of them `jig-client-protocol-wire/src/generated/v10.rs`, which
+  106,267 of them `jig-client-protocol-wire/src/generated/v11.rs`, which
   was 99,451 lines as v7 at `d91a89c`. The goldens are 7,921 files (`find
   . -path ./target -prune -o -path '*/golden/*' -type f -print | wc -l`).
   Their build cost has not been measured: `cargo build -p
@@ -565,7 +565,7 @@ less than the code they stand for:
   (`jig-client-view/src/pages.rs:180-203`).
 - **An owner's number under other names:** `Part`'s `connector`, in
   every variant (`jig-client-domain/src/contract/common.rs:185-207`;
-  `OwnerPart`, `contract/owner_part.rs:41`; the wire's `client-v10.schema`,
+  `OwnerPart`, `contract/owner_part.rs:41`; the wire's `client-v11.schema`,
   :62-73 and :107), and the `family` fields of
   `jig-client-domain/src/boundary.rs` (:7, :12, :36, :41) and
   `jig-client-protocol-link/src/component.rs` (:210, :249). They read

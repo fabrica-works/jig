@@ -6,7 +6,7 @@ use crate::{
     sign_in::{self, Link, Pending, Waiting},
 };
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v10 as w;
+use jig_client_protocol_wire::v11 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use skein_lib::{CryptoRng, Env, Map, Queue, ReplyTo, Time, Token};
