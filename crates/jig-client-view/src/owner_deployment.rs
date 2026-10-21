@@ -495,6 +495,7 @@ fn render_hosts(
             }
             OwnerHostKind::Engine => {}
         }
+        programs::rule(b, words, host.rule);
         programs::render(b, words, &host.programs, host.awaiting_logins);
         field_number(b, words, P::Slots, u64::from(host.slots));
         field_number(b, words, P::Used, u64::from(host.used));
@@ -686,7 +687,7 @@ pub fn render(
 pub fn max_nodes(l: &Limits) -> Option<u32> {
     let link = crate::chip_nodes(l)?.checked_add(3)?;
     let run = link.checked_add(14)?;
-    let hosts = run.checked_mul(l.rows)?.checked_add(19)?.checked_add(l.rows.checked_mul(10)?)?.checked_mul(l.rows)?;
+    let hosts = run.checked_mul(l.rows)?.checked_add(20)?.checked_add(l.rows.checked_mul(10)?)?.checked_mul(l.rows)?;
     let attempts = run.checked_mul(l.rows)?;
     let accounts = crate::chip_nodes(l)?
         .checked_mul(l.rows)?

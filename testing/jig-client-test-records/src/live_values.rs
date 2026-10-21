@@ -324,6 +324,7 @@ pub fn deployment_rows_record() -> w::OwnerDeployment {
     let host = w::OwnerHost::new(
         &l,
         w::OwnerHostParts {
+            rule: w::OwnerHostRule::Open,
             skein_bools: [false, true, false, true],
             name: None,
             programs: Box::new([]),

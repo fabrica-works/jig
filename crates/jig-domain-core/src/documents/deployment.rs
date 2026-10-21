@@ -45,6 +45,7 @@ pub struct HostRun {
 pub struct Host {
     pub name: Option<Box<[u8]>>,
     pub awaiting_logins: bool,
+    pub rule: crate::HostRule,
     pub programs: List<super::ProgramLogin>,
     pub channel: u64,
     pub kind: fleet::HostKind,
@@ -268,6 +269,7 @@ pub(super) fn deployment(
             .push(Host {
                 name,
                 awaiting_logins: value.kind == fleet::HostKind::Worker && core.fleet.awaiting_logins(value.channel),
+                rule: core.host_rule(fleet::PlacementConstraint { channel: value.channel, kind: value.kind }),
                 programs,
                 channel: value.channel.raw(),
                 kind: value.kind,
@@ -570,6 +572,8 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
             u64::from(limits.lines)
                 .checked_mul(u64::from(fleet::WORKER_NAME).checked_add(super::programs::logins_worst_case(limits)?)?)?,
         )?
+        // HostRule's tag and u64 payload occupy 16 aligned bytes per host.
+        .checked_add(u64::from(limits.lines).checked_mul(u64::try_from(size_of::<crate::HostRule>()).ok()?)?)?
         .checked_add(List::<Account>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(account_heap)?)?
         .checked_add(List::<HelloRefusalLine>::worst_case(limits.lines)?)?

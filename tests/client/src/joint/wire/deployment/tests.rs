@@ -43,6 +43,7 @@ pub(crate) fn source() -> documents::Deployment {
             [documents::Host {
                 name: None,
                 awaiting_logins: false,
+                rule: jig_domain_core::HostRule::Open,
                 programs: skein_lib::List::with_capacity(0),
                 channel: u64::MAX,
                 kind: fleet::HostKind::Engine,
@@ -200,6 +201,7 @@ fn deployment_keeps_host_placement_and_secret_free_account_flags_without_derivin
         (host.channel, host.kind, host.slots, host.used, host.free),
         (u64::MAX, client::OwnerHostKind::Engine, u32::MAX, 7, 0)
     );
+    assert_eq!(host.rule, client::HostRule::Open);
     assert!(host.draining && !host.connected && host.cut);
     assert_eq!((host.grace_until, host.grace_remaining), (Some(Wall::EPOCH), Some(Duration::ZERO)));
     assert_eq!(host.runs.capacity(), 3);

@@ -66,6 +66,12 @@ fn host(value: &documents::Host, limits: &Limits) -> Result<client::OwnerHost, o
     Ok(client::OwnerHost {
         name: value.name.as_deref().map(super::programs::configured_name).transpose()?,
         awaiting_logins: value.awaiting_logins,
+        rule: match value.rule {
+            jig_domain_core::HostRule::Open => client::HostRule::Open,
+            jig_domain_core::HostRule::Person(person) => client::HostRule::Person(person),
+            jig_domain_core::HostRule::Several => client::HostRule::Several,
+            jig_domain_core::HostRule::Unknown => client::HostRule::Unknown,
+        },
         programs: super::programs::logins(&value.programs, limits)?,
         channel: value.channel,
         kind: host_kind(value.kind),

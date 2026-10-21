@@ -110,6 +110,7 @@ fn deployment_hosts_ten_attempt_states_three_placements_task_links_and_absent_cl
             .push(OwnerHost {
                 name: None,
                 awaiting_logins: false,
+                rule: HostRule::Open,
                 programs: skein_lib::List::with_capacity(0),
                 channel: u64::MAX,
                 kind: OwnerHostKind::Worker,
@@ -406,6 +407,7 @@ fn deployment_heap_counts_every_reserved_list_box_chip_text_and_exact_carrier_th
         .push(OwnerHost {
             name: None,
             awaiting_logins: false,
+            rule: HostRule::Open,
             programs: skein_lib::List::with_capacity(0),
             channel: 1,
             kind: OwnerHostKind::Engine,

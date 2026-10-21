@@ -154,6 +154,7 @@ pub fn deployment_document() -> d::Deployment {
         hosts: list([d::Host {
             name: None,
             awaiting_logins: false,
+            rule: jig_domain_core::HostRule::Open,
             programs: List::with_capacity(0),
             channel: 17,
             kind: fleet::HostKind::Engine,

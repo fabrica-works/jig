@@ -68,12 +68,22 @@ pub struct OwnerProjectCapacity {
     pub proposals: u32,
 }
 
+/// A host's current placement rule, independent of a run's payer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum HostRule {
+    Open,
+    Person(u64),
+    Several,
+    Unknown,
+}
+
 /// A connected or retained host and its supplied placement facts.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[expect(clippy::struct_excessive_bools, reason = "independent host, inventory and document facts")]
 pub struct OwnerHost {
     pub name: Option<Box<[u8]>>,
     pub awaiting_logins: bool,
+    pub rule: HostRule,
     pub programs: List<OwnerProgramLogin>,
     pub channel: u64,
     pub kind: OwnerHostKind,

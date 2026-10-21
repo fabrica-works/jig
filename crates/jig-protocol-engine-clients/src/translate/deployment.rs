@@ -362,6 +362,17 @@ pub fn run(value: &d::HostRun, limits: &w::Limits) -> Result<w::OwnerHostRun, w:
         },
     )
 }
+fn host_rule(value: jig_domain_core::HostRule, limits: &w::Limits) -> Result<w::OwnerHostRule, w::Problem> {
+    use jig_domain_core::HostRule;
+    Ok(match value {
+        HostRule::Open => w::OwnerHostRule::Open,
+        HostRule::Person(party) => {
+            w::OwnerHostRule::Person(w::OwnerHostPerson::new(limits, w::OwnerHostPersonParts { party })?)
+        }
+        HostRule::Several => w::OwnerHostRule::Several,
+        HostRule::Unknown => w::OwnerHostRule::Unknown,
+    })
+}
 pub fn host(value: &d::Host, limits: &w::Limits) -> Result<w::OwnerHost, w::Problem> {
     let mut runs = List::with_capacity(value.runs.len());
     for row in &value.runs {
@@ -374,6 +385,7 @@ pub fn host(value: &d::Host, limits: &w::Limits) -> Result<w::OwnerHost, w::Prob
         w::OwnerHostParts {
             skein_bools: [value.awaiting_logins, value.draining, value.connected, value.cut],
             name: value.name.clone(),
+            rule: host_rule(value.rule, limits)?,
             programs: super::programs::logins(
                 &value.programs,
                 limits,

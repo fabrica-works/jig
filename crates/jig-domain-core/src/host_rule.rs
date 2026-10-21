@@ -5,7 +5,7 @@ use jig_domain_fleet::{HostKind, LoginState, PlacementConstraint};
 use skein_lib::List;
 
 /// One bounded fact per host, independent of any run or payer.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum HostRule {
     Open,
     Person(u64),

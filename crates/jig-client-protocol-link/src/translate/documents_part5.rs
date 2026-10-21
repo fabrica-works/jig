@@ -273,6 +273,12 @@ pub(crate) fn owner_host_fields(
     Ok(c::OwnerHost {
         name,
         awaiting_logins: value.awaiting_logins(),
+        rule: match value.rule() {
+            w::OwnerHostRule::Open => c::HostRule::Open,
+            w::OwnerHostRule::Person(person) => c::HostRule::Person(person.party()),
+            w::OwnerHostRule::Several => c::HostRule::Several,
+            w::OwnerHostRule::Unknown => c::HostRule::Unknown,
+        },
         programs: crate::translate::programs::logins(value.programs(), limits, room)?,
         channel: value.channel(),
         kind: owner_host_kind_fields(value.kind(), limits),

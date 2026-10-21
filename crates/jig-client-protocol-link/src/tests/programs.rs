@@ -119,3 +119,42 @@ fn configured_host_names_stay_whole_below_the_text_limit() {
     let rows = decode::hosts(&bytes.finish(), &limits, &mut room).expect("whole name");
     assert_eq!(rows.get(0).expect("host").name.as_ref(), b"configured-worker");
 }
+
+#[test]
+fn a_host_rule_survives_wire_receipt() {
+    let person = w::OwnerHostPerson::new(&w::CEILINGS, w::OwnerHostPersonParts { party: 7 }).expect("person");
+    for (rule, expected) in [
+        (w::OwnerHostRule::Open, c::HostRule::Open),
+        (w::OwnerHostRule::Person(person), c::HostRule::Person(7)),
+        (w::OwnerHostRule::Several, c::HostRule::Several),
+        (w::OwnerHostRule::Unknown, c::HostRule::Unknown),
+    ] {
+        let row = w::OwnerHost::new(
+            &w::CEILINGS,
+            w::OwnerHostParts {
+                name: None,
+                skein_bools: [false, false, true, false],
+                rule,
+                programs: Box::new([]),
+                channel: 17,
+                kind: w::OwnerHostKind::Worker,
+                slots: 1,
+                used: 0,
+                free: 1,
+                grace_until: None,
+                grace_remaining: None,
+                runs: Box::new([]),
+            },
+        )
+        .expect("host");
+        let mut bytes = Writer::new(usize::try_from(row.measure()).expect("row").checked_add(4).expect("prefix"));
+        bytes.put(&row.measure().to_be_bytes()).expect("prefix");
+        row.encode(&mut bytes).expect("row");
+        let mut room = 4096;
+        let limits = fixtures::limits();
+        let rows =
+            crate::translate::documents::owner_host_piece(&bytes.finish(), &limits, limits.client.rows, &mut room)
+                .expect("host receipt");
+        assert_eq!(rows.get(0).expect("host").rule, expected);
+    }
+}

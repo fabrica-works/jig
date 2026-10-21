@@ -142,6 +142,8 @@ fn records_4(bytes: &[u8]) {
     check!(OwnerRunLocationAdrift, bytes);
     check!(OwnerRunLocation, bytes);
     check!(OwnerHostRun, bytes);
+    check!(OwnerHostPerson, bytes);
+    check!(OwnerHostRule, bytes);
     check!(OwnerHost, bytes);
     check!(OwnerAgentShortfallModel, bytes);
     check!(OwnerAgentShortfallWindow, bytes);

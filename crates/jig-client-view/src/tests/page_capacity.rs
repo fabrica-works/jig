@@ -791,7 +791,8 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
     // Program facts add 11 * 2 * 2 + 3 * 2 = 50 nodes at this profile.
     // Each card frame's two committed outcomes grow by 2 * (260 - 34) = 452.
     // The page formulas count these frames independently of their offered controls.
-    const DEPLOYMENT_NODES: u32 = 8_199;
+    // One placement-rule phrase per host adds two nodes at this profile.
+    const DEPLOYMENT_NODES: u32 = 8_201;
     assert_eq!(
         [
             crate::inbox_nodes(&CLIENT, 0),

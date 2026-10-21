@@ -786,7 +786,9 @@ enum OwnerProgramState { usable, not_signed_in, signed_in_otherwise: OwnerProgra
 enum OwnerProgramSignOut { signed_out, failed: OwnerProgramFailed }
 record OwnerProgramLogin { name: bytes 32 state: option OwnerProgramState sign_out: option OwnerProgramSignOut cleanup: bool cut: bool }
 record OwnerProgramHost { name: bytes 4096 channel: u64 connected: bool awaiting_logins: bool programs: bytes 16777216 cut: bool }
-record OwnerHost { name: option bytes 4096 awaiting_logins: bool programs: bytes 16777216 channel: u64 kind: OwnerHostKind slots: u32 used: u32 free: u32 draining: bool connected: bool grace_until: option u64 grace_remaining: option duration runs: bytes 16777216 cut: bool }
+record OwnerHostPerson { party: u64 }
+enum OwnerHostRule { open, person: OwnerHostPerson, several, unknown }
+record OwnerHost { name: option bytes 4096 awaiting_logins: bool rule: OwnerHostRule programs: bytes 16777216 channel: u64 kind: OwnerHostKind slots: u32 used: u32 free: u32 draining: bool connected: bool grace_until: option u64 grace_remaining: option duration runs: bytes 16777216 cut: bool }
 record OwnerAgentShortfallModel { charter: u32 model: u32 }
 record OwnerAgentShortfallWindow { charter: u32 model: u32 }
 record OwnerAgentShortfallOutput { charter: u32 model: u32 }

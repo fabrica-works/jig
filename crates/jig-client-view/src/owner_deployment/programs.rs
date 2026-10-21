@@ -17,6 +17,15 @@ fn failure(b: &mut Builder, words: &Words, reason: F) {
     };
     text(b, words, P::ProgramDetail(phrase), &[]);
 }
+pub(super) fn rule(b: &mut Builder, words: &Words, rule: jig_client::contract::HostRule) {
+    use jig_client::contract::HostRule;
+    match rule {
+        HostRule::Open => {}
+        HostRule::Person(person) => super::field_number(b, words, P::ProgramDetail(G::OnlyPerson), person),
+        HostRule::Several => text(b, words, P::ProgramDetail(G::SeveralPeople), &[]),
+        HostRule::Unknown => text(b, words, P::ProgramDetail(G::UnnamedLogin), &[]),
+    }
+}
 pub(super) fn render(b: &mut Builder, words: &Words, rows: &List<OwnerProgramLogin>, awaiting: bool) {
     if rows.is_empty() && !awaiting {
         return;

@@ -229,7 +229,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 276] = [
+pub const ALL: [DeploymentPhrase; 279] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -506,6 +506,9 @@ pub const ALL: [DeploymentPhrase; 276] = [
     DeploymentPhrase::ProgramDetail(ProgramPhrase::Unknown),
     DeploymentPhrase::ProgramDetail(ProgramPhrase::Closed),
     DeploymentPhrase::ProgramDetail(ProgramPhrase::StatusUnknown),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::OnlyPerson),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::SeveralPeople),
+    DeploymentPhrase::ProgramDetail(ProgramPhrase::UnnamedLogin),
 ];
 impl DeploymentPhrase {
     #[must_use]

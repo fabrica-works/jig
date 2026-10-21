@@ -8,6 +8,7 @@ fn host() -> d::Host {
     d::Host {
         name: Some(b"configured-worker".as_slice().into()),
         awaiting_logins: true,
+        rule: jig_domain_core::HostRule::Open,
         programs: List::with_capacity(0),
         channel: 17,
         kind: fleet::HostKind::Worker,
@@ -69,4 +70,25 @@ fn a_refused_worker_position_reaches_the_wire_record() {
         panic!("position refusal");
     };
     assert_eq!(row.worker(), u32::MAX);
+}
+
+#[test]
+fn a_host_rule_reaches_the_wire() {
+    use jig_domain_core::HostRule;
+    for (rule, expected) in [
+        (HostRule::Open, w::OwnerHostRule::Open),
+        (
+            HostRule::Person(7),
+            w::OwnerHostRule::Person(
+                w::OwnerHostPerson::new(&w::CEILINGS, w::OwnerHostPersonParts { party: 7 }).expect("person"),
+            ),
+        ),
+        (HostRule::Several, w::OwnerHostRule::Several),
+        (HostRule::Unknown, w::OwnerHostRule::Unknown),
+    ] {
+        let mut value = host();
+        value.rule = rule;
+        let wire = crate::translate::deployment::host(&value, &w::CEILINGS).expect("host");
+        assert_eq!(wire.rule(), &expected);
+    }
 }

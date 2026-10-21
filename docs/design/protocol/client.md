@@ -206,7 +206,10 @@ from the whole authority payload used for edits (`../client/domain/contract.md`,
 
 Client v11 appends the public provider catalogue and startup key bound to `me`,
 and provider/payer readiness to `accounts`. Deployment includes the same
-catalogue and viewer readiness for the reference fragment. The `position`
+catalogue and viewer readiness for the reference fragment. Each deployment host's
+`OwnerHostRule` is `open`, `person` with an `OwnerHostPerson` party number,
+`several`, or `unknown`, recording its current kept-login placement rule.
+The `position`
 hello refusal names a worker position that is unconfigured or held by a live
 channel. Existing tags stay fixed. These are bounded secret-free
 configuration/derived facts

@@ -299,6 +299,7 @@ fn deployment_view_opaque_history_keys_source_order_and_full_width_requester_pro
 }
 #[test]
 fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wrong_checked_shapes() {
+    const DEPLOYMENT_PHRASES: usize = 279; // 276 existing + three host rules.
     let english = crate::phrases::english::language();
     let mut second = english.clone();
     for phrase in &mut second.phrases {
@@ -329,7 +330,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 276);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), DEPLOYMENT_PHRASES);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -358,6 +359,7 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
             .push(OwnerHost {
                 name: None,
                 awaiting_logins: false,
+                rule: HostRule::Person(u64::MAX),
                 programs: List::with_capacity(0),
                 channel: n,
                 kind: OwnerHostKind::Worker,
@@ -1059,6 +1061,7 @@ fn program_host() -> OwnerHost {
     OwnerHost {
         name: Some(b"configured-worker".as_slice().into()),
         awaiting_logins: false,
+        rule: HostRule::Open,
         programs: List::with_capacity(2),
         channel: 17,
         kind: OwnerHostKind::Worker,
@@ -1174,5 +1177,20 @@ fn account_lists_one_past_the_view_counts_are_refused() {
         account_lists(CLIENT.accounts.accounts, CLIENT.accounts.sources + 1),
     ] {
         assert!(view::required(&value, &CLIENT, shared_words()).is_none());
+    }
+}
+
+#[test]
+fn a_closed_host_says_why() {
+    for (rule, expected) in [
+        (HostRule::Person(u64::MAX), b"Only this person's runs: 18446744073709551615".as_slice()),
+        (HostRule::Several, b"No run: several people's logins".as_slice()),
+        (HostRule::Unknown, b"No run: a login jig cannot name".as_slice()),
+    ] {
+        let mut value = empty();
+        let mut host = program_host();
+        host.rule = rule;
+        value.hosts.push(host).expect("host");
+        assert!(contains(&round_trip(value), expected), "missing {expected:?}");
     }
 }

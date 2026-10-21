@@ -376,3 +376,11 @@ fn program_diagnostics_report_their_cut() {
         Some(fleet::LoginState::Failed { reason: fleet::SourceFailure::Exited, detail: b"fai".as_slice().into() })
     );
 }
+
+#[test]
+fn a_host_names_the_person_whose_logins_it_keeps() {
+    let (mut core, env) = program_facts();
+    program_inventory(&mut core, &env, fleet::LoginState::Usable);
+    let value = deployment(&core, &env.limits);
+    assert_eq!(value.hosts.get(0).expect("worker").rule, HostRule::Person(1));
+}

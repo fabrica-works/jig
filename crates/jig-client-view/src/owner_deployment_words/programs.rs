@@ -19,10 +19,14 @@ pub enum ProgramPhrase {
     Unknown,
     Closed,
     StatusUnknown,
+    OnlyPerson,
+    SeveralPeople,
+    UnnamedLogin,
 }
 impl ProgramPhrase {
     pub(super) const fn hole(self) -> Option<skein_ui::phrases::HoleKind> {
         match self {
+            Self::OnlyPerson => Some(skein_ui::phrases::HoleKind::Number),
             Self::Programs
             | Self::Awaiting
             | Self::Received
@@ -40,7 +44,9 @@ impl ProgramPhrase {
             | Self::Unconfigured
             | Self::Unknown
             | Self::Closed
-            | Self::StatusUnknown => None,
+            | Self::StatusUnknown
+            | Self::SeveralPeople
+            | Self::UnnamedLogin => None,
         }
     }
     pub(super) const fn number(self) -> u16 {
@@ -63,6 +69,9 @@ impl ProgramPhrase {
             Self::Unknown => 9715,
             Self::Closed => 9716,
             Self::StatusUnknown => 9717,
+            Self::OnlyPerson => 9719,
+            Self::SeveralPeople => 9720,
+            Self::UnnamedLogin => 9721,
         }
     }
     pub(super) const fn label(self) -> &'static [u8] {
@@ -85,6 +94,9 @@ impl ProgramPhrase {
             Self::Unknown => b"Unknown program source",
             Self::Closed => b"Worker closed",
             Self::StatusUnknown => b"Login status unknown",
+            Self::OnlyPerson => b"Only this person's runs: ",
+            Self::SeveralPeople => b"No run: several people's logins",
+            Self::UnnamedLogin => b"No run: a login jig cannot name",
         }
     }
 }
