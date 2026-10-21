@@ -775,6 +775,7 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
                 .expect("restored task admitted");
             let indexed = domain.names.insert(number, id);
             assert!(indexed == Ok(None), "restored name admitted");
+            crate::waits::refresh(domain, number);
         }
         Stored::Stub(stub) => {
             if stub.task == 0
@@ -1003,7 +1004,7 @@ pub(crate) fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<R
         }
     }
     if !crate::writers::valid_restored(domain, env.limits.depth.saturating_add(1))
-        || !crate::batch::acyclic(domain, &env.limits, Party::Person(0), &[])
+        || !crate::waits::restore(domain, env, out)
         || !crate::funders::links(domain, env.limits.tasks)
     {
         return failed(domain, None, Refusal::Restore, out);

@@ -580,3 +580,100 @@ fn saturated_verdict_machine_field_arrays_fit_their_declared_owner_bound() {
         measured.event(Event::Settled { task });
     }
 }
+
+#[test]
+fn a_wide_back_walk_with_ancestors_and_dependents_fits_its_priced_scratch() {
+    const ROOT: u64 = 1;
+    const BRANCH: u64 = 2;
+    const SOURCE: u64 = 3;
+    const FIRST_LEAF: u64 = 10;
+    const PROPOSED: u64 = 18;
+    const WIDTH: u64 = 8;
+    let limits =
+        Limits { tasks: 24, tree_tasks: 24, project_tasks: 24, inbox_messages: 16, inbox_bytes: 512, ..LIMITS };
+    let mut measured = Measured::new(&limits);
+    measured.bootstrap();
+    let reply_to = measured.to();
+    measured.event(Event::Make { reply_to, creator: Party::Person(9), batch: Box::new([pool_task(ROOT, &[])]) });
+    let batch = (BRANCH..FIRST_LEAF).map(|number| pool_task(number, &[])).collect();
+    let reply_to = measured.to();
+    measured.event(Event::Make { reply_to, creator: Party::Task(ROOT), batch });
+    for sibling in SOURCE..FIRST_LEAF {
+        let reply_to = measured.to();
+        measured.event(Event::Introduce { reply_to, by: ROOT, left: BRANCH, right: sibling });
+    }
+    let dependencies: Vec<_> = (SOURCE..FIRST_LEAF).collect();
+    let batch = (FIRST_LEAF..FIRST_LEAF + WIDTH).map(|number| pool_task(number, &dependencies)).collect();
+    let reply_to = measured.to();
+    measured.event(Event::Make { reply_to, creator: Party::Task(BRANCH), batch });
+    let reply_to = measured.to();
+    measured.event(Event::Introduce { reply_to, by: BRANCH, left: SOURCE, right: FIRST_LEAF });
+    let reply_to = measured.to();
+    measured.event(Event::Make {
+        reply_to,
+        creator: Party::Task(SOURCE),
+        batch: Box::new([pool_task(PROPOSED, &[FIRST_LEAF])]),
+    });
+    assert!(measured.refused, "the creator's eight waiting dependents close the proposed circle");
+    let width = usize::try_from(WIDTH).expect("small tree width");
+    assert_eq!(measured.d.task(ROOT).expect("root").delegates.len(), width);
+    assert_eq!(measured.d.task(BRANCH).expect("branch").delegates.len(), width);
+}
+
+#[test]
+fn the_wait_index_and_walk_have_an_explicit_memory_delta() {
+    // abf728e0's bound for this profile; the added index owns resource keys,
+    // per-task comparison payloads, reversed edges and all simultaneous scratch.
+    const SEED_BYTES: u64 = 9_808_904;
+    const WAIT_BYTES: u64 = 1_485_368;
+    assert_eq!(tasks::worst_case(&LIMITS), Some(SEED_BYTES + WAIT_BYTES));
+}
+
+#[test]
+fn retained_root_holds_and_new_live_holds_fit_the_index_together() {
+    const ROOT: u64 = 1;
+    const LIVE_CHILD: u64 = 5;
+    const LIVE_TASKS: u32 = 3;
+    let limits = Limits { tasks: LIVE_TASKS, holdings: 1, tree_tasks: 6, ..LIMITS };
+    let mut world = jig_tasks_world::World::new(321, limits);
+    let kind = tasks::Kind { connector: 1, kind: 1, hold: tasks::HoldKind::Exclusive { taken: tasks::Taken::Waits } };
+    world.configure_holds(1, vec![kind]);
+    world.make(Party::Person(9), vec![task(ROOT, &[])]);
+    for child in 2..=LIVE_CHILD {
+        let holding = tasks::Holding::Write {
+            resource: tasks::Name {
+                connector: 1,
+                path: Box::new([Box::new([u8::try_from(child).expect("small task identity")])]),
+            },
+            kind: 1,
+        };
+        let mut new = task(child, &[]);
+        new.holdings = Box::new([holding.clone()]);
+        world.make(Party::Task(ROOT), vec![new]);
+        if child == LIVE_CHILD {
+            break;
+        }
+        world.claim(child, child);
+        world.terminal(
+            child,
+            End::Finished { result: TaskResult::Failure { reason: Box::new([1]) }, cancel_delegates: false },
+        );
+        world.settle_effects(child);
+        world.send(Event::Retained { task: child, root: ROOT, holding });
+        world.release(child);
+    }
+    let mut measured = Measured::new(&limits);
+    measured.event(Event::Kinds { connector: 1, kinds: Box::new([kind]) });
+    for row in world.records.values().filter(|row| row.key().live()) {
+        measured.event(Event::Restore { record: row.clone() });
+    }
+    measured.event(Event::Restored);
+    assert_eq!(measured.d.task(ROOT).expect("retaining root").holdings.len(), LIVE_TASKS as usize);
+    assert!(measured.d.task(LIVE_CHILD).expect("new child").holds_taken);
+}
+
+fn pool_task(number: u64, dependencies: &[u64]) -> tasks::New {
+    let mut new = task(number, dependencies);
+    new.funder = Funder::Pool { project: 1, person: 9, period: 7 };
+    new
+}

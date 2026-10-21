@@ -1,12 +1,12 @@
-//! Whole-batch structural and financial admission (domain/tasks.md, sections 4 and 10). Bounded immutable dependencies and delegation waits are checked
-//! together before mutation; tasks does not judge root-authorized authority.
+//! Whole-batch structural and financial admission (domain/tasks.md, sections 4, 6.7 and 11).
+//! Dependencies, delegation and threshold queue waits are checked together
+//! before mutation; tasks does not judge root-authorized authority.
 #![expect(
     clippy::result_large_err,
     reason = "bounded owner refusal keeps exact revision and capacity facts inline instead of allocating on refusal"
 )]
 use crate::domain::{Domain, record};
 use crate::{Authority, Contract, Executor, Last, Limits, New, Parameter, Party, Phase, Problem, Refusal, Spec, Was};
-use skein_lib::List;
 
 fn problem(task: Option<u64>, why: Refusal) -> Problem {
     Problem { task, why, blocked_by: None, capacity: None }
@@ -142,9 +142,7 @@ fn check_with_result_proposal(
     if !crate::funders::can_reserve(domain, creator, batch, result_proposal, direct_finish) {
         return Err(problem(None, Refusal::Funding));
     }
-    if !acyclic(domain, limits, creator, batch) {
-        return Err(problem(Some(batch.first().expect("nonempty batch").number), Refusal::Circle { cut: false }));
-    }
+    crate::waits::check_batch(domain, limits, creator, batch)?;
     Ok(())
 }
 
@@ -494,78 +492,6 @@ pub fn valid_authority(limits: &Limits, value: &Authority) -> bool {
         }
     }
     bytes <= usize::try_from(limits.authority_bytes).expect("u32 fits usize")
-}
-
-/// Include the delegation edges added to an existing creator, as well as all
-/// immutable existing dependencies: a reference to an ancestor can otherwise
-/// create a wait cycle without a cycle among the new tasks themselves.
-pub(crate) fn acyclic(domain: &Domain, limits: &Limits, creator: Party, batch: &[New]) -> bool {
-    let mut ordered = List::with_capacity(limits.tasks);
-    let total = domain.names.len().saturating_add(u32::try_from(batch.len()).unwrap_or(u32::MAX));
-    for _ in 0..total {
-        let mut next = None;
-        for (number, _) in &domain.names {
-            if contains(ordered.as_slice(), *number) {
-                continue;
-            }
-            let task = record(domain, *number).expect("indexed task live");
-            let mut ready = true;
-            for dependency in &task.dependencies {
-                if domain.names.contains_key(dependency) && !contains(ordered.as_slice(), *dependency) {
-                    ready = false;
-                }
-            }
-            for delegate in &task.delegates {
-                if !contains(ordered.as_slice(), *delegate) {
-                    ready = false;
-                }
-            }
-            if creator == Party::Task(*number) {
-                for new in batch {
-                    if !contains(ordered.as_slice(), new.number) {
-                        ready = false;
-                    }
-                }
-            }
-            if ready {
-                next = Some(*number);
-                break;
-            }
-        }
-        if next.is_none() {
-            for new in batch {
-                if contains(ordered.as_slice(), new.number) {
-                    continue;
-                }
-                let mut ready = true;
-                for dependency in &new.dependencies {
-                    if (domain.names.contains_key(dependency) || batch_has(batch, *dependency))
-                        && !contains(ordered.as_slice(), *dependency)
-                    {
-                        ready = false;
-                    }
-                }
-                if ready {
-                    next = Some(new.number);
-                    break;
-                }
-            }
-        }
-        let Some(number) = next else {
-            return false;
-        };
-        ordered.push(number).expect("admitted graph bounded by live task capacity");
-    }
-    true
-}
-
-fn batch_has(batch: &[New], number: u64) -> bool {
-    for new in batch {
-        if new.number == number {
-            return true;
-        }
-    }
-    false
 }
 
 /// Shape bound for a batch retained before its resources have been reported.

@@ -122,7 +122,8 @@ pub(crate) fn stub_capacity(limits: &Limits) -> Option<u32> {
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     crate::domain::output_bound(limits)?;
     crate::activity::line_bytes_limit(limits)?;
-    if limits.tasks == 0
+    if limits.circle == 0
+        || limits.tasks == 0
         || limits.batch == 0
         || limits.tree_tasks == 0
         || limits.run_inbox == 0
@@ -275,6 +276,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             .checked_add(u64::from(limits.hold_bytes))?,
     )?;
     Slab::<Task>::worst_case(limits.tasks)?
+        .checked_add(crate::waits::worst_case(limits)?)?
         .checked_add(Map::<u64, crate::PersonProposal>::worst_case(limits.tasks)?)?
         .checked_add(u64::from(limits.tasks).checked_mul(proposal_payload)?)?
         .checked_add(crate::compound::worst_case(limits, payload.checked_add(proposal_payload)?)?)?

@@ -57,6 +57,9 @@ impl Tasks {
         writers: &[WriterSlot],
         judge: &mut Judge<Name, Stimulus>,
     ) {
+        if circle_of_waits(live, pools) {
+            judge.fail("circle of waits");
+        }
         for row in live {
             if row.holds_taken && matches!(row.phase, Phase::Waiting | Phase::Held { was: Was::Waiting, .. }) {
                 judge.fail("task waits while holding a resource");
@@ -398,5 +401,97 @@ fn stored(live: &[TaskRecord], limits: &Limits, judge: &mut Judge<Name, Stimulus
         })
     {
         judge.fail("stored shape exceeds configured limit");
+    }
+}
+
+// Compute live waits independently of the tasks child's indexes and back walk.
+fn circle_of_waits(live: &[TaskRecord], pools: &[PoolSlots]) -> bool {
+    let mut pending = BTreeMap::<u64, usize>::new();
+    let mut dependents = BTreeMap::<u64, Vec<u64>>::new();
+    let mut held = BTreeMap::<ResourceName, Vec<u64>>::new();
+    let mut waiters = BTreeMap::<ResourceName, Vec<u64>>::new();
+    let mut thresholds = BTreeMap::<ResourceName, usize>::new();
+    for row in live.iter().filter(|row| row.holds_taken) {
+        for holding in &row.holdings {
+            let name = holding_name(holding);
+            held.entry(name.clone()).or_default().push(row.number);
+        }
+    }
+    for row in live {
+        let mut waits = 0;
+        if matches!(row.phase, Phase::Waiting | Phase::Active(_)) {
+            for dependency in &row.waiting_on {
+                if live.iter().any(|other| other.number == *dependency) {
+                    dependents.entry(*dependency).or_default().push(row.number);
+                    waits += 1;
+                }
+            }
+        }
+        if matches!(row.phase, Phase::Waiting | Phase::Active(_) | Phase::Closing(_)) {
+            for delegate in &row.delegates {
+                if live.iter().any(|other| other.number == *delegate) {
+                    dependents.entry(*delegate).or_default().push(row.number);
+                    waits += 1;
+                }
+            }
+        }
+        if row.phase == Phase::Waiting && row.hold_wait_since.is_some() && !row.holds_taken && row.waiting_on.is_empty()
+        {
+            for holding in &row.holdings {
+                let name = holding_name(holding);
+                let threshold = match holding {
+                    Holding::Write { .. } => 1,
+                    Holding::Slot { .. } => pools
+                        .iter()
+                        .find(|pool| pool.pool == *name)
+                        .map_or(1, |pool| usize::try_from(pool.slots.max(1)).expect("u32 fits usize")),
+                };
+                thresholds.insert(name.clone(), threshold);
+                if held.get(name).map_or(0, Vec::len) >= threshold {
+                    waiters.entry(name.clone()).or_default().push(row.number);
+                    waits += 1;
+                }
+            }
+        }
+        pending.insert(row.number, waits);
+    }
+    let mut ready: Vec<_> = pending.iter().filter(|(_, waits)| **waits == 0).map(|(task, _)| *task).collect();
+    while let Some(number) = ready.pop() {
+        pending.remove(&number);
+        for dependent in dependents.get(&number).into_iter().flatten() {
+            remove_wait(&mut pending, &mut ready, *dependent);
+        }
+        let Some(row) = live.iter().find(|row| row.number == number) else { continue };
+        if !row.holds_taken {
+            continue;
+        }
+        for holding in &row.holdings {
+            let name = holding_name(holding);
+            let holders = held.get_mut(name).expect("counted holder");
+            let before = holders.len();
+            holders.retain(|holder| *holder != number);
+            if thresholds.get(name) == Some(&before) {
+                for waiter in waiters.get(name).into_iter().flatten() {
+                    remove_wait(&mut pending, &mut ready, *waiter);
+                }
+            }
+        }
+    }
+    !pending.is_empty()
+}
+
+fn remove_wait(pending: &mut BTreeMap<u64, usize>, ready: &mut Vec<u64>, task: u64) {
+    if let Some(waits) = pending.get_mut(&task) {
+        *waits = waits.checked_sub(1).expect("each observed wait removed once");
+        if *waits == 0 {
+            ready.push(task);
+        }
+    }
+}
+
+fn holding_name(holding: &Holding) -> &ResourceName {
+    match holding {
+        Holding::Write { resource, .. } => resource,
+        Holding::Slot { pool, .. } => pool,
     }
 }

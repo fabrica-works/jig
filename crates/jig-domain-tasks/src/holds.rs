@@ -1,5 +1,5 @@
 //! Connector-configured, whole-set hold admission and bounded waiting
-//! (domain/tasks.md, 6.1–6.2). Names are opaque; the hub orders tasks and
+//! (domain/tasks.md, 6.2, 6.6 and 6.7). Names are opaque; the hub orders tasks and
 //! never interprets a connector's path.
 #![expect(
     clippy::result_large_err,
@@ -72,7 +72,8 @@ pub(crate) fn kinds(domain: &mut Domain, limits: &Limits, connector: u16, kinds:
 
 /// Keep the latest connector count durable; a shrink changes admission but
 /// leaves all current holders in place.
-pub(crate) fn slots(domain: &mut Domain, limits: &Limits, pool: Name, slots: u32, out: &mut Queue<Request>) {
+pub(crate) fn slots(domain: &mut Domain, env: &Env<Limits>, pool: Name, slots: u32, out: &mut Queue<Request>) {
+    let limits = &env.limits;
     if !domain.ready() || !shape(limits, &pool) {
         return;
     }
@@ -86,8 +87,19 @@ pub(crate) fn slots(domain: &mut Domain, limits: &Limits, pool: Name, slots: u32
         }
     };
     let row = PoolSlots { number, pool: pool.clone(), slots };
-    domain.pools.insert(pool, row.clone()).expect("pool room preflighted");
+    domain.pools.insert(pool.clone(), row.clone()).expect("pool room preflighted");
     out.push(Request::Save { record: Stored::Pool(row) });
+    // A slot report can both close a circle and free a held waiter (6.6–6.7).
+    let mut waiters = List::with_capacity(limits.tasks);
+    for ((_, waiter), ()) in domain.waits.waiters.range((pool.clone(), 0)..=(pool, u64::MAX)) {
+        waiters.push(*waiter).expect("one waiter per task");
+    }
+    for waiter in waiters.into_boxed() {
+        if let Err(problem) = crate::waits::check_queue(domain, limits, waiter) {
+            crate::waits::hold_circle(domain, env, waiter, problem, out);
+        }
+    }
+    crate::waits::pool_changed(domain, limits);
 }
 
 pub(crate) fn restore_pool(domain: &mut Domain, limits: &Limits, row: PoolSlots) -> bool {
@@ -136,7 +148,7 @@ pub(crate) fn allocation_gone(
     }
 }
 
-fn name(holding: &Holding) -> &Name {
+pub(crate) fn name(holding: &Holding) -> &Name {
     match holding {
         Holding::Write { resource, .. } => resource,
         Holding::Slot { pool, .. } => pool,
@@ -149,7 +161,7 @@ fn kind(holding: &Holding) -> u16 {
     }
 }
 
-fn rule(domain: &Domain, holding: &Holding) -> Option<HoldKind> {
+pub(crate) fn rule(domain: &Domain, holding: &Holding) -> Option<HoldKind> {
     let key = KindKey { connector: name(holding).connector, kind: kind(holding) };
     match domain.resources.get(name(holding)) {
         Some(rule) => Some(*rule),
@@ -189,13 +201,12 @@ fn same(a: &Holding, b: &Holding) -> bool {
 }
 
 fn holder(domain: &Domain, holding: &Holding) -> Option<u64> {
-    for (number, _) in &domain.names {
-        let row = record(domain, *number).expect("indexed live task");
-        if row.holds_taken {
-            for held in &row.holdings {
-                if same(held, holding) && rule(domain, held) != Some(HoldKind::Shared) {
-                    return Some(*number);
-                }
+    let name = name(holding);
+    for ((_, number), ()) in domain.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+        let row = record(domain, *number).expect("indexed holder");
+        for held in &row.holdings {
+            if same(held, holding) && rule(domain, held) != Some(HoldKind::Shared) {
+                return Some(*number);
             }
         }
     }
@@ -203,19 +214,9 @@ fn holder(domain: &Domain, holding: &Holding) -> Option<u64> {
 }
 
 fn holders(domain: &Domain, holding: &Holding) -> u32 {
-    let mut count = 0_u32;
-    for (number, _) in &domain.names {
-        let row = record(domain, *number).expect("indexed live task");
-        if row.holds_taken {
-            for held in &row.holdings {
-                if same(held, holding) {
-                    count = count.saturating_add(1);
-                    break;
-                }
-            }
-        }
-    }
-    count
+    let name = name(holding);
+    u32::try_from(domain.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)).count())
+        .expect("bounded holders")
 }
 
 fn held_by(domain: &Domain, task: u64, holding: &Holding) -> bool {
@@ -248,18 +249,16 @@ fn available(domain: &Domain, holding: &Holding, extra: u32) -> bool {
 
 /// Current task that owns an exclusive resource, including a handed-down one.
 pub(crate) fn writer_holder(domain: &Domain, resource: &Name) -> Option<u64> {
-    for (number, _) in &domain.names {
-        let row = record(domain, *number).expect("indexed live task");
-        if row.holds_taken {
-            for held in &row.holdings {
-                if name(held) == resource
-                    && match rule(domain, held) {
-                        Some(HoldKind::Exclusive { .. }) => true,
-                        Some(HoldKind::Pooled { .. } | HoldKind::Shared) | None => false,
-                    }
-                {
-                    return Some(*number);
+    for ((_, number), ()) in domain.waits.holders.range((resource.clone(), 0)..=(resource.clone(), u64::MAX)) {
+        let row = record(domain, *number).expect("indexed holder");
+        for held in &row.holdings {
+            if name(held) == resource
+                && match rule(domain, held) {
+                    Some(HoldKind::Exclusive { .. }) => true,
+                    Some(HoldKind::Pooled { .. } | HoldKind::Shared) | None => false,
                 }
+            {
+                return Some(*number);
             }
         }
     }
@@ -273,19 +272,9 @@ pub fn valid_name(limits: &Limits, resource: &Name) -> bool {
 }
 
 fn waiting_count(domain: &Domain, holding: &Holding) -> u32 {
-    let mut count = 0_u32;
-    for (number, _) in &domain.names {
-        let row = record(domain, *number).expect("indexed live task");
-        if queued(row) {
-            for needed in &row.holdings {
-                if same(needed, holding) {
-                    count = count.saturating_add(1);
-                    break;
-                }
-            }
-        }
-    }
-    count
+    let name = name(holding);
+    u32::try_from(domain.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)).count())
+        .expect("bounded waiters")
 }
 
 /// Preflight a complete batch without granting any of its resources.
@@ -440,7 +429,7 @@ fn priority(domain: &Domain, number: u64, bound: u32) -> u32 {
     0
 }
 
-fn earlier(domain: &Domain, left: u64, right: u64, limits: &Limits) -> bool {
+pub(crate) fn earlier(domain: &Domain, left: u64, right: u64, limits: &Limits) -> bool {
     let lp = priority(domain, left, limits.tasks);
     let rp = priority(domain, right, limits.tasks);
     if lp != rp {
@@ -488,6 +477,10 @@ pub(crate) fn wait(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mu
     }
     let Some(resource) = blocked else { return };
     task_mut(domain, number).expect("waiting task live").record.hold_wait_since = Some(env.wall);
+    if let Err(problem) = crate::waits::check_queue(domain, &env.limits, number) {
+        crate::waits::hold_circle(domain, env, number, problem, out);
+        return;
+    }
     publish(domain, env, number, out);
     let place = place(domain, &env.limits, number, &resource);
     out.push(Request::Waiting { task: number, resource, place });
@@ -498,7 +491,7 @@ pub(crate) fn wait(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mu
 /// Where `number` stands among the queued waiters for `resource`, counting from 1.
 fn place(domain: &Domain, limits: &Limits, number: u64, resource: &Name) -> u32 {
     let mut place = 1_u32;
-    for (other, _) in &domain.names {
+    for ((_, other), ()) in domain.waits.waiters.range((resource.clone(), 0)..=(resource.clone(), u64::MAX)) {
         if *other != number {
             let row = record(domain, *other).expect("indexed live task");
             if queued(row) && earlier(domain, *other, number, limits) {
@@ -516,7 +509,6 @@ fn place(domain: &Domain, limits: &Limits, number: u64, resource: &Name) -> u32 
 
 /// A waiting task given a dependency leaves its queues, keeping when it began to wait: its
 /// bound stops while the dependency is pending (domain/tasks.md, 6.2).
-#[expect(dead_code, reason = "the amendment that adds a dependency to a waiting task calls it")]
 pub(crate) fn leave(domain: &mut Domain, number: u64) {
     domain.hold_alarms.cancel(number);
 }
@@ -534,6 +526,10 @@ pub(crate) fn back(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mu
             blocked = Some(name(needed).clone());
             break;
         }
+    }
+    if let Err(problem) = crate::waits::check_queue(domain, &env.limits, number) {
+        crate::waits::hold_circle(domain, env, number, problem, out);
+        return;
     }
     task_mut(domain, number).expect("returning task live").record.hold_bound_since = Some(env.wall);
     publish(domain, env, number, out);

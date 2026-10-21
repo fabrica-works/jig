@@ -732,10 +732,14 @@ pub(crate) fn apply_release(
         task.record.inbox = notice.inbox;
         crate::activity::message(&mut task.record, &notice.activity_word, env.limits.inbox_messages, out);
     }
+    let circle = match task.record.phase {
+        Phase::Held { why: crate::Hold::Circle, .. } => true,
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } | Phase::Ended(_) => false,
+    };
     task.record.narrowing |= crate::run::run_attempt(&next).is_some();
     task.record.phase = next;
     task.record.due_reason = crate::Why::Released;
-    if task.record.phase == Phase::Waiting {
+    if task.record.phase == Phase::Waiting && !circle {
         task.record.hold_wait_since = None;
         task.record.hold_bound_since = None;
     }
@@ -743,6 +747,11 @@ pub(crate) fn apply_release(
     task.record.refusals = 0;
     history(domain, number, env.wall, by, Change::Released, &[], out);
     publish(domain, env, number, out);
+    if let Err(problem) = crate::waits::check_return(domain, &env.limits, number) {
+        crate::waits::hold_circle(domain, env, number, problem, out);
+    } else if crate::holds::queued(record(domain, number).expect("released task")) {
+        crate::holds::back(domain, env, number, out);
+    }
     if record(domain, number).expect("released task live").phase == Phase::Active(Active::Due) {
         crate::domain::activate(domain, number, out);
     }

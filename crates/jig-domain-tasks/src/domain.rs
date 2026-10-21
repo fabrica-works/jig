@@ -32,12 +32,14 @@ pub(crate) enum Startup {
     Failed,
 }
 
-/// Bounded live task arena, immutable dependencies, retry timers, finite period/pool ledgers,
+/// Bounded live task arena, indexed waits, retry timers, finite period/pool ledgers,
 /// configured charters and deterministic retry randomness. Keeps bounded historical stubs,
 /// transport receipt, connector state or mutable root shadow ledger. (domain/tasks.md, sections 2, 4–5 and 10).
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) startup: Startup,
+    pub(crate) waits: crate::waits::Index,
+    pub(crate) circle_changes: skein_lib::Set<u64>,
     pub(crate) tasks: Slab<Task>,
     pub(crate) names: Map<u64, Id<Task>>,
     pub(crate) stubs: Map<u64, crate::Stub>,
@@ -168,6 +170,8 @@ impl Domain {
         }
         Domain {
             startup: Startup::Restoring,
+            waits: crate::waits::Index::new(limits),
+            circle_changes: skein_lib::Set::with_capacity(limits.tasks),
             tasks: Slab::with_capacity(limits.tasks),
             names: Map::with_capacity(limits.tasks),
             stubs: Map::with_capacity(crate::limits::stub_capacity(limits).expect("valid stub bound")),
@@ -502,7 +506,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         Event::Resource { name, hold } => crate::holds::resource(domain, &env.limits, name, hold),
         Event::Kinds { connector, kinds } => crate::holds::kinds(domain, &env.limits, connector, &kinds),
-        Event::Slots { pool, slots } => crate::holds::slots(domain, &env.limits, pool, slots, out),
+        Event::Slots { pool, slots } => crate::holds::slots(domain, env, pool, slots, out),
         Event::AllocationGone { pool, task } => crate::holds::allocation_gone(domain, env, &pool, task, out),
         Event::WakeProcedure { task } => wake_procedure(domain, env, task, out),
         Event::ProposePerson { reply_to, proposal } => {
@@ -932,6 +936,7 @@ fn milestone(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queu
 }
 
 pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
+    crate::waits::refresh(domain, number);
     crate::proposals::withdraw_on_close(domain, env, number, out);
     let task = task_mut(domain, number).expect("published task is live");
     crate::inbox::keep_refusals(&mut task.record, &[]);

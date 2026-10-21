@@ -423,3 +423,35 @@ fn an_ended_listed_task_without_its_project_index_row_is_refused() {
         Err("ended task missing its project index row")
     );
 }
+
+#[test]
+fn live_queue_and_dependency_circles_are_judged_from_rows() {
+    use jig_domain_tasks::{Active, Holding, Name, Phase, PoolSlots};
+    use jig_tasks_world::{LIMITS, World, task};
+    let mut world = World::new(0, LIMITS);
+    world.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
+    let mut holder = world.record(1).clone();
+    let mut waiter = world.record(2).clone();
+    let resource = Name { connector: 1, path: Box::new([Box::new([1])]) };
+    holder.waiting_on = Box::new([waiter.number]);
+    holder.phase = Phase::Active(Active::Idle);
+    waiter.phase = Phase::Waiting;
+    waiter.holds_taken = false;
+    waiter.hold_wait_since = Some(skein_lib::Wall::EPOCH);
+    for pooled in [false, true] {
+        let holding = if pooled {
+            Holding::Slot { pool: resource.clone(), kind: 1 }
+        } else {
+            Holding::Write { resource: resource.clone(), kind: 1 }
+        };
+        holder.holdings = Box::new([holding.clone()]);
+        waiter.holdings = Box::new([holding]);
+        let pools = if pooled { vec![PoolSlots { number: 1, pool: resource.clone(), slots: 0 }] } else { vec![] };
+        rejects(vec![Seen::Resources { live: vec![holder.clone(), waiter.clone()], pools, writers: vec![] }]);
+    }
+    holder.holdings = Box::new([]);
+    waiter.hold_wait_since = None;
+    waiter.holdings = Box::new([]);
+    waiter.waiting_on = Box::new([holder.number]);
+    rejects(vec![Seen::Resources { live: vec![holder, waiter], pools: vec![], writers: vec![] }]);
+}

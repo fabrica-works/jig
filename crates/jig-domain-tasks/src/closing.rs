@@ -223,9 +223,9 @@ pub(crate) fn settled(domain: &mut Domain, env: &Env<Limits>, number: u64, out: 
 
 pub(crate) fn progress(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     // Every pass must advance a phase or end a task to need another pass;
-    // immutable dependency DAGs and delegation depth bound the cascade.
+    // bounded live waits and delegation depth bound the cascade.
     for _ in 0..env.limits.tasks.saturating_add(1) {
-        let mut changed = false;
+        let mut changed = crate::waits::lift(domain, env, out);
         let numbers = snapshot(domain, env.limits.tasks);
         for number in numbers.into_boxed() {
             let Some(task) = record(domain, number) else {
@@ -334,6 +334,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     end_milestone(&mut ended, env.wall, out);
     ended.ended_at = Some(env.wall);
     ended.changed = env.wall;
+    crate::waits::remove(domain, number);
     let id = domain.names.remove(&number).expect("ending name exists");
     crate::holds::release(domain, number);
     crate::refs::end(domain, env, number, out);
