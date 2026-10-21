@@ -661,6 +661,7 @@ circle, each for another of the set, so that none of them could end.
     left), or a pool on it changes its slots; one whose names were cut
     at the limit, at every such change. A release judges it afresh.
   - *a pool that shrinks* (6.6): each waiter, as a join.
+  - *a failed task's hold retained by its root* (6.5): each waiter, as a join.
 
   Taking holds adds no wait: a task becomes active with its dependencies
   done and no delegates yet.
@@ -1131,6 +1132,7 @@ B waits in the holder's queue, and a batch whose task waits in the queue
 of a resource its grandparent holds; a waiting task whose dependencies
 are done joining a queue onto a circle, held, and back at its place
 once the circle breaks; a pool shrinking onto a circle, its waiter held;
+a failed task's hold retained by its root onto a circle, its waiter held;
 a restart restoring a circle an older rule allowed, its waiter held; a
 pool's two holders each given a dependency on a task that waits, through
 its delegate, for that pool: the first accepted, the second refused,

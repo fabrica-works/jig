@@ -1,5 +1,5 @@
 //! Connector-configured, whole-set hold admission and bounded waiting
-//! (domain/tasks.md, 6.2, 6.6 and 6.7). Names are opaque; the hub orders tasks and
+//! (domain/tasks.md, 6.2, 6.5, 6.6 and 6.7). Names are opaque; the hub orders tasks and
 //! never interprets a connector's path.
 #![expect(
     clippy::result_large_err,
@@ -90,16 +90,21 @@ pub(crate) fn slots(domain: &mut Domain, env: &Env<Limits>, pool: Name, slots: u
     domain.pools.insert(pool.clone(), row.clone()).expect("pool room preflighted");
     out.push(Request::Save { record: Stored::Pool(row) });
     // A slot report can both close a circle and free a held waiter (6.6–6.7).
-    let mut waiters = List::with_capacity(limits.tasks);
-    for ((_, waiter), ()) in domain.waits.waiters.range((pool.clone(), 0)..=(pool, u64::MAX)) {
+    check_waiters(domain, env, &pool, out);
+    crate::waits::pool_changed(domain, limits);
+}
+
+/// A shrink or retained hold changes whom existing queues wait for (domain/tasks.md, 6.7).
+fn check_waiters(domain: &mut Domain, env: &Env<Limits>, resource: &Name, out: &mut Queue<Request>) {
+    let mut waiters = List::with_capacity(env.limits.tasks);
+    for ((_, waiter), ()) in domain.waits.waiters.range((resource.clone(), 0)..=(resource.clone(), u64::MAX)) {
         waiters.push(*waiter).expect("one waiter per task");
     }
     for waiter in waiters.into_boxed() {
-        if let Err(problem) = crate::waits::check_queue(domain, &crate::compound::Staged::new(0), limits, waiter) {
+        if let Err(problem) = crate::waits::check_queue(domain, &crate::compound::Staged::new(0), &env.limits, waiter) {
             crate::waits::hold_circle(domain, env, waiter, problem, out);
         }
     }
-    crate::waits::pool_changed(domain, limits);
 }
 
 pub(crate) fn restore_pool(domain: &mut Domain, limits: &Limits, row: PoolSlots) -> bool {
@@ -645,6 +650,7 @@ pub(crate) fn retained(
     publish(domain, env, task, out);
     publish(domain, env, root, out);
     out.push(Request::Taken { task: root, holdings: Box::new([holding.clone()]) });
+    check_waiters(domain, env, name(holding), out);
 }
 
 /// Validate one live row against the configured kinds and prior restored rows.

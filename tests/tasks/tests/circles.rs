@@ -749,3 +749,42 @@ fn a_compound_readding_an_indexed_dependency_frees_it_once() {
     finish_task(&mut world, HOLDER);
     finish_task(&mut world, DEPENDENT);
 }
+
+#[test]
+fn retaining_a_failed_childs_hold_judges_its_roots_queued_delegate() {
+    let mut world = configured(&LIMITS, false);
+    world.make(Party::Person(PERSON), vec![task(ROOT, &[])]);
+    let mut holder = task(HOLDER, &[]);
+    holder.holdings = Box::new([holding(false)]);
+    world.make(Party::Task(ROOT), vec![holder]);
+    let mut waiter = task(WAITER, &[]);
+    waiter.holdings = Box::new([holding(false)]);
+    world.make(Party::Task(ROOT), vec![waiter]);
+    let place = world.record(WAITER).hold_wait_since.expect("queued delegate");
+    world.claim(HOLDER, HOLDER);
+    world.terminal(
+        HOLDER,
+        jig_domain_tasks::End::Finished {
+            result: jig_domain_tasks::TaskResult::Failure { reason: Box::new([RESOURCE]) },
+            cancel_delegates: false,
+        },
+    );
+    world.settle_effects(HOLDER);
+    world.send(Event::Retained { task: HOLDER, root: ROOT, holding: holding(false) });
+    assert_eq!(named_circle(&world, WAITER).tasks.as_ref(), [WAITER, ROOT]);
+    assert_eq!(world.record(WAITER).hold_wait_since, Some(place));
+    assert!(world.record(ROOT).holdings.contains(&holding(false)));
+    assert!(world.record(HOLDER).holdings.is_empty());
+    world.release(HOLDER);
+    world.restart();
+    assert_eq!(named_circle(&world, WAITER).tasks.as_ref(), [WAITER, ROOT]);
+    world.elapse(Duration::from_secs(1));
+    world.send(Event::Hold { task: ROOT, why: Hold::Budget });
+    assert_eq!(world.record(WAITER).phase, Phase::Waiting);
+    assert_eq!(world.record(WAITER).hold_wait_since, Some(place));
+    assert_eq!(world.record(WAITER).hold_bound_since, Some(world.env.wall));
+    cancel(&mut world, WAITER);
+    world.settle(WAITER);
+    release(&mut world, ROOT);
+    finish_task(&mut world, ROOT);
+}
