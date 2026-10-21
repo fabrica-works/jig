@@ -7,6 +7,9 @@ use jig_domain_tasks::{
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::Duration;
 
+#[path = "open/resume.rs"]
+mod resume;
+
 fn claimed(flags: Flags) -> World {
     let mut chat = task(1, &[]);
     chat.flags = flags;
