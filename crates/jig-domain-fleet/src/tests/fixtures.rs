@@ -1,6 +1,7 @@
 pub fn bounds() -> crate::Bounds {
     use skein_lib::Duration;
     crate::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([]),
         turns: u32::MAX,
         spend: u64::MAX,

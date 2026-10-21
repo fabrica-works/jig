@@ -1,7 +1,7 @@
 //! General operation targets and template overrides, translated into people records.
 use super::{Untranslatable, asks};
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use jig_domain_people as p;
 use skein_lib::List;
 
@@ -301,6 +301,10 @@ fn member(
         tracked: v.tracked,
         label: v.label,
         flags: p::Flags {
+            ended_by: match flags.ended_by {
+                w::EndedBy::Result => p::EndedBy::Result,
+                w::EndedBy::Requester => p::EndedBy::Requester,
+            },
             conversation: flags.conversation,
             listed: flags.listed,
             retention: match flags.retention {

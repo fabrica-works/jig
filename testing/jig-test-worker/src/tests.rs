@@ -48,7 +48,10 @@ fn an_undecodable_charter_fails_the_start_as_invalid() {
     assert_eq!(worker.spawns(), 0);
     assert_eq!(
         worker.take_answer().ending,
-        host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start { why: Box::from(&b"charter"[..]) }))
+        host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+            cause: jig_domain_host::StartCause::Other,
+            why: Box::from(&b"charter"[..])
+        }))
     );
 }
 
@@ -225,4 +228,34 @@ fn a_run_failed_on_its_limited_or_refused_account_keeps_the_account() {
         host::RunFailure::Refused { account: 0 }
     );
     assert_eq!(model(smith::ModelFault::Unauthorized { account: 0 }), host::RunFailure::Model);
+}
+
+#[test]
+fn only_typed_agent_grants_refusals_carry_the_grants_start_cause() {
+    for (why, expected) in [
+        (smith::RunInvalid::Grants, host::StartCause::Grants),
+        (smith::RunInvalid::Messages, host::StartCause::Other),
+        (smith::RunInvalid::Outcome, host::StartCause::Other),
+        (smith::RunInvalid::Workspace, host::StartCause::Other),
+    ] {
+        let result = smith::RunResult::Refused { refusal: smith::Refusal::Invalid(why) };
+        let crate::hand_out::Finish::Refused(cause) = crate::hand_out::Finish::of(&result) else {
+            panic!("start refusal")
+        };
+        assert_eq!(cause, expected);
+    }
+}
+
+#[test]
+fn hello_endpoint_storage_is_priced_at_its_actual_length() {
+    let mut limits = fixtures::limits();
+    let before = crate::worst_case(&limits).expect("native bounds");
+    let mut endpoints = skein_lib::List::with_capacity(host::PROGRAM_ENDPOINTS);
+    for endpoint in 0..host::PROGRAM_ENDPOINTS {
+        endpoints.push(endpoint).expect("bounded endpoint list");
+    }
+    limits.bounds.program_endpoints = endpoints.into_boxed();
+    assert_eq!(crate::worst_case(&limits), Some(before + u64::from(host::PROGRAM_ENDPOINTS) * 4));
+    limits.bounds.program_endpoints = Box::new([0, 0]);
+    assert_eq!(crate::worst_case(&limits), None);
 }

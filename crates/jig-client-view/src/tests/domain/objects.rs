@@ -307,7 +307,12 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
         requester: OwnerRequester::Person(1),
         tracked: None,
         label: 1,
-        flags: TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead },
+        flags: TaskFlags {
+            ended_by: EndedBy::Result,
+            conversation: true,
+            listed: false,
+            retention: Retention::ForgottenOnceRead,
+        },
         changed: Wall::EPOCH,
         last_activity: Wall::EPOCH,
         ended_at: None,

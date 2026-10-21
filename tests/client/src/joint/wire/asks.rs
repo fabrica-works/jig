@@ -465,7 +465,12 @@ mod tests {
             named: List::with_capacity(0),
             tracked: None,
             label: 0,
-            flags: client::TaskFlags { conversation: false, listed: false, retention: client::Retention::Kept },
+            flags: client::TaskFlags {
+                ended_by: client::EndedBy::Result,
+                conversation: false,
+                listed: false,
+                retention: client::Retention::Kept,
+            },
             llm: Some(llm),
         }
     }

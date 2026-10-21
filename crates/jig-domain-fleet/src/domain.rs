@@ -94,6 +94,21 @@ impl Domain {
         self.cleanup_programs.contains(&name)
     }
 
+    /// Actual evidence from an admitted hello; the engine follows the same rule.
+    #[must_use]
+    pub fn program_endpoint(&self, channel: Token, endpoint: u32) -> Option<bool> {
+        if channel == Token::new(0)
+            && match self.engine_hello {
+                EngineHello::Admitted => false,
+                EngineHello::Expected | EngineHello::Heard => true,
+            }
+        {
+            return None;
+        }
+        let host = self.channels.get(*self.tokens.get(&channel)?)?;
+        Some(host.program_endpoints.contains(&endpoint))
+    }
+
     /// Supply the checked fixed membership once, before admitting channels.
     /// Its minter uses the fleet's configured-worker and name-byte limits.
     pub fn configure_workers(&mut self, names: crate::Membership) {
@@ -143,6 +158,7 @@ impl Domain {
         let mut tokens = Map::with_capacity(channels_count);
         if limits.engine_slots > 0 {
             let engine = Channel {
+                program_endpoints: Box::new([]),
                 worker: None,
                 declarations: Box::new([]),
                 sources: crate::sources::Sources::new(Box::new([]), 0, false),

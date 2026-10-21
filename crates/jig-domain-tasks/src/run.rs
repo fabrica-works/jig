@@ -354,7 +354,8 @@ pub(crate) fn activation(
     };
     let narrowed = old.narrowing;
     let kept = ends::kept(domain, number);
-    let end = if narrowed { End::Parked } else { end };
+    let parked = !narrowed && kept.parks(&end, &old.contract, &env.limits);
+    let end = if narrowed || parked { End::Parked } else { end };
     let result_followups = match &end {
         End::FinishedWithFollowups { .. } => true,
         End::Finished { .. } | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
@@ -383,8 +384,6 @@ pub(crate) fn activation(
         }
         End::Parked | End::Failed(_) | End::Refused | End::Recheck => end,
     };
-    let parked = kept.parks(&end);
-    let end = if parked { End::Parked } else { end };
     let refuses_live = match &end {
         End::Finished { cancel_delegates, .. } => !cancel_delegates && !result_followups,
         End::FinishedWithFollowups { .. } => unreachable!("follow-ups normalized"),
@@ -451,7 +450,7 @@ pub(crate) fn activation(
     task.record.narrowing = false;
     let spent = task.record.run_spent;
     crate::activity::append(&mut task.record, env.wall, crate::Line::RunEnded { attempt, end: end_kind, spent }, out);
-    if parked {
+    if parked && kept.dependencies {
         let pending = task.record.waiting_on.clone();
         crate::activity::append(&mut task.record, env.wall, crate::Line::Kept { attempt, pending }, out);
     }

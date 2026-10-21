@@ -1,6 +1,6 @@
 //! Task lifecycle values and bounded creation templates (protocol/store.md, 5.1).
 use super::value;
-use crate::tasks_v6 as wire;
+use crate::tasks_v7 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};
@@ -793,7 +793,18 @@ pub(super) fn flags(source: domain::Flags, limits: &wire::Limits) -> Result<wire
         domain::Retention::Kept => wire::Retention::Kept,
         domain::Retention::ForgottenOnceRead => wire::Retention::ForgottenOnceRead,
     };
-    wire::Flags::new(limits, wire::FlagsParts { conversation: source.conversation, listed: source.listed, retention })
+    wire::Flags::new(
+        limits,
+        wire::FlagsParts {
+            ended_by: match source.ended_by {
+                domain::EndedBy::Result => wire::EndedBy::Result,
+                domain::EndedBy::Requester => wire::EndedBy::Requester,
+            },
+            conversation: source.conversation,
+            listed: source.listed,
+            retention,
+        },
+    )
 }
 /// Read immutable task flags.
 pub(super) fn read_flags(source: wire::Flags) -> domain::Flags {
@@ -802,5 +813,13 @@ pub(super) fn read_flags(source: wire::Flags) -> domain::Flags {
         wire::Retention::Kept => domain::Retention::Kept,
         wire::Retention::ForgottenOnceRead => domain::Retention::ForgottenOnceRead,
     };
-    domain::Flags { conversation: source.conversation, listed: source.listed, retention }
+    domain::Flags {
+        ended_by: match source.ended_by {
+            wire::EndedBy::Result => domain::EndedBy::Result,
+            wire::EndedBy::Requester => domain::EndedBy::Requester,
+        },
+        conversation: source.conversation,
+        listed: source.listed,
+        retention,
+    }
 }

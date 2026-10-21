@@ -17,6 +17,7 @@ pub fn hello() -> host::Hello {
         workstreams: Box::new([4, 5]),
         hosting: Box::new([host::Hosting { run: RUN, attempt: ATTEMPT, phase: host::Phase::Waiting }]),
         bounds: host::Bounds {
+            program_endpoints: Box::new([]),
             models: Box::new([host::ModelBound { name: b"small".as_slice().into(), window: 1024, output: 128 }]),
             turns: 8,
             spend: 100,
@@ -148,6 +149,7 @@ pub fn domain() -> Domain {
 }
 pub fn run() -> Box<core::RunCharter> {
     Box::new(core::RunCharter {
+        ended_by: jig_domain_tasks::EndedBy::Result,
         sources: Box::new([Some(1)]),
         accounts: Box::new([]),
         placement: jig_domain_fleet::PlacementConstraint {
@@ -292,6 +294,7 @@ pub fn start_refusal() -> host::LinkUp {
         panic!("answer fixture");
     };
     answer.ending = host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+        cause: jig_domain_host::StartCause::Other,
         why: b"the model is absent".as_slice().into(),
     }));
     host::LinkUp::Answer { run, attempt, answer }

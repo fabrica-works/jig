@@ -21,7 +21,7 @@ pub fn task_record() -> jig_domain_tasks::TaskRecord {
         hold_bound_since: None,
         kept_account: Some(u32::MAX - 1),
         label: 7,
-        flags: task::Flags { conversation: true, listed: false, retention: task::Retention::Kept },
+        flags: task::Flags { conversation: true, ..task::Flags::PLAIN },
         last_activity: Wall::from_nanos(19),
         ended_below: task::Endings { done: 3, failed: 5, cancelled: 7 },
         question_lines: Box::new([task::QuestionLine {

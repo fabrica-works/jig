@@ -2,7 +2,7 @@ use crate::{Request, tests::fixtures, translate};
 use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Queue, Reader, Time, Token};
-fn translated(kind: u16, bytes: &[u8], limits: &wire::v5::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
+fn translated(kind: u16, bytes: &[u8], limits: &wire::v6::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
     let mut parts = List::with_capacity(1);
     let mut values = Queue::with_capacity(4);
     let down =
@@ -175,6 +175,7 @@ fn the_hello_carries_the_hubs_agent_bounds_and_hosting() {
 fn a_hub_invalid_start_keeps_its_words_in_the_answer_record() {
     let host::LinkUp::Answer { run, attempt, mut answer } = fixtures::answer() else { panic!("answer") };
     answer.ending = host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+        cause: jig_domain_host::StartCause::Other,
         why: b"budget too small".as_slice().into(),
     }));
     let frame = translate::up(host::LinkUp::Answer { run, attempt, answer }, &[], &fixtures::codec())

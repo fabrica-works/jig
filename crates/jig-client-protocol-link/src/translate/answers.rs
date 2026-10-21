@@ -3,7 +3,7 @@ use crate::Limits;
 use crate::translate::text_problem;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use skein_lib::{List, Reader, Wall, bytes};
 pub(crate) fn seen(value: &w::SeenThrough, _limits: &Limits) -> c::SeenThrough {
     match value {
@@ -478,6 +478,8 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
             why: match row.why() {
                 w::Malformed::TwoAsAllowed => c::Malformed::TwoAsAllowed,
                 w::Malformed::ConversationNotAgent => c::Malformed::ConversationNotAgent,
+
+                w::Malformed::EndedBy => c::Malformed::EndedBy,
                 w::Malformed::Cycle => c::Malformed::Cycle,
                 w::Malformed::ProposedAsAllowed => c::Malformed::ProposedAsAllowed,
                 w::Malformed::ProjectMismatch => c::Malformed::ProjectMismatch,

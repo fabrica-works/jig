@@ -348,3 +348,12 @@ work that takes it there. Owners keep the rows their work changes
 
 | Draft | About | Next |
 |---|---|---|
+
+
+The Open task slice carries immutable `EndedBy` through configuration, client
+creation, durable records, preparation and Smith mode. Its shared kept rule
+normalizes Open raw finishes before judgment. Native Open selection and claim
+checks use admitted endpoint evidence; an ordinary program choice is visibly
+refused without source fallback. Typed prestart Grants refusal has the fenced
+Recheck backstop. The reference client shows the derived refusal cause. The
+application's ordered repin and real-loop Open acceptance remain downstream.

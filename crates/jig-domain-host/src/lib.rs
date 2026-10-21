@@ -18,6 +18,7 @@ extern crate alloc;
 mod activity;
 mod answers;
 mod assignment;
+pub use jig_domain_workers::{PROGRAM_ENDPOINTS, valid_program_endpoints};
 mod boundary;
 mod call;
 mod domain;
@@ -35,8 +36,8 @@ pub use activity::{Activity, CountKind, Operation};
 pub use boundary::{
     AgentFailure, Answer, AnsweredCall, Ask, Assignment, Delivery, DeliveryOutcome, Ending, Event, Failure, Finish,
     Form, FromAgent, Grant, GrantTable, Hosting, Invalid, MessageRefusal, Phase, Preparation, Reason, Refusal, Refused,
-    Reply, Request, RunAssignment, RunFailure, Scheme, SettledAnswer, Start, StartMessage, ToAgent, Turn, Work,
-    Workspace,
+    Reply, Request, RunAssignment, RunFailure, Scheme, SettledAnswer, Start, StartCause, StartMessage, ToAgent, Turn,
+    Work, Workspace,
 };
 pub use domain::{Domain, max_out, resume, step};
 pub use facts::Fact;

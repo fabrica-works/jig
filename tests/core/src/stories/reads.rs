@@ -75,6 +75,7 @@ pub fn conversation_member(forgettable: bool) -> people::Member {
         tracked: None,
         label: jig_client_test_records::CHAT,
         flags: people::Flags {
+            ended_by: people::EndedBy::Result,
             conversation: true,
             listed: false,
             retention: if forgettable { people::Retention::ForgottenOnceRead } else { people::Retention::Kept },

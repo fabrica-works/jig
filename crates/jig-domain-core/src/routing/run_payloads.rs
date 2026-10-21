@@ -15,6 +15,7 @@ pub(super) fn route_answer_payload(
     end: tasks::End,
     saved: Option<Box<[tasks::SavedResource]>>,
     invalid_saved: bool,
+    grants_refused: bool,
     read: Option<u64>,
     refused: &[u64],
 ) -> Requests {
@@ -47,6 +48,16 @@ pub(super) fn route_answer_payload(
                         offered: proof.offered,
                     }));
                 }
+                let end = if grants_refused
+                    && end == tasks::End::Failed(tasks::Class::Invalid)
+                    && cumulative == 0
+                    && proof.turn.is_none()
+                    && core.program_offered(run.raw(), &proof.accounts)
+                {
+                    tasks::End::Recheck
+                } else {
+                    end
+                };
                 (cumulative, end, saved)
             }
         }

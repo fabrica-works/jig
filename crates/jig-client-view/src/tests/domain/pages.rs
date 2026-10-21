@@ -304,7 +304,12 @@ fn list_entry(task: u64, phase: Phase, changed: u64) -> TaskLine {
         requester: OwnerRequester::Person(1),
         tracked: None,
         label: 1,
-        flags: TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead },
+        flags: TaskFlags {
+            ended_by: EndedBy::Result,
+            conversation: true,
+            listed: false,
+            retention: Retention::ForgottenOnceRead,
+        },
         changed: skein_lib::Wall::from_nanos(changed),
         last_activity: skein_lib::Wall::EPOCH,
         ended_at: None,
@@ -756,7 +761,7 @@ fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> TaskLine
         project: 1,
         requester: OwnerRequester::Person(7),
         label: 2,
-        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: false, listed: true, retention: Retention::Kept },
         waits_on: WaitsOn::Nothing,
         conversation: None,
     }

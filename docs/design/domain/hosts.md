@@ -781,6 +781,31 @@ host tools' calls (6.8).
   all the same fails its
   attempt as invalid, naming why (6.3).
 
+### 8.1 Open compatibility
+
+The task's ending authority translates to Smith's `Finite` or `Open`
+mode. Open grants wait and never delivery. This release refuses an
+ordinary chosen program path for an Open task before preparation. It
+does not select another source or account because of that refusal, nor
+change ending authority. Account and source waits retain precedence.
+Alternative models and grants use the same compatibility view at
+selection and claim recheck.
+
+Each admitted hello declares the actual program endpoint numbers, fixed
+for that channel, including the engine host. Unknown evidence fails
+closed. The independent entrance cap is 64 distinct endpoint numbers;
+wire and domain entrances reject malformed metadata before retention.
+It is not derived from the model count. A malformed list refuses the
+channel without inventing an agent shortfall.
+
+An agent start refusal carries `StartCause::{Other,Grants}` separately
+from operator bytes. Only an uncommitted, valid-fenced Open terminal
+with a proven offered program source, no accepted turn and zero
+cumulative expense converts typed Grants to Recheck. It releases the
+attempt without an Invalid try; the same selection policy then refuses
+another unsupported start. Structural host invalids, unproven endpoint
+cases and committed terminals keep their ordinary handling.
+
 ## 9. Messages and delivery
 
 - **Messages** go to smith as messages, rendered by the same translation

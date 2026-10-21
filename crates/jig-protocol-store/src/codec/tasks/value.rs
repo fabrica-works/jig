@@ -1,5 +1,5 @@
 //! Funding and resource values shared by tasks rows (protocol/store.md, 5.1).
-use crate::tasks_v6 as wire;
+use crate::tasks_v7 as wire;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};
 

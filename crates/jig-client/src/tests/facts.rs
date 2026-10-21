@@ -189,14 +189,14 @@ fn chat_status_follows_the_pages_status_table() {
     let me = me();
     for row in ROWS {
         let chip = facts_chip(row.phase.clone(), row.work.clone());
-        assert_eq!(facts::chat_status(&chip, &row.wait, PROJECT, &me), (row.expected)(), "{}", row.name);
+        assert_eq!(facts::chat_status(&chip, &row.wait, None, PROJECT, &me), (row.expected)(), "{}", row.name);
     }
     let chip = facts_chip(
         RUNNING,
         Some(OwnerChipWork::Tool { call: Box::from(b"call".as_slice()), tool: Box::from(b"search".as_slice()) }),
     );
     assert_eq!(
-        facts::chat_status(&chip, &NOTHING, PROJECT, &me),
+        facts::chat_status(&chip, &NOTHING, None, PROJECT, &me),
         ChatStatus::Tool { tool: Box::from(b"search".as_slice()), since: OBSERVED_SINCE }
     );
 }
@@ -215,11 +215,11 @@ fn a_task_line_and_its_task_document_give_one_status() {
     line.project = task.project;
     let me = me();
     assert_eq!(
-        facts::chat_status(&task.chip, &task.waits_on, task.project, &me),
+        facts::chat_status(&task.chip, &task.waits_on, task.run_wait.as_ref(), task.project, &me),
         ChatStatus::WaitingForYou { kind: WaitedFor::Question, entries: 1 }
     );
     assert_eq!(
-        facts::chat_status(&line.chip, &line.waits_on, line.project, &me),
+        facts::chat_status(&line.chip, &line.waits_on, None, line.project, &me),
         ChatStatus::WaitingForYou { kind: WaitedFor::Question, entries: 1 }
     );
 }
@@ -261,5 +261,22 @@ const ACTS: &[(ActKind, bool)] = &[
 fn dangerous_marks_cancel_reject_and_delete_note_alone() {
     for &(act, expected) in ACTS {
         assert_eq!(facts::dangerous(act), expected, "{act:?}");
+    }
+}
+
+#[test]
+fn refusal_status_only_replaces_an_unplaced_starting_chat() {
+    let me = me();
+    let cause = TaskWaitRefused::Program(OpenProgram::Model);
+    let wait = TaskRunWait::Refused(cause);
+    for row in ROWS {
+        let chip = facts_chip(row.phase.clone(), row.work.clone());
+        let expected = match (&row.phase, &row.wait) {
+            (OwnerChipPhase::Active(RunStage::Due | RunStage::Preparing), WaitsOn::Nothing) => {
+                ChatStatus::HostRefused(cause)
+            }
+            _ => (row.expected)(),
+        };
+        assert_eq!(facts::chat_status(&chip, &row.wait, Some(&wait), PROJECT, &me), expected, "{}", row.name);
     }
 }

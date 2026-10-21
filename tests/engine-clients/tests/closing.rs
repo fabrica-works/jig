@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};

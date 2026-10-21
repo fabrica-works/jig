@@ -173,15 +173,17 @@ const JOURNAL: skein_lib::JournalLimits =
 // The largest tasks row can reference all 64 names; sparse and ALL rows keep only used names.
 // Added provenance costs 25 bytes per dependency plus its four-byte list count;
 // the optional wait-bound wall adds nine bytes, so the largest row grows by 413 bytes.
+// Ending authority adds (batch + 1)^2 = (4 + 1)^2 = 25 bytes: the row,
+// its recurring members and its proposed creations with their recurring members.
 const STORE_KV: skein_kv::Limits = skein_kv::Limits {
-    value: 10_664_731,
+    value: 10_664_756,
     ops: 285_763,
     commit: 865_108_626,
     queued_bytes: 2_595_325_878,
     segment: 1_730_217_252,
     snapshot_after: 865_108_626,
-    chunk: 10_666_830,
-    page: skein_kv::Page { rows: 2, bytes: 10_666_810 },
+    chunk: 10_666_855,
+    page: skein_kv::Page { rows: 2, bytes: 10_666_835 },
     ..small::STORE_KV
 };
 const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {

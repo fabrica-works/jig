@@ -18,17 +18,17 @@ fn the_engine_cap_for_one_slot_is_the_hand_summed_bytes() {
 
 #[test]
 fn the_worker_cap_for_one_slot_is_the_hand_summed_bytes() {
-    // Hello125 + turn71 + answer136 + call85 + unauthorized28 + limited29
+    // Hello385 (125 + endpoint count 4 + 64 * 4) + turn71 + answer136 + call85 + unauthorized28 + limited29
     // + account refused60; seven headers56 + fact reserve16 =606.
     // Reserve16 fits no25-byte fact. Sources add Logins158 + two SignedOut66.
-    assert_eq!(worker_cap(&SIZES_ONE_SLOT), Some(WorkerCap { cap: Cap { bytes: 896, frames: 10 }, facts: 16 }));
+    assert_eq!(worker_cap(&SIZES_ONE_SLOT), Some(WorkerCap { cap: Cap { bytes: 1156, frames: 10 }, facts: 16 }));
 }
 
 #[test]
 fn the_worker_cap_reserves_the_facts_share_last() {
     let sizes = Sizes { facts: 75, ..SIZES_ONE_SLOT };
-    // Mandatory frames880 bytes + reserve75 =955; three shortest facts25 each.
-    assert_eq!(worker_cap(&sizes), Some(WorkerCap { cap: Cap { bytes: 955, frames: 13 }, facts: 75 }));
+    // Mandatory frames1140 bytes + reserve75 =1215; three shortest facts25 each.
+    assert_eq!(worker_cap(&sizes), Some(WorkerCap { cap: Cap { bytes: 1215, frames: 13 }, facts: 75 }));
 }
 
 #[test]

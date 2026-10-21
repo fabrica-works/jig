@@ -415,6 +415,8 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
                     domain::Malformed::Cycle => wire::Malformed::Cycle,
                     domain::Malformed::AsAllowedTwice => wire::Malformed::AsAllowedTwice,
                     domain::Malformed::Conversation => wire::Malformed::Conversation,
+
+                    domain::Malformed::EndedBy => wire::Malformed::EndedBy,
                 },
             },
         )?),
@@ -508,6 +510,8 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
                     wire::Malformed::Cycle => domain::Malformed::Cycle,
                     wire::Malformed::AsAllowedTwice => domain::Malformed::AsAllowedTwice,
                     wire::Malformed::Conversation => domain::Malformed::Conversation,
+
+                    wire::Malformed::EndedBy => domain::Malformed::EndedBy,
                 },
             }
         }

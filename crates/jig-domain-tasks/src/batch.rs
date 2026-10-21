@@ -207,6 +207,9 @@ fn check_members(
     for (at, new) in batch.iter().enumerate() {
         assert!(new.deadline == crate::Deadline::Named, "root resolves every made deadline");
         let number = Some(new.number);
+        if !crate::flags::valid(new.flags, new.executor, creator) {
+            return Err(problem(number, Refusal::Contract));
+        }
         if domain.names.contains_key(&new.number) {
             return Err(problem(number, Refusal::Duplicate));
         }

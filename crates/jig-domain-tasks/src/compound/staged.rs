@@ -93,7 +93,7 @@ impl CompoundTask<'_> {
                 | crate::MessageKind::News { .. } => true,
             },
         };
-        let blocked = !crate::run::ends::pending(self.waiting_on).may_be_due(self.executor);
+        let blocked = !crate::run::ends::pending(self.waiting_on, self.flags.ended_by).may_be_due(self.executor);
         if wakes && !blocked && self.phase == Phase::Active(Active::Idle) {
             self.phase = Phase::Active(Active::Due);
         }
@@ -148,7 +148,8 @@ impl Staged {
                     }
                 }
                 Plan::Release(plan) if plan.number == number => {
-                    row.phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, plan.next.clone());
+                    row.phase = crate::run::ends::pending(row.waiting_on, row.flags.ended_by)
+                        .amended(row.executor, plan.next.clone());
                     row.revision = row.revision.checked_add(1).expect("admission checked");
                     project_dependency_hold(domain, &mut row);
                     if let Some(notice) = &plan.notice {
@@ -238,7 +239,8 @@ impl Staged {
             Plan::Amend(plan) => returned_circle(plan.number, self.amended_phase(domain, limits, plan)),
             Plan::Release(plan) => {
                 let row = self.record(domain, plan.number).expect("admitted release");
-                let phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, plan.next.clone());
+                let phase = crate::run::ends::pending(row.waiting_on, row.flags.ended_by)
+                    .amended(row.executor, plan.next.clone());
                 returned_circle(
                     plan.number,
                     crate::control::returned_phase(
@@ -422,14 +424,15 @@ fn project_amend<'a>(row: &mut CompoundTask<'a>, plan: &'a crate::control::Amend
     row.revision = row.revision.checked_add(1).expect("admission checked");
     row.revisions.spec = row.revisions.spec.checked_add(u64::from(plan.changed)).expect("admission checked");
     row.revisions.person = row.revisions.person.checked_add(u64::from(plan.person_changed)).expect("admission checked");
-    row.phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, row.phase.clone());
+    row.phase = crate::run::ends::pending(row.waiting_on, row.flags.ended_by).amended(row.executor, row.phase.clone());
     row.last_message = plan.message;
     row.inbox = &plan.prepared.inbox;
     if plan.attempt.is_none() {
         row.wake(&plan.prepared.word);
     }
     if let Some(release) = &plan.release {
-        row.phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, release.next.clone());
+        row.phase =
+            crate::run::ends::pending(row.waiting_on, row.flags.ended_by).amended(row.executor, release.next.clone());
         row.revision = row.revision.checked_add(1).expect("admission checked");
     }
 }

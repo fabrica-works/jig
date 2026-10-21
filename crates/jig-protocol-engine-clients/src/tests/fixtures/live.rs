@@ -67,7 +67,12 @@ pub fn tasks_document() -> d::Lines {
             requester: t::Party::Person(23),
             tracked: Some(19),
             label: 0,
-            flags: t::Flags { conversation: false, listed: true, retention: t::Retention::Kept },
+            flags: t::Flags {
+                ended_by: t::EndedBy::Result,
+                conversation: false,
+                listed: true,
+                retention: t::Retention::Kept,
+            },
             changed: Wall::from_nanos(29),
             last_activity: Wall::from_nanos(29),
             ended_at: None,

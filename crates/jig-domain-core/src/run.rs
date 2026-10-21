@@ -371,6 +371,7 @@ pub struct RunPolicy {
 /// assignment cell so delivery queues carry a small fixed-size value.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RunCharter {
+    pub ended_by: tasks::EndedBy,
     /// Selected grant for main then each retained alternative; none sources have no grant.
     pub sources: Box<[Option<u32>]>,
     pub accounts: Box<[authority::AccountBinding]>,

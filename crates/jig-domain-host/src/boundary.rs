@@ -104,6 +104,7 @@ pub enum Event {
     },
     /// Terminal for a start the agent refused; its bounded words name why.
     StartRefused {
+        cause: StartCause,
         owner: Token,
         why: Box<[u8]>,
     },
@@ -320,6 +321,7 @@ pub enum FromAgent {
     },
     /// The agent refused its start, before any run began.
     StartRefused {
+        cause: StartCause,
         owner: Token,
         why: Box<[u8]>,
     },
@@ -361,7 +363,7 @@ impl Event {
                 Event::Finished { owner, turns, spent, read, finish }
             }
             FromAgent::Started { owner, agent } => Event::Started { owner, agent },
-            FromAgent::StartRefused { owner, why } => Event::StartRefused { owner, why },
+            FromAgent::StartRefused { cause, owner, why } => Event::StartRefused { cause, owner, why },
             FromAgent::Refused { owner, name, reason } => Event::Refused { owner, name, reason },
             FromAgent::Yielded { owner } => Event::Yielded { owner },
             FromAgent::Faulted { owner, fault } => Event::Faulted { owner, fault },
@@ -663,6 +665,7 @@ pub enum Refusal {
 pub enum Invalid {
     /// The agent refused the start; its words are for operators.
     Start {
+        cause: StartCause,
         why: Box<[u8]>,
     },
     /// The charter holds more bytes than a run may.
@@ -777,4 +780,11 @@ mod tests {
         // tag 1 + length 1 + 32 name bytes.
         assert_eq!(size_of::<Form>(), 34);
     }
+}
+
+/// Why the agent refused a start, independent of its diagnostic bytes.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum StartCause {
+    Other,
+    Grants,
 }

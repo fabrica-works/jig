@@ -696,6 +696,9 @@ pub(super) fn worst_case(worker: &config::Worker, agent: &Agent, root_bytes: usi
         workstreams: Box::default(),
     };
     let domain = root::worst_case(&limits)?;
+    // The environment and the retained agent each own the endpoint declaration;
+    // root::worst_case also prices its one transient hello handoff.
+    let endpoint_copies = u64::try_from(agent.bounds.program_endpoints.len()).ok()?.checked_mul(4)?.checked_mul(2)?;
     let room = root::max_out(&limits).checked_mul(2)?;
     let lower = room.checked_mul(link::MAX_OUT_DOWN)?;
     let payload = smith::worst_case(&agent.host_limits)?.checked_add(host::worst_case(&agent.limits)?)?;
@@ -704,6 +707,7 @@ pub(super) fn worst_case(worker: &config::Worker, agent: &Agent, root_bytes: usi
         command = command.checked_add(u64::try_from(argument.len()).ok()?)?;
     }
     domain
+        .checked_add(endpoint_copies)?
         .checked_add(crate::program_sources::worst_case(hub.detail_bytes)?)?
         .checked_add(Queue::<jig_domain_host::Event>::worst_case(2)?)?
         .checked_add(u64::from(hub.detail_bytes).checked_mul(2)?)?

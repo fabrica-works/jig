@@ -773,6 +773,7 @@ dependencies = [
 name = "jig-domain-host"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-workers",
  "skein-lib",
 ]
 
@@ -1267,6 +1268,7 @@ dependencies = [
 name = "jig-protocol-worker-wire"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-workers",
  "skein-channel",
  "skein-codec",
  "skein-lib",

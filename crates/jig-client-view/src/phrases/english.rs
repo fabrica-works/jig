@@ -13,6 +13,35 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::OpenProgramModel => Box::new([Segment::Text(copy_of(b"This model runs through a program"))]),
+            JigPhrase::OpenProgramUnavailable => {
+                Box::new([Segment::Text(copy_of(b"A chat can't stay open through a program yet"))])
+            }
+            JigPhrase::OpenProgramChooseModel => {
+                Box::new([Segment::Text(copy_of(b"To chat now, choose a model that doesn't run through a program"))])
+            }
+            JigPhrase::OpenProgramSource => Box::new([
+                Segment::Text(copy_of(b"Account ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" would use its program source ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+            JigPhrase::OpenProgramNoSwitch => {
+                Box::new([Segment::Text(copy_of(b"This chat does not switch to another source on its own"))])
+            }
+            JigPhrase::RefusedWorkerAt => Box::new([
+                Segment::Text(copy_of(b"A worker was refused at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::RefusedEngineAt => Box::new([
+                Segment::Text(copy_of(b"An engine host was refused at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::MalformedEndedBy => Box::new([
+                Segment::Text(copy_of(b"Requester-ended task is not an agent conversation at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+
             JigPhrase::KeptUntil => Box::new([
                 Segment::Text(copy_of(b"kept until T")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

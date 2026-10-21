@@ -88,7 +88,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.configured_workers).checked_mul(u64::from(limits.worker_name_bytes))?)?;
     let count = limits.workers.checked_add(u32::from(limits.engine_slots > 0))?;
     count.checked_add(limits.history)?;
-    let channels = Slab::<Channel>::worst_case(count)?.checked_add(Map::<Token, Id<Channel>>::worst_case(count)?)?;
+    let endpoints = u64::from(count).checked_mul(u64::from(crate::PROGRAM_ENDPOINTS).checked_mul(4)?)?;
+    let channels = Slab::<Channel>::worst_case(count)?
+        .checked_add(endpoints)?
+        .checked_add(Map::<Token, Id<Channel>>::worst_case(count)?)?;
     // Each worker: the attempts it hosts, and the workstream keys it holds.
     let hosts = Set::<Id<Attempt>>::worst_case(limits.slots)?;
     let keys = Map::<u64, u64>::worst_case(limits.workstreams)?;

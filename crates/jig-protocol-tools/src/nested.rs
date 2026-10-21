@@ -388,6 +388,7 @@ fn texts(value: &Value) -> Result<Box<[Box<[u8]>]>, Problem> {
 fn flags(value: &Value) -> Result<tasks::Flags, Problem> {
     let retention = value.required(b"retention")?.text()?;
     Ok(tasks::Flags {
+        ended_by: tasks::EndedBy::Result,
         conversation: value.required(b"conversation")?.boolean()?,
         listed: value.required(b"listed")?.boolean()?,
         retention: match retention.as_ref() {

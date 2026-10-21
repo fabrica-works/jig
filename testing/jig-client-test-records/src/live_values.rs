@@ -134,7 +134,12 @@ pub fn task_line_record() -> w::TaskLine {
             label: 0,
             flags: w::TaskFlags::new(
                 &l,
-                w::TaskFlagsParts { conversation: false, listed: true, retention: w::Retention::Kept },
+                w::TaskFlagsParts {
+                    ended_by: w::EndedBy::Result,
+                    conversation: false,
+                    listed: true,
+                    retention: w::Retention::Kept,
+                },
             )
             .expect("fixture flags"),
             last_activity: 29,

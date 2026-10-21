@@ -23,6 +23,7 @@ fn a_worker_s_hello_reaches_the_fleet_with_its_bounds() {
     assert_eq!(
         hello.bounds,
         fleet::Bounds {
+            program_endpoints: Box::new([]),
             models: Box::new([fleet::ModelBound { name: b"small".as_slice().into(), window: 1024, output: 128 }]),
             turns: 8,
             spend: 100,

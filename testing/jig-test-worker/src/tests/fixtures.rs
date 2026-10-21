@@ -45,6 +45,7 @@ pub fn limits() -> Limits {
         facts: 8,
     };
     let bounds = host::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([]),
         turns: 8,
         spend: 100,
@@ -70,6 +71,7 @@ pub fn charter_bytes() -> Box<[u8]> {
     let source =
         smith_charter::Charter::decode(&smith_charter::CEILINGS, &mut Reader::new(&SMALLEST)).expect("golden charter");
     let mut parts = source.into_parts();
+    parts.mode = smith_charter::Mode::Finite;
     parts.budget = smith_charter::Budget::new(
         &smith_charter::CEILINGS,
         smith_charter::BudgetParts {

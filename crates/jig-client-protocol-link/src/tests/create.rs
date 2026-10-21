@@ -42,7 +42,12 @@ fn a_new_task_keeps_each_contract_and_executor_through_the_store() {
     ] {
         let mut task = fixtures::new_task(executor, contract);
         task.budget = c::NewBudget::Named;
-        task.flags = c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept };
+        task.flags = c::TaskFlags {
+            ended_by: c::EndedBy::Result,
+            conversation: true,
+            listed: false,
+            retention: c::Retention::Kept,
+        };
         let ask = c::Ask::Create { project: 7, tasks: fixtures::list([task]) };
         let wire = translate::asks::ask(&ask, &limits.wire).unwrap();
         assert_eq!(translate::store::restore_ask(wire, &limits), Ok(ask), "{name}");

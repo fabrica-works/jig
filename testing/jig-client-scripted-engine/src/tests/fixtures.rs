@@ -78,7 +78,7 @@ pub(super) fn new_task(words: Text) -> NewTask {
         named: List::with_capacity(0),
         tracked: None,
         label: 0,
-        flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: true, listed: false, retention: Retention::Kept },
     }
 }
 pub(super) fn create(project: u32, words: Text) -> Ask {

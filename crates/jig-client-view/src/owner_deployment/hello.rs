@@ -14,7 +14,11 @@ pub(super) fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLin
     field_number(b, words, P::Slots, u64::from(value.slots));
     text(b, words, P::At, &[Hole::Wall(words.adjusted_wall(value.at))]);
     duration(b, words, P::StopBound, value.stop_bound);
-    match value.why {
+    refusal(b, words, value.why);
+    b.close();
+}
+pub(crate) fn refusal(b: &mut Builder, words: &Words, why: OwnerHelloRefusal) {
+    match why {
         OwnerHelloRefusal::Agent { why } => agent(b, words, why),
         OwnerHelloRefusal::ReservedChannel => text(b, words, P::HelloRefusalReservedChannel, &[]),
         OwnerHelloRefusal::Workers { limit } => {
@@ -29,7 +33,6 @@ pub(super) fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLin
             duration(b, words, P::AllowedGrace, grace);
         }
     }
-    b.close();
 }
 fn agent(b: &mut Builder, words: &Words, why: jig_client::contract::OwnerAgentShortfall) {
     use crate::owner_deployment_words::AgentPhrase as A;

@@ -15,7 +15,7 @@ pub fn templates() -> List<Template> {
         budget: TemplateBudget::AsAllowed { cap: None },
         deadline: TemplateDeadline::None,
         tracked: None,
-        flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: true, listed: false, retention: Retention::Kept },
         label: 31,
         grace: None,
     };

@@ -1,5 +1,5 @@
 //! Sparse entrance facts without invented names, words or bounds (contract.md, 4).
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
@@ -39,6 +39,8 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
                 why: match why {
                     p::Malformed::AsAllowedTwice => w::Malformed::TwoAsAllowed,
                     p::Malformed::Conversation => w::Malformed::ConversationNotAgent,
+
+                    p::Malformed::EndedBy => w::Malformed::EndedBy,
                     p::Malformed::Cycle => w::Malformed::Cycle,
                     p::Malformed::ProposedAsAllowed => w::Malformed::ProposedAsAllowed,
                 },

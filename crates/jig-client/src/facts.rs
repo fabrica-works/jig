@@ -11,6 +11,7 @@ use skein_lib::Wall;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ChatStatus {
     Starting,
+    HostRefused(crate::contract::TaskWaitRefused),
     Writing,
     Tool { tool: Box<[u8]>, since: Wall },
     Working { since: Wall },
@@ -25,7 +26,13 @@ pub enum ChatStatus {
 
 /// Read the same facts for a task query's line and a task's page.
 #[must_use]
-pub fn chat_status(chip: &Chip, waits_on: &WaitsOn, project: u32, me: &Me) -> ChatStatus {
+pub fn chat_status(
+    chip: &Chip,
+    waits_on: &WaitsOn,
+    run_wait: Option<&crate::contract::TaskRunWait>,
+    project: u32,
+    me: &Me,
+) -> ChatStatus {
     match chip.details.as_ref() {
         ChipPhase::Owner { phase, details } => match phase {
             OwnerChipPhase::Held { reason, .. } => ChatStatus::Held(*reason),
@@ -34,6 +41,16 @@ pub fn chat_status(chip: &Chip, waits_on: &WaitsOn, project: u32, me: &Me) -> Ch
             OwnerChipPhase::Active(stage) => {
                 if let Some(waiting) = waiting(waits_on, project, me) {
                     return waiting;
+                }
+                let unplaced = match stage {
+                    RunStage::Due | RunStage::Preparing => true,
+                    RunStage::Idle
+                    | RunStage::Claimed { .. }
+                    | RunStage::Running { .. }
+                    | RunStage::BackingOff { .. } => false,
+                };
+                if unplaced && let Some(crate::contract::TaskRunWait::Refused(why)) = run_wait {
+                    return ChatStatus::HostRefused(*why);
                 }
                 active(*stage, details)
             }

@@ -36,6 +36,7 @@ fn row() -> OwnerInboxEntry {
             tracked: None,
             label: 1,
             flags: jig_client_domain::contract::TaskFlags {
+                ended_by: jig_client_domain::contract::EndedBy::Result,
                 conversation: true,
                 listed: false,
                 retention: jig_client_domain::contract::Retention::ForgottenOnceRead,

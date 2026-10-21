@@ -226,7 +226,12 @@ fn reply_preview_preserves_task_title_activity_and_read_position() {
         requester: OwnerRequester::Person(1),
         tracked: None,
         label: 1,
-        flags: TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead },
+        flags: TaskFlags {
+            ended_by: EndedBy::Result,
+            conversation: true,
+            listed: false,
+            retention: Retention::ForgottenOnceRead,
+        },
         changed: Wall::EPOCH,
         last_activity: Wall::EPOCH,
         ended_at: None,

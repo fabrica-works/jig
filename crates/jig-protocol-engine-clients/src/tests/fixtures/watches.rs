@@ -1,6 +1,6 @@
 use super::{Exchange, family_record, wire};
 use crate::{Request, stream::Stream};
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use jig_domain_core as core;
 use skein_lib::{Token, Writer};
 impl Exchange {

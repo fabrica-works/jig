@@ -54,7 +54,7 @@ pub(super) fn task() -> Task {
         run_wait: None,
         llm: None,
         label: 0,
-        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: false, listed: true, retention: Retention::Kept },
         last_activity: Wall::EPOCH,
         waits_on: WaitsOn::Nothing,
         chip: chip(8),

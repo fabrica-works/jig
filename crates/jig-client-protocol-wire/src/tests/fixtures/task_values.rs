@@ -12,7 +12,12 @@ pub fn task(limits: &Limits) -> Task {
             label: 0,
             flags: TaskFlags::new(
                 limits,
-                TaskFlagsParts { conversation: false, listed: true, retention: Retention::Kept },
+                TaskFlagsParts {
+                    ended_by: EndedBy::Result,
+                    conversation: false,
+                    listed: true,
+                    retention: Retention::Kept,
+                },
             )
             .expect("fixture flags"),
             last_activity: 0,

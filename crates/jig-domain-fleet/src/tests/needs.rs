@@ -20,6 +20,7 @@ fn needs_window(window: u32) -> Needs {
 }
 fn bounds_window(window: u32) -> Bounds {
     Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([ModelBound { name: b"model".as_slice().into(), window, output: 1024 }]),
         turns: 8,
         spend: 100,
@@ -227,4 +228,45 @@ fn each_per_charter_shortfall_names_the_second_applicable_charter() {
         ..adequate
     };
     assert_eq!(rejected(needs, several), HelloRefusal::Agent { why: AgentShortfall::Turns { charter: 73 } });
+}
+
+#[test]
+fn endpoint_evidence_is_admitted_once_for_workers_and_engine() {
+    for channel in [C1, Token::new(0)] {
+        let mut limits = LIMITS;
+        limits.engine_slots = 1;
+        let mut h = Harness::with_needs(limits, needs_window(8192));
+        assert_eq!(h.domain.program_endpoint(channel, 7), None);
+        let mut bounds = bounds_window(8192);
+        bounds.program_endpoints = endpoint_numbers(crate::PROGRAM_ENDPOINTS);
+        h.step(Event::Hello { worker: 0, channel, hello: hello(bounds) });
+        assert_eq!(h.domain.program_endpoint(channel, 7), Some(true));
+        assert_eq!(h.domain.program_endpoint(channel, crate::PROGRAM_ENDPOINTS), Some(false));
+        h.step(Event::Hello { worker: 0, channel, hello: hello(bounds_window(8192)) });
+        assert_eq!(h.domain.program_endpoint(channel, 7), Some(true));
+    }
+}
+
+#[test]
+fn ambiguous_or_oversized_endpoint_metadata_is_never_retained() {
+    let repeated: Box<[u32]> = Box::new([7, 7]);
+    for endpoints in [repeated, endpoint_numbers(crate::PROGRAM_ENDPOINTS + 1)] {
+        let mut h = Harness::with_needs(LIMITS, needs_window(8192));
+        let mut bounds = bounds_window(8192);
+        bounds.program_endpoints = endpoints;
+        assert_eq!(
+            &*h.step(Event::Hello { worker: 0, channel: C1, hello: hello(bounds) }),
+            &[Request::Refuse { channel: C1 }]
+        );
+        assert_eq!(h.domain.program_endpoint(C1, 7), None);
+        assert_eq!(h.domain.workers(), 0);
+    }
+}
+
+fn endpoint_numbers(count: u32) -> Box<[u32]> {
+    let mut endpoints = List::with_capacity(count);
+    for endpoint in 0..count {
+        endpoints.push(endpoint).expect("bounded test endpoints");
+    }
+    endpoints.into_boxed()
 }

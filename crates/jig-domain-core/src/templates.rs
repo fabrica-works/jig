@@ -64,6 +64,11 @@ pub fn valid_executor(
     charters: &[crate::Charter],
     models: &[crate::Model],
 ) -> bool {
+    if template.flags.ended_by == jig_domain_tasks::EndedBy::Requester
+        && (!template.flags.conversation || executor == TemplateExecutor::Chosen)
+    {
+        return false;
+    }
     let policy = match executor {
         TemplateExecutor::Chosen => None,
         TemplateExecutor::Charter(number) => {

@@ -147,3 +147,44 @@ fn maximum_nested_task_contracts_fit_the_page_bound_and_preserve_every_raw_slot_
         }
     }
 }
+
+#[test]
+fn refused_chat_header_shows_the_supplied_cause_and_receipt_time() {
+    for (cause, expected) in [
+        (TaskWaitRefused::Program(OpenProgram::Model), b"This model runs through a program".as_slice()),
+        (
+            TaskWaitRefused::Program(OpenProgram::Source { account: 17, source: 23 }),
+            b"Account 17 would use its program source 23".as_slice(),
+        ),
+        (
+            TaskWaitRefused::Hello {
+                kind: OwnerHostKind::Worker,
+                at: Wall::EPOCH,
+                why: OwnerHelloRefusal::Position { worker: 7 },
+            },
+            b"Unconfigured or occupied worker position 7".as_slice(),
+        ),
+    ] {
+        let mut row = task_doc(&[]);
+        row.flags.conversation = true;
+        row.waits_on = WaitsOn::Nothing;
+        row.run_wait = Some(TaskRunWait::Refused(cause));
+        row.chip.phase = Phase::Due;
+        row.chip.details = Box::new(ChipPhase::Owner {
+            phase: OwnerChipPhase::Active(RunStage::Due),
+            details: Box::new(super::super::owner_chip::details()),
+        });
+        let (tree, _) = page(row);
+        assert!(contains(&tree, b"Cannot start yet"));
+        assert!(contains(&tree, expected));
+        match cause {
+            TaskWaitRefused::Hello { .. } => {
+                assert!(contains(&tree, b"A worker was refused at 01:00"));
+            }
+            TaskWaitRefused::Program(_) => {
+                assert!(contains(&tree, b"A chat can't stay open through a program yet"));
+                assert!(contains(&tree, b"To chat now, choose a model that doesn't run through a program"));
+            }
+        }
+    }
+}

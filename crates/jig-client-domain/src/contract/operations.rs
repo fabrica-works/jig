@@ -20,6 +20,7 @@ pub enum Malformed {
     ConversationNotAgent,
     Cycle,
     ProposedAsAllowed,
+    EndedBy,
 }
 
 /// A dependency names a place in this batch or an existing task.
@@ -59,6 +60,7 @@ pub struct TaskFlags {
     pub conversation: bool,
     pub listed: bool,
     pub retention: Retention,
+    pub ended_by: EndedBy,
 }
 /// A batch member, including grants named after it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -90,4 +92,11 @@ pub struct CreatedGiven {
 pub enum ProposeAction {
     Batch { tasks: skein_lib::List<NewTask> },
     Amendment { task: u64, revision: Revision, change: Box<Amendment> },
+}
+
+/// The immutable authority that may end a task (domain/tasks.md, 5.7).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum EndedBy {
+    Result,
+    Requester,
 }

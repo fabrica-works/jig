@@ -103,11 +103,7 @@ fn cards(world: &mut World<Test, Scripted>) -> TaskLine {
         requester: jig_client_domain::contract::OwnerRequester::Person(1),
         tracked: None,
         label: 1,
-        flags: jig_client_domain::contract::TaskFlags {
-            conversation: true,
-            listed: false,
-            retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
-        },
+        flags: reply_flags(),
         changed: Wall::EPOCH,
         last_activity: Wall::EPOCH,
         ended_at: None,
@@ -171,5 +167,14 @@ fn rows(world: &mut World<Test, Scripted>, reply: &TaskLine) {
                 }),
             )
             .expect("golden rows fit");
+    }
+}
+
+fn reply_flags() -> c::TaskFlags {
+    c::TaskFlags {
+        ended_by: c::EndedBy::Result,
+        conversation: true,
+        listed: false,
+        retention: c::Retention::ForgottenOnceRead,
     }
 }

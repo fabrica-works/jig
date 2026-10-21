@@ -556,9 +556,9 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
             why: people::Malformed::AsAllowedTwice | people::Malformed::ProposedAsAllowed,
             ..
         } => parties::Refusal::Limit { which: parties::LimitKind::Batch },
-        people::Refusal::NotWellFormed { why: people::Malformed::Conversation, .. } => {
-            parties::Refusal::Limit { which: parties::LimitKind::Spec }
-        }
+        people::Refusal::NotWellFormed {
+            why: people::Malformed::Conversation | people::Malformed::EndedBy, ..
+        } => parties::Refusal::Limit { which: parties::LimitKind::Spec },
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,
         people::Refusal::Unknown => parties::Refusal::Unknown,

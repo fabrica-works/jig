@@ -26,7 +26,7 @@ pub struct Component {
     pub(crate) limits: Limits,
     pub(crate) workers: Box<[Worker]>,
     pub(crate) payload: u32,
-    pub(crate) codec: wire::v5::Limits,
+    pub(crate) codec: wire::v6::Limits,
     pub(crate) connections: Map<Token, Connection>,
     schema: skein_channel::Schema,
     next_channel: u64,
@@ -316,7 +316,10 @@ impl Component {
                         self.refuse(now, connection, state, 3, Box::new([]), out);
                         return;
                     };
-                    let hello = crate::translate::hello(record);
+                    let Some(hello) = crate::translate::hello(record) else {
+                        self.refuse(now, connection, state, 3, Box::new([]), out);
+                        return;
+                    };
                     state.phase = Phase::Open;
                     state.heard = true;
                     state.deadline = None;

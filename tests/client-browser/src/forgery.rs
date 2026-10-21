@@ -1,6 +1,6 @@
 //! A valid person task would put its specification in the person's inbox.
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use skein_lib::{List, Writer};
 
 const PROJECT: u32 = 1;
@@ -37,7 +37,12 @@ fn task() -> c::NewTask {
         named: List::with_capacity(0),
         tracked: None,
         label: LABEL,
-        flags: c::TaskFlags { conversation: false, listed: true, retention: c::Retention::Kept },
+        flags: c::TaskFlags {
+            ended_by: c::EndedBy::Result,
+            conversation: false,
+            listed: true,
+            retention: c::Retention::Kept,
+        },
     }
 }
 

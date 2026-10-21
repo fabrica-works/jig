@@ -139,6 +139,15 @@ fn template(
     };
     let conversation = check::boolean(&mut object, document, b"conversation", path, problems);
     let listed = check::boolean(&mut object, document, b"listed", path, problems);
+    let ended_by = match object.member(document, b"ended_by") {
+        None => tasks::EndedBy::Result,
+        Some(at) if named(document, at, b"result") => tasks::EndedBy::Result,
+        Some(at) if named(document, at, b"requester") => tasks::EndedBy::Requester,
+        Some(_) => {
+            problems.push(path.member(b"ended_by"), What::Form);
+            return None;
+        }
+    };
     let retention = check::text(&mut object, document, b"retention", path, problems);
     let label = check::count(&mut object, document, b"label", path, problems);
     let grace = match object.required(document, b"grace_ms", path, problems) {
@@ -167,11 +176,16 @@ fn template(
         budget: budget?,
         deadline: deadline?,
         tracked: tracked.ok()?,
-        flags: tasks::Flags { conversation: conversation?, listed: listed?, retention },
+        flags: tasks::Flags { ended_by, conversation: conversation?, listed: listed?, retention },
         label: label?,
         grace: grace.ok()?,
         llm: llm.ok()?,
     };
+    if template.flags.ended_by == tasks::EndedBy::Requester
+        && (!template.flags.conversation || template.executor == TemplateExecutor::Chosen)
+    {
+        problems.push(path.member(b"ended_by"), What::Form);
+    }
     if template.number == 0 {
         problems.push(path.member(b"number"), What::Bound);
     }

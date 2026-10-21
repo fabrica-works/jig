@@ -77,6 +77,10 @@ pub(super) fn flags(value: jig_domain_tasks::Flags, limits: &w::Limits) -> Resul
     w::TaskFlags::new(
         limits,
         w::TaskFlagsParts {
+            ended_by: match value.ended_by {
+                jig_domain_tasks::EndedBy::Result => w::EndedBy::Result,
+                jig_domain_tasks::EndedBy::Requester => w::EndedBy::Requester,
+            },
             conversation: value.conversation,
             listed: value.listed,
             retention: match value.retention {

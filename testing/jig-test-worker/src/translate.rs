@@ -86,3 +86,28 @@ pub const fn unstarted(end: smith::End) -> Option<&'static [u8]> {
         smith::End::Unspawned | smith::End::Exited { .. } | smith::End::Settled => None,
     }
 }
+
+/// Preserve agent start policy separately from its diagnostic bytes.
+#[must_use]
+pub const fn start_cause(why: smith::RunInvalid) -> host::StartCause {
+    match why {
+        smith::RunInvalid::Grants => host::StartCause::Grants,
+        smith::RunInvalid::HostPart { .. }
+        | smith::RunInvalid::Room { .. }
+        | smith::RunInvalid::Messages
+        | smith::RunInvalid::CharterVersion
+        | smith::RunInvalid::MalformedCharter
+        | smith::RunInvalid::Activation
+        | smith::RunInvalid::Window
+        | smith::RunInvalid::Conventions
+        | smith::RunInvalid::TooLarge
+        | smith::RunInvalid::Workspace
+        | smith::RunInvalid::Outcome
+        | smith::RunInvalid::Budget(_)
+        | smith::RunInvalid::Price(_)
+        | smith::RunInvalid::Llm
+        | smith::RunInvalid::Effort
+        | smith::RunInvalid::Conversation
+        | smith::RunInvalid::Endpoint => host::StartCause::Other,
+    }
+}

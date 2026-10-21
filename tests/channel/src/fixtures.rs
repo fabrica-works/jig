@@ -212,6 +212,7 @@ pub(crate) fn agent_with_limits(agent_limits: &smith_agent_service::Limits) -> j
         limits,
         host_limits,
         bounds: jig_domain_host::Bounds {
+            program_endpoints: Box::new([]),
             models: Box::new([jig_domain_host::ModelBound {
                 name: b"fake".as_slice().into(),
                 window: 1_048_576,
@@ -366,6 +367,7 @@ pub(crate) fn peer_hello() -> skein_channel::Frame {
     let bounds = wire::Bounds::new(
         codec,
         wire::BoundsParts {
+            program_endpoints: List::with_capacity(0),
             models,
             turns: 8,
             spend: 100,
@@ -568,7 +570,12 @@ pub fn chat(store: &crate::world::Store, project: u32, words: &[u8]) -> jig_doma
     member.authority.delegation.depth = member.authority.delegation.depth.saturating_sub(1);
     member.budget = people::Budget::AsAllowed { cap: None };
     member.contract = people::Contract::Report { words: 32 };
-    member.flags = people::Flags { conversation: true, listed: false, retention: people::Retention::Kept };
+    member.flags = people::Flags {
+        ended_by: people::EndedBy::Result,
+        conversation: true,
+        listed: false,
+        retention: people::Retention::Kept,
+    };
     member.label = jig_client_test_records::CHAT;
     people::Ask::Create { project, batch: Box::new([member]) }
 }

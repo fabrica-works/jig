@@ -352,6 +352,7 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
                         tracked: Some(0),
                         label: 2,
                         flags: jig_client_domain::contract::TaskFlags {
+                            ended_by: jig_client_domain::contract::EndedBy::Result,
                             conversation: false,
                             listed: true,
                             retention: jig_client_domain::contract::Retention::Kept

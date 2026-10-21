@@ -699,8 +699,11 @@ fn a_refused_start_answers_invalid_with_its_words_and_frees_its_slot() {
     let mut h = Harness::new();
     let (owner, workspace) = pending_start(&mut h, 1);
     let _other = h.assign(2);
-    let requests =
-        h.step(Event::from_agent(crate::FromAgent::StartRefused { owner, why: b"budget".as_slice().into() }));
+    let requests = h.step(Event::from_agent(crate::FromAgent::StartRefused {
+        cause: crate::StartCause::Grants,
+        owner,
+        why: b"budget".as_slice().into(),
+    }));
     assert_eq!(
         requests.as_ref(),
         &[
@@ -714,6 +717,7 @@ fn a_refused_start_answers_invalid_with_its_words_and_frees_its_slot() {
                     read: None,
                     refused: Box::new([]),
                     ending: crate::Ending::Refused(Refusal::Invalid(Invalid::Start {
+                        cause: crate::StartCause::Grants,
                         why: b"budget".as_slice().into(),
                     })),
                 },
@@ -729,14 +733,20 @@ fn a_refused_start_answers_invalid_with_its_words_and_frees_its_slot() {
 fn a_refused_starts_words_keep_only_the_bounded_detail_tail() {
     let mut h = Harness::new();
     let (owner, _) = pending_start(&mut h, 1);
-    let requests =
-        h.step(Event::from_agent(crate::FromAgent::StartRefused { owner, why: b"prefix detailed".as_slice().into() }));
+    let requests = h.step(Event::from_agent(crate::FromAgent::StartRefused {
+        cause: crate::StartCause::Other,
+        owner,
+        why: b"prefix detailed".as_slice().into(),
+    }));
     let [Request::Release { .. }, Request::Up(LinkUp::Answer { answer, .. })] = &*requests else {
         panic!("expected refusal: {requests:?}")
     };
     assert_eq!(
         answer.ending,
-        crate::Ending::Refused(Refusal::Invalid(Invalid::Start { why: b"detailed".as_slice().into() }))
+        crate::Ending::Refused(Refusal::Invalid(Invalid::Start {
+            cause: crate::StartCause::Other,
+            why: b"detailed".as_slice().into()
+        }))
     );
 }
 
@@ -773,8 +783,11 @@ fn a_start_refusal_after_cancel_keeps_the_cancellations_answer() {
     let mut h = Harness::new();
     let (owner, _) = pending_start(&mut h, 1);
     assert!(h.step(Event::Down(LinkDown::Cancel { run: Token::new(1), attempt: Token::new(1001) })).is_empty());
-    let requests =
-        h.step(Event::from_agent(crate::FromAgent::StartRefused { owner, why: b"budget".as_slice().into() }));
+    let requests = h.step(Event::from_agent(crate::FromAgent::StartRefused {
+        cause: crate::StartCause::Other,
+        owner,
+        why: b"budget".as_slice().into(),
+    }));
     let [Request::Release { .. }, Request::Up(LinkUp::Answer { answer, .. })] = &*requests else {
         panic!("expected cancellation: {requests:?}")
     };

@@ -57,7 +57,12 @@ pub fn task() -> c::Task {
         run_wait: None,
         llm: None,
         label: 0,
-        flags: c::TaskFlags { conversation: false, listed: false, retention: c::Retention::Kept },
+        flags: c::TaskFlags {
+            ended_by: c::EndedBy::Result,
+            conversation: false,
+            listed: false,
+            retention: c::Retention::Kept,
+        },
         last_activity: Wall::EPOCH,
         waits_on: c::WaitsOn::Nothing,
         chip: chip(),

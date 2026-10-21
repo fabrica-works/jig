@@ -11,6 +11,7 @@ pub const CREDENTIAL_RESOURCE: u64 = 1;
 pub fn bounds() -> jig_domain_fleet::Bounds {
     use skein_lib::Duration;
     jig_domain_fleet::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([
             jig_domain_fleet::ModelBound { name: b"scripted".as_slice().into(), window: 8192, output: 1024 },
             jig_domain_fleet::ModelBound { name: b"research".as_slice().into(), window: 8192, output: 1024 },
@@ -82,7 +83,12 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             budget: TemplateBudget::AsAllowed { cap: None },
             deadline: TemplateDeadline::None,
             tracked: None,
-            flags: Flags { conversation: true, listed: false, retention: Retention::Kept },
+            flags: Flags {
+                ended_by: jig_domain_tasks::EndedBy::Result,
+                conversation: true,
+                listed: false,
+                retention: Retention::Kept,
+            },
             label: jig_client_test_records::CHAT,
             grace: Some(skein_lib::Duration::from_millis(5000)),
             llm: None,
@@ -96,7 +102,12 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             budget: TemplateBudget::Given,
             deadline: TemplateDeadline::Given,
             tracked: Some(1),
-            flags: Flags { conversation: false, listed: true, retention: Retention::Kept },
+            flags: Flags {
+                ended_by: jig_domain_tasks::EndedBy::Result,
+                conversation: false,
+                listed: true,
+                retention: Retention::Kept,
+            },
             label: jig_client_test_records::GOAL,
             grace: None,
             llm: None,
@@ -433,7 +444,12 @@ pub fn create_chat(creating: &Creating, project: u32, role: u32, words: Box<[u8]
     member.authority.delegation.tasks = member.authority.delegation.tasks.min(creating.tasks).saturating_sub(1);
     member.authority.delegation.depth = member.authority.delegation.depth.saturating_sub(1);
     member.budget = people::Budget::AsAllowed { cap: None };
-    member.flags = people::Flags { conversation: true, listed: false, retention: people::Retention::Kept };
+    member.flags = people::Flags {
+        ended_by: people::EndedBy::Result,
+        conversation: true,
+        listed: false,
+        retention: people::Retention::Kept,
+    };
     member.label = jig_client_test_records::CHAT;
     member.contract = people::Contract::Report { words: 128 };
     member.wake = people::WakePolicy {

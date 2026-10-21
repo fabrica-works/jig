@@ -415,6 +415,9 @@ pub(crate) fn core() -> (Core, Limits) {
 }
 
 pub(crate) fn make_task(core: &mut Core, limits: &Limits, number: u64) {
+    make_task_ended_by(core, limits, number, tasks::EndedBy::Result);
+}
+fn make_task_ended_by(core: &mut Core, limits: &Limits, number: u64, ended_by: tasks::EndedBy) {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.tasks };
     let mut out = Queue::with_capacity(tasks::max_out(&limits.tasks));
     tasks::step(&mut core.tasks, &env, tasks::Event::Restored, &mut out);
@@ -431,7 +434,7 @@ pub(crate) fn make_task(core: &mut Core, limits: &Limits, number: u64) {
     let row = tasks::New {
         deadline: jig_domain_tasks::Deadline::Named,
         label: 0,
-        flags: tasks::Flags { conversation: true, ..tasks::Flags::PLAIN },
+        flags: tasks::Flags { ended_by, conversation: true, ..tasks::Flags::PLAIN },
         number,
         project: 1,
         executor: tasks::Executor::Agent { charter: 1 },
@@ -3219,6 +3222,7 @@ fn an_answer_payload_for_a_replaced_attempt_is_dropped() {
     let (mut core, limits) = watch_core();
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let event = Event::AnswerPayload {
+        grants_refused: false,
         read: None,
         refused: Box::new([]),
         run: Token::new(1),

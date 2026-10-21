@@ -34,6 +34,10 @@ pub fn max_out(limits: &Limits) -> u32 {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     smith::check(&limits.agent).ok()?;
+    if !host::valid_program_endpoints(&limits.bounds.program_endpoints) {
+        return None;
+    }
+    let hello_endpoints = u64::try_from(limits.bounds.program_endpoints.len()).ok()?.checked_mul(4)?;
     if limits.hub.slots > limits.agent.agents {
         return None;
     }
@@ -61,6 +65,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.hub.slots).checked_mul(u64::from(limits.agent.detail_bytes))?)?
         .checked_add(Map::<Token, Option<Content>>::worst_case(limits.hub.slots)?)?
         .checked_add(u64::from(limits.hub.slots).checked_mul(limits.agent.call_bytes)?)?
+        .checked_add(hello_endpoints)?
         .checked_add(scratch)
 }
 

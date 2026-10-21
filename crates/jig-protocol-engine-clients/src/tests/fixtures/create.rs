@@ -99,7 +99,12 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
             label: 15,
             flags: w::TaskFlags::new(
                 &l,
-                w::TaskFlagsParts { conversation: false, listed: true, retention: w::Retention::ForgottenOnceRead },
+                w::TaskFlagsParts {
+                    ended_by: w::EndedBy::Result,
+                    conversation: false,
+                    listed: true,
+                    retention: w::Retention::ForgottenOnceRead,
+                },
             )
             .unwrap(),
         },
@@ -141,7 +146,12 @@ fn expected_member(role: bool, expected: p::Authority) -> p::Member {
         named: expected.grants,
         tracked: Some(14),
         label: 15,
-        flags: p::Flags { conversation: false, listed: true, retention: p::Retention::ForgottenOnceRead },
+        flags: p::Flags {
+            ended_by: p::EndedBy::Result,
+            conversation: false,
+            listed: true,
+            retention: p::Retention::ForgottenOnceRead,
+        },
         llm: if role {
             None
         } else {

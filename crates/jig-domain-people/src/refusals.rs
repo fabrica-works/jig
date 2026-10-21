@@ -70,6 +70,7 @@ pub enum Malformed {
     Cycle,
     AsAllowedTwice,
     Conversation,
+    EndedBy,
 }
 
 /// Authority missing from a party's request.

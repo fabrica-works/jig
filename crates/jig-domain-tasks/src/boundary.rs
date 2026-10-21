@@ -1883,6 +1883,7 @@ pub struct Added {
 /// (domain/engine.md, sections 7.1 and 9).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RunContext {
+    pub ended_by: crate::EndedBy,
     pub llm: Option<crate::LlmChoice>,
     /// Current financial payer; preparations must recheck it before admission.
     pub payer: crate::Payer,

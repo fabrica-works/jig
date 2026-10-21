@@ -3,9 +3,12 @@ use alloc::boxed::Box;
 use jig_domain_host as host;
 use jig_protocol_worker_wire as wire;
 use skein_lib::{List, Reader, Token};
-pub(crate) fn hello(record: wire::Hello) -> host::Hello {
+pub(crate) fn hello(record: wire::Hello) -> Option<host::Hello> {
     let fields = record.into_parts();
     let bounds = fields.bounds.into_parts();
+    if !host::valid_program_endpoints(bounds.program_endpoints.as_slice()) {
+        return None;
+    }
     let mut models = List::with_capacity(bounds.models.len());
     for model in bounds.models.into_boxed() {
         let model = model.into_parts();
@@ -24,12 +27,13 @@ pub(crate) fn hello(record: wire::Hello) -> host::Hello {
             })
             .expect("one slot per decoded run");
     }
-    host::Hello {
+    Some(host::Hello {
         slots: fields.slots,
         stop_bound: fields.stop_bound,
         workstreams: fields.workstreams.into_boxed(),
         hosting: hosting.into_boxed(),
         bounds: host::Bounds {
+            program_endpoints: bounds.program_endpoints.into_boxed(),
             models: models.into_boxed(),
             turns: bounds.turns,
             spend: bounds.spend,
@@ -40,7 +44,7 @@ pub(crate) fn hello(record: wire::Hello) -> host::Hello {
             inbox: bounds.inbox,
             unacknowledged: bounds.unacknowledged,
         },
-    }
+    })
 }
 fn phase(value: wire::Phase) -> host::Phase {
     match value {
@@ -64,7 +68,7 @@ pub(crate) enum Up {
     Limited(wire::Limited),
     AccountRefused(wire::AccountRefused),
 }
-pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v5::Limits) -> Option<Up> {
+pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v6::Limits) -> Option<Up> {
     let mut found = None;
     for rule in wire::KINDS {
         if rule.kind == kind {
@@ -282,7 +286,16 @@ fn ending(value: wire::Ending, parts: &mut Parts) -> host::Ending {
                         wire::Invalid::Transcript => host::Invalid::Transcript,
                         wire::Invalid::Grants => host::Invalid::Grants,
                         wire::Invalid::Messages => host::Invalid::Messages,
-                        wire::Invalid::Start(record) => host::Invalid::Start { why: record.into_parts().why },
+                        wire::Invalid::Start(record) => {
+                            let record = record.into_parts();
+                            host::Invalid::Start {
+                                why: record.why,
+                                cause: match record.cause {
+                                    wire::StartCause::Other => host::StartCause::Other,
+                                    wire::StartCause::Grants => host::StartCause::Grants,
+                                },
+                            }
+                        }
                     };
                     host::Refusal::Invalid(invalid)
                 }
@@ -421,7 +434,7 @@ pub(crate) fn down(
     down: host::LinkDown,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v5::Limits,
+    limits: &wire::v6::Limits,
 ) -> Option<Down> {
     match down {
         host::LinkDown::Sources { sources } => {
@@ -494,7 +507,7 @@ fn assignment_record(
     assignment: host::Assignment,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v5::Limits,
+    limits: &wire::v6::Limits,
 ) -> Option<wire::Assignment> {
     let run = assignment.assignment;
     let workspace = match run.workspace {
@@ -576,7 +589,7 @@ fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
     Some(writer.finish())
 }
 /// A grant's form and its value's arm agree, or the grant is not sent.
-fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v5::Limits) -> Option<wire::Grant> {
+fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v6::Limits) -> Option<wire::Grant> {
     let value = match grant.form {
         host::Form::Program(form) => match value {
             crate::GrantValue::Program { name } => {
@@ -623,7 +636,7 @@ const fn grant_scheme(scheme: host::Scheme) -> crate::Scheme {
         host::Scheme::Key => crate::Scheme::Key,
     }
 }
-fn settled(answer: host::SettledAnswer, limits: &wire::v5::Limits) -> Option<wire::SettledAnswer> {
+fn settled(answer: host::SettledAnswer, limits: &wire::v6::Limits) -> Option<wire::SettledAnswer> {
     match answer {
         host::SettledAnswer::Host { error, body } => {
             Some(wire::SettledAnswer::Host(wire::HostAnswer::new(limits, wire::HostAnswerParts { error, body }).ok()?))
@@ -643,7 +656,7 @@ fn settled(answer: host::SettledAnswer, limits: &wire::v5::Limits) -> Option<wir
     }
 }
 
-pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v5::Limits) -> Down {
+pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v6::Limits) -> Down {
     Down::TurnBusy(
         wire::TurnBusy::new(limits, wire::TurnBusyParts { task: run.raw(), attempt: attempt.raw(), number: turn })
             .expect("fixed turn busy fields fit"),

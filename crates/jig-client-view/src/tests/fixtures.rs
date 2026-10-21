@@ -147,7 +147,12 @@ pub(crate) fn task_line(
         changed,
         tracked: None,
         label: 0,
-        flags: c::TaskFlags { conversation: false, listed: true, retention: c::Retention::Kept },
+        flags: c::TaskFlags {
+            ended_by: c::EndedBy::Result,
+            conversation: false,
+            listed: true,
+            retention: c::Retention::Kept,
+        },
         last_activity: changed,
         ended_at: None,
         budget: c::OwnerBudget {
@@ -188,7 +193,12 @@ pub(crate) fn chat_templates() -> skein_lib::List<jig_client::contract::Template
             budget: c::TemplateBudget::AsAllowed { cap: None },
             deadline: c::TemplateDeadline::None,
             tracked: None,
-            flags: c::TaskFlags { conversation: true, listed: false, retention: c::Retention::Kept },
+            flags: c::TaskFlags {
+                ended_by: c::EndedBy::Result,
+                conversation: true,
+                listed: false,
+                retention: c::Retention::Kept,
+            },
             label: 1,
             grace: None,
         })
@@ -276,7 +286,12 @@ pub(crate) fn chat_request(project: u32, words: Text) -> jig_client::contract::A
             named: skein_lib::List::with_capacity(0),
             tracked: None,
             label: 1,
-            flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
+            flags: TaskFlags {
+                ended_by: EndedBy::Result,
+                conversation: true,
+                listed: false,
+                retention: Retention::Kept,
+            },
         })
         .unwrap();
     Ask::Create { project, tasks }
@@ -305,7 +320,12 @@ pub(crate) fn goal_request(form: crate::page::project::goals::GoalForm, words: T
             named: skein_lib::List::with_capacity(0),
             tracked: Some(form.priority),
             label: 2,
-            flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+            flags: TaskFlags {
+                ended_by: EndedBy::Result,
+                conversation: false,
+                listed: true,
+                retention: Retention::Kept,
+            },
         })
         .unwrap();
     Ask::Propose {

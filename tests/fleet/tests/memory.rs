@@ -115,11 +115,13 @@ impl Measured {
     fn hello(&mut self, channel: Token, hosting: Vec<Hosted>) -> Vec<Request> {
         let limits = self.env.limits;
         let workstreams = (0..limits.workstreams).map(|nth| channel.raw() * 100 + u64::from(nth)).collect();
+        let mut bounds = jig_fleet_world::fixtures::bounds();
+        bounds.program_endpoints = (0..jig_domain_fleet::PROGRAM_ENDPOINTS).collect();
         self.step(Event::Hello {
             worker: u32::try_from(channel.raw()).expect("fixture channel") % LIMITS.configured_workers,
             channel,
             hello: Hello {
-                bounds: jig_fleet_world::fixtures::bounds(),
+                bounds,
                 stop_bound: Duration::from_secs(0),
                 slots: limits.slots,
                 workstreams,
@@ -564,4 +566,16 @@ fn two_standing_refusals_with_no_history_retain_no_additional_heap() {
     assert!(world.domain.standing_refusal(jig_domain_fleet::Kinds::Engine).is_some());
     assert!(world.domain.standing_refusal(jig_domain_fleet::Kinds::Workers).is_some());
     assert!(world.domain.hello_refusals().is_empty());
+}
+
+#[test]
+fn full_endpoint_metadata_including_engine_fits_its_accounted_channels() {
+    let mut limits = LIMITS;
+    limits.engine_slots = 1;
+    let mut world = Measured::new(limits);
+    world.hello(Token::new(0), Vec::new());
+    for worker in 1..=limits.workers {
+        world.hello(Token::new(u64::from(worker)), Vec::new());
+    }
+    assert_eq!(world.domain.program_endpoint(Token::new(0), 0), Some(true));
 }

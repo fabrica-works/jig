@@ -1,4 +1,4 @@
-//! Real services, worker-v5 bytes, `ProgramSource`, and the hosted auth fake.
+//! Real services, worker-v6 bytes, `ProgramSource`, and the hosted auth fake.
 use crate::{
     processes::{self, Proc},
     referee::Rules,

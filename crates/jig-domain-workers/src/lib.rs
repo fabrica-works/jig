@@ -110,3 +110,21 @@ impl Membership {
 
 #[cfg(test)]
 mod tests;
+
+/// Maximum endpoint identities admitted in one host hello (protocol/channel.md, 5.1).
+/// Independent of the number of model declarations.
+pub const PROGRAM_ENDPOINTS: u32 = 64;
+
+/// Reject an oversized or ambiguous endpoint declaration before retaining it.
+#[must_use]
+pub fn valid_program_endpoints(endpoints: &[u32]) -> bool {
+    if endpoints.len() > usize::try_from(PROGRAM_ENDPOINTS).expect("u32 fits usize") {
+        return false;
+    }
+    for (at, endpoint) in endpoints.iter().enumerate() {
+        if endpoints.get(..at).expect("prefix").contains(endpoint) {
+            return false;
+        }
+    }
+    true
+}

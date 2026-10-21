@@ -477,6 +477,7 @@ fn bounds(value: host::Bounds) -> fleet::Bounds {
             .expect("configured model count");
     }
     fleet::Bounds {
+        program_endpoints: value.program_endpoints,
         models: models.into_boxed(),
         turns: value.turns,
         spend: value.spend,

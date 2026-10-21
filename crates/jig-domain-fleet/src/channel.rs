@@ -42,6 +42,7 @@ use crate::limits::Limits;
 /// A worker in contact.
 #[derive(Debug)]
 pub(crate) struct Channel {
+    pub(crate) program_endpoints: Box<[u32]>,
     pub(crate) sources: crate::sources::Sources,
     pub(crate) worker: Option<u32>,
     /// Model eligibility in configured charter order, independent of free slots.
@@ -125,6 +126,7 @@ fn admit_worker(
 }
 
 /// Hello, on a new channel: the worker is in contact, or turned away.
+#[expect(clippy::too_many_lines, reason = "one hello admits a host and its immutable endpoint evidence atomically")]
 pub(crate) fn hello(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -146,6 +148,17 @@ pub(crate) fn hello(
     if engine {
         domain.engine_hello = crate::domain::EngineHello::Heard;
     }
+    if !engine && domain.tokens.contains_key(&channel) {
+        domain.facts.push(Fact::Dropped);
+        return;
+    }
+    if !crate::valid_program_endpoints(&hello.bounds.program_endpoints) {
+        // Malformed metadata has no charter shortfall: reject the channel without
+        // publishing an invented admission dimension.
+        domain.facts.push(Fact::Dropped);
+        out.push(Request::Refuse { channel });
+        return;
+    }
     let kind = if engine { HostKind::Engine } else { HostKind::Worker };
     if let Some(why) = crate::needs::shortfall(&domain.needs, &hello.bounds, kind) {
         refuse(domain, env, channel, &hello, crate::HelloRefusal::Agent { why }, out);
@@ -158,14 +171,11 @@ pub(crate) fn hello(
             host.eligible = Box::new([]);
             host.eligible = crate::needs::eligibility(&domain.needs, &hello.bounds.models);
             host.declarations = crate::needs::declarations(&domain.needs, &hello.bounds.models);
+            host.program_endpoints = hello.bounds.program_endpoints;
             domain.engine_hello = crate::domain::EngineHello::Admitted;
             domain.standing_engine = None;
             domain.placing = true;
         }
-        return;
-    }
-    if domain.tokens.contains_key(&channel) {
-        domain.facts.push(Fact::Dropped);
         return;
     }
     if !admit_worker(domain, env, channel, worker, &hello, out) {
@@ -183,6 +193,7 @@ pub(crate) fn hello(
     }
     let Hello { slots, workstreams, hosting, stop_bound: _, bounds } = hello;
     let mut worker = Channel {
+        program_endpoints: bounds.program_endpoints,
         declarations: crate::needs::declarations(&domain.needs, &bounds.models),
         worker: Some(worker),
         sources: crate::sources::Sources::new(domain.program_sources.clone(), limits.program_sources, true),

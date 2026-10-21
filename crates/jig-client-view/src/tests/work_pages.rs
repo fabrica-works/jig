@@ -364,7 +364,12 @@ pub(super) fn project_rows(d: &mut Fixture, out: &[Request]) {
                             project: 1,
                             requester: OwnerRequester::Person(7),
                             label: 2,
-                            flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+                            flags: TaskFlags {
+                                ended_by: EndedBy::Result,
+                                conversation: false,
+                                listed: true,
+                                retention: Retention::Kept,
+                            },
                             waits_on: WaitsOn::Nothing,
                             conversation: None,
                         }]),

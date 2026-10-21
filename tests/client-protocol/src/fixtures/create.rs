@@ -44,7 +44,12 @@ pub fn create_tasks() -> List<c::NewTask> {
                 named: List::with_capacity(0),
                 tracked: None,
                 label: 1,
-                flags: c::TaskFlags { conversation: false, listed: true, retention: c::Retention::Kept },
+                flags: c::TaskFlags {
+                    ended_by: c::EndedBy::Result,
+                    conversation: false,
+                    listed: true,
+                    retention: c::Retention::Kept,
+                },
             })
             .expect("two roots");
     }

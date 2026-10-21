@@ -73,7 +73,12 @@ fn template() -> Template {
         budget: people::TemplateBudget::Given,
         deadline: people::TemplateDeadline::Given,
         tracked: Some(1),
-        flags: tasks::Flags { conversation: false, listed: true, retention: tasks::Retention::Kept },
+        flags: tasks::Flags {
+            ended_by: tasks::EndedBy::Result,
+            conversation: false,
+            listed: true,
+            retention: tasks::Retention::Kept,
+        },
         label: 2,
         grace: None,
         llm: None,

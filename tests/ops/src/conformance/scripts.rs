@@ -661,6 +661,7 @@ fn completion_activity(owner: Token, turns: u32) -> Vec<root::Event> {
 #[must_use]
 pub fn agent_bounds() -> host::Bounds {
     host::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([host::ModelBound {
             name: b"scripted".as_slice().into(),
             window: u32::MAX,

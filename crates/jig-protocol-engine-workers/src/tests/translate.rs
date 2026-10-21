@@ -21,7 +21,7 @@ fn answer(record: jig_protocol_worker_wire::Answer) -> (jig_domain_host::Answer,
 }
 #[test]
 fn a_hello_record_becomes_the_hubs_hello_with_its_bounds() {
-    let hello = translate::hello(fixtures::hello_record());
+    let hello = translate::hello(fixtures::hello_record()).expect("valid hello");
     assert_eq!(hello.slots, 1);
     assert_eq!(hello.stop_bound, Duration::from_secs(20));
     assert_eq!(hello.workstreams.as_ref(), &[9]);
@@ -196,7 +196,7 @@ fn down(record: jig_domain_host::LinkDown) -> translate::Down {
     };
     translated.expect("complete output")
 }
-fn codec() -> jig_protocol_worker_wire::v5::Limits {
+fn codec() -> jig_protocol_worker_wire::v6::Limits {
     jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).expect("small codec")
 }
 fn assignment_output() -> jig_domain_host::LinkDown {
@@ -477,9 +477,11 @@ fn answered_call(
 fn an_invalid_start_answer_keeps_its_words_in_the_hub() {
     use jig_protocol_worker_wire as wire;
     let limits = codec();
-    let start =
-        wire::InvalidStart::new(&limits, wire::InvalidStartParts { why: b"budget too small".as_slice().into() })
-            .expect("bounded reason");
+    let start = wire::InvalidStart::new(
+        &limits,
+        wire::InvalidStartParts { cause: wire::StartCause::Grants, why: b"budget too small".as_slice().into() },
+    )
+    .expect("bounded reason");
     let invalid = wire::InvalidValue::new(&limits, wire::InvalidValueParts { value: wire::Invalid::Start(start) })
         .expect("invalid start");
     let refusal = wire::RefusalValue::new(&limits, wire::RefusalValueParts { value: wire::Refusal::Invalid(invalid) })
@@ -491,6 +493,7 @@ fn an_invalid_start_answer_keeps_its_words_in_the_hub() {
     assert_eq!(
         answer.ending,
         jig_domain_host::Ending::Refused(jig_domain_host::Refusal::Invalid(jig_domain_host::Invalid::Start {
+            cause: jig_domain_host::StartCause::Grants,
             why: b"budget too small".as_slice().into()
         },))
     );
@@ -527,4 +530,18 @@ fn a_program_value_under_another_form_is_not_sent() {
     for form in [Form::Credential(Scheme::Bearer), Form::Credential(Scheme::Key), Form::Application] {
         assert!(granted(form, crate::GrantValue::Program { name: program_name() }).is_none());
     }
+}
+
+#[test]
+fn a_duplicate_program_endpoint_hello_is_refused_before_delivery() {
+    let limits = jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).unwrap();
+    let mut hello = fixtures::hello_record().into_parts();
+    let mut bounds = hello.bounds.into_parts();
+    let mut endpoints = skein_lib::List::with_capacity(2);
+    endpoints.push(7).unwrap();
+    endpoints.push(7).unwrap();
+    bounds.program_endpoints = endpoints;
+    hello.bounds = jig_protocol_worker_wire::Bounds::new(&limits, bounds).unwrap();
+    let hello = jig_protocol_worker_wire::Hello::new(&limits, hello).unwrap();
+    assert!(translate::hello(hello).is_none());
 }

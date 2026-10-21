@@ -48,7 +48,7 @@ impl Side {
         }
     }
     fn send(&mut self, now: Time, request: Request) {
-        use jig_client_protocol_wire::v11 as w;
+        use jig_client_protocol_wire::v12 as w;
         use skein_lib::Reader;
         if matches!(&request, Request::CloseStream) {
             self.stream_epoch += 1;
@@ -79,7 +79,7 @@ impl Side {
         self.connections.down(now, request, &mut self.down);
     }
     fn receipts(&mut self, event: &Event) -> Vec<Receipt> {
-        use jig_client_protocol_wire::v11 as w;
+        use jig_client_protocol_wire::v12 as w;
         use skein_lib::Reader;
         let mut receipts: Vec<_> = self
             .wire

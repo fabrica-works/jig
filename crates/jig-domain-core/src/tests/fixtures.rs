@@ -1,6 +1,7 @@
 pub fn bounds() -> jig_domain_fleet::Bounds {
     use skein_lib::Duration;
     jig_domain_fleet::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([jig_domain_fleet::ModelBound {
             name: Box::from(&b"scripted"[..]),
             window: 8192,
@@ -98,7 +99,12 @@ pub(crate) fn ended_report(number: u64, requester: tasks::Party) -> tasks::TaskR
     make_batch(&mut core, &limits, tasks::Party::Person(1), Box::new([new]));
     let mut row = core.tasks.task(number).expect("fixture task").clone();
     row.requester = requester;
-    row.flags = tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::ForgottenOnceRead };
+    row.flags = tasks::Flags {
+        ended_by: tasks::EndedBy::Result,
+        conversation: true,
+        listed: false,
+        retention: tasks::Retention::ForgottenOnceRead,
+    };
     row.phase =
         tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: b"done".as_slice().into() }));
     row.ended_at = Some(Wall::from_nanos(1));

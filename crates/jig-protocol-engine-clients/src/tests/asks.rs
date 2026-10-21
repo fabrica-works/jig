@@ -3,7 +3,7 @@ use crate::{
     Request, ToApplication,
     translate::{Untranslatable, asks::ask},
 };
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use jig_domain_people as p;
 #[test]
 fn a_message_record_becomes_the_cores_say() {

@@ -39,6 +39,7 @@ impl Words {
                 match why {
                     Malformed::ProjectMismatch => JigPhrase::MalformedProject,
                     Malformed::TwoAsAllowed => JigPhrase::MalformedTwoAsAllowed,
+                    Malformed::EndedBy => JigPhrase::MalformedEndedBy,
                     Malformed::ConversationNotAgent => JigPhrase::MalformedConversation,
                     Malformed::Cycle => JigPhrase::MalformedCycle,
                     Malformed::ProposedAsAllowed => JigPhrase::MalformedProposedAsAllowed,

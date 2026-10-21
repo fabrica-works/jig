@@ -223,6 +223,10 @@ fn new_task(
         tracked: member.tracked,
         label: member.label,
         flags: tasks::Flags {
+            ended_by: match member.flags.ended_by {
+                people::EndedBy::Result => tasks::EndedBy::Result,
+                people::EndedBy::Requester => tasks::EndedBy::Requester,
+            },
             conversation: member.flags.conversation,
             listed: member.flags.listed,
             retention: match member.flags.retention {
@@ -342,7 +346,9 @@ fn well_formed(batch: &[people::Member]) -> Result<(), people::Refusal> {
             people::Budget::Named => false,
             people::Budget::AsAllowed { .. } => true,
         };
-        let why = if member.flags.conversation && !agent {
+        let why = if member.flags.ended_by == people::EndedBy::Requester && (!agent || !member.flags.conversation) {
+            Some(people::Malformed::EndedBy)
+        } else if member.flags.conversation && !agent {
             Some(people::Malformed::Conversation)
         } else if as_allowed {
             if allowed {

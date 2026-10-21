@@ -2,7 +2,7 @@
 use super::asks;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use skein_lib::{List, bytes};
 
 pub(super) fn answer(value: &c::AnswerOn, limits: &w::Limits) -> Result<w::AnswerOn, w::Problem> {
@@ -244,6 +244,10 @@ fn new_task(v: &c::NewTask, limits: &w::Limits) -> Result<w::NewTask, w::Problem
             flags: w::TaskFlags::new(
                 limits,
                 w::TaskFlagsParts {
+                    ended_by: match v.flags.ended_by {
+                        c::EndedBy::Result => w::EndedBy::Result,
+                        c::EndedBy::Requester => w::EndedBy::Requester,
+                    },
                     conversation: v.flags.conversation,
                     listed: v.flags.listed,
                     retention: match v.flags.retention {
@@ -345,6 +349,10 @@ fn restore_task(v: &w::NewTask, limits: &crate::Limits) -> Result<c::NewTask, w:
         tracked: *v.tracked(),
         label: v.label(),
         flags: c::TaskFlags {
+            ended_by: match v.flags().ended_by() {
+                w::EndedBy::Result => c::EndedBy::Result,
+                w::EndedBy::Requester => c::EndedBy::Requester,
+            },
             conversation: v.flags().conversation(),
             listed: v.flags().listed(),
             retention: match v.flags().retention() {

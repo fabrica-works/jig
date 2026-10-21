@@ -491,6 +491,24 @@ them (5.7).
 
 ### 5.7 Kept by a dependency
 
+A task's immutable `ended_by` is `Result` or `Requester`. `Result` is the
+default. `Requester` requires an agent conversation requested by a person;
+creation and restored records enforce that shape. It changes no cancel
+rights. The authority travels with the task through client creation,
+storage, preparation and its run charter, independent of the configured
+charter shared by other tasks.
+
+The shared kept rule has independent dependency and open facts. Only
+pending dependencies block claims and Due. Open tasks start and resume
+normally, but every raw finished result, including a failure result and a
+finish with follow-ups, parks before result validation. Result and
+follow-ups are discarded; charged spend, saved work, committed turns,
+read fences, delegates and history remain. Saved-work, charge and message
+fences are checked first. Closing keeps cancellation's partial result,
+narrowing goes Due, and held tasks stay held. Dependency-only tasks retain
+the existing valid-done rule; runtime failures retain their retry policy.
+
+
 An active task with a pending dependency is kept: it stays active, with
 its holds, its delegates and what its executor has done, and goes no
 further until each is done. The tasks child keeps the promise, not the

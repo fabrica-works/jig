@@ -261,7 +261,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Prepared { owner, workspace } => hosted::prepared(domain, owner, workspace, out),
         Event::Unprepared { owner, failure, detail } => hosted::unprepared(domain, env, owner, failure, detail, out),
         Event::Started { owner, agent } => hosted::started(domain, env, owner, agent, out),
-        Event::StartRefused { owner, why } => hosted::start_refused(domain, env, owner, why, out),
+        Event::StartRefused { owner, why, cause } => hosted::start_refused(domain, env, owner, why, cause, out),
         Event::Refused { owner, name, reason } => hosted::refused_message(domain, owner, name, reason, out),
         Event::Yielded { owner } => hosted::yielded(domain, owner, out),
         Event::Faulted { owner, fault } => hosted::faulted(domain, env, owner, fault, out),

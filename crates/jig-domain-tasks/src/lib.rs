@@ -80,7 +80,7 @@ mod failures;
 mod flags;
 mod goals;
 mod grace;
-pub use flags::{Flags, Retention};
+pub use flags::{EndedBy, Flags, Retention};
 mod funders;
 mod hold_origin;
 mod holds;

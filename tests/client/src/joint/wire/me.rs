@@ -47,6 +47,10 @@ fn template(
         },
         tracked: value.tracked,
         flags: c::TaskFlags {
+            ended_by: match value.flags.ended_by {
+                t::EndedBy::Result => c::EndedBy::Result,
+                t::EndedBy::Requester => c::EndedBy::Requester,
+            },
             conversation: value.flags.conversation,
             listed: value.flags.listed,
             retention: match value.flags.retention {

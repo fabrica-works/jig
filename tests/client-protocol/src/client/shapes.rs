@@ -60,3 +60,15 @@ impl Story {
         *first
     }
 }
+
+impl Story {
+    #[must_use]
+    pub fn requester_chat(seed: u64) -> Self {
+        let mut config = jig_core_world::world::config(seed);
+        config.core.settings.templates[0].flags.ended_by = jig_domain_tasks::EndedBy::Requester;
+        let mut story = Self::configured(seed, &fixtures::owner_limits(), config);
+        story.sign_in();
+        assert!(story.run_until(|s| s.client.link().state == client::Link::Live, READY));
+        story
+    }
+}

@@ -28,7 +28,15 @@ fn a_chats_flags_and_last_activity_survive_a_cold_restart() {
     let templates = jig_core_world::fixtures::templates();
     let label = templates.iter().find(|template| template.number == 1).expect("fixture template").label;
     assert_eq!(row.label, label);
-    assert_eq!(row.flags, tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::Kept });
+    assert_eq!(
+        row.flags,
+        tasks::Flags {
+            ended_by: tasks::EndedBy::Result,
+            conversation: true,
+            listed: false,
+            retention: tasks::Retention::Kept
+        }
+    );
     assert_eq!(row.last_activity, Wall::from_nanos(9_000_000_000));
 }
 

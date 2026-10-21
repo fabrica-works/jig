@@ -1,6 +1,6 @@
 use crate::{
     Bounds, BoundsParts, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,
-    ModelBoundParts, Phase, v5,
+    ModelBoundParts, Phase, v6,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Secret, Writer};
@@ -9,7 +9,7 @@ pub const WORKER_A: &[u8] = b"worker-a";
 pub const WORKER_B: &[u8] = b"worker-b";
 pub const MODEL_SMALL: &[u8] = b"small";
 
-pub const LIMITS: v5::Limits = v5::Limits {
+pub const LIMITS: v6::Limits = v6::Limits {
     program_source_name: 32,
     sources_sources: 2,
     check_name: 32,
@@ -23,6 +23,7 @@ pub const LIMITS: v5::Limits = v5::Limits {
     credential_secret: 32,
     model_bound_name: 16,
     bounds_models: 2,
+    bounds_program_endpoints: jig_domain_workers::PROGRAM_ENDPOINTS,
     hello_workstreams: 2,
     hello_hosting: 2,
     turn_refused: 2,
@@ -80,9 +81,14 @@ pub fn hello_fullest() -> Hello {
     let mut models = List::with_capacity(2);
     models.push(model()).expect("first model slot");
     models.push(model()).expect("second model slot");
+    let mut program_endpoints = List::with_capacity(jig_domain_workers::PROGRAM_ENDPOINTS);
+    for endpoint in 0..jig_domain_workers::PROGRAM_ENDPOINTS {
+        program_endpoints.push(endpoint).unwrap();
+    }
     let bounds = Bounds::new(
         &LIMITS,
         BoundsParts {
+            program_endpoints,
             models,
             turns: 40,
             spend: 100,
@@ -109,8 +115,8 @@ pub fn hello_fullest() -> Hello {
 }
 
 pub fn hello_smallest() -> Hello {
-    // Three empty counts, plus the hello's and agent bounds' fixed fields.
-    Hello::decode(&LIMITS, &mut skein_lib::Reader::new(&[0; 72])).expect("smallest hello")
+    // Four empty counts, plus the hello's and agent bounds' fixed fields.
+    Hello::decode(&LIMITS, &mut skein_lib::Reader::new(&[0; 76])).expect("smallest hello")
 }
 
 pub const MESSAGE_FIRST: u64 = 41;
@@ -238,7 +244,7 @@ pub fn grant(value: crate::GrantValue, number: u32, generation: u64) -> crate::G
         .expect("grant within small limits")
 }
 
-pub fn granted_key(limits: &v5::Limits, key: &[u8]) -> crate::Granted {
+pub fn granted_key(limits: &v6::Limits, key: &[u8]) -> crate::Granted {
     let value = crate::CredentialValue::new(
         limits,
         crate::CredentialValueParts { scheme: crate::Scheme::Key, bytes: Secret::new(key.into()) },
@@ -382,7 +388,7 @@ pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
     facts: 4096,
 };
 
-fn one_slot_limits() -> v5::Limits {
+fn one_slot_limits() -> v6::Limits {
     crate::sizes::limits(&SIZES_ONE_SLOT).expect("small size bounds")
 }
 
@@ -410,7 +416,7 @@ pub fn fullest_turn() -> crate::Turn {
     .expect("full turn")
 }
 
-fn fullest_call(limits: &v5::Limits) -> crate::AnsweredCall {
+fn fullest_call(limits: &v6::Limits) -> crate::AnsweredCall {
     let answer = crate::HostAnswer::new(limits, crate::HostAnswerParts { error: true, body: full_bytes() })
         .expect("full host answer");
     crate::AnsweredCall::new(
@@ -420,7 +426,7 @@ fn fullest_call(limits: &v5::Limits) -> crate::AnsweredCall {
     .expect("full answered call")
 }
 
-fn fullest_grants(limits: &v5::Limits) -> List<crate::Grant> {
+fn fullest_grants(limits: &v6::Limits) -> List<crate::Grant> {
     let mut grants = List::with_capacity(2);
     for number in [5, 6] {
         let mut name =

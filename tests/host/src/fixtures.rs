@@ -49,6 +49,7 @@ pub fn callback(name: &[u8]) -> Token {
 #[must_use]
 pub fn bounds() -> jig_domain_host::Bounds {
     jig_domain_host::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([]),
         turns: 8,
         spend: 100,

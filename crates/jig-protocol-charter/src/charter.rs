@@ -111,7 +111,7 @@ pub fn charter(charter: Charter, brief: Box<[Section]>, resumed: bool) -> Option
     }
     let outcome = outcome(charter.contract)?;
     Some(run::Charter {
-        mode: run::Mode::Finite,
+        mode: charter.mode,
         resume: charter.resumes && resumed,
         waiting: charter.waiting,
         instructions: charter.instructions,
@@ -122,7 +122,10 @@ pub fn charter(charter: Charter, brief: Box<[Section]>, resumed: bool) -> Option
         },
         grants: run::charter::Grants {
             wait: charter.wait,
-            deliver: outcome.change.clone(),
+            deliver: match charter.mode {
+                run::Mode::Finite => outcome.change.clone(),
+                run::Mode::Open => None,
+            },
             tools: run::charter::Tools {
                 inspect: charter.workspace.inspect,
                 modify: charter.workspace.modify,

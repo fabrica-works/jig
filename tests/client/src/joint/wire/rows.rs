@@ -53,6 +53,7 @@ pub(crate) mod tests {
             tracked: None,
             label: 1,
             flags: jig_domain_tasks::Flags {
+                ended_by: jig_domain_tasks::EndedBy::Result,
                 conversation: true,
                 listed: false,
                 retention: jig_domain_tasks::Retention::ForgottenOnceRead,

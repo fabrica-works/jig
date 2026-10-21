@@ -204,6 +204,10 @@ pub fn encode(source: run::Charter, names: &[EndpointName], limits: &wire::Limit
     let charter = wire::Charter::new(
         limits,
         wire::CharterParts {
+            mode: match source.mode {
+                run::Mode::Finite => wire::Mode::Finite,
+                run::Mode::Open => wire::Mode::Open,
+            },
             instructions: source.instructions,
             brief,
             tools: tools(source.grants, limits)?,
@@ -214,7 +218,6 @@ pub fn encode(source: run::Charter, names: &[EndpointName], limits: &wire::Limit
             models,
             waiting: source.waiting,
             resume: source.resume,
-            mode: wire::Mode::Finite,
         },
     )
     .ok()?;

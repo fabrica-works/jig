@@ -1,4 +1,4 @@
-//! One rule for going on after an amendment (domain/tasks.md, 5.7 and section 7).
+//! One rule for dependencies and ending authority (domain/tasks.md, 5.7 and section 7).
 use crate::domain::{Domain, record};
 use crate::{Active, End, Executor, Phase, TaskResult, Was};
 
@@ -7,6 +7,7 @@ use crate::{Active, End, Executor, Phase, TaskResult, Was};
 pub(crate) struct Kept {
     /// A dependency an amendment added is pending.
     pub(crate) dependencies: bool,
+    pub(crate) open: bool,
 }
 
 impl Domain {
@@ -25,24 +26,24 @@ impl Domain {
 pub(crate) fn kept(domain: &Domain, task: u64) -> Kept {
     match record(domain, task) {
         Some(row) => for_record(row),
-        None => pending(&[]),
+        None => pending(&[], crate::EndedBy::Result),
     }
 }
 
 /// Publication borrows its row mutably; closing keeps cancellation's partial result.
 pub(crate) fn for_record(row: &crate::TaskRecord) -> Kept {
     match row.phase {
-        Phase::Active(_) | Phase::Held { was: Was::Active(_), .. } => pending(&row.waiting_on),
+        Phase::Active(_) | Phase::Held { was: Was::Active(_), .. } => pending(&row.waiting_on, row.flags.ended_by),
         Phase::Waiting
         | Phase::Closing(_)
         | Phase::Held { was: Was::Waiting | Was::Closing(_), .. }
-        | Phase::Ended(_) => pending(&[]),
+        | Phase::Ended(_) => pending(&[], crate::EndedBy::Result),
     }
 }
 
 /// The same facts for a compound request's projected dependency list.
-pub(crate) fn pending(dependencies: &[u64]) -> Kept {
-    Kept { dependencies: !dependencies.is_empty() }
+pub(crate) fn pending(dependencies: &[u64], ended_by: crate::EndedBy) -> Kept {
+    Kept { dependencies: !dependencies.is_empty(), open: ended_by == crate::EndedBy::Requester }
 }
 
 /// Each caller asks its own question; a new reason to keep a task answers every one.
@@ -54,12 +55,12 @@ impl Kept {
 
     /// A done end waits until every dependency is met: a person's answer is refused, a run's parks.
     pub(crate) fn refuses_done(self) -> bool {
-        self.dependencies
+        self.dependencies || self.open
     }
 
     /// No run of it may end it, so a finish grace without a live run cancels it at once.
     pub(crate) fn finishes_alone(self) -> bool {
-        !self.dependencies
+        !self.dependencies && !self.open
     }
 
     /// Whether a wake may make this executor Due; a person or a procedure is never kept from its step.
@@ -87,18 +88,31 @@ impl Kept {
         }
     }
 
-    /// A failed result still ends; a done result keeps the committed conversation.
-    pub(crate) fn parks(self, end: &End) -> bool {
-        self.refuses_done()
-            && match end {
-                End::Finished { result, .. } | End::FinishedWithFollowups { result, .. } => match result {
-                    TaskResult::Failure { .. } => false,
-                    TaskResult::Approved { .. }
-                    | TaskResult::Report { .. }
-                    | TaskResult::Verdict { .. }
-                    | TaskResult::Change { .. } => true,
-                },
-                End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
+    /// Open refuses every raw finish before judgment. Dependency-only finishes
+    /// keep the existing valid-done policy; failures and invalid results still end.
+    pub(crate) fn parks(self, end: &End, contract: &crate::Contract, limits: &crate::Limits) -> bool {
+        match end {
+            End::Finished { result, .. } => {
+                self.open
+                    || self.dependencies && done(result) && super::invalid_result(contract, result, limits).is_none()
             }
+            End::FinishedWithFollowups { result, followups } => {
+                self.open
+                    || self.dependencies
+                        && done(result)
+                        && super::invalid_followups(contract, result, followups, limits).is_none()
+            }
+            End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
+        }
+    }
+}
+
+fn done(result: &TaskResult) -> bool {
+    match result {
+        TaskResult::Failure { .. } => false,
+        TaskResult::Approved { .. }
+        | TaskResult::Report { .. }
+        | TaskResult::Verdict { .. }
+        | TaskResult::Change { .. } => true,
     }
 }

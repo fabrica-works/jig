@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use jig_domain_core::documents as d;
 use jig_domain_tasks as t;
 use skein_lib::{Duration, List, Wall};

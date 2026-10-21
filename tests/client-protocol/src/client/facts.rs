@@ -87,8 +87,8 @@ impl Story {
         let page = self.chat_document()?;
         let line = self.line(task)?;
         Some((
-            client::facts::chat_status(&page.chip, &page.waits_on, page.project, me),
-            client::facts::chat_status(&line.chip, &line.waits_on, line.project, me),
+            client::facts::chat_status(&page.chip, &page.waits_on, page.run_wait.as_ref(), page.project, me),
+            client::facts::chat_status(&line.chip, &line.waits_on, None, line.project, me),
         ))
     }
 }

@@ -295,7 +295,7 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_eng
     exchanges: 8,
     exchanges_per_client: 2,
     message_bytes: 65536,
-    wire: jig_client_protocol_wire::v11::CEILINGS,
+    wire: jig_client_protocol_wire::v12::CEILINGS,
     link_span: Duration::from_secs(300),
 };
 
@@ -361,9 +361,11 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 // The largest tasks row can reference all 64 names; sparse and ALL rows keep only used names.
 // Added provenance costs 25 bytes per dependency plus its four-byte list count;
 // the optional wait-bound wall adds nine bytes, so the largest row grows by 213 bytes.
+// Ending authority adds (batch + 1)^2 = (2 + 1)^2 = 9 bytes: the row,
+// its recurring members and its proposed creations with their recurring members.
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
-    value: 1_567_819,
+    value: 1_567_828,
     // Two operations per journal write plus three metadata operations: 2 * 18,590 + 3.
     ops: 37_183,
     // 256 MiB values + 37,183 operations * (2,079 key + 9 framing) + 26 frame bytes.
@@ -374,8 +376,8 @@ pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     budget: 268_435_456,
     segment: 692_147_172,
     snapshot_after: 346_073_586,
-    chunk: 1_569_918,
-    page: skein_kv::Page { rows: 2, bytes: 1_569_898 },
+    chunk: 1_569_927,
+    page: skein_kv::Page { rows: 2, bytes: 1_569_907 },
     deadline: Duration::from_secs(30),
 };
 pub(super) const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {

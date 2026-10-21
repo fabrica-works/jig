@@ -46,7 +46,7 @@ pub fn header(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &
             | jig_client::contract::WaitsOn::Nothing => {
                 words.chat_status(
                     b,
-                    &jig_client::facts::chat_status(&doc.chip, &doc.waits_on, doc.project, me),
+                    &jig_client::facts::chat_status(&doc.chip, &doc.waits_on, doc.run_wait.as_ref(), doc.project, me),
                     client.wall(),
                 );
             }

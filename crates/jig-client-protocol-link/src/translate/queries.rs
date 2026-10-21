@@ -58,6 +58,10 @@ pub(super) fn query(value: c::TaskQuery, limits: &w::Limits) -> Result<w::TaskQu
 }
 pub(super) fn flags(value: &w::TaskFlags) -> c::TaskFlags {
     c::TaskFlags {
+        ended_by: match value.ended_by() {
+            w::EndedBy::Result => c::EndedBy::Result,
+            w::EndedBy::Requester => c::EndedBy::Requester,
+        },
         conversation: value.conversation(),
         listed: value.listed(),
         retention: match value.retention() {

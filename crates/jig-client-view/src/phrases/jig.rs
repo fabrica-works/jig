@@ -6,6 +6,15 @@ use skein_ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    OpenProgramModel,
+    OpenProgramUnavailable,
+    OpenProgramChooseModel,
+    OpenProgramSource,
+    OpenProgramNoSwitch,
+    RefusedWorkerAt,
+    RefusedEngineAt,
+    MalformedEndedBy,
+
     DependencyParked,
     KeptUntil,
     DependencyRemoved,
@@ -1025,6 +1034,15 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::OpenProgramModel => 7816,
+            Self::OpenProgramUnavailable => 7817,
+            Self::OpenProgramChooseModel => 7818,
+            Self::OpenProgramSource => 7819,
+            Self::OpenProgramNoSwitch => 7820,
+            Self::RefusedWorkerAt => 7822,
+            Self::RefusedEngineAt => 7823,
+            Self::MalformedEndedBy => 7824,
+
             Self::Word(word) => return word.id(),
             Self::DependencyParked => 7815,
             Self::KeptUntil => 7800,
@@ -1659,7 +1677,11 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::DependencyParked
+            Self::OpenProgramModel
+            | Self::OpenProgramUnavailable
+            | Self::OpenProgramChooseModel
+            | Self::OpenProgramNoSwitch
+            | Self::DependencyParked
             | Self::CircleHold
             | Self::CircleLifts
             | Self::CircleRefused
@@ -2063,7 +2085,8 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::TurnUnreadVersion
+            Self::MalformedEndedBy
+            | Self::TurnUnreadVersion
             | Self::FrameProjectNumber
             | Self::FrameResultsSeen
             | Self::PolicyEditRole
@@ -2183,7 +2206,8 @@ impl JigPhrase {
             | Self::DependencyDone
             | Self::CircleWaitsFor
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::PolicyEffect
+            Self::OpenProgramSource
+            | Self::PolicyEffect
             | Self::RunRetryFailed
             | Self::SpecificationNumber
             | Self::CreateProcedure
@@ -2209,7 +2233,9 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::RunBackingOff
+            Self::RefusedWorkerAt
+            | Self::RefusedEngineAt
+            | Self::RunBackingOff
             | Self::RunPhaseSince
             | Self::RunPlacement
             | Self::RunObservedSince
@@ -2285,7 +2311,15 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 603] = [
+pub const ALL: [JigPhrase; 611] = [
+    JigPhrase::OpenProgramModel,
+    JigPhrase::OpenProgramUnavailable,
+    JigPhrase::OpenProgramChooseModel,
+    JigPhrase::OpenProgramSource,
+    JigPhrase::OpenProgramNoSwitch,
+    JigPhrase::RefusedWorkerAt,
+    JigPhrase::RefusedEngineAt,
+    JigPhrase::MalformedEndedBy,
     JigPhrase::DependencyParked,
     JigPhrase::KeptUntil,
     JigPhrase::DependencyRemoved,

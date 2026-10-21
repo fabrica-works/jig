@@ -3,6 +3,7 @@
 pub fn bounds() -> jig_domain_fleet::Bounds {
     use skein_lib::Duration;
     jig_domain_fleet::Bounds {
+        program_endpoints: Box::new([]),
         models: Box::new([]),
         turns: u32::MAX,
         spend: u64::MAX,
@@ -76,6 +77,7 @@ pub fn model_needs() -> jig_domain_fleet::Needs {
 #[must_use]
 pub fn model_bounds(names: &[&[u8]]) -> jig_domain_fleet::Bounds {
     jig_domain_fleet::Bounds {
+        program_endpoints: Box::new([]),
         models: names
             .iter()
             .map(|name| jig_domain_fleet::ModelBound {

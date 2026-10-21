@@ -51,7 +51,12 @@ fn create(llm: w::LlmChoice) -> w::Ask {
             label: 0,
             flags: w::TaskFlags::new(
                 &limits,
-                w::TaskFlagsParts { conversation: false, listed: false, retention: w::Retention::Kept },
+                w::TaskFlagsParts {
+                    ended_by: w::EndedBy::Result,
+                    conversation: false,
+                    listed: false,
+                    retention: w::Retention::Kept,
+                },
             )
             .expect("flags"),
             llm: Some(llm),

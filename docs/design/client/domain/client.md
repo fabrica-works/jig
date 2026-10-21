@@ -1143,6 +1143,16 @@ with a person in front of a tree, are view.md's, 18.10.
   Correctness (revisions, once, atomicity) is never sugar: it is
   plumbing.
 
+### 19.1 Refused starts
+
+`chat_status` also reads the task document's optional `run_wait`.
+For Due or Preparing, a derived `Refused` produces `HostRefused`, after
+waiting-for-party precedence. Held, placed, idle and terminal statuses
+keep their precedence. Summary rows that have no run wait pass None.
+HostRefused is not a reply. The reference view shows Hello's observed
+kind, time and cause, or the task-specific program compatibility cause;
+it promises no automatic source switch.
+
 ## 20. Modes
 
 - **Long-lived:** a browser or a terminal. The host drives its loop, and

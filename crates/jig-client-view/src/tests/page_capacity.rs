@@ -639,7 +639,7 @@ fn fill_goals(d: &mut Fixture, watch: jig_client::Handle, _doc: &Project) {
         project: 1,
         requester: OwnerRequester::Person(7),
         label: 2,
-        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: false, listed: true, retention: Retention::Kept },
         waits_on: WaitsOn::Nothing,
         conversation: None,
     };
@@ -669,7 +669,7 @@ fn fill_ended_goals(d: &mut Fixture, read: jig_client::Handle, _doc: &Project) {
         project: 1,
         requester: OwnerRequester::Person(7),
         label: 2,
-        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: false, listed: true, retention: Retention::Kept },
         waits_on: WaitsOn::Nothing,
         conversation: None,
     };

@@ -61,7 +61,7 @@ use skein_lib::{List, Token, Writer};
 pub const TOKEN_ONE: &[u8] = b"access";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
-pub fn codec() -> wire::v5::Limits {
+pub fn codec() -> wire::v6::Limits {
     wire::sizes::limits(&SIZES).expect("small codec limits")
 }
 pub fn hello() -> host::Hello {
@@ -71,6 +71,7 @@ pub fn hello() -> host::Hello {
         workstreams: Box::new([3]),
         hosting: Box::new([host::Hosting { run: RUN_SEVEN, attempt: ATTEMPT_TWO, phase: host::Phase::Active }]),
         bounds: host::Bounds {
+            program_endpoints: Box::new([]),
             models: Box::new([host::ModelBound { name: b"model".as_slice().into(), window: 16, output: 8 }]),
             turns: 1,
             spend: 10,

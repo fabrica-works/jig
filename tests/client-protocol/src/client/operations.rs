@@ -5,6 +5,11 @@ use jig_domain_tasks as tasks;
 use skein_lib::Duration;
 const RUNNING_WAIT: Duration = Duration::from_secs(1);
 impl Story {
+    #[must_use]
+    pub fn task_ended_by(&self, task: u64) -> Option<tasks::EndedBy> {
+        Some(self.task_record(task)?.flags.ended_by)
+    }
+
     pub fn running_task(&mut self) -> u64 {
         let task = self.start_task();
         assert!(self.run_until(|s| s.phase(task) == Some(contract::Phase::Running), RUNNING_WAIT));

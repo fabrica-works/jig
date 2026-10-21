@@ -4,7 +4,7 @@ use crate::Limits;
 use crate::translate::{piece_problem, text_problem, too_large};
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use skein_lib::Map;
 use skein_lib::{List, Reader, Wall, bytes};
 pub(crate) fn document_text(value: &w::DocumentText, limits: &Limits) -> Result<c::DocumentText, w::Problem> {

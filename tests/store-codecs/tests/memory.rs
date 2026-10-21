@@ -1,5 +1,5 @@
 //! Full golden rows decode within their heap worst cases (skein's codec.md, 6).
-use jig_protocol_store::{accounts_v1, component_v2, core_v4, notes_v1, people_v6, tasks_v6};
+use jig_protocol_store::{accounts_v1, component_v2, core_v4, notes_v1, people_v7, tasks_v7};
 use skein_heap::{Counting, Meter};
 use skein_lib::Reader;
 
@@ -36,9 +36,9 @@ fn a_full_notes_row_decodes_within_its_heap_worst_case() {
 }
 #[test]
 fn a_full_tasks_row_decodes_within_its_heap_worst_case() {
-    let bound = tasks_v6::Row::worst_case_heap(&tasks_v6::CEILINGS).expect("tasks heap bound");
+    let bound = tasks_v7::Row::worst_case_heap(&tasks_v7::CEILINGS).expect("tasks heap bound");
     check("tasks", "row", bound, |golden| {
-        tasks_v6::Row::decode(&tasks_v6::CEILINGS, &mut Reader::new(golden)).expect("full row")
+        tasks_v7::Row::decode(&tasks_v7::CEILINGS, &mut Reader::new(golden)).expect("full row")
     });
 }
 #[test]
@@ -50,9 +50,9 @@ fn a_full_core_row_decodes_within_its_heap_worst_case() {
 }
 #[test]
 fn a_full_people_row_decodes_within_its_heap_worst_case() {
-    let bound = people_v6::Row::worst_case_heap(&people_v6::CEILINGS).expect("people heap bound");
+    let bound = people_v7::Row::worst_case_heap(&people_v7::CEILINGS).expect("people heap bound");
     check("people", "row", bound, |golden| {
-        people_v6::Row::decode(&people_v6::CEILINGS, &mut Reader::new(golden)).expect("full row")
+        people_v7::Row::decode(&people_v7::CEILINGS, &mut Reader::new(golden)).expect("full row")
     });
 }
 #[test]
@@ -156,19 +156,19 @@ fn the_longest_accounts_rows_decode_within_the_rows_heap_worst_case() {
 
 #[test]
 fn added_dependencies_kept_lines_and_circle_payloads_fit_their_heap_bounds() {
-    let limits = tasks_v6::CEILINGS;
+    let limits = tasks_v7::CEILINGS;
     check(
         "tasks",
         "task_definition",
-        tasks_v6::TaskDefinition::worst_case_heap(&limits).expect("definition bound"),
+        tasks_v7::TaskDefinition::worst_case_heap(&limits).expect("definition bound"),
         |golden| {
-            tasks_v6::TaskDefinition::decode(&limits, &mut Reader::new(golden)).expect("full definition with additions")
+            tasks_v7::TaskDefinition::decode(&limits, &mut Reader::new(golden)).expect("full definition with additions")
         },
     );
-    check("tasks", "kept_line", tasks_v6::KeptLine::worst_case_heap(&limits).expect("kept bound"), |golden| {
-        tasks_v6::KeptLine::decode(&limits, &mut Reader::new(golden)).expect("full pending list")
+    check("tasks", "kept_line", tasks_v7::KeptLine::worst_case_heap(&limits).expect("kept bound"), |golden| {
+        tasks_v7::KeptLine::decode(&limits, &mut Reader::new(golden)).expect("full pending list")
     });
-    check("tasks", "circle", tasks_v6::Circle::worst_case_heap(&limits).expect("circle bound"), |golden| {
-        tasks_v6::Circle::decode(&limits, &mut Reader::new(golden)).expect("full circle")
+    check("tasks", "circle", tasks_v7::Circle::worst_case_heap(&limits).expect("circle bound"), |golden| {
+        tasks_v7::Circle::decode(&limits, &mut Reader::new(golden)).expect("full circle")
     });
 }

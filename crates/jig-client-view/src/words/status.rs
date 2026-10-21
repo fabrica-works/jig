@@ -11,6 +11,10 @@ use skein_ui::{Builder, phrases::Hole};
 impl Words {
     pub(crate) fn chat_status(&self, b: &mut Builder, status: &ChatStatus, wall: Wall) {
         match status {
+            ChatStatus::HostRefused(why) => {
+                self.text(b, P::Word(Word::Status(StatusWord::HostRefused)), &[]);
+                self.host_refused(b, *why);
+            }
             ChatStatus::Starting => self.text(b, P::Word(Word::Status(StatusWord::Starting)), &[]),
             ChatStatus::Writing => self.text(b, P::Word(Word::Status(StatusWord::Writing)), &[]),
             ChatStatus::Tool { tool, since } => {
@@ -68,6 +72,34 @@ impl Words {
             ChatStatus::Ended { at } => {
                 self.text(b, P::Word(Word::status(status)), &[]);
                 self.wall(b, *at);
+            }
+        }
+    }
+    fn host_refused(&self, b: &mut Builder, why: jig_client::contract::TaskWaitRefused) {
+        use jig_client::contract::{OpenProgram, OwnerHostKind, TaskWaitRefused as R};
+        match why {
+            R::Hello { kind, at, why } => {
+                let phrase = match kind {
+                    OwnerHostKind::Engine => P::RefusedEngineAt,
+                    OwnerHostKind::Worker => P::RefusedWorkerAt,
+                };
+                self.text(b, phrase, &[Hole::Wall(self.adjusted_wall(at))]);
+                crate::owner_deployment::hello_refusal(b, self, why);
+            }
+            R::Program(OpenProgram::Model) => {
+                self.text(b, P::OpenProgramModel, &[]);
+                self.text(b, P::OpenProgramUnavailable, &[]);
+                self.text(b, P::OpenProgramChooseModel, &[]);
+            }
+            R::Program(OpenProgram::Source { account, source }) => {
+                self.text(
+                    b,
+                    P::OpenProgramSource,
+                    &[Hole::Number(u64::from(account)), Hole::Number(u64::from(source))],
+                );
+                self.text(b, P::OpenProgramUnavailable, &[]);
+                self.text(b, P::OpenProgramNoSwitch, &[]);
+                self.text(b, P::OpenProgramChooseModel, &[]);
             }
         }
     }

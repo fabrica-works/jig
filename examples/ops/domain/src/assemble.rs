@@ -65,6 +65,10 @@ pub(crate) fn assignment(
     }
     let value = charter::charter(
         charter::Charter {
+            mode: match run.ended_by {
+                jig_domain_tasks::EndedBy::Result => charter::Mode::Finite,
+                jig_domain_tasks::EndedBy::Requester => charter::Mode::Open,
+            },
             instructions: policy.instructions,
             tools: domain.tools.clone(),
             wait: true,
@@ -252,12 +256,13 @@ pub(crate) fn answer_payload(domain: &mut Domain, run: Token, attempt: Token, pa
 }
 
 pub(crate) fn result_read(domain: &Domain, payload: Token, end: tasks::End, work: &mut Queue<Work>) {
-    let Some(crate::boundary::Payload::Answer { task, attempt, spent, read, refused, .. }) =
+    let Some(crate::boundary::Payload::Answer { task, attempt, spent, read, refused, ending, .. }) =
         domain.payloads.get(&payload)
     else {
         return;
     };
     work.push(Work::Core(core::Event::AnswerPayload {
+        grants_refused: grants_refused(ending),
         run: Token::new(*task),
         attempt: Token::new(*attempt),
         payload,
@@ -399,5 +404,21 @@ fn host_form(form: fleet::Form) -> host::Form {
         fleet::Form::Program(name) => {
             host::Form::Program(host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))
         }
+    }
+}
+
+fn grants_refused(ending: &host::Ending) -> bool {
+    match ending {
+        host::Ending::Refused(refusal) => match refusal {
+            host::Refusal::Invalid(invalid) => match invalid {
+                host::Invalid::Start { cause, .. } => *cause == host::StartCause::Grants,
+                host::Invalid::Charter
+                | host::Invalid::Transcript
+                | host::Invalid::Grants
+                | host::Invalid::Messages => false,
+            },
+            host::Refusal::Busy => false,
+        },
+        host::Ending::Ended { .. } | host::Ending::Parked { .. } | host::Ending::Failed { .. } => false,
     }
 }

@@ -6,8 +6,15 @@ use jig_protocol_worker_wire::{self as wire, Part};
 use skein_channel::{Frame, frame_writer};
 use skein_lib::{List, Queue, Reader, Time, Token, Writer, bytes};
 
-pub(crate) fn hello(hello: host::Hello, limits: &wire::v5::Limits) -> Option<Frame> {
+pub(crate) fn hello(hello: host::Hello, limits: &wire::v6::Limits) -> Option<Frame> {
     let bounds = hello.bounds;
+    if !host::valid_program_endpoints(&bounds.program_endpoints) {
+        return None;
+    }
+    let mut program_endpoints = List::with_capacity(limits.bounds_program_endpoints);
+    for endpoint in bounds.program_endpoints {
+        program_endpoints.push(endpoint).ok()?;
+    }
     let mut models = List::with_capacity(limits.bounds_models);
     for model in bounds.models {
         let model = wire::ModelBound::new(
@@ -20,6 +27,7 @@ pub(crate) fn hello(hello: host::Hello, limits: &wire::v5::Limits) -> Option<Fra
     let bounds = wire::Bounds::new(
         limits,
         wire::BoundsParts {
+            program_endpoints,
             models,
             turns: bounds.turns,
             spend: bounds.spend,
@@ -54,7 +62,7 @@ pub(crate) fn hello(hello: host::Hello, limits: &wire::v5::Limits) -> Option<Fra
     frame(0x0100, body.finish())
 }
 
-pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v5::Limits) -> Option<Frame> {
+pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v6::Limits) -> Option<Frame> {
     match up {
         host::LinkUp::Logins { logins } => logins_frame(logins, limits),
         host::LinkUp::SignedOut { name, result } => signed_out_frame(name, result, limits),
@@ -164,14 +172,14 @@ fn part(token: Option<Token>, parts: &[Part]) -> Result<Option<Box<[u8]>>, ()> {
 fn name(token: Option<Token>) -> Option<u64> {
     Some(token?.raw())
 }
-fn work(work: host::Work, parts: &[Part], limits: &wire::v5::Limits) -> Option<wire::Work> {
+fn work(work: host::Work, parts: &[Part], limits: &wire::v6::Limits) -> Option<wire::Work> {
     wire::Work::new(
         limits,
         wire::WorkParts { left: part(work.left, parts).ok()?, saved: part(work.saved, parts).ok()? },
     )
     .ok()
 }
-fn refused(items: Box<[host::Refused]>, limits: &wire::v5::Limits) -> Option<List<wire::Refused>> {
+fn refused(items: Box<[host::Refused]>, limits: &wire::v6::Limits) -> Option<List<wire::Refused>> {
     let mut list = List::with_capacity(limits.turn_refused);
     for item in items {
         let reason = match item.reason {
@@ -185,7 +193,7 @@ fn refused(items: Box<[host::Refused]>, limits: &wire::v5::Limits) -> Option<Lis
     }
     Some(list)
 }
-fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v5::Limits) -> Option<wire::Ending> {
+fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v6::Limits) -> Option<wire::Ending> {
     Some(match ending {
         host::Ending::Refused(refusal) => {
             let value = match refusal {
@@ -214,7 +222,7 @@ fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v5::Limits) -> Op
         }
     })
 }
-fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v5::Limits) -> Option<wire::Failure> {
+fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v6::Limits) -> Option<wire::Failure> {
     Some(match failure {
         host::Failure::Unprepared(preparation) => {
             let value = match preparation {
@@ -240,7 +248,7 @@ fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v5::Limits) ->
         }
     })
 }
-fn activity(activity: host::Activity, limits: &wire::v5::Limits) -> Option<wire::Activity> {
+fn activity(activity: host::Activity, limits: &wire::v6::Limits) -> Option<wire::Activity> {
     Some(match activity {
         host::Activity::Phase(value) => {
             let value = phase(value);
@@ -267,18 +275,28 @@ fn phase(value: host::Phase) -> wire::Phase {
         host::Phase::Ending => wire::Phase::Ending,
     }
 }
-fn invalid_value(value: host::Invalid, limits: &wire::v5::Limits) -> Option<wire::Invalid> {
+fn invalid_value(value: host::Invalid, limits: &wire::v6::Limits) -> Option<wire::Invalid> {
     Some(match value {
-        host::Invalid::Start { why } => {
-            wire::Invalid::Start(wire::InvalidStart::new(limits, wire::InvalidStartParts { why }).ok()?)
-        }
+        host::Invalid::Start { why, cause } => wire::Invalid::Start(
+            wire::InvalidStart::new(
+                limits,
+                wire::InvalidStartParts {
+                    why,
+                    cause: match cause {
+                        host::StartCause::Other => wire::StartCause::Other,
+                        host::StartCause::Grants => wire::StartCause::Grants,
+                    },
+                },
+            )
+            .ok()?,
+        ),
         host::Invalid::Charter => wire::Invalid::Charter,
         host::Invalid::Transcript => wire::Invalid::Transcript,
         host::Invalid::Grants => wire::Invalid::Grants,
         host::Invalid::Messages => wire::Invalid::Messages,
     })
 }
-fn run_failure(value: host::RunFailure, limits: &wire::v5::Limits) -> Option<wire::RunFailure> {
+fn run_failure(value: host::RunFailure, limits: &wire::v6::Limits) -> Option<wire::RunFailure> {
     Some(match value {
         host::RunFailure::Model => wire::RunFailure::Model,
         host::RunFailure::Budget => wire::RunFailure::Budget,
@@ -334,7 +352,7 @@ fn count_kind(value: host::CountKind) -> wire::CountKind {
 pub(crate) fn down(
     kind: u16,
     body: &[u8],
-    limits: &wire::v5::Limits,
+    limits: &wire::v6::Limits,
     now: Time,
     parts: &mut List<Part>,
     next: &mut u64,
@@ -552,7 +570,7 @@ fn assignment(
     })
 }
 
-fn login_state(state: host::LoginState, limits: &wire::v5::Limits) -> Option<wire::LoginState> {
+fn login_state(state: host::LoginState, limits: &wire::v6::Limits) -> Option<wire::LoginState> {
     Some(match state {
         host::LoginState::Usable => wire::LoginState::Usable,
         host::LoginState::NotSignedIn => wire::LoginState::NotSignedIn,
@@ -566,7 +584,7 @@ fn login_state(state: host::LoginState, limits: &wire::v5::Limits) -> Option<wir
 fn source_failed(
     reason: host::SourceFailure,
     detail: Box<[u8]>,
-    limits: &wire::v5::Limits,
+    limits: &wire::v6::Limits,
 ) -> Option<wire::SourceFailed> {
     let reason = match reason {
         host::SourceFailure::Missing => wire::SourceFailure::Missing,
@@ -580,7 +598,7 @@ fn source_failed(
     wire::SourceFailed::new(limits, wire::SourceFailedParts { reason, detail }).ok()
 }
 
-fn logins_frame(logins: Box<[host::Login]>, limits: &wire::v5::Limits) -> Option<Frame> {
+fn logins_frame(logins: Box<[host::Login]>, limits: &wire::v6::Limits) -> Option<Frame> {
     let mut rows = List::<wire::Login>::with_capacity(limits.logins_logins);
     for login in logins {
         for row in &rows {
@@ -602,7 +620,7 @@ fn logins_frame(logins: Box<[host::Login]>, limits: &wire::v5::Limits) -> Option
     record.encode(&mut body).ok()?;
     frame(wire::Kind::Logins.number(), body.finish())
 }
-fn signed_out_frame(name: host::SourceName, result: host::SignOutResult, limits: &wire::v5::Limits) -> Option<Frame> {
+fn signed_out_frame(name: host::SourceName, result: host::SignOutResult, limits: &wire::v6::Limits) -> Option<Frame> {
     let result = match result {
         host::SignOutResult::SignedOut => wire::SignOutResult::SignedOut,
         host::SignOutResult::Failed { reason, detail } => {

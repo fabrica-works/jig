@@ -198,7 +198,15 @@ fn decoded(domain: &mut Domain, env: &Env<Limits>, owner: Token, start: Result<B
                 Invalid::Transcript => b"transcript",
                 Invalid::CallName => b"call name",
             };
-            hub(domain, env, host::Event::from_agent(host::FromAgent::StartRefused { owner, why: Box::from(why) }));
+            hub(
+                domain,
+                env,
+                host::Event::from_agent(host::FromAgent::StartRefused {
+                    owner,
+                    why: Box::from(why),
+                    cause: host::StartCause::Other,
+                }),
+            );
         }
     }
 }
@@ -492,8 +500,12 @@ fn encoded(domain: &mut Domain, env: &Env<Limits>, owner: Token, encoded: Encode
                 Finish::Ended => host::Finish::Ended { outcome: body },
                 Finish::Parked => host::Finish::Parked,
                 Finish::Failed(failure) => host::Finish::Failed { failure },
-                Finish::Refused => {
-                    hub(domain, env, host::Event::from_agent(host::FromAgent::StartRefused { owner, why: body }));
+                Finish::Refused(cause) => {
+                    hub(
+                        domain,
+                        env,
+                        host::Event::from_agent(host::FromAgent::StartRefused { owner, why: body, cause }),
+                    );
                     return;
                 }
             };
@@ -530,7 +542,15 @@ fn ended(domain: &mut Domain, env: &Env<Limits>, owner: Token, end: smith::End, 
     };
     assert!(started || unstarted, "a process terminal follows Started");
     if let Some(why) = translate::unstarted(end) {
-        hub(domain, env, host::Event::from_agent(host::FromAgent::StartRefused { owner, why: Box::from(why) }));
+        hub(
+            domain,
+            env,
+            host::Event::from_agent(host::FromAgent::StartRefused {
+                owner,
+                why: Box::from(why),
+                cause: host::StartCause::Other,
+            }),
+        );
     } else if hand_out_pending(domain, owner) {
         drop(domain.gone.insert(owner, detail).expect("one deferred gone per run"));
     } else {

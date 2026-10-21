@@ -56,6 +56,9 @@ fn valid_phase(task: &TaskRecord, limits: &Limits) -> bool {
     {
         return false;
     }
+    if !crate::flags::valid(task.flags, task.executor, task.requester) {
+        return false;
+    }
     match task.executor {
         Executor::Person(_) if !person_phase(&task.phase) => return false,
         Executor::Procedure { .. } | Executor::Person(_) if task.flags.conversation => return false,

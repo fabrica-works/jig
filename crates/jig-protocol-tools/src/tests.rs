@@ -481,6 +481,7 @@ fn a_delegate_call_names_label_flags_and_as_allowed() {
     assert_eq!(
         batch[0].flags,
         jig_domain_tasks::Flags {
+            ended_by: jig_domain_tasks::EndedBy::Result,
             conversation: true,
             listed: true,
             retention: jig_domain_tasks::Retention::ForgottenOnceRead,

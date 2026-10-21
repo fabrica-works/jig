@@ -162,6 +162,7 @@ pub(super) fn workspace_prepared(
     }
     policy.resume = resume;
     let run = RunCharter {
+        ended_by: context.ended_by,
         sources: sources.into_boxed(),
         accounts: allowance.choice.accounts,
         placement: allowance.choice.placement,

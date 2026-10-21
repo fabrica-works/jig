@@ -1,6 +1,6 @@
 //! Shared literals for client document codec tests (testing-strategy.md, 8).
 pub use jig_client::shapes::{CHAT, GOAL};
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use skein_lib::{Duration, List, Writer};
 mod owner;
 pub use owner::*;
@@ -130,7 +130,12 @@ pub fn task_record() -> w::Task {
             label: 0,
             flags: w::TaskFlags::new(
                 &lim,
-                w::TaskFlagsParts { conversation: false, listed: false, retention: w::Retention::Kept },
+                w::TaskFlagsParts {
+                    ended_by: w::EndedBy::Result,
+                    conversation: false,
+                    listed: false,
+                    retention: w::Retention::Kept,
+                },
             )
             .expect("fixture flags"),
             last_activity: 0,

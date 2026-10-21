@@ -4,6 +4,8 @@ use alloc::boxed::Box;
 use skein_channel::{Direction, Role, Term};
 use skein_lib::{Duration, List, Reader};
 
+// Existing hello 178 + list count 4 + the independent 64 endpoint identities.
+const HELLO_MAX: u32 = 178 + 4 + jig_domain_workers::PROGRAM_ENDPOINTS * 4;
 fn hello_schema() -> skein_channel::Schema {
     crate::schema(&fixtures::LIMITS).expect("small schema")
 }
@@ -150,18 +152,18 @@ fn the_schema_lists_the_hello_from_the_initiator() {
     assert_eq!(version.kinds.len(), 21);
     assert_eq!(
         version.kind(0x0100),
-        Some(skein_channel::Kind { kind: 0x0100, direction: Direction::FromInitiator, largest: 178 })
+        Some(skein_channel::Kind { kind: 0x0100, direction: Direction::FromInitiator, largest: HELLO_MAX })
     );
 }
 
 #[test]
 fn terms_that_take_every_kind_leave_no_gap() {
-    assert_eq!(crate::terms_gap(&hello_schema(), Role::Initiator, &hello_terms(178)), None);
+    assert_eq!(crate::terms_gap(&hello_schema(), Role::Initiator, &hello_terms(HELLO_MAX)), None);
 }
 
 #[test]
 fn terms_below_the_hello_bound_name_the_hello_kind() {
-    assert_eq!(crate::terms_gap(&hello_schema(), Role::Initiator, &hello_terms(177)), Some(0x0100));
+    assert_eq!(crate::terms_gap(&hello_schema(), Role::Initiator, &hello_terms(HELLO_MAX - 1)), Some(0x0100));
 }
 
 #[test]
@@ -283,7 +285,7 @@ fn through_bytes<T>(
     value: &T,
     measure: fn(&T) -> u32,
     encode: fn(&T, &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow>,
-    decode: fn(&crate::v5::Limits, &mut Reader<'_>) -> Result<T, crate::v5::Problem>,
+    decode: fn(&crate::v6::Limits, &mut Reader<'_>) -> Result<T, crate::v6::Problem>,
 ) -> T {
     let mut writer = skein_lib::Writer::new(usize::try_from(measure(value)).expect("small notice"));
     encode(value, &mut writer).expect("measured room");

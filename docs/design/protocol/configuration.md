@@ -288,6 +288,15 @@ not select accounts or infer provider membership. The public JSON refuses
   policy's overrides naming configured templates, each at most once,
   and no more of them than the limit on templates.
 
+### 3.2 Ending authority in templates
+
+Templates optionally name `ended_by` as `result` (the default) or
+`requester`. Requester requires a named agent charter and `conversation:
+true`; effective executor overrides must preserve it. The delivered
+client template carries this flag into the NewTask record, without a
+template identity in the request. Tool-created and deployment tasks use
+Result explicitly; the tools gain no `ended_by` key.
+
 ## 4. jig's part for a worker
 
 | Member | What it gives |

@@ -15,7 +15,7 @@ pub(crate) enum Finish {
     Ended,
     Parked,
     Failed(host::RunFailure),
-    Refused,
+    Refused(host::StartCause),
 }
 
 impl Finish {
@@ -24,7 +24,10 @@ impl Finish {
             smith::RunResult::Accepted { .. } => Self::Ended,
             smith::RunResult::Parked => Self::Parked,
             smith::RunResult::Failed { failure } => Self::Failed(crate::translate::failure(failure)),
-            smith::RunResult::Refused { .. } => Self::Refused,
+            smith::RunResult::Refused { refusal } => Self::Refused(match refusal {
+                smith::Refusal::Invalid(why) => crate::translate::start_cause(*why),
+                smith::Refusal::Busy => host::StartCause::Other,
+            }),
         }
     }
 }

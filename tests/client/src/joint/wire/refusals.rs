@@ -26,6 +26,7 @@ pub fn refusal(value: people::Refusal) -> Result<client::Refusal, super::owner::
             at,
             why: match why {
                 people::Malformed::AsAllowedTwice => client::Malformed::TwoAsAllowed,
+                people::Malformed::EndedBy => client::Malformed::EndedBy,
                 people::Malformed::Conversation => client::Malformed::ConversationNotAgent,
                 people::Malformed::Cycle => client::Malformed::Cycle,
                 people::Malformed::ProposedAsAllowed => client::Malformed::ProposedAsAllowed,

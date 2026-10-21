@@ -10,6 +10,7 @@ pub(crate) fn start_refused(
     env: &Env<Limits>,
     owner: Token,
     why: Box<[u8]>,
+    cause: crate::StartCause,
     out: &mut Queue<Request>,
 ) {
     let id = Id::<Hosted>::from_token(owner);
@@ -42,7 +43,7 @@ pub(crate) fn start_refused(
         spent: 0,
         read: None,
         refused: entry.refusals.take(),
-        ending: Ending::Refused(Refusal::Invalid(Invalid::Start { why: tail(why, &env.limits) })),
+        ending: Ending::Refused(Refusal::Invalid(Invalid::Start { cause, why: tail(why, &env.limits) })),
     };
     out.push(Request::Up(LinkUp::Answer { run: entry.run, attempt: entry.attempt, answer }));
     conclude(domain, id, out);

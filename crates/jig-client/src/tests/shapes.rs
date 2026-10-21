@@ -41,7 +41,10 @@ fn chat_fills_the_chat_template_into_one_as_allowed_task() {
     assert_eq!(task.named.len(), 0);
     assert_eq!(task.tracked, None);
     assert_eq!(task.label, 1);
-    assert_eq!(task.flags, TaskFlags { conversation: true, listed: false, retention: Retention::Kept });
+    assert_eq!(
+        task.flags,
+        TaskFlags { ended_by: EndedBy::Result, conversation: true, listed: false, retention: Retention::Kept }
+    );
 }
 #[test]
 fn close_chat_cancels_the_chat_last_with_its_template_s_grace() {

@@ -47,3 +47,28 @@ mod payer;
 mod account;
 
 mod waits;
+
+#[test]
+fn shared_kept_rule_separates_claims_from_finish_authority() {
+    use crate::{Contract, End, EndedBy, Executor, TaskResult};
+    let done = End::Finished { result: TaskResult::Report { words: Box::new([]) }, cancel_delegates: false };
+    let failed = End::Finished { result: TaskResult::Failure { reason: Box::new([]) }, cancel_delegates: false };
+    let malformed = End::Finished {
+        result: TaskResult::Verdict { fields: Box::new([]), code: 0, words: Box::new([]) },
+        cancel_delegates: false,
+    };
+    let contract = Contract::Report { words: 1 };
+    for (dependencies, ended_by, blocks, parks_done, parks_failure, parks_invalid) in [
+        (&[][..], EndedBy::Result, false, false, false, false),
+        (&[2][..], EndedBy::Result, true, true, false, false),
+        (&[][..], EndedBy::Requester, false, true, true, true),
+        (&[2][..], EndedBy::Requester, true, true, true, true),
+    ] {
+        let kept = crate::run::ends::pending(dependencies, ended_by);
+        assert_eq!(kept.blocks_claims(), blocks);
+        assert_eq!(kept.may_be_due(Executor::Agent { charter: 1 }), !blocks);
+        assert_eq!(kept.parks(&done, &contract, &revisions::LIMITS), parks_done);
+        assert_eq!(kept.parks(&failed, &contract, &revisions::LIMITS), parks_failure);
+        assert_eq!(kept.parks(&malformed, &contract, &revisions::LIMITS), parks_invalid);
+    }
+}

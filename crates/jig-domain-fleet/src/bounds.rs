@@ -10,6 +10,7 @@ pub struct ModelBound {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Bounds {
+    pub program_endpoints: Box<[u32]>,
     pub models: Box<[ModelBound]>,
     pub turns: u32,
     pub spend: u64,

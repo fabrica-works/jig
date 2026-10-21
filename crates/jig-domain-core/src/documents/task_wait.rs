@@ -70,6 +70,7 @@ pub(super) fn waiting(core: &Core, row: &tasks::TaskRecord) -> Option<TaskRunWai
         Err(RunWait::InvalidAccount { account, why }) => {
             Some(TaskRunWait::Account { account: Some(account), source: None, why: TaskWaitWhy::Invalid(why) })
         }
+        Err(RunWait::OpenProgram(why)) => Some(TaskRunWait::Refused(TaskWaitRefused::Program(why))),
         Err(RunWait::Credential) => Some(TaskRunWait::Credential),
         Err(RunWait::Host) => Some(match core.fleet.standing_refusal(core.charter_of(row.number).hosts) {
             Some((kind, record)) => {

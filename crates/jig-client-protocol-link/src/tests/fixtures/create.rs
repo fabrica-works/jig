@@ -39,7 +39,12 @@ pub fn new_task(executor: c::OwnerExecutor, contract: c::NewContract) -> c::NewT
         }]),
         tracked: Some(13),
         label: 14,
-        flags: c::TaskFlags { conversation: false, listed: true, retention: c::Retention::ForgottenOnceRead },
+        flags: c::TaskFlags {
+            ended_by: c::EndedBy::Result,
+            conversation: false,
+            listed: true,
+            retention: c::Retention::ForgottenOnceRead,
+        },
     }
 }
 

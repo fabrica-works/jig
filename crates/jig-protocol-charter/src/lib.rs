@@ -24,6 +24,7 @@ pub use charter::charter;
 pub use encode::{EndpointName, encode};
 pub use identity::run_identity;
 pub use result::{Field, RunResult, Unreadable, result};
+pub use smith_domain_run::Mode;
 
 /// The encoding ceilings already owned by this kit (protocol/channel.md, 6.1).
 #[must_use]

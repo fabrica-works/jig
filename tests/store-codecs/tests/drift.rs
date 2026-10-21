@@ -48,12 +48,12 @@ fn the_accounts_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_tasks_familys_code_and_goldens_have_no_drift() {
-    check("tasks", 6);
+    check("tasks", 7);
 }
 
 #[test]
 fn the_people_familys_code_and_goldens_have_no_drift() {
-    check("people", 6);
+    check("people", 7);
 }
 
 #[test]

@@ -113,6 +113,7 @@ fn a_tasks_label_and_flags_are_kept_as_made() {
     let mut made = task(1, &[]);
     made.label = 7;
     let flags = jig_domain_tasks::Flags {
+        ended_by: jig_domain_tasks::EndedBy::Result,
         conversation: true,
         listed: false,
         retention: jig_domain_tasks::Retention::ForgottenOnceRead,

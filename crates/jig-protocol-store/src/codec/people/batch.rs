@@ -53,6 +53,10 @@ pub(super) fn encode(batch: &[domain::Member], limits: &wire::Limits) -> Result<
                     flags: wire::Flags::new(
                         limits,
                         wire::FlagsParts {
+                            ended_by: match member.flags.ended_by {
+                                domain::EndedBy::Result => wire::EndedBy::Result,
+                                domain::EndedBy::Requester => wire::EndedBy::Requester,
+                            },
                             conversation: member.flags.conversation,
                             listed: member.flags.listed,
                             retention: match member.flags.retention {
@@ -87,7 +91,7 @@ pub(super) fn decode(batch: List<wire::Member>, limits: &wire::Limits) -> Result
             flags,
             llm,
         } = member.into_parts();
-        let wire::FlagsParts { conversation, listed, retention } = flags.into_parts();
+        let wire::FlagsParts { conversation, listed, retention, ended_by } = flags.into_parts();
         members
             .push(domain::Member {
                 llm: super::llm::decode_llm(llm),
@@ -111,6 +115,10 @@ pub(super) fn decode(batch: List<wire::Member>, limits: &wire::Limits) -> Result
                 tracked,
                 label,
                 flags: domain::Flags {
+                    ended_by: match ended_by {
+                        wire::EndedBy::Result => domain::EndedBy::Result,
+                        wire::EndedBy::Requester => domain::EndedBy::Requester,
+                    },
                     conversation,
                     listed,
                     retention: match retention {

@@ -71,6 +71,10 @@ pub(crate) fn template(value: &w::Template, limits: &Limits) -> Result<c::Templa
         deadline: crate::translate::operations::restore_deadline(value.deadline()),
         tracked: *value.tracked(),
         flags: c::TaskFlags {
+            ended_by: match value.flags().ended_by() {
+                w::EndedBy::Result => c::EndedBy::Result,
+                w::EndedBy::Requester => c::EndedBy::Requester,
+            },
             conversation: value.flags().conversation(),
             listed: value.flags().listed(),
             retention: match value.flags().retention() {

@@ -149,7 +149,12 @@ fn document(number: u64) -> contract::Task {
         kept_account: None,
         run_wait: None,
         label: 0,
-        flags: contract::TaskFlags { conversation: false, listed: true, retention: contract::Retention::Kept },
+        flags: contract::TaskFlags {
+            ended_by: contract::EndedBy::Result,
+            conversation: false,
+            listed: true,
+            retention: contract::Retention::Kept,
+        },
         last_activity: Wall::from_nanos(0),
         waits_on: contract::WaitsOn::Nothing,
         chip: contract::Chip {

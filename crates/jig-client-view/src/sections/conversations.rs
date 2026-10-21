@@ -107,7 +107,11 @@ fn waiting(b: &mut Builder, client: &Borrowed<'_>, row: &jig_client::contract::T
         | jig_client::contract::WaitsOn::Nothing => false,
     };
     if !kept && let Some(me) = client.frame().document {
-        words.chat_status(b, &jig_client::facts::chat_status(&row.chip, &row.waits_on, row.project, me), client.wall());
+        words.chat_status(
+            b,
+            &jig_client::facts::chat_status(&row.chip, &row.waits_on, None, row.project, me),
+            client.wall(),
+        );
     }
     match &row.waits_on {
         jig_client::contract::WaitsOn::Party { .. } => {}

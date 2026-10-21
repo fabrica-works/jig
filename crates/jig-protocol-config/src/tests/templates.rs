@@ -20,7 +20,12 @@ fn the_chat_and_goal_templates_parse_with_their_defaults() {
                 budget: TemplateBudget::AsAllowed { cap: None },
                 deadline: TemplateDeadline::None,
                 tracked: None,
-                flags: Flags { conversation: true, listed: false, retention: Retention::Kept },
+                flags: Flags {
+                    ended_by: jig_domain_tasks::EndedBy::Result,
+                    conversation: true,
+                    listed: false,
+                    retention: Retention::Kept
+                },
                 label: 1,
                 grace: Some(Duration::from_secs(5)),
                 llm: None,
@@ -34,7 +39,12 @@ fn the_chat_and_goal_templates_parse_with_their_defaults() {
                 budget: TemplateBudget::Given,
                 deadline: TemplateDeadline::Given,
                 tracked: Some(1),
-                flags: Flags { conversation: false, listed: true, retention: Retention::Kept },
+                flags: Flags {
+                    ended_by: jig_domain_tasks::EndedBy::Result,
+                    conversation: false,
+                    listed: true,
+                    retention: Retention::Kept
+                },
                 label: 2,
                 grace: None,
                 llm: None,
@@ -350,4 +360,22 @@ fn configuration_templates_refuse_an_account_at_its_exact_path() {
         chat_llm().member(b"account"),
         What::Unknown,
     );
+}
+
+#[test]
+fn requester_ending_is_explicit_and_requires_an_agent_conversation() {
+    let bytes = fixtures::with(
+        fixtures::ENGINE_SMALL,
+        br#""conversation": true"#,
+        br#""conversation": true, "ended_by": "requester""#,
+    );
+    let engine = fixtures::engine(&bytes).unwrap();
+    assert_eq!(engine.templates[0].flags.ended_by, jig_domain_tasks::EndedBy::Requester);
+    for (from, to) in [
+        (br#""conversation": true"#.as_slice(), br#""conversation": false"#.as_slice()),
+        (br#""executor": {"charter": 1}"#.as_slice(), br#""executor": "chosen""#.as_slice()),
+    ] {
+        let bad = fixtures::with(&bytes, from, to);
+        fixtures::engine(&bad).expect_err("invalid ending authority");
+    }
 }

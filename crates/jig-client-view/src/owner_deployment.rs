@@ -2,6 +2,7 @@
 //! Supplied clocks, loss counters and identities stay independent.
 mod accounts;
 mod hello;
+pub(crate) use hello::refusal as hello_refusal;
 mod programs;
 use crate::owner_deployment_words::{AccountPhrase as A, DeploymentPhrase as P};
 use crate::words::Words;

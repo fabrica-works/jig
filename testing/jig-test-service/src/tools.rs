@@ -170,6 +170,7 @@ pub(super) fn charter(
     }
     let translated = charter::charter(
         charter::Charter {
+            mode: mode(value.run.ended_by),
             instructions: policy.instructions,
             tools: declarations(policy.call_timeout, value.run.authority.tools.0)?,
             wait: true,
@@ -390,5 +391,12 @@ fn host_form(form: jig_domain_accounts::Form) -> jig_domain_host::Form {
         jig_domain_accounts::Form::Program(name) => jig_domain_host::Form::Program(
             jig_domain_host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"),
         ),
+    }
+}
+
+fn mode(value: jig_domain_tasks::EndedBy) -> jig_protocol_charter::Mode {
+    match value {
+        jig_domain_tasks::EndedBy::Result => jig_protocol_charter::Mode::Finite,
+        jig_domain_tasks::EndedBy::Requester => jig_protocol_charter::Mode::Open,
     }
 }

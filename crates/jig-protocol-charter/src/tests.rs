@@ -18,6 +18,7 @@ fn source() -> Charter {
         effort: Some(Box::from(&b"low"[..])),
     };
     Charter {
+        mode: smith_domain_run::Mode::Finite,
         instructions: Box::from(&b"help"[..]),
         tools: Box::new([Tool {
             name: Box::from(&b"read"[..]),
@@ -265,4 +266,15 @@ fn endpoint_resolution_still_refuses_wrong_dialects_and_unknown_numbers() {
         let translated = charter(source, Box::new([]), true).expect("bounded charter");
         assert!(encode(translated, &names, &wire::CEILINGS).is_none());
     }
+}
+
+#[test]
+fn open_mode_is_encoded_and_never_grants_delivery() {
+    let mut value = source();
+    value.mode = smith_domain_run::Mode::Open;
+    value.contract.change = Some(crate::ChangeRule { checks_must_pass: false, fields: Box::new([]) });
+    let value = charter(value, Box::new([]), false).unwrap();
+    assert_eq!(value.mode, smith_domain_run::Mode::Open);
+    assert!(value.grants.deliver.is_none());
+    assert!(value.grants.wait);
 }

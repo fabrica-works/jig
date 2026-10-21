@@ -312,7 +312,7 @@ fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_pu
         project: 1,
         requester: OwnerRequester::Person(7),
         label: 2,
-        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: false, listed: true, retention: Retention::Kept },
         waits_on: WaitsOn::Nothing,
         conversation: None,
     };

@@ -80,6 +80,10 @@ fn member(
         tracked: v.tracked,
         label: v.label,
         flags: p::Flags {
+            ended_by: match v.flags.ended_by {
+                c::EndedBy::Result => p::EndedBy::Result,
+                c::EndedBy::Requester => p::EndedBy::Requester,
+            },
             conversation: v.flags.conversation,
             listed: v.flags.listed,
             retention: match v.flags.retention {

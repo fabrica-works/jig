@@ -320,6 +320,8 @@ fn memory_below_the_components_sum_is_refused() {
     // (protocol/llm.md, 5.2). Propagating that room through the core and journal
     // queues adds 1,617,424 bytes to this fixture's components sum.
     const SIGN_IN_CANCEL_GROWTH: u64 = 1_617_424;
+    // Open ending authority grows the small profile's owned rows and carriers.
+    const ENDING_AUTHORITY_GROWTH: u64 = 992;
     // Finishing (domain/root.md, section 3; domain/people.md, section 3):
     // people's sign_in_worst_case adds Set<(Wall, u64)> at 8 sign-ins: 576 bytes.
     // Core's Reconciliation scratch replaces the views' Token snapshot:
@@ -464,6 +466,7 @@ fn memory_below_the_components_sum_is_refused() {
     let over = BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving
         + SOURCE_DEADLINE_GROWTH
         + SIGN_IN_CANCEL_GROWTH
+        + ENDING_AUTHORITY_GROWTH
         // Deployment role storage and project-role scratch: people.projects 2 -> 3.
         + 7_288;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });

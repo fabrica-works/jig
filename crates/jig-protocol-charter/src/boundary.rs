@@ -148,6 +148,7 @@ pub struct WorkspaceTools {
 /// One core charter with its explicit tool rights.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Charter {
+    pub mode: smith_domain_run::Mode,
     pub instructions: Box<[u8]>,
     pub tools: Box<[Tool]>,
     pub wait: bool,

@@ -101,9 +101,11 @@ pub struct Flags {
     pub conversation: bool,
     pub listed: bool,
     pub retention: Retention,
+    pub ended_by: EndedBy,
 }
 impl Flags {
-    pub const PLAIN: Flags = Flags { conversation: false, listed: false, retention: Retention::Kept };
+    pub const PLAIN: Flags =
+        Flags { ended_by: EndedBy::Result, conversation: false, listed: false, retention: Retention::Kept };
 }
 /// A task's retention class.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -170,4 +172,11 @@ pub(crate) fn valid(limits: &crate::Limits, batch: &[Member]) -> bool {
         }
     }
     true
+}
+
+/// The immutable authority that may end a task (domain/tasks.md, 5.7).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum EndedBy {
+    Result,
+    Requester,
 }

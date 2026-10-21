@@ -1,7 +1,7 @@
 pub mod thread;
 use crate::*;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use skein_lib::{Duration, List, Queue, Secret, Time, Token, Wall, Writer};
 pub const PARTY: u64 = 7;
 pub const SUBJECT_TASK: u64 = 9;
@@ -384,6 +384,7 @@ pub fn me() -> contract::Me {
                 deadline: contract::TemplateDeadline::None,
                 tracked: if number == 2 { Some(10) } else { None },
                 flags: contract::TaskFlags {
+                    ended_by: contract::EndedBy::Result,
                     conversation: number == 1,
                     listed: number == 2,
                     retention: contract::Retention::Kept,

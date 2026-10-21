@@ -132,6 +132,9 @@ fn a_bundle_above_sixteen_mebibytes_is_refused() {
 }
 
 fn agent_document(directory: &std::path::Path, program: bool) -> PathBuf {
+    agent_endpoint_document(directory, program, false)
+}
+fn agent_endpoint_document(directory: &std::path::Path, program: bool, program_endpoint: bool) -> PathBuf {
     fs::write(directory.join("root.der"), skein_tls_world::pki::ROOT).expect("public test root");
     let mut value = serde_json::json!({
         "profile":{"name":"standard","declared":{"tool_payload":512,"read_window":256},
@@ -145,6 +148,9 @@ fn agent_document(directory: &std::path::Path, program: bool) -> PathBuf {
         value["programs"] = serde_json::json!({"claude_code":{
             "path":directory.join("private-claude"),"directory":directory.join("private-programs")
         }});
+    }
+    if program_endpoint {
+        value["endpoints"][0]["program"] = serde_json::json!("claude_code");
     }
     let path = directory.join("agent.json");
     fs::write(&path, serde_json::to_vec(&value).expect("agent fixture JSON")).expect("agent configuration");
@@ -175,4 +181,15 @@ fn an_agent_without_a_program_supplies_no_program_resources() {
     let parsed = super::agent(&agent_document(&directory, false)).expect("configured agent");
     assert!(parsed.sources.is_none());
     fs::remove_dir_all(directory).expect("scratch cleanup");
+}
+
+#[test]
+fn advertised_program_endpoints_follow_actual_endpoint_selections() {
+    for (program_endpoint, expected) in [(false, &[][..]), (true, &[0][..])] {
+        let directory = scratch("endpoint-evidence");
+        let parsed =
+            super::agent(&agent_endpoint_document(&directory, true, program_endpoint)).expect("parsed endpoint");
+        assert_eq!(parsed.agent.bounds.program_endpoints.as_ref(), expected);
+        fs::remove_dir_all(directory).expect("scratch cleanup");
+    }
 }

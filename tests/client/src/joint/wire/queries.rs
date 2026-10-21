@@ -43,6 +43,10 @@ pub(crate) fn query(value: &c::TaskQuery) -> Result<d::TaskQuery, super::watches
 }
 pub(super) fn flags(value: t::Flags) -> c::TaskFlags {
     c::TaskFlags {
+        ended_by: match value.ended_by {
+            t::EndedBy::Result => c::EndedBy::Result,
+            t::EndedBy::Requester => c::EndedBy::Requester,
+        },
         conversation: value.conversation,
         listed: value.listed,
         retention: match value.retention {

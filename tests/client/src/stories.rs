@@ -178,7 +178,7 @@ pub fn task() -> Task {
         run_wait: None,
         llm: None,
         label: 0,
-        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: false, listed: true, retention: Retention::Kept },
         last_activity: Wall::EPOCH,
         waits_on: WaitsOn::Nothing,
         chip: Chip {
@@ -288,6 +288,7 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
                         tracked: None,
                         label: 1,
                         flags: jig_client_domain::contract::TaskFlags {
+                            ended_by: jig_client_domain::contract::EndedBy::Result,
                             conversation: true,
                             listed: false,
                             retention: jig_client_domain::contract::Retention::ForgottenOnceRead,

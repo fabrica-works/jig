@@ -2,7 +2,7 @@
 use jig_protocol_engine_clients_http as mapping;
 mod closing;
 use crate::fixtures;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_protocol_engine_clients::{

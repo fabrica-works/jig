@@ -49,6 +49,7 @@ pub fn hello(channel: Token, worker: u32, hello: host::Hello) -> core::Event {
             workstreams: hello.workstreams,
             hosting: hosting.into_boxed(),
             bounds: fleet::Bounds {
+                program_endpoints: hello.bounds.program_endpoints,
                 models: models.into_boxed(),
                 turns: hello.bounds.turns,
                 spend: hello.bounds.spend,
@@ -327,10 +328,13 @@ pub(super) fn read(domain: &mut Domain, env: &Env<Limits>, payload: Token, end: 
     }
 }
 pub(super) fn result_event(domain: &Domain, payload: Token, end: tasks::End) -> Option<core::Event> {
-    let Some(Payload::Answer { task, attempt, cumulative, read, refused, .. }) = domain.payloads.get(&payload) else {
+    let Some(Payload::Answer { task, attempt, cumulative, read, refused, end: ending, .. }) =
+        domain.payloads.get(&payload)
+    else {
         return None;
     };
     Some(core::Event::AnswerPayload {
+        grants_refused: grants_refused(ending),
         run: Token::new(*task),
         attempt: Token::new(*attempt),
         payload,
@@ -541,5 +545,24 @@ const fn source_failure(reason: host::SourceFailure) -> fleet::SourceFailure {
         host::SourceFailure::Unconfigured => fleet::SourceFailure::Unconfigured,
         host::SourceFailure::Unknown => fleet::SourceFailure::Unknown,
         host::SourceFailure::Closed => fleet::SourceFailure::Closed,
+    }
+}
+
+fn grants_refused(ending: &Ending) -> bool {
+    match ending {
+        Ending::Scripted(_) => false,
+        Ending::Link(ending) => match ending {
+            host::Ending::Refused(refusal) => match refusal {
+                host::Refusal::Invalid(invalid) => match invalid {
+                    host::Invalid::Start { cause, .. } => *cause == host::StartCause::Grants,
+                    host::Invalid::Charter
+                    | host::Invalid::Transcript
+                    | host::Invalid::Grants
+                    | host::Invalid::Messages => false,
+                },
+                host::Refusal::Busy => false,
+            },
+            host::Ending::Ended { .. } | host::Ending::Parked { .. } | host::Ending::Failed { .. } => false,
+        },
     }
 }

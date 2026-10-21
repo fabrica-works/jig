@@ -122,6 +122,7 @@ fn agent(configuration: &Path) -> Result<AgentStart, String> {
         limits: protocol,
         host_limits,
         bounds: jig_domain_host::Bounds {
+            program_endpoints: configuration.endpoint_programs.keys().copied().collect::<Vec<_>>().into_boxed_slice(),
             models: models.into_boxed_slice(),
             turns: policy.max_turns,
             spend: policy.max_spend,

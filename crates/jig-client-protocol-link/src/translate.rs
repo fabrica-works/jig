@@ -10,7 +10,7 @@ mod operations;
 pub(crate) mod programs;
 mod task_wait;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Undecodable {
     Malformed,

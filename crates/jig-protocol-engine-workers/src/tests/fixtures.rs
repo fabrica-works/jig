@@ -95,6 +95,7 @@ pub fn hello_record() -> jig_protocol_worker_wire::Hello {
     let bounds = wire::Bounds::new(
         &codec,
         wire::BoundsParts {
+            program_endpoints: List::with_capacity(0),
             models,
             turns: 8,
             spend: 100,
@@ -249,7 +250,7 @@ pub fn refused_account() -> jig_protocol_worker_wire::RunFailure {
     wire::RunFailure::Refused(refused)
 }
 
-fn codec() -> jig_protocol_worker_wire::v5::Limits {
+fn codec() -> jig_protocol_worker_wire::v6::Limits {
     jig_protocol_worker_wire::sizes::limits(&SIZES).expect("small codec")
 }
 fn refused_messages() -> skein_lib::List<jig_protocol_worker_wire::Refused> {

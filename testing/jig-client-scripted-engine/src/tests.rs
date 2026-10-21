@@ -350,7 +350,7 @@ fn task() -> Task {
         run_wait: None,
         llm: None,
         label: 0,
-        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        flags: TaskFlags { ended_by: EndedBy::Result, conversation: false, listed: true, retention: Retention::Kept },
         last_activity: Wall::EPOCH,
         waits_on: WaitsOn::Nothing,
         chip: Chip {
@@ -676,7 +676,12 @@ fn page_reply(position: u64) -> InboxEntry {
         let mut value = task();
         value.chip.title = DocumentText::complete(text(&[b'x'; 1100]));
         value.label = 1;
-        value.flags = TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead };
+        value.flags = TaskFlags {
+            ended_by: EndedBy::Result,
+            conversation: true,
+            listed: false,
+            retention: Retention::ForgottenOnceRead,
+        };
         crate::queries::line(
             &value,
             core::iter::empty(),
@@ -828,7 +833,12 @@ fn scenario_reply_identity() {
         let mut value = task();
         value.chip.title = DocumentText::complete(text(b"whole reply"));
         value.label = 1;
-        value.flags = TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead };
+        value.flags = TaskFlags {
+            ended_by: EndedBy::Result,
+            conversation: true,
+            listed: false,
+            retention: Retention::ForgottenOnceRead,
+        };
         crate::queries::line(
             &value,
             core::iter::empty(),

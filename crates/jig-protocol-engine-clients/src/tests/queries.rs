@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::translate::watches;
-use jig_client_protocol_wire::v11 as w;
+use jig_client_protocol_wire::v12 as w;
 use jig_domain_core::{Event, documents as d};
 use jig_domain_tasks as t;
 use skein_lib::Token;
@@ -52,7 +52,12 @@ fn a_task_document_carries_its_label_flags_activity_and_oldest_waiting_entry() {
     let limits = fixtures::wire_limits();
     let mut source = fixtures::task_with_hold();
     source.label = 5;
-    source.flags = t::Flags { conversation: true, listed: true, retention: t::Retention::ForgottenOnceRead };
+    source.flags = t::Flags {
+        ended_by: t::EndedBy::Result,
+        conversation: true,
+        listed: true,
+        retention: t::Retention::ForgottenOnceRead,
+    };
     source.last_activity = skein_lib::Wall::from_nanos(13);
     source.waits_on = d::WaitsOn::Party {
         whom: jig_domain_people::Whom::Role { project: QUERY_PROJECT, role: WAITING_ROLE },

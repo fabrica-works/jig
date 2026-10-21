@@ -784,3 +784,116 @@ mod grace;
 
 #[path = "lifecycle/compound.rs"]
 mod compound;
+
+fn open_task() -> jig_domain_tasks::New {
+    let mut value = task(1, &[]);
+    value.flags.conversation = true;
+    value.flags.ended_by = jig_domain_tasks::EndedBy::Requester;
+    value
+}
+
+#[test]
+fn open_discards_every_raw_finish_before_result_judgment() {
+    let ends = [
+        End::Finished { result: TaskResult::Report { words: Box::new([1]) }, cancel_delegates: true },
+        End::Finished { result: TaskResult::Failure { reason: Box::new([1]) }, cancel_delegates: false },
+        End::Finished {
+            result: TaskResult::Verdict { fields: Box::new([]), code: 0, words: Box::new([]) },
+            cancel_delegates: false,
+        },
+        End::Finished {
+            result: TaskResult::Report {
+                words: vec![1; usize::try_from(LIMITS.result_bytes).expect("result bound fits") + 1].into(),
+            },
+            cancel_delegates: false,
+        },
+        End::FinishedWithFollowups {
+            result: TaskResult::Failure { reason: Box::new([]) },
+            followups: ResultFollowups::Delegates(Box::new([task(2, &[])])),
+        },
+    ];
+    for end in ends {
+        let mut w = World::new(326, LIMITS);
+        w.make(Party::Person(1), vec![open_task()]);
+        w.claim(1, 1);
+        assert_eq!(
+            w.terminal_cause(1, end, Cause::Priced { cumulative: 0 }),
+            Reply::Acknowledged(jig_domain_tasks::Accepted::New)
+        );
+        assert_eq!(w.record(1).phase, Phase::Active(Active::Idle));
+        assert_eq!(w.record(1).tries.invalid, 0);
+        assert_eq!(w.record(1).invalid_result, None);
+        assert!(w.record(1).delegates.is_empty());
+        assert!(w.results.is_empty());
+        w.restart();
+        assert_eq!(w.record(1).flags.ended_by, jig_domain_tasks::EndedBy::Requester);
+        assert_eq!(w.record(1).phase, Phase::Active(Active::Idle));
+    }
+}
+
+#[test]
+fn open_runtime_failures_keep_the_existing_retry_policy() {
+    let mut w = World::new(326, LIMITS);
+    w.make(Party::Person(1), vec![open_task()]);
+    w.claim(1, 1);
+    w.terminal(1, End::Failed(Class::Invalid));
+    assert_eq!(w.record(1).tries.invalid, 1);
+    assert!(matches!(w.record(1).phase, Phase::Active(Active::BackingOff { .. })));
+}
+
+#[test]
+fn open_park_keeps_saved_charge_and_delegates_then_cancel_wins() {
+    let mut w = World::new(326, LIMITS);
+    w.make(Party::Person(1), vec![open_task()]);
+    w.claim(1, 1);
+    w.make(Party::Task(1), vec![task(2, &[])]);
+    let saved = Box::new([jig_domain_tasks::SavedResource { connector: 1, path: Box::new([Box::from([3])]) }]);
+    let reply_to = w.to();
+    w.send(Event::Activation {
+        reply_to,
+        task: 1,
+        attempt: 1,
+        cause: Cause::Priced { cumulative: 3 },
+        end: End::Finished { result: TaskResult::Report { words: Box::new([1]) }, cancel_delegates: true },
+        saved: Some(saved.clone()),
+    });
+    assert_eq!(w.record(1).phase, Phase::Active(Active::Idle));
+    assert_eq!(w.record(1).saved.as_ref(), saved.as_ref());
+    assert_eq!(w.record(1).numbers.spent, 3);
+    assert_eq!(w.record(1).delegates.as_ref(), [2]);
+    let reply_to = w.to();
+    w.send(Event::Control {
+        reply_to,
+        by: Party::Person(1),
+        task: 1,
+        control: jig_domain_tasks::Control::Cancel { reason: Box::new([4]), grace: None, message: None },
+    });
+    w.complete_cancel();
+    assert!(matches!(w.results.get(&1), Some(Ending::Cancelled { .. })));
+}
+
+#[test]
+fn open_still_refuses_bad_saved_work_before_normalizing_a_finish() {
+    let mut w = World::new(326, LIMITS);
+    w.make(Party::Person(1), vec![open_task()]);
+    w.claim(1, 1);
+    let before = w.record(1).clone();
+    let reply_to = w.to();
+    let call = reply_to.into_token().raw();
+    w.send(Event::Activation {
+        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
+        task: 1,
+        attempt: 1,
+        cause: Cause::Priced { cumulative: 0 },
+        end: End::Finished { result: TaskResult::Report { words: Box::new([1]) }, cancel_delegates: false },
+        saved: Some(
+            vec![
+                jig_domain_tasks::SavedResource { connector: 1, path: Box::new([]) };
+                usize::try_from(LIMITS.saved_resources).expect("saved count fits") + 1
+            ]
+            .into(),
+        ),
+    });
+    refused(&w.replies[&call], Refusal::Contract);
+    assert_eq!(w.record(1), &before);
+}

@@ -223,3 +223,57 @@ fn a_changed_template_under_the_same_name_is_a_conflict() {
     assert_eq!(story.made_under(NAME), FIRST_MAKE);
     assert_eq!(story.task_deadline(FIRST_TASK), Some(deadline));
 }
+
+#[test]
+fn requester_template_authority_crosses_shapes_and_new_task_bytes() {
+    let mut story = Story::requester_chat(fixtures::SEED);
+    let me = story.shapes_me();
+    assert_eq!(
+        me.projects
+            .get(0)
+            .expect("requester chat fixture")
+            .templates
+            .get(0)
+            .expect("requester chat fixture")
+            .flags
+            .ended_by,
+        c::EndedBy::Requester
+    );
+    let ask = shapes::chat(&me, PROJECT, jig_client_world::stories::text(b"Hello")).expect("requester chat fixture");
+    send(&mut story, CREATE, ask);
+    assert_eq!(story.task_ended_by(FIRST_TASK).expect("requester chat fixture"), jig_domain_tasks::EndedBy::Requester);
+    let mut finite = me;
+    finite
+        .projects
+        .get_mut(0)
+        .expect("requester chat fixture")
+        .templates
+        .get_mut(0)
+        .expect("requester chat fixture")
+        .flags
+        .ended_by = c::EndedBy::Result;
+    let ask =
+        shapes::chat(&finite, PROJECT, jig_client_world::stories::text(b"Finite")).expect("requester chat fixture");
+    send(&mut story, REPLAY, ask);
+    assert_eq!(story.task_ended_by(FIRST_TASK + 1).expect("requester chat fixture"), jig_domain_tasks::EndedBy::Result);
+}
+
+#[test]
+fn requester_without_conversation_is_a_typed_malformed_creation() {
+    let mut story = Story::requester_chat(fixtures::SEED);
+    let me = story.shapes_me();
+    let c::Ask::Create { project, mut tasks } =
+        shapes::chat(&me, PROJECT, jig_client_world::stories::text(b"Hello")).expect("requester chat fixture")
+    else {
+        panic!("chat creation")
+    };
+    tasks.get_mut(0).expect("requester chat fixture").flags.conversation = false;
+    send(&mut story, CREATE, c::Ask::Create { project, tasks });
+    assert_eq!(
+        story.answered(CREATE),
+        vec![Outcome::Answered(Answered::Jig(c::Answer::Refused {
+            refusal: c::Refusal::Malformed { at: 0, why: c::Malformed::EndedBy },
+            at: None
+        }))]
+    );
+}
