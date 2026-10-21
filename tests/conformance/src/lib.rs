@@ -57,6 +57,8 @@ impl Config {
 
     fn root(self) -> (root::Config, root::Limits) {
         let (mut config, mut limits) = jig_core_world::peers::fixture(self.seed, u32::from(self.engine));
+        config.core.worker_names =
+            (0..self.workers).map(|index| format!("worker-{index}").into_bytes().into_boxed_slice()).collect();
         if self.scenario == Some(Scenario::Compound) {
             limits.core.tasks.tasks = 3;
             limits.core.tasks.project_tasks = 3;

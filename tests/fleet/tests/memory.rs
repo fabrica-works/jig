@@ -53,7 +53,7 @@ impl Measured {
     fn with_needs(limits: Limits, needs: impl FnOnce() -> jig_domain_fleet::Needs) -> Measured {
         let bound = worst_case(&limits).expect("the test limits fit");
         let meter = Meter::new();
-        let domain = Domain::new(&limits, needs());
+        let domain = jig_fleet_world::fixtures::domain(&limits, needs());
         let out = Queue::with_capacity(max_out(&limits));
         Measured { domain, env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, out, meter, bound, names: 0 }
     }
@@ -116,7 +116,7 @@ impl Measured {
         let limits = self.env.limits;
         let workstreams = (0..limits.workstreams).map(|nth| channel.raw() * 100 + u64::from(nth)).collect();
         self.step(Event::Hello {
-            worker: 0,
+            worker: u32::try_from(channel.raw()).expect("fixture channel") % LIMITS.configured_workers,
             channel,
             hello: Hello {
                 bounds: jig_fleet_world::fixtures::bounds(),
@@ -465,7 +465,7 @@ fn source_lifecycle_at_capacity_fits_the_memory_bound() {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut out = Queue::with_capacity(max_out(&limits));
     let meter = Meter::new();
-    let mut domain = Domain::new(&limits, jig_fleet_world::fixtures::needs());
+    let mut domain = jig_fleet_world::fixtures::domain(&limits, jig_fleet_world::fixtures::needs());
     let mut measured_step = |event| {
         meter.start();
         step(&mut domain, &env, event, &mut out);
@@ -480,7 +480,7 @@ fn source_lifecycle_at_capacity_fits_the_memory_bound() {
     for worker in 1..=limits.workers {
         let channel = Token::new(u64::from(worker));
         measured_step(Event::Hello {
-            worker: 0,
+            worker: u32::try_from(channel.raw()).expect("fixture channel") % LIMITS.configured_workers,
             channel,
             hello: Hello {
                 slots: limits.slots,

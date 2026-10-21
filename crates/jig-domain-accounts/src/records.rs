@@ -99,14 +99,7 @@ pub(crate) fn within(bytes: &[u8], bound: u32) -> bool {
 
 /// A program source's name: 1 to 32 characters of `a-z`, `0-9` and `-` (accounts.md, 3.4).
 pub(crate) fn program_name(name: &[u8]) -> bool {
-    if name.is_empty() || !within(name, NAME) {
-        return false;
-    }
-    let mut valid = true;
-    for byte in name {
-        valid &= byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-';
-    }
-    valid
+    crate::SourceName::new(name).is_some()
 }
 
 /// Explicit uses are bounded and contain no repeated payer.

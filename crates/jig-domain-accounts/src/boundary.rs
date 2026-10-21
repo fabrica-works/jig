@@ -76,11 +76,11 @@ pub enum Event {
     Want,
     ProgramTargets {
         source: u32,
-        hosts: Box<[u32]>,
+        hosts: Box<[crate::Worker]>,
     },
     ProgramSignedOut {
         source: u32,
-        host: u32,
+        host: crate::Worker,
         result: ProgramResult,
     },
     Component(FromComponent),
@@ -317,11 +317,11 @@ pub enum Request {
         names: Box<[Program]>,
     },
     CheckProgram {
-        name: Box<[u8]>,
+        name: crate::SourceName,
     },
     SignOutProgram {
         source: u32,
-        name: Box<[u8]>,
+        name: crate::SourceName,
     },
     Component(ToComponent),
     Signing(Signing),
@@ -421,14 +421,21 @@ pub enum ProgramResult {
     Lost,
     Failed,
 }
+/// Only unconfirmed terminal results can enter a failed-host list.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ProgramFailure {
+    NotInContact,
+    Lost,
+    Failed,
+}
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ProgramHost {
-    pub worker: u32,
-    pub result: ProgramResult,
+    pub worker: crate::Worker,
+    pub result: ProgramFailure,
 }
 /// Desired cleanup is durable; observations remain per-channel and volatile.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Program {
-    pub name: Box<[u8]>,
+    pub name: crate::SourceName,
     pub cleanup: bool,
 }

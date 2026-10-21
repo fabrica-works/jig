@@ -448,7 +448,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
         }
         Event::Want => want(domain, env, out),
-        Event::ProgramTargets { source, hosts } => crate::programs::targets(domain, env, source, hosts, out),
+        Event::ProgramTargets { source, hosts } => crate::programs::targets(domain, source, hosts, out),
         Event::ProgramSignedOut { source, host, result } => {
             crate::programs::signed_out(domain, source, host, result, out);
         }
@@ -705,6 +705,12 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     }
     crate::signing::close(domain, out);
     crate::keys::close(domain, out);
+    for (_, pending) in &domain.programs {
+        match pending.leaving {
+            crate::changes::Leaving::Source(request) => crate::changes::refuse(request, crate::Refusal::Closing, out),
+            crate::changes::Leaving::Account(_) => {}
+        }
+    }
     domain.programs = Map::with_capacity(env.limits.program_names);
     for (_, leaving) in &domain.signing_out {
         match leaving {

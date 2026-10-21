@@ -6,7 +6,14 @@ impl Peers {
         match up {
             workers::Up::Hello { channel, slots, stop_bound, hosting } => {
                 root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
-                    worker: 0,
+                    worker: u32::try_from(
+                        self.workers
+                            .iter()
+                            .filter(|worker| worker.channel != 0)
+                            .position(|worker| worker.channel == channel)
+                            .expect("configured peer worker"),
+                    )
+                    .expect("bounded peer membership"),
                     channel: Token::new(channel),
                     hello: fleet::Hello {
                         bounds: crate::fixtures::bounds(),

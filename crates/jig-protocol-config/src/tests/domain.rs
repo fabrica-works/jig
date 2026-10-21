@@ -297,7 +297,7 @@ fn memory_below_the_components_sum_is_refused() {
     //     + 1 * 4096 model-name bytes) = 4520.
     // Delta = 64 + 24 + 32 + 16 + 4520 = 4656; 18_677_344_295 + 4656
     // = 18_677_348_951. Other document scratch paths remain below deployment.
-    // y1b adds 114,476 bytes over main's 18_677_348_951:
+    // Before review, y1b added 114,476 bytes over main's 18_677_348_951:
     // Issued: 3 nodes * 600 + 12 names * 32 = 2,184.
     // Pending operations: 3 nodes * 512 + 12 sources * 9 hosts * 8,
     // plus 9 terminal rows * 8 = 2,472.
@@ -309,8 +309,8 @@ fn memory_below_the_components_sum_is_refused() {
     // target snapshot: (8 configured workers + 1 engine) * 4 = 36;
     // configured names: 8 * (16 carrier + 32 bytes) = 384.
     // 2,184 + 2,472 + 1,760 + 106,848 + 792 + 36 + 384 = 114,476.
-    // Resuming one worker's deferred source commands preserves the small profile's
-    // existing output/journal/KV envelopes; the engine has no program backend.
+    // These are the original envelopes; joined sign-out terminals change their
+    // output room below. The engine has no program backend.
     // Facts add 416: 2 lost-history nodes * 11 slots * 8 bytes,
     // plus 3 host-view copies * (2 connected + 8 history rows) * 8 bytes.
     // Readiness's max(128 ranking, 768 facts, 4520 hosts/model) moves to
@@ -321,7 +321,21 @@ fn memory_below_the_components_sum_is_refused() {
     // (8 configured workers + 1 engine) * (24-byte carrier + 32-byte name) = 504.
     // Retained answers take max(9 * 56, 2,048 visit bytes), so that term is unchanged.
     // Total y1b delta: 114,476 + 416 + 504 = 115,396 over main.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_464_347 });
+    // Review: typed Issued grows 40 -> 56 bytes, while twelve owned names disappear:
+    // 3 B-tree nodes * 11 slots * 16 - 12 names * 32 = 144 bytes.
+    // Atomic Pending grows 32 -> 56: 3 nodes * 11 slots * 24 = 792.
+    // Joined fleet replies grow Pending 24 -> 32: 2 workers * 3 nodes * 11 * 8 = 528.
+    // Worker and failure rows stay 8 bytes. Program becomes 34 inline bytes instead
+    // of 24 + 32 owned; its envelope remains below the 638,368-byte routed payload.
+    // Two replies per source lift fleet max_out from 21 to 25. Four scratch queues:
+    // 4 queues * 4 extra requests * 88 bytes = 1,408.
+    // Core route room grows 18,538 -> 18,570 (8 routes * 4 extra fleet outputs):
+    // 32 * (536 Event + 240 Request + 638,368 owned payload) = 20,452,608.
+    // Projection caches: 8 tasks * (2 connectors + 2) caches * 32 extra milestones
+    // * (168 inline + 4,096 words + 2 * 512 result bytes) = 5,414,912.
+    // Review delta = 144 + 792 + 528 + 1,408 + 20,452,608 + 5,414,912 = 25,870,392.
+    // 18,677,464,347 + 25,870,392 = 18,703,334,739; the sum is one byte greater.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_334_739 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

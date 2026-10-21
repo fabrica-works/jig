@@ -24,7 +24,7 @@ impl World {
         limits.host.turns = 2;
         let rows = jig_core_world::fixtures::account_rows(&configuration.core.settings.llm_providers);
         let mut world = Self {
-            domain: root::Domain::new(configuration, &limits),
+            domain: root::Domain::new(configuration, &limits).expect("fixture core configuration"),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             owner: Token::new(0),
             saved: Vec::new(),

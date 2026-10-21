@@ -21,7 +21,8 @@ mod selection;
 mod signing;
 pub use boundary::{
     ADDRESS, Answer, Change, End, Ended, Event, Fact, Failure, Form, FromComponent, Grant, GrantTable, KeyFailure,
-    Pending, Place, Program, ProgramHost, ProgramResult, Request, Scheme, Signing, State, ToComponent, Turned, Unread,
+    Pending, Place, Program, ProgramFailure, ProgramHost, ProgramResult, Request, Scheme, Signing, State, ToComponent,
+    Turned, Unread,
 };
 pub use checks::{Bound, Refusal, SignIn, room_for_sign_in};
 pub use domain::{Account, Domain, fire, max_out, step};
@@ -30,3 +31,5 @@ pub use limits::{Limits, worst_case};
 pub use providers::{MANAGE_USAGE, Offers, PROVIDER_NAME, Provider, Providers};
 pub use records::{DISPLAY, Held, Holder, Key, Kind, NAME, SUBJECT, Stored, USES, Use};
 pub use selection::{Coverage, Excluded, HostSource, Selection, WaitWhy};
+
+pub use jig_domain_fleet::{SourceName, Worker};

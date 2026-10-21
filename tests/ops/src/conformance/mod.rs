@@ -164,7 +164,7 @@ impl Application for Ops {
     }
     fn build(config: &Config) -> root::Domain {
         let configuration = config::root_for(config.seed, config.story == Story::Environment).0;
-        root::Domain::new(configuration, &config.limits)
+        root::Domain::new(configuration, &config.limits).expect("fixture core configuration")
     }
     fn systems(_: &Config, _: u64) -> Systems {
         let mut production = production::Production::new(0, production::Backend::Fake);

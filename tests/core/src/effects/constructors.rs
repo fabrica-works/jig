@@ -343,6 +343,12 @@ impl World {
         cut: Option<Cut>,
         clock: Option<(Time, Wall)>,
     ) -> World {
+        let mut configuration = configuration;
+        let workers = peers.workers.iter().filter(|worker| worker.channel != 0).count();
+        if workers > configuration.core.worker_names.len() {
+            configuration.core.worker_names =
+                (0..workers).map(|index| format!("worker-{index}").into_bytes().into_boxed_slice()).collect();
+        }
         let rows = crate::fixtures::account_rows(&configuration.core.settings.llm_providers);
         let mut world = Self::empty(configuration, limits);
         if let Some((now, wall)) = clock {

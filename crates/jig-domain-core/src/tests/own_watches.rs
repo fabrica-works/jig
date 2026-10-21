@@ -35,7 +35,7 @@ fn signed_core() -> (Core, Limits, u64, Box<[Record]>) {
     let limits = limits();
     let mut configuration = config(41);
     configuration.owners = Box::new([]);
-    let mut core = Core::new(configuration, &limits);
+    let mut core = Core::new(configuration, &limits).expect("fixture core configuration");
     drop(watch_outputs(&mut core, &limits, Event::People(people::Event::Restored)));
     let (sign_in, records) = sign_in(&mut core, &limits, 1);
     (core, limits, sign_in, records)
@@ -76,7 +76,7 @@ fn an_own_subject_names_the_sign_ins_party() {
 #[test]
 fn an_own_subject_after_a_restart_names_the_restored_sign_ins_party() {
     let (original, limits, sign_in, records) = signed_core();
-    let mut restored = Core::new(config(42), &limits);
+    let mut restored = Core::new(config(42), &limits).expect("fixture core configuration");
     assert_eq!(restored.restart_begin(), RestartRequest::Step(RestartStep::LoadCore));
     let header = original.counters.deployment();
     assert_eq!(

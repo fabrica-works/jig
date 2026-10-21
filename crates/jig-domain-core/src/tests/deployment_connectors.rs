@@ -8,8 +8,9 @@ fn source(connectors: &[u16], lines: u32) -> (Core, Limits) {
     limits.connectors = u32::try_from(connectors.len()).unwrap();
     limits.documents.lines = lines;
     let mut config = config(71);
+    config.worker_names = Box::new([b"alpha".as_slice().into()]);
     config.connectors = connectors.into();
-    let mut core = Core::new(config, &limits);
+    let mut core = Core::new(config, &limits).expect("fixture core configuration");
     restore_key_account(&mut core, &limits, 0, 1, 1);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
@@ -250,7 +251,6 @@ fn an_account_waiting_to_ask_again_has_no_wall_without_a_document_clock() {
 
 fn program_facts() -> (Core, Env<Limits>) {
     let (mut core, limits) = source(&[], 4);
-    assert!(core.fleet.configure_workers(&limits.fleet, Box::new([b"alpha".as_slice().into()])));
     core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     for record in [

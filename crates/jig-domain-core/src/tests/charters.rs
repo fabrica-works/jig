@@ -5,7 +5,7 @@ use super::*;
 fn a_charter_whose_default_spend_misses_its_floor_is_refused() {
     let mut config = config(1);
     config.settings.charters[0].spend = 1;
-    let _core = Core::new(config, &limits());
+    let _core = Core::new(config, &limits()).expect("fixture core configuration");
 }
 
 pub(super) fn context(task: u64, charter: u32) -> Box<tasks::RunContext> {

@@ -61,7 +61,10 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
         }]),
     };
     config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
-    (Domain::new(config, &limits), Env { now: Time::ZERO, wall: Wall::EPOCH, limits })
+    (
+        Domain::new(config, &limits).expect("fixture core configuration"),
+        Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
+    )
 }
 
 fn take(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {

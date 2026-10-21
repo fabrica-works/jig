@@ -22,7 +22,7 @@ pub(crate) fn sign_out(domain: &mut Domain, source: u32, name: SourceName, out: 
     let mut workers = List::with_capacity(u32::try_from(domain.worker_names.len()).unwrap_or(0));
     for index in 0..domain.worker_names.len() {
         if let Ok(worker) = u32::try_from(index) {
-            workers.push(worker).expect("configured worker count");
+            workers.push(crate::Worker { position: worker }).expect("configured worker count");
         }
     }
     out.push(Request::ProgramTargets { source, workers: workers.into_boxed() });
@@ -35,20 +35,22 @@ pub(crate) fn sign_out(domain: &mut Domain, source: u32, name: SourceName, out: 
                 target = Some(*id);
             }
         }
+        let worker = crate::Worker { position: worker };
         let Some(id) = target else {
             out.push(Request::ProgramSignedOut { source, worker, result: crate::ProgramResult::NotInContact });
             continue;
         };
         let Some(host) = domain.channels.get_mut(id) else { continue };
-        let declared = host.sources.sent.contains(&name)
-            || match &host.sources.desired {
-                Some(names) => names.contains(&name),
-                None => false,
+        if let Some(pending) = host.sources.pending.get_mut(&name) {
+            let reply = core::mem::replace(&mut pending.reply, Reply::Cleanup);
+            pending.reply = match reply {
+                Reply::Cleanup => Reply::Program { source, worker },
+                Reply::Direct(to) => Reply::DirectProgram { to, source, worker },
+                kept @ (Reply::Program { .. } | Reply::DirectProgram { .. }) => kept,
             };
-        if !declared
-            || host.sources.pending.contains_key(&name)
-            || host.sources.pending.len() == host.sources.pending.capacity()
-        {
+            continue;
+        }
+        if host.sources.pending.len() == host.sources.pending.capacity() {
             out.push(Request::ProgramSignedOut { source, worker, result: crate::ProgramResult::Failed });
             continue;
         }

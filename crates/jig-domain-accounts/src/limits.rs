@@ -72,10 +72,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         )?
         .checked_add(List::<crate::ProgramHost>::worst_case(limits.program_hosts)?)?
         .checked_add(
-            Map::<u32, crate::ProgramResult>::worst_case(limits.program_hosts)?
+            Map::<crate::Worker, crate::ProgramFailure>::worst_case(limits.program_hosts)?
                 .checked_mul(u64::from(limits.accounts))?,
         )?
-        .checked_add(u64::from(limits.program_names).checked_mul(u64::from(NAME))?)?
         .checked_add(Map::<u32, Granted>::worst_case(limits.credentials)?)?
         .checked_add(Deadlines::<u32>::worst_case(limits.credentials)?)?
         .checked_add(List::<u32>::worst_case(sources)?)?

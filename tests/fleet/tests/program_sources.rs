@@ -8,12 +8,17 @@ struct World {
 }
 impl World {
     fn new(names: &[&[u8]]) -> Self {
-        let limits = fleet::Limits { program_sources: 2, ..jig_fleet_world::LIMITS };
+        Self::under(names, fleet::Limits { program_sources: 2, ..jig_fleet_world::LIMITS })
+    }
+    fn under(names: &[&[u8]], limits: fleet::Limits) -> Self {
         let mut world = Self {
             domain: fleet::Domain::new(&limits, jig_fleet_world::fixtures::needs()),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(fleet::max_out(&limits)),
         };
+        assert!(
+            world.domain.configure_workers(&limits, Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]))
+        );
         assert!(world.step(Event::Sources { sources: names.iter().map(|name| source(name)).collect() }).is_empty());
         world
     }
@@ -27,8 +32,11 @@ impl World {
         requests
     }
     fn hello(&mut self, channel: Token) -> Vec<Request> {
+        self.hello_at(channel, 0)
+    }
+    fn hello_at(&mut self, channel: Token, worker: u32) -> Vec<Request> {
         self.step(Event::Hello {
-            worker: 0,
+            worker,
             channel,
             hello: fleet::Hello {
                 slots: 2,
@@ -189,24 +197,22 @@ fn a_lost_sign_out_cannot_complete_a_new_channel_call() {
     assert_eq!(to.into_token(), Token::new(2));
 }
 
-fn configured() -> World {
-    let mut world = World::new(&[b"a"]);
-    assert!(
-        world
-            .domain
-            .configure_workers(&world.env.limits, Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]))
-    );
-    world
+fn worker(number: u32) -> fleet::Worker {
+    configured().domain.configured_worker(number).expect("configured fixture worker")
 }
+fn configured() -> World {
+    World::new(&[b"a"])
+}
+
 #[test]
 fn already_offline_members_are_not_confirmed_signed_out() {
     let mut world = configured();
     assert_eq!(
         world.step(Event::SignOutProgram { source: 7, name: source(b"a") }),
         vec![
-            Request::ProgramTargets { source: 7, workers: Box::new([0, 1]) },
-            Request::ProgramSignedOut { source: 7, worker: 0, result: fleet::ProgramResult::NotInContact },
-            Request::ProgramSignedOut { source: 7, worker: 1, result: fleet::ProgramResult::NotInContact },
+            Request::ProgramTargets { source: 7, workers: Box::new([worker(0), worker(1)]) },
+            Request::ProgramSignedOut { source: 7, worker: worker(0), result: fleet::ProgramResult::NotInContact },
+            Request::ProgramSignedOut { source: 7, worker: worker(1), result: fleet::ProgramResult::NotInContact },
         ]
     );
 }
@@ -218,7 +224,7 @@ fn loss_ends_the_configured_members_operation_once() {
     world.step(Event::SignOutProgram { source: 7, name: source(b"a") });
     assert_eq!(
         world.step(Event::Lost { channel: CHANNEL }),
-        vec![Request::ProgramSignedOut { source: 7, worker: 0, result: fleet::ProgramResult::Lost },]
+        vec![Request::ProgramSignedOut { source: 7, worker: worker(0), result: fleet::ProgramResult::Lost },]
     );
     assert!(world.step(Event::Lost { channel: CHANNEL }).is_empty());
 }
@@ -272,4 +278,140 @@ fn a_check_waits_until_its_source_list_has_been_sent() {
     }
     assert!(requests.iter().any(|request| matches!(request,
         Request::Check { channel: CHANNEL, name } if *name == source(b"b"))));
+}
+
+#[test]
+fn a_hello_refuses_an_unconfigured_position() {
+    let mut world = configured();
+    let rows = world.hello_at(CHANNEL, 2);
+    assert_eq!(rows, vec![Request::Refuse { channel: CHANNEL }]);
+    assert_eq!(world.domain.workers(), 0);
+}
+#[test]
+fn a_hello_refuses_an_occupied_position() {
+    let mut world = configured();
+    world.hello(CHANNEL);
+    let other = Token::new(102);
+    assert_eq!(world.hello(other), vec![Request::Refuse { channel: other }]);
+    assert_eq!(world.domain.workers(), 1);
+}
+#[test]
+fn fan_out_reaches_distinct_configured_positions() {
+    let mut world = configured();
+    world.hello(CHANNEL);
+    let other = Token::new(102);
+    world.hello_at(other, 1);
+    world.inventory(&[b"a"]);
+    world.step(Event::Logins {
+        channel: other,
+        logins: Box::new([fleet::Login { name: source(b"a"), state: fleet::LoginState::NotSignedIn }]),
+    });
+    let rows = world.step(Event::SignOutProgram { source: 7, name: source(b"a") });
+    assert_eq!(
+        rows,
+        vec![
+            Request::ProgramTargets { source: 7, workers: Box::new([worker(0), worker(1)]) },
+            Request::SignOut { channel: CHANNEL, name: source(b"a") },
+            Request::SignOut { channel: other, name: source(b"a") }
+        ]
+    );
+}
+
+#[test]
+fn a_holder_sign_out_joins_pending_cleanup() {
+    let mut world = configured();
+    world.step(Event::CleanupPrograms { names: Box::new([source(b"a")]) });
+    world.hello(CHANNEL);
+    world.step(Event::Logins {
+        channel: CHANNEL,
+        logins: Box::new([fleet::Login { name: source(b"a"), state: fleet::LoginState::Usable }]),
+    });
+    let started = world.step(Event::SignOutProgram { source: 7, name: source(b"a") });
+    assert_eq!(
+        started,
+        vec![
+            Request::ProgramTargets { source: 7, workers: Box::new([worker(0), worker(1)]) },
+            Request::ProgramSignedOut { source: 7, worker: worker(1), result: fleet::ProgramResult::NotInContact }
+        ]
+    );
+    assert_eq!(
+        world.step(Event::SignedOut { channel: CHANNEL, name: source(b"a"), result: fleet::SignOutResult::SignedOut }),
+        vec![Request::ProgramSignedOut { source: 7, worker: worker(0), result: fleet::ProgramResult::SignedOut }]
+    );
+}
+#[test]
+fn a_holder_sign_out_shares_a_direct_terminal() {
+    let mut world = configured();
+    world.hello(CHANNEL);
+    world.inventory(&[b"a"]);
+    let reply = Token::new(41);
+    world.step(Event::SignOut { to: ReplyTo::new(reply), channel: CHANNEL, name: source(b"a") });
+    let started = world.step(Event::SignOutProgram { source: 7, name: source(b"a") });
+    assert_eq!(
+        started,
+        vec![
+            Request::ProgramTargets { source: 7, workers: Box::new([worker(0), worker(1)]) },
+            Request::ProgramSignedOut { source: 7, worker: worker(1), result: fleet::ProgramResult::NotInContact }
+        ]
+    );
+    let ended =
+        world.step(Event::SignedOut { channel: CHANNEL, name: source(b"a"), result: fleet::SignOutResult::SignedOut });
+    let mut ended = ended.into_iter();
+    let Some(Request::SignedOut { to, result, .. }) = ended.next() else { panic!("direct terminal") };
+    assert_eq!(to.into_token(), reply);
+    assert_eq!(result, Some(fleet::SignOutResult::SignedOut));
+    assert_eq!(
+        ended.collect::<Vec<_>>(),
+        vec![Request::ProgramSignedOut { source: 7, worker: worker(0), result: fleet::ProgramResult::SignedOut }]
+    );
+}
+#[test]
+fn channel_loss_answers_both_attached_replies() {
+    let mut world = configured();
+    world.hello(CHANNEL);
+    world.inventory(&[b"a"]);
+    let reply = Token::new(41);
+    world.step(Event::SignOut { to: ReplyTo::new(reply), channel: CHANNEL, name: source(b"a") });
+    world.step(Event::SignOutProgram { source: 7, name: source(b"a") });
+    let mut ended = world.step(Event::Lost { channel: CHANNEL }).into_iter();
+    let Some(Request::SignedOut { to, result, .. }) = ended.next() else { panic!("direct terminal") };
+    assert_eq!(to.into_token(), reply);
+    assert_eq!(result, None);
+    assert_eq!(
+        ended.collect::<Vec<_>>(),
+        vec![Request::ProgramSignedOut { source: 7, worker: worker(0), result: fleet::ProgramResult::Lost }]
+    );
+}
+
+#[test]
+fn joined_calls_fit_the_loss_output_bound() {
+    const NAMES: [&[u8]; 2] = [b"a", b"b"];
+    let limits = fleet::Limits {
+        configured_workers: 2,
+        workers: 1,
+        slots: 1,
+        attempts: 1,
+        grants: 0,
+        program_sources: u32::try_from(NAMES.len()).expect("source count"),
+        ..jig_fleet_world::LIMITS
+    };
+    let mut world = World::under(&NAMES, limits);
+    world.hello(CHANNEL);
+    world.inventory(&NAMES);
+    for (index, name) in NAMES.iter().enumerate() {
+        world.step(Event::SignOut {
+            to: ReplyTo::new(Token::new(u64::try_from(index).expect("reply token"))),
+            channel: CHANNEL,
+            name: source(name),
+        });
+    }
+    for (index, name) in NAMES.iter().enumerate() {
+        world.step(Event::SignOutProgram { source: u32::try_from(index).expect("source number"), name: source(name) });
+    }
+    let rows = world.step(Event::Lost { channel: CHANNEL });
+    assert_eq!(rows.len(), NAMES.len() * 2);
+    assert!(rows.iter().all(|row| matches!(
+        row,
+        Request::SignedOut { result: None, .. } | Request::ProgramSignedOut { result: fleet::ProgramResult::Lost, .. }
+    )));
 }

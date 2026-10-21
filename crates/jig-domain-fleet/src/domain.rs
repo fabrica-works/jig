@@ -18,7 +18,8 @@ use alloc::boxed::Box;
 /// adopted attempt's placing or answer). The parent reserves this much room
 /// in `out` before calling it. A turn emits at most two (busy or
 /// acknowledgement, and drop); adoption and cleanup release one held turn
-/// per resume, within the same bound.
+/// per resume, within the same bound. A lost channel ends both the direct and
+/// holder reply for each joined source operation, plus a possible fault refusal.
 #[must_use]
 pub const fn max_out(limits: &Limits) -> u32 {
     let listed = limits.slots.saturating_mul(limits.grants.saturating_add(2)).saturating_add(1);
@@ -26,7 +27,7 @@ pub const fn max_out(limits: &Limits) -> u32 {
     let adopting = limits.grants.saturating_add(3);
     let other = if tracked > adopting { tracked } else { adopting };
     let runs = if listed > other { listed } else { other };
-    let sources = limits.program_sources.saturating_add(1);
+    let sources = limits.program_sources.saturating_mul(2).saturating_add(1);
     let workers = limits.configured_workers.saturating_add(1);
     let sources = if sources > workers { sources } else { workers };
     if runs > sources { runs } else { sources }
@@ -92,19 +93,31 @@ impl Domain {
     /// Supply the fixed configured membership before admitting channels.
     /// Returns false for names outside the startup bounds or a late replacement.
     pub fn configure_workers(&mut self, limits: &Limits, names: Box<[Box<[u8]>]>) -> bool {
-        if self.workers() != 0
-            || !self.worker_names.is_empty()
-            || names.len() > usize::try_from(limits.configured_workers).unwrap_or(0)
-        {
+        let Ok(count) = u32::try_from(names.len()) else { return false };
+        if self.workers() != 0 || !self.worker_names.is_empty() || count > limits.configured_workers {
             return false;
         }
         for name in &names {
-            if name.len() > usize::try_from(limits.worker_name_bytes).unwrap_or(0) {
+            let Ok(length) = u32::try_from(name.len()) else { return false };
+            if length > limits.worker_name_bytes {
                 return false;
             }
         }
         self.worker_names = names;
         true
+    }
+    /// Admit a position only from this fleet's fixed configured membership.
+    #[must_use]
+    pub fn configured_worker(&self, position: u32) -> Option<crate::Worker> {
+        self.worker_names.get(usize::try_from(position).ok()?)?;
+        Some(crate::Worker { position })
+    }
+    /// The name of a position this fleet admitted; membership never changes.
+    #[must_use]
+    pub fn configured_name(&self, worker: crate::Worker) -> &[u8] {
+        self.worker_names
+            .get(usize::try_from(worker.position).expect("admitted position fits usize"))
+            .expect("admitted configured position")
     }
     #[must_use]
     pub fn worker_name(&self, worker: u32) -> Option<&[u8]> {

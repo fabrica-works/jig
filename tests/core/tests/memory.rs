@@ -18,7 +18,7 @@ fn core_children_routes_and_an_in_flight_decision_fit_the_checked_bound() {
     let config = configuration.core;
     let meter = Meter::new();
     meter.start();
-    let mut domain = core::Core::new(config, &limits.core);
+    let mut domain = core::Core::new(config, &limits.core).expect("fixture core configuration");
     let measured = meter.end();
     meter.check(measured, bound, &limits.core);
 

@@ -42,7 +42,7 @@ pub(super) fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
             offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
         }]),
     };
-    let mut core = Core::new(config, &limits);
+    let mut core = Core::new(config, &limits).expect("fixture core configuration");
     core.connectors = Box::new([]);
     core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };

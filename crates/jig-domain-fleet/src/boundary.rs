@@ -366,11 +366,11 @@ pub enum Event {
 pub enum Request {
     ProgramTargets {
         source: u32,
-        workers: Box<[u32]>,
+        workers: Box<[crate::Worker]>,
     },
     ProgramSignedOut {
         source: u32,
-        worker: u32,
+        worker: crate::Worker,
         result: crate::ProgramResult,
     },
     Sources {

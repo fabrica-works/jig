@@ -306,5 +306,5 @@ fn startup_rejects_an_incompatible_merged_template() {
         let bytes = policy_owned_bytes(&charter.policy).expect("bounded fixture policy");
         limits.run_bytes = limits.run_bytes.max(u32::try_from(bytes).expect("fixture policy size"));
     }
-    drop(Core::new(config, &limits));
+    drop(Core::new(config, &limits).expect("fixture core configuration"));
 }

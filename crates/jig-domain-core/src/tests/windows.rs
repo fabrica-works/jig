@@ -3,7 +3,7 @@ use super::*;
 fn window_core(resume_bytes: u32) -> Core {
     let mut config = config(1);
     config.settings.resume_bytes = resume_bytes;
-    let mut core = Core::new(config, &limits());
+    let mut core = Core::new(config, &limits()).expect("fixture core configuration");
     core.begin_transcript(1, 1);
     window(&mut core).window = Some((1, 1));
     core

@@ -185,7 +185,7 @@ fn retained_effect_core(seed: u64) -> (core::Core, core::Limits, core::CallKey) 
     let world = World::new(seed, false);
     let key = world.call_key(1);
     let (configuration, limits) = jig_core_world::effects::fixture(seed, false);
-    let mut domain = core::Core::new(configuration.core, &limits.core);
+    let mut domain = core::Core::new(configuration.core, &limits.core).expect("fixture core configuration");
     let deployment = world
         .store
         .rows

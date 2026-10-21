@@ -403,7 +403,7 @@ impl Domain {
             "journal admits the whole core and connector route before stepping"
         );
         Domain {
-            core: core::Core::new(config.core, &limits.core),
+            core: core::Core::new(config.core, &limits.core).expect("fixture core configuration"),
             first: connector::Domain::new(config.first, &limits.connector),
             second: connector::Domain::new(config.second, &limits.connector),
             journal: Journal::new(&limits.journal),

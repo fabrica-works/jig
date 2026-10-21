@@ -8,6 +8,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+jig-fleet-world = { path = "../fleet" }
+jig-domain-fleet.workspace = true
 skein-lib.workspace = true
 skein-world.workspace = true
 jig-domain-accounts.workspace = true

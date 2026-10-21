@@ -33,7 +33,7 @@ fn signin(core: &mut Core, env: &Env<Limits>, token: u64) {
 #[test]
 fn an_empty_load_commits_the_original_bootstrap_only_after_loading_completes() {
     let env = env();
-    let mut core = Core::new(config(47), &env.limits);
+    let mut core = Core::new(config(47), &env.limits).expect("fixture core configuration");
     let mut expected = core.counters.deployment();
     assert!(core.counters.dirty(), "ordinary first start still needs its header");
     assert_eq!(core.restart_begin(), RestartRequest::Step(RestartStep::LoadCore));
@@ -55,7 +55,7 @@ fn an_empty_load_commits_the_original_bootstrap_only_after_loading_completes() {
 #[test]
 fn a_restored_header_preserves_every_counter_and_refused_signins_allocate_nothing() {
     let env = env();
-    let mut core = Core::new(config(48), &env.limits);
+    let mut core = Core::new(config(48), &env.limits).expect("fixture core configuration");
     let mut expected = core.counters.deployment();
     expected.id = [239; 16];
     expected.tasks = 11;
@@ -87,7 +87,7 @@ fn a_restored_header_preserves_every_counter_and_refused_signins_allocate_nothin
 #[test]
 fn an_unknown_header_cannot_allocate_any_family_or_become_dirty_on_time() {
     let mut env = env();
-    let mut core = Core::new(config(49), &env.limits);
+    let mut core = Core::new(config(49), &env.limits).expect("fixture core configuration");
     let expected = core.counters.deployment();
     assert_eq!(core.restart_begin(), RestartRequest::Step(RestartStep::LoadCore));
     for family in [
@@ -189,7 +189,12 @@ fn restore_ranges_admit_each_live_family_once() {
 
 fn record_key_rows() -> [(CoreRecord, CoreKey); 8] {
     [
-        (CoreRecord::Deployment(Core::new(config(50), &limits()).counters.deployment()), CoreKey::Deployment),
+        (
+            CoreRecord::Deployment(
+                Core::new(config(50), &limits()).expect("fixture core configuration").counters.deployment(),
+            ),
+            CoreKey::Deployment,
+        ),
         (
             CoreRecord::Projection(ProjectionRecord::Goal {
                 goal: ProjectionGoal {
@@ -275,7 +280,7 @@ fn census_fixture() -> (Core, Env<Limits>) {
     env.limits.people.inbox_entries = 8;
     let mut configuration = config(79);
     configuration.owners = Box::new([]);
-    let mut core = Core::new(configuration, &env.limits);
+    let mut core = Core::new(configuration, &env.limits).expect("fixture core configuration");
     assert_eq!(core.restart_begin(), RestartRequest::Step(RestartStep::LoadCore));
     let mut header = core.counters.deployment();
     header.tasks = 20;

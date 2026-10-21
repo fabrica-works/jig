@@ -315,7 +315,7 @@ pub fn config(seed: u64) -> root::Config {
         first,
         second,
         core: core::Config {
-            worker_names: Box::new([]),
+            worker_names: Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]),
             deployment: [31; 16],
             seed,
             workers_in_process: false,

@@ -104,7 +104,7 @@ pub fn signed_small_core() -> (core::Core, Env<core::Limits>, u64) {
         wall: Wall::EPOCH,
         limits: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core,
     };
-    let mut core = core::Core::new(configuration(&env.limits), &env.limits);
+    let mut core = core::Core::new(configuration(&env.limits), &env.limits).expect("fixture core configuration");
     drop(core::step(&mut core, &env, core::Event::People(people::Event::Restored)));
     let core::Requests::Out(mut out) = core::step(
         &mut core,

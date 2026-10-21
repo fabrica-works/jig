@@ -275,7 +275,7 @@ fn config(seed: u64) -> Config {
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "policy admitted");
     Config {
-        worker_names: Box::new([]),
+        worker_names: Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]),
         deployment: [31; 16],
         seed,
         workers_in_process: false,
@@ -377,7 +377,7 @@ fn restore_key_account(core: &mut Core, limits: &Limits, number: u32, source: u3
 
 pub(crate) fn core() -> (Core, Limits) {
     let limits = limits();
-    let mut core = Core::new(config(41), &limits);
+    let mut core = Core::new(config(41), &limits).expect("fixture core configuration");
     restore_key_account(&mut core, &limits, 0, 1, 1);
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
@@ -610,7 +610,7 @@ fn tree_core() -> (Core, Limits) {
     given.delegation.tasks = 17;
     given.delegation.depth = 5;
     set_role_authority(&mut config.authority, given);
-    let mut core = Core::new(config, &limits);
+    let mut core = Core::new(config, &limits).expect("fixture core configuration");
     core.people = old.people;
     core.accounts = old.accounts;
     send_task(&mut core, &limits, tasks::Event::Restored);
@@ -1658,7 +1658,7 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
         &mut core.fleet,
         &env,
         fleet::Event::Hello {
-            worker: 0,
+            worker: 1,
             channel: Token::new(11),
             hello: fleet::Hello {
                 bounds: fixtures::bounds(),
@@ -3103,4 +3103,43 @@ fn outcome_names_cover_the_configured_name_bound() {
     let mut limits = limits();
     limits.people.program_host_name_bytes = limits.fleet.worker_name_bytes - 1;
     assert_eq!(worst_case(&limits), None);
+}
+
+#[test]
+fn startup_refuses_too_many_configured_workers() {
+    let mut limits = limits();
+    let config = config(41);
+    limits.fleet.configured_workers = 1;
+    assert_eq!(Core::new(config, &limits).err(), Some(Problem::Workers { limit: 1 }));
+}
+#[test]
+fn startup_refuses_an_oversized_worker_name() {
+    let mut config = config(41);
+    let limits = limits();
+    config.worker_names = Box::new([configured_worker_name(limits.fleet.worker_name_bytes + 1)]);
+    assert_eq!(
+        Core::new(config, &limits).err(),
+        Some(Problem::WorkerName { worker: 0, limit: limits.fleet.worker_name_bytes })
+    );
+}
+
+#[test]
+fn startup_accepts_the_configured_worker_count_bound() {
+    let config = config(41);
+    let mut limits = limits();
+    limits.fleet.configured_workers = u32::try_from(config.worker_names.len()).expect("fixture worker count");
+    let _core = Core::new(config, &limits).expect("configured membership at its bound");
+}
+#[test]
+fn startup_accepts_the_worker_name_byte_bound() {
+    let mut config = config(41);
+    let limits = limits();
+    config.worker_names = Box::new([configured_worker_name(limits.fleet.worker_name_bytes)]);
+    let _core = Core::new(config, &limits).expect("configured membership at its bound");
+}
+
+fn configured_worker_name(length: u32) -> Box<[u8]> {
+    let mut name = skein_lib::bytes::zeroed(usize::try_from(length).expect("fixture name bound"));
+    name.fill(b'a');
+    name
 }

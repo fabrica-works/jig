@@ -88,8 +88,10 @@ pub struct Domain {
 
 impl Domain {
     /// Construct without issuing a request; the caller supplies the first input.
-    #[must_use]
-    pub fn new(config: Config, limits: &Limits) -> Self {
+    ///
+    /// # Errors
+    /// The core's configured workers exceed the priced membership bounds.
+    pub fn new(config: Config, limits: &Limits) -> Result<Self, core::Problem> {
         let room = crate::limits::room(limits).expect("finite root route");
         assert!(room.writes <= limits.journal.writes && room.held <= limits.journal.held, "admit the complete route");
         assert!(limits.routes > 0 && limits.journal.now > 0, "nonempty route and door");
@@ -128,7 +130,7 @@ impl Domain {
         let turn_rng = skein_lib::Rng::new(config.core.seed ^ 0x5455_524E_4255_5359);
         let mut core_config = config.core;
         core_config.hub_turns = limits.host.turns;
-        let mut core = core::Core::new(core_config, &limits.core);
+        let mut core = core::Core::new(core_config, &limits.core)?;
         check_engine_hello(&mut core.fleet, &limits.core.fleet, config.agent_bounds, limits.host.slots);
         // Connector hold rules are configuration, so a cold root installs
         // the same translated vocabulary before restoring live task rows.
@@ -148,7 +150,7 @@ impl Domain {
                 <= observability::message_capacity(&limits.observability).expect("watch news bound"),
             "offered watch inbox fits owner message bound"
         );
-        Self {
+        Ok(Self {
             deployment,
             core,
             observability: observability::Domain::with_templates(&limits.observability, config.triage_templates)
@@ -180,7 +182,7 @@ impl Domain {
             stopped_reported: false,
             restarting: false,
             restored_commits: None,
-        }
+        })
     }
 
     /// Decisions open only when the core's cold-start script says so.

@@ -31,7 +31,7 @@ fn configured(pairs: Box<[authority::Implication]>, rows: u32) -> (Core, Limits)
     given.grants = Box::new([grant(1, authority::Last::Exact(b"alpha".as_slice().into()))]);
     set_role_authority(&mut cfg.authority, given);
     let (prepared, _) = core();
-    let mut core = Core::new(cfg, &limits);
+    let mut core = Core::new(cfg, &limits).expect("fixture core configuration");
     core.people = prepared.people;
     make_task(&mut core, &limits, 1);
     send_task(

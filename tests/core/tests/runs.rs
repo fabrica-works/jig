@@ -116,7 +116,7 @@ fn a_chat_past_the_resume_limit_starts_fresh() {
 fn transcript_core(window: (u64, u32)) -> core::Core {
     let limits = jig_core_world::world::limits().core;
     let config = jig_core_world::world::config(105).core;
-    let mut core = core::Core::new(config, &limits);
+    let mut core = core::Core::new(config, &limits).expect("fixture core configuration");
     core.begin_transcript(1, 3);
     core.transcripts.get_mut(&1).expect("begun transcript").window = Some(window);
     core

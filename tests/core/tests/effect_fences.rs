@@ -8,7 +8,7 @@ use skein_lib::{Env, Queue, ReplyTo, Time, Token};
 fn recovered(world: &World, seed: u64, requirement: bool) -> (core::Core, Env<core::Limits>) {
     let (configuration, limits) = fixture(seed, requirement);
     let env = Env { now: Time::from_nanos(world.wall_time().as_nanos()), wall: world.wall_time(), limits: limits.core };
-    let mut core = core::Core::new(configuration.core, &env.limits);
+    let mut core = core::Core::new(configuration.core, &env.limits).expect("fixture core configuration");
     for row in world.store.rows.values() {
         if let root::Record::Core(core::Record::Core(row @ core::CoreRecord::Deployment(_))) = row {
             assert!(matches!(core.restore_core(row.clone(), &env.limits), core::Restored::Deployment { .. }));

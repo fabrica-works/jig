@@ -13,7 +13,7 @@ use skein_lib::{Journal, JournalLimits, JournalRoom, Released};
 pub(super) fn timer_core(answers: bool) -> (Core, Env<Limits>) {
     let mut limits = limits();
     limits.people.sign_ins = 3;
-    let mut core = Core::new(config(41), &limits);
+    let mut core = Core::new(config(41), &limits).expect("fixture core configuration");
     let mut deployment = core.counters.deployment();
     deployment.people = 1;
     deployment.sign_ins = 11;

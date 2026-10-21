@@ -13,7 +13,7 @@ pub(crate) struct Removing {
     pub(crate) request: Token,
     pub(crate) left: u32,
     pub(crate) confirmed: bool,
-    pub(crate) failed_hosts: Map<u32, crate::ProgramResult>,
+    pub(crate) failed_hosts: Map<crate::Worker, crate::ProgramFailure>,
 }
 
 pub(crate) fn account(domain: &Domain, holder: Holder, number: u32) -> Result<(), Refusal> {
@@ -177,9 +177,16 @@ fn removable(domain: &Domain, holder: Holder, number: u32) -> Result<u32, Refusa
     }
     let entry = domain.accounts.get(&number).expect("checked account");
     let mut leaving: u32 = 0;
+    let mut programs: u32 = 0;
     for (_, source) in &entry.sources {
         match domain.sources.get(source).expect("a kept source").kind {
-            Kind::SignIn | Kind::Program => {
+            Kind::Program => {
+                if domain.programs.contains_key(source) {
+                    return Err(Refusal::Limit { bound: Bound::Sources });
+                }
+                programs = programs.saturating_add(1);
+            }
+            Kind::SignIn => {
                 if domain.signing_out.contains_key(source) {
                     return Err(Refusal::Limit { bound: Bound::Sources });
                 }
@@ -194,7 +201,10 @@ fn removable(domain: &Domain, holder: Holder, number: u32) -> Result<u32, Refusa
     if leaving > domain.signing_out.capacity().saturating_sub(domain.signing_out.len()) {
         return Err(Refusal::Limit { bound: Bound::Sources });
     }
-    Ok(leaving)
+    if programs > domain.programs.capacity().saturating_sub(domain.programs.len()) {
+        return Err(Refusal::Limit { bound: Bound::Sources });
+    }
+    Ok(leaving.saturating_add(programs))
 }
 fn remove(
     domain: &mut Domain,
@@ -228,7 +238,7 @@ fn remove(
                 out.push(Request::Signing(Signing::SignOut { source: *source }));
             }
             Kind::Key => out.push(Request::Signing(Signing::Forget { source: *source })),
-            Kind::Program => crate::programs::begin(domain, *source, Leaving::Account(number), out),
+            Kind::Program => crate::programs::begin(domain, &env.limits, *source, Leaving::Account(number), out),
             Kind::None => {} // Refused by removable before any mutation.
         }
     }

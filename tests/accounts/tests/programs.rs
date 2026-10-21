@@ -57,7 +57,8 @@ fn a_declaration_saves_its_reservation_atomically() {
                 Request::Save { record: Stored::Next { number: 2 } },
                 Request::Programs {
                     names: Box::new([jig_domain_accounts::Program {
-                        name: b"personal".as_slice().into(),
+                        name: jig_domain_accounts::SourceName::new(b"personal".as_slice())
+                            .expect("admitted fixture name"),
                         cleanup: false
                     }])
                 },
@@ -177,10 +178,13 @@ fn sign_out(world: &mut World, holder: Holder) -> Vec<Request> {
     world.step(Event::SignOut { request: skein_lib::Token::new(91), holder, source: 1 })
 }
 fn targets(world: &mut World, workers: &[u32]) -> Vec<Request> {
-    world.step(Event::ProgramTargets { source: 1, hosts: workers.into() })
+    world.step(Event::ProgramTargets {
+        source: 1,
+        hosts: workers.iter().map(|number| jig_accounts_world::worker(*number)).collect(),
+    })
 }
 fn ended(world: &mut World, worker: u32, result: jig_domain_accounts::ProgramResult) -> Vec<Request> {
-    world.step(Event::ProgramSignedOut { source: 1, host: worker, result })
+    world.step(Event::ProgramSignedOut { source: 1, host: jig_accounts_world::worker(worker), result })
 }
 #[test]
 fn signing_out_a_program_retains_its_declaration() {
@@ -224,8 +228,14 @@ fn a_program_answer_names_every_unconfirmed_configured_position() {
             answer: jig_domain_accounts::Answer::SignedOut {
                 confirmed: false,
                 failed_hosts: Box::new([
-                    ProgramHost { worker: 0, result: ProgramResult::NotInContact },
-                    ProgramHost { worker: 2, result: ProgramResult::Lost },
+                    ProgramHost {
+                        worker: jig_accounts_world::worker(0),
+                        result: jig_domain_accounts::ProgramFailure::NotInContact
+                    },
+                    ProgramHost {
+                        worker: jig_accounts_world::worker(2),
+                        result: jig_domain_accounts::ProgramFailure::Lost
+                    },
                 ]),
             },
         }]
@@ -356,8 +366,125 @@ fn a_holder_check_is_answered_after_dispatch() {
     assert_eq!(
         rows[rows.len() - 2..],
         [
-            Request::CheckProgram { name: b"personal".as_slice().into() },
+            Request::CheckProgram {
+                name: jig_domain_accounts::SourceName::new(b"personal".as_slice()).expect("admitted fixture name")
+            },
             Request::Answer { request, answer: jig_domain_accounts::Answer::Done }
         ]
+    );
+}
+
+#[test]
+fn an_early_terminal_waits_for_its_target_snapshot() {
+    let mut world = fresh();
+    declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("declaration");
+    sign_out(&mut world, HOLDER);
+    assert!(ended(&mut world, 0, jig_domain_accounts::ProgramResult::SignedOut).is_empty());
+    assert_eq!(
+        targets(&mut world, &[0]),
+        vec![Request::Answer {
+            request: skein_lib::Token::new(91),
+            answer: jig_domain_accounts::Answer::SignedOut { confirmed: true, failed_hosts: Box::new([]) }
+        }]
+    );
+}
+#[test]
+fn an_early_failure_survives_the_target_snapshot() {
+    let mut world = fresh();
+    declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("declaration");
+    sign_out(&mut world, HOLDER);
+    ended(&mut world, 0, jig_domain_accounts::ProgramResult::Failed);
+    assert_eq!(
+        targets(&mut world, &[0]),
+        vec![Request::Answer {
+            request: skein_lib::Token::new(91),
+            answer: jig_domain_accounts::Answer::SignedOut {
+                confirmed: false,
+                failed_hosts: Box::new([jig_domain_accounts::ProgramHost {
+                    worker: jig_accounts_world::worker(0),
+                    result: jig_domain_accounts::ProgramFailure::Failed
+                }])
+            }
+        }]
+    );
+}
+#[test]
+fn closing_answers_a_pending_program_sign_out() {
+    let mut world = fresh();
+    declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("declaration");
+    sign_out(&mut world, HOLDER);
+    let rows = world.step(Event::Close);
+    let answers: Vec<_> = rows.into_iter().filter(|row| matches!(row, Request::Answer { .. })).collect();
+    assert_eq!(
+        answers,
+        vec![Request::Answer {
+            request: skein_lib::Token::new(91),
+            answer: jig_domain_accounts::Answer::Refused { refusal: Refusal::Closing }
+        }]
+    );
+}
+#[test]
+fn a_pending_program_sign_out_blocks_account_removal() {
+    let mut world = fresh();
+    declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("declaration");
+    sign_out(&mut world, HOLDER);
+    let request = skein_lib::Token::new(92);
+    assert_eq!(
+        world.step(Event::Change {
+            request,
+            holder: HOLDER,
+            change: jig_domain_accounts::Change::Remove { account: 0 }
+        }),
+        vec![Request::Answer {
+            request,
+            answer: jig_domain_accounts::Answer::Refused {
+                refusal: Refusal::Limit { bound: jig_domain_accounts::Bound::Sources }
+            }
+        }]
+    );
+}
+
+#[test]
+fn an_accepted_program_name_is_a_fleet_source_name() {
+    let mut world = fresh();
+    let name = b"a-0123456789";
+    let (result, rows) = declare(&mut world, HOLDER, PROVIDER, None, name);
+    assert!(result.is_ok());
+    let Some(Request::Programs { names }) = rows.last() else { panic!("published names") };
+    assert_eq!(Some(names[0].name), jig_domain_fleet::SourceName::new(name));
+}
+#[test]
+fn a_refused_program_name_is_not_a_fleet_source_name() {
+    let mut world = fresh();
+    let name = b"not portable";
+    assert_eq!(declare(&mut world, HOLDER, PROVIDER, None, name), (Err(programs::DeclarationRefusal::Name), vec![]));
+    assert_eq!(jig_domain_fleet::SourceName::new(name), None);
+}
+
+#[test]
+fn a_pending_program_sign_out_blocks_a_holder_check() {
+    let mut world = fresh();
+    declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("declaration");
+    sign_out(&mut world, HOLDER);
+    let mut out = Queue::with_capacity(jig_domain_accounts::max_out(&LIMITS));
+    assert_eq!(
+        programs::check(&mut world.domain, HOLDER, 1, &mut out),
+        Err(Refusal::Limit { bound: jig_domain_accounts::Bound::Sources })
+    );
+    assert!(out.is_empty());
+}
+#[test]
+fn an_early_program_terminal_finishes_account_removal() {
+    let mut world = fresh();
+    declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("declaration");
+    let request = skein_lib::Token::new(92);
+    world.step(Event::Change { request, holder: HOLDER, change: jig_domain_accounts::Change::Remove { account: 0 } });
+    ended(&mut world, 0, jig_domain_accounts::ProgramResult::SignedOut);
+    assert_eq!(
+        targets(&mut world, &[0]),
+        vec![Request::Answer {
+            request,
+            answer: jig_domain_accounts::Answer::Removed { confirmed: true, failed_hosts: Box::new([]) }
+        }]
     );
 }

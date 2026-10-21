@@ -284,6 +284,8 @@ name = "jig-accounts-world"
 version = "0.0.0"
 dependencies = [
  "jig-domain-accounts",
+ "jig-domain-fleet",
+ "jig-fleet-world",
  "skein-lib",
  "skein-world",
 ]
@@ -724,6 +726,7 @@ dependencies = [
 name = "jig-domain-accounts"
 version = "0.0.0"
 dependencies = [
+ "jig-domain-fleet",
  "skein-lib",
 ]
 

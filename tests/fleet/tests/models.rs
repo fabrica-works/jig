@@ -20,7 +20,7 @@ impl Fleet {
     fn new() -> Self {
         let limits = fleet::Limits { engine_slots: 1, ..jig_fleet_world::LIMITS };
         Self {
-            domain: fleet::Domain::new(&limits, model_needs()),
+            domain: jig_fleet_world::fixtures::domain(&limits, model_needs()),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
         }
     }
@@ -42,7 +42,11 @@ impl Fleet {
     }
 
     fn hello(&mut self, channel: Token, names: &[&[u8]]) -> Vec<Request> {
-        self.send(Event::Hello { worker: 0, channel, hello: hello(model_bounds(names)) })
+        self.send(Event::Hello {
+            worker: u32::try_from(channel.raw()).expect("fixture channel fits") % self.env.limits.configured_workers,
+            channel,
+            hello: hello(model_bounds(names)),
+        })
     }
 
     fn start(&mut self, charter: u32) {

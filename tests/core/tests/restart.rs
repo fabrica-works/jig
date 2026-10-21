@@ -66,7 +66,7 @@ fn applied_without_answer(world: &mut World) {
 fn the_restart_script_waits_for_each_step_and_each_connector() {
     let limits = jig_core_world::world::limits().core;
     let config = jig_core_world::world::config(111).core;
-    let mut core = core::Core::new(config, &limits);
+    let mut core = core::Core::new(config, &limits).expect("fixture core configuration");
     let steps = [
         core::RestartStep::LoadCore,
         core::RestartStep::LoadInbox,
@@ -95,7 +95,8 @@ fn the_restart_script_waits_for_each_step_and_each_connector() {
 #[test]
 fn an_out_of_order_restart_completion_refuses_the_start_naming_its_step() {
     let limits = jig_core_world::world::limits().core;
-    let mut core = core::Core::new(jig_core_world::world::config(112).core, &limits);
+    let mut core =
+        core::Core::new(jig_core_world::world::config(112).core, &limits).expect("fixture core configuration");
     assert_eq!(core.restart_begin(), core::RestartRequest::Step(core::RestartStep::LoadCore));
     assert_eq!(
         core.restart_done(core::RestartStep::Open),
@@ -308,7 +309,8 @@ fn a_refused_claim_keeps_the_conversation_for_the_next_resume() {
         panic!("durable proof")
     };
     let limits = jig_core_world::world::limits().core;
-    let mut core = core::Core::new(jig_core_world::world::config(120).core, &limits);
+    let mut core =
+        core::Core::new(jig_core_world::world::config(120).core, &limits).expect("fixture core configuration");
     core.replaced.insert(task, saved.clone()).expect("one durable replacement");
     let mut pending = saved.clone();
     pending.attempt += 1;

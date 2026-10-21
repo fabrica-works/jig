@@ -48,6 +48,9 @@ fn core_breaches(manifests: &[CrateManifest]) -> Vec<String> {
                 .filter(|name| {
                     if manifest.name.as_deref() == Some("jig-domain-core") {
                         **name != "skein-lib" && !CORE_FAMILY.contains(&name.as_str())
+                    } else if manifest.name.as_deref() == Some("jig-domain-accounts") {
+                        // Admitted program names and positions only (domain/root.md, 2).
+                        !["skein-lib", "jig-domain-fleet"].contains(&name.as_str())
                     } else {
                         **name != "skein-lib"
                     }

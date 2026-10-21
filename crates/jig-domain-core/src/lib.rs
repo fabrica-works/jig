@@ -46,7 +46,7 @@ mod indexes;
 mod llm;
 mod memory;
 
-pub use memory::{policy_owned_bytes, worst_case};
+pub use memory::{Problem, policy_owned_bytes, worst_case};
 mod model_names;
 mod numbers;
 mod person_task;
@@ -511,9 +511,11 @@ impl Core {
     }
 
     /// Allocate the eight children and the bounded live core tables.
-    #[must_use]
+    /// # Errors
+    /// A configured worker count or name exceeds the priced membership bounds.
     #[expect(clippy::too_many_lines, reason = "construct all bounded children, bindings and subject marks together")]
-    pub fn new(config: Config, limits: &Limits) -> Core {
+    pub fn new(config: Config, limits: &Limits) -> Result<Core, Problem> {
+        memory::problems(&config, limits)?;
         assert!(limits.people.words <= limits.tasks.message_bytes, "party words fit one run message");
         assert!(limits.tasks.message_bytes >= 24, "projection refusal news fits one run message");
         assert!(config.settings.tools.valid(), "each engine tool has one configured authority bit");
@@ -544,7 +546,7 @@ impl Core {
             );
         }
         let fleet_needs = fleet_needs::configured(&config, limits);
-        Core {
+        Ok(Core {
             fill: 0,
             workers_in_process: config.workers_in_process,
             stopping: false,
@@ -641,7 +643,9 @@ impl Core {
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
             fleet: {
                 let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs);
-                assert!(fleet.configure_workers(&limits.fleet, config.worker_names), "checked worker names");
+                if !fleet.configure_workers(&limits.fleet, config.worker_names) {
+                    return Err(Problem::Workers { limit: limits.fleet.configured_workers });
+                }
                 fleet
             },
             accounts: accounts::Domain::new(&limits.accounts, config.settings.llm_providers.clone()),
@@ -649,7 +653,7 @@ impl Core {
             notes: notes::Domain::new(&limits.notes),
             views: views::Domain::new(&limits.views),
             settings: config.settings,
-        }
+        })
     }
 
     /// Reclaim retired child slots at the application's iteration boundary.

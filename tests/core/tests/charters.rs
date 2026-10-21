@@ -49,7 +49,7 @@ fn a_delegate_waits_for_a_host_declaring_its_charters_model() {
     let mut bounds = jig_core_world::fixtures::bounds();
     bounds.models[1].name = b"specialist".as_slice().into();
     world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
-        worker: 0,
+        worker: 1,
         channel: Token::new(8),
         hello: fleet::Hello {
             bounds,

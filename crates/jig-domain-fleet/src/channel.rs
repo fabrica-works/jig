@@ -2,6 +2,7 @@
 //! their channel for delivery and by the configured worker position each channel
 //! authenticated as for program logins and their answers. A returning worker
 //! gets a fresh channel; stale channel results never update its replacement.
+//! The engine host uses reserved token zero and never loses contact.
 //!
 //! A hello is the worker's entrance. It is turned away, its channel to be
 //! closed, if the fleet has no room for another worker or its declared stop
@@ -101,6 +102,28 @@ pub(crate) fn cache(channel: &mut Channel, limits: &Limits, workstream: u64) {
     assert!(room.is_ok(), "room was made above");
 }
 
+fn admit_worker(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    channel: Token,
+    worker: u32,
+    hello: &Hello,
+    out: &mut Queue<Request>,
+) -> bool {
+    let configured = u32::try_from(domain.worker_names.len()).expect("admitted configured membership fits u32");
+    let mut occupied = false;
+    for (_, id) in &domain.tokens {
+        if let Some(host) = domain.channels.get(*id) {
+            occupied |= host.worker == Some(worker);
+        }
+    }
+    if worker >= configured || occupied {
+        refuse(domain, env, channel, hello, crate::HelloRefusal::Workers { limit: configured }, out);
+        return false;
+    }
+    true
+}
+
 /// Hello, on a new channel: the worker is in contact, or turned away.
 pub(crate) fn hello(
     domain: &mut Domain,
@@ -143,24 +166,17 @@ pub(crate) fn hello(
         domain.facts.push(Fact::Dropped);
         return;
     }
+    if !admit_worker(domain, env, channel, worker, &hello, out) {
+        return;
+    }
     let too_long = hello.stop_bound >= limits.grace;
     if domain.channels.is_full() || too_long {
-        crate::history::refused(
-            domain,
-            crate::HelloRefusalRecord {
-                channel,
-                at: env.wall,
-                slots: hello.slots,
-                stop_bound: hello.stop_bound,
-                why: if too_long {
-                    crate::HelloRefusal::StopBound { grace: limits.grace }
-                } else {
-                    crate::HelloRefusal::Workers { limit: limits.workers }
-                },
-            },
-        );
-        domain.facts.push(Fact::TurnedAway);
-        out.push(Request::Refuse { channel });
+        let why = if too_long {
+            crate::HelloRefusal::StopBound { grace: limits.grace }
+        } else {
+            crate::HelloRefusal::Workers { limit: limits.workers }
+        };
+        refuse(domain, env, channel, &hello, why, out);
         return;
     }
     let Hello { slots, workstreams, hosting, stop_bound: _, bounds } = hello;

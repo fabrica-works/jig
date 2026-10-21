@@ -24,19 +24,13 @@ pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::O
             return people::Outcome::AccountProgramDeclared { source, name };
         }
         accounts::Answer::SignedOut { confirmed, failed_hosts } => {
-            return match hosts(core, failed_hosts) {
-                Ok(failed_hosts) => people::Outcome::AccountSignedOut { confirmed, failed_hosts },
-                Err(refusal) => people::Outcome::Refused(refusal),
-            };
+            return people::Outcome::AccountSignedOut { confirmed, failed_hosts: hosts(core, failed_hosts) };
         }
         accounts::Answer::Refused { refusal } => refusal,
         accounts::Answer::KeyKept { source } => return people::Outcome::AccountKeyKept { source },
         accounts::Answer::Done => return people::Outcome::AccountChanged,
         accounts::Answer::Removed { confirmed, failed_hosts } => {
-            return match hosts(core, failed_hosts) {
-                Ok(failed_hosts) => people::Outcome::AccountRemoved { confirmed, failed_hosts },
-                Err(refusal) => people::Outcome::Refused(refusal),
-            };
+            return people::Outcome::AccountRemoved { confirmed, failed_hosts: hosts(core, failed_hosts) };
         }
     };
     let refusal = match refusal {
@@ -154,28 +148,22 @@ fn payer(core: &crate::Core, holder: accounts::Holder, plan: bool, party: u64) -
     Ok(())
 }
 
-fn hosts(
-    core: &crate::Core,
-    hosts: Box<[accounts::ProgramHost]>,
-) -> Result<Box<[people::AccountHostFailure]>, people::Refusal> {
-    let Ok(count) = u32::try_from(hosts.len()) else {
-        return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
-    };
+fn hosts(core: &crate::Core, hosts: Box<[accounts::ProgramHost]>) -> Box<[people::AccountHostFailure]> {
+    let count = u32::try_from(hosts.len()).expect("admitted configured membership");
     let mut rows = skein_lib::List::with_capacity(count);
     for host in hosts {
-        let name = core.fleet.worker_name(host.worker).ok_or(people::Refusal::Unknown)?;
+        let name = core.fleet.configured_name(host.worker);
         let why = match host.result {
-            accounts::ProgramResult::NotInContact => people::AccountHostWhy::NotInContact,
-            accounts::ProgramResult::Lost => people::AccountHostWhy::Lost,
-            accounts::ProgramResult::Failed => people::AccountHostWhy::Failed,
-            accounts::ProgramResult::SignedOut => return Err(people::Refusal::Unknown),
+            accounts::ProgramFailure::NotInContact => people::AccountHostWhy::NotInContact,
+            accounts::ProgramFailure::Lost => people::AccountHostWhy::Lost,
+            accounts::ProgramFailure::Failed => people::AccountHostWhy::Failed,
         };
-        if rows.push(people::AccountHostFailure { name: skein_lib::bytes::copy_of(name), why }).is_err() {
-            return Err(people::Refusal::Limit { which: people::LimitKind::Sources });
-        }
+        rows.push(people::AccountHostFailure { name: skein_lib::bytes::copy_of(name), why })
+            .expect("one output per admitted host failure");
     }
-    Ok(rows.into_boxed())
+    rows.into_boxed()
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

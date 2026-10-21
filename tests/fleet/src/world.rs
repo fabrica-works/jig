@@ -524,7 +524,7 @@ impl World {
         let mut world = World {
             now: Time::ZERO,
             rng: Rng::new(settings.seed),
-            domain: Domain::new(&settings.limits, crate::fixtures::needs()),
+            domain: crate::fixtures::domain(&settings.limits, crate::fixtures::needs()),
             stage: Stage::new(settings.limits, max_out, max_out + SLACK),
             epoch: 0,
             loaded: true,
@@ -786,7 +786,7 @@ impl World {
         self.stats.restarts += 1;
         self.epoch += 1;
         self.loaded = false;
-        self.domain = Domain::new(&self.settings.limits, crate::fixtures::needs());
+        self.domain = crate::fixtures::domain(&self.settings.limits, crate::fixtures::needs());
         self.stage.inbox.clear();
         self.calls = Ledger::new("start or adoption");
         self.relays = Ledger::new("relayed call");
@@ -880,7 +880,7 @@ impl World {
                     .map(|(run, attempt, phase)| Hosted { run: Token::new(run), attempt: Token::new(attempt), phase })
                     .collect();
                 Event::Hello {
-                    worker: 0,
+                    worker: u32::try_from(self.channels[&channel].worker).expect("configured worker position"),
                     channel: token,
                     hello: Hello {
                         bounds: crate::fixtures::bounds(),

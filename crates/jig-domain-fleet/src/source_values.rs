@@ -93,3 +93,15 @@ pub enum ProgramResult {
 
 /// Whole configured worker names exposed in program facts and outcomes.
 pub const WORKER_NAME: u32 = 4_096;
+
+/// A position admitted from the fleet's immutable configured membership.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct Worker {
+    pub(crate) position: u32,
+}
+impl Worker {
+    #[must_use]
+    pub const fn number(self) -> u32 {
+        self.position
+    }
+}

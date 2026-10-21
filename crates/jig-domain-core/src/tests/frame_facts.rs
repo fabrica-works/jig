@@ -161,7 +161,7 @@ fn the_frame_offers_both_charters_for_goals() {
     config.authority = authority::Domain::new(rules, limits.authority).expect("charter policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut config.authority, authority::Event::Policy { project: 1, policy }, &mut out);
-    let mut core = Core::new(config, &limits);
+    let mut core = Core::new(config, &limits).expect("fixture core configuration");
     core.people = old.people;
     let frame = frame(&core, &limits);
     let crate::acts::Creating { within: crate::acts::Bounds::Create { charters, .. }, .. } =

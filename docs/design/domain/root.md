@@ -66,9 +66,12 @@ are connectors.md. What is still open is listed in section 14.
   their terminals, and smith's payloads it hands out to be decoded or
   encoded (section 5). It is the union of its children's, wrapped: an
   exhaustive enum per direction, with one variant per child.
-- **Its children are siblings,** sharing no types (programming-model.md,
-  4.5). The core knows each connector by a number the root gives it in
-  configuration; each connector knows nothing of the core.
+- **Its children are siblings,** sharing no state (programming-model.md,
+  4.5). Program lifecycle has one narrow value-type exception: accounts
+  carries fleet's admitted `SourceName` and configured `Worker` through its
+  operation, so routing cannot reinterpret a name or invent a worker position.
+  Accounts calls no fleet step and holds no fleet state. The core knows each
+  connector by a number the root gives it in configuration; each connector knows nothing of the core.
 - **No root above it.** In one process, an engine's root and its
   workers' roots stay apart, each under its own protocol layer, joined
   only by bytes over in-process addresses (`../protocol/service.md`,
@@ -304,7 +307,8 @@ next only once this one is done, so the order is the core's.
 - hold anything between steps but its children and the journal;
 - read or rewrite a value it carries between children, beyond wrapping
   it;
-- give one child another child's type;
+- give one child another child's type, except the admitted program lifecycle
+  values specified in section 2;
 - route by content beyond the variant.
 
 ## 12. The reference root

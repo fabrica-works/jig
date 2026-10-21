@@ -29,7 +29,7 @@ fn period_core(configured: u64) -> (Core, Limits) {
     config.projects = List::with_capacity(2);
     config.projects.push(1).unwrap();
     config.projects.push(2).unwrap();
-    let mut core = Core::new(config, &limits);
+    let mut core = Core::new(config, &limits).expect("fixture core configuration");
     core.people = auth.people;
     send_task(&mut core, &limits, tasks::Event::Restored);
     let opened = watch_outputs(

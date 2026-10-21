@@ -472,7 +472,7 @@ pub(super) fn tag_account(
                 let mut sources = skein_lib::List::with_capacity(env.limits.accounts.program_names);
                 let mut cleanup = skein_lib::List::with_capacity(env.limits.accounts.program_names);
                 for row in names {
-                    let Some(name) = fleet::SourceName::new(&row.name) else { continue };
+                    let name = row.name;
                     sources.push(name).expect("one per reservation");
                     if row.cleanup {
                         cleanup.push(name).expect("subset of issued names");
@@ -482,11 +482,9 @@ pub(super) fn tag_account(
                 append_fleet(core, env, work, fleet::Event::Sources { sources: sources.into_boxed() }, &mut out);
             }
             accounts::Request::CheckProgram { name } => {
-                let name = fleet::SourceName::new(&name).expect("validated durable source name");
                 append_fleet(core, env, work, fleet::Event::CheckProgram { name }, &mut out);
             }
             accounts::Request::SignOutProgram { source, name } => {
-                let name = fleet::SourceName::new(&name).expect("validated durable source name");
                 append_fleet(core, env, work, fleet::Event::SignOutProgram { source, name }, &mut out);
             }
             accounts::Request::Granted { grant } => {

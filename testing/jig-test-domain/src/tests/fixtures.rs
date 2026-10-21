@@ -106,7 +106,7 @@ pub fn domain() -> Domain {
             first: jig_test_connector_world::config(1),
             second: jig_test_connector_world::config(2),
             core: core::Config {
-                worker_names: Box::new([]),
+                worker_names: Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]),
                 deployment: [1; 16],
                 seed: 1,
                 workers_in_process: false,

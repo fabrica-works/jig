@@ -125,6 +125,33 @@ fn context_carrier(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(task.result_bytes))
 }
 
+/// A directly supplied startup value exceeds the core's priced worker membership.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Problem {
+    Workers { limit: u32 },
+    WorkerName { worker: u32, limit: u32 },
+}
+pub(crate) fn problems(config: &crate::Config, limits: &Limits) -> Result<(), Problem> {
+    let Ok(count) = u32::try_from(config.worker_names.len()) else {
+        return Err(Problem::Workers { limit: limits.fleet.configured_workers });
+    };
+    if count > limits.fleet.configured_workers {
+        return Err(Problem::Workers { limit: limits.fleet.configured_workers });
+    }
+    for (index, name) in config.worker_names.iter().enumerate() {
+        let Ok(worker) = u32::try_from(index) else {
+            return Err(Problem::Workers { limit: limits.fleet.configured_workers });
+        };
+        let Ok(bytes) = u32::try_from(name.len()) else {
+            return Err(Problem::WorkerName { worker, limit: limits.fleet.worker_name_bytes });
+        };
+        if bytes > limits.fleet.worker_name_bytes {
+            return Err(Problem::WorkerName { worker, limit: limits.fleet.worker_name_bytes });
+        }
+    }
+    Ok(())
+}
+
 /// Pure checked heap ceiling for the core's eight children, its retained
 /// route state, loads and the largest synchronous decision. Invalid child
 /// limits or unrepresentable arithmetic return `None`; a root adds its own
@@ -419,11 +446,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             .checked_add(sizeof(size_of::<fleet::SourceName>())?.checked_mul(3)?)?
             .checked_add(u64::from(limits.fleet.source_detail_bytes))?,
     )?;
-    let program_payload =
-        bytes(limits.accounts.program_hosts, sizeof(size_of::<accounts::ProgramHost>())?)?.max(bytes(
-            limits.accounts.program_names,
-            sizeof(size_of::<accounts::Program>())?.checked_add(u64::from(accounts::NAME))?,
-        )?);
+    let program_payload = bytes(limits.accounts.program_hosts, sizeof(size_of::<accounts::ProgramHost>())?)?
+        .max(bytes(limits.accounts.program_names, sizeof(size_of::<accounts::Program>())?)?);
     let payload = payload.max(source_payload).max(program_payload).max(people::outcome_bytes(&limits.people)?);
     total = total.checked_add(Queue::<fleet::Request>::worst_case(fleet::max_out(&limits.fleet).checked_mul(4)?)?)?;
     total = total.checked_add(Queue::<Event>::worst_case(route.writes)?)?;

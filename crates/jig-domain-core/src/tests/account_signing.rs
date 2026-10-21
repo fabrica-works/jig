@@ -12,6 +12,7 @@ fn signing_core() -> (Core, Env<Limits>) {
     let mut limits = limits();
     limits.accounts.accounts = 2;
     let mut config = config(73);
+    config.worker_names = Box::new([]);
     let offers = accounts::Offers { sign_in: true, key: true, programs: Box::new([]) };
     config.settings.llm_providers = accounts::Providers {
         providers: Box::new([accounts::Provider {
@@ -23,7 +24,7 @@ fn signing_core() -> (Core, Env<Limits>) {
             offers,
         }]),
     };
-    let mut core = Core::new(config, &limits);
+    let mut core = Core::new(config, &limits).expect("fixture core configuration");
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     signed_in(&mut core, &env);
     drop(step(&mut core, &env, Event::Account(accounts::Event::Want)));

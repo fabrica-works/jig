@@ -59,7 +59,7 @@ mod programs;
 mod source_values;
 mod sources;
 pub use source_values::{
-    Login, LoginMethod, LoginState, ProgramResult, SignOutResult, SourceFailure, SourceName, WORKER_NAME,
+    Login, LoginMethod, LoginState, ProgramResult, SignOutResult, SourceFailure, SourceName, WORKER_NAME, Worker,
 };
 mod domain;
 mod facts;

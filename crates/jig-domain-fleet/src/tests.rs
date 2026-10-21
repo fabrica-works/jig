@@ -67,7 +67,14 @@ impl Harness {
 
     fn with_needs(limits: Limits, needs: crate::Needs) -> Harness {
         let out = Queue::with_capacity(max_out(&limits));
-        Harness { domain: Domain::new(&limits, needs), env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, out }
+        let mut domain = Domain::new(&limits, needs);
+        let mut names = List::with_capacity(limits.configured_workers);
+        for index in 0..limits.configured_workers {
+            let name = skein_lib::Decimal::of(u64::from(index));
+            names.push(skein_lib::bytes::copy_of(name.as_bytes())).expect("configured fixture worker count");
+        }
+        assert!(domain.configure_workers(&limits, names.into_boxed()));
+        Harness { domain, env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, out }
     }
 
     /// Steps `event`, returning what it emitted, oldest first.
@@ -151,7 +158,14 @@ impl Harness {
             workstreams: keys.into_boxed(),
             hosting: Box::from(hosting),
         };
-        self.step(Event::Hello { worker: 0, channel, hello })
+        self.step(Event::Hello {
+            worker: u32::try_from(channel.raw())
+                .expect("fixture channel fits")
+                .checked_rem(self.env.limits.configured_workers)
+                .expect("nonempty fixture membership"),
+            channel,
+            hello,
+        })
     }
 
     fn start(&mut self, run: Token, attempt: Token, workstream: u64) -> Box<[Request]> {
@@ -1158,7 +1172,7 @@ fn a_configured_worker_fan_out_sets_the_output_floor() {
 }
 #[test]
 fn a_slot_burst_sets_the_output_floor() {
-    for (slots, expected) in [(1, 13), (8, 33)] {
+    for (slots, expected) in [(1, 25), (8, 33)] {
         assert_eq!(max_out(&Limits { configured_workers: 0, slots, ..LIMITS }), expected);
     }
 }
@@ -1356,3 +1370,9 @@ fn free_kind_follows_the_placement_rule() {
 mod grants;
 
 mod needs;
+
+#[test]
+fn an_overflowing_joined_reply_count_is_refused() {
+    let limits = Limits { program_sources: u32::MAX / 2 + 1, ..LIMITS };
+    assert_eq!(worst_case(&limits), None);
+}

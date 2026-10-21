@@ -273,7 +273,8 @@ pub(crate) fn absent(state: &LoginState) -> bool {
 #[derive(Debug)]
 pub(crate) enum Reply {
     Direct(ReplyTo),
-    Program { source: u32, worker: u32 },
+    DirectProgram { to: ReplyTo, source: u32, worker: crate::Worker },
+    Program { source: u32, worker: crate::Worker },
     Cleanup,
 }
 #[derive(Debug)]
@@ -290,14 +291,23 @@ pub(crate) fn terminal(
 ) {
     match reply {
         Reply::Direct(to) => out.push(Request::SignedOut { to, channel, name, result }),
+        Reply::DirectProgram { to, source, worker } => {
+            let terminal = program_result(result.as_ref());
+            out.push(Request::SignedOut { to, channel, name, result });
+            out.push(Request::ProgramSignedOut { source, worker, result: terminal });
+        }
         Reply::Program { source, worker } => {
-            let result = match result {
-                Some(SignOutResult::SignedOut) => crate::ProgramResult::SignedOut,
-                Some(SignOutResult::Failed { .. }) => crate::ProgramResult::Failed,
-                None => crate::ProgramResult::Lost,
-            };
+            let result = program_result(result.as_ref());
             out.push(Request::ProgramSignedOut { source, worker, result });
         }
         Reply::Cleanup => {}
+    }
+}
+
+fn program_result(result: Option<&SignOutResult>) -> crate::ProgramResult {
+    match result {
+        Some(SignOutResult::SignedOut) => crate::ProgramResult::SignedOut,
+        Some(SignOutResult::Failed { .. }) => crate::ProgramResult::Failed,
+        None => crate::ProgramResult::Lost,
     }
 }

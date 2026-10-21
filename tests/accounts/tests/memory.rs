@@ -371,7 +371,10 @@ fn full_program_operations_stay_below_the_accounts_bound() {
             );
             let _last = run.step(
                 &mut domain,
-                Event::ProgramTargets { source, hosts: (0..LIMITS.program_hosts).collect() },
+                Event::ProgramTargets {
+                    source,
+                    hosts: (0..LIMITS.program_hosts).map(jig_accounts_world::worker).collect(),
+                },
                 "full target set",
             );
         }

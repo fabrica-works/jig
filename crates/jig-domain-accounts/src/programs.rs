@@ -8,7 +8,7 @@ use skein_lib::{Env, List, Map, Queue};
 #[derive(PartialEq, Eq, Debug)]
 pub(crate) struct Issued {
     pub(crate) holder: Holder,
-    pub(crate) name: Box<[u8]>,
+    pub(crate) name: crate::SourceName,
     pub(crate) signed_out: bool,
 }
 
@@ -38,11 +38,9 @@ pub fn declare(
     if !domain.wanted() {
         return Err(DeclarationRefusal::Account(Refusal::Closing));
     }
-    if !crate::records::program_name(&name) {
-        return Err(DeclarationRefusal::Name);
-    }
+    let Some(admitted) = crate::SourceName::new(&name) else { return Err(DeclarationRefusal::Name) };
     for (_, issued) in &domain.issued {
-        if issued.name == name {
+        if issued.name.as_bytes() == name.as_ref() {
             return Err(DeclarationRefusal::Issued);
         }
     }
@@ -95,7 +93,7 @@ pub fn declare(
     let place = entry.sources.len();
     assert!(entry.sources.insert(place, number) == Ok(None), "admitted source at the last place");
     entry.plan = true;
-    let issued = Issued { holder, name: name.clone(), signed_out: false };
+    let issued = Issued { holder, name: admitted, signed_out: false };
     assert!(domain.issued.insert(number, issued).is_ok(), "admitted lifetime name");
     out.push(Request::Save { record: Stored::Issued { number, holder, name: name.clone(), signed_out: false } });
     let source = Source::new(account, Kind::Program, name, &env.limits);
@@ -107,7 +105,8 @@ pub fn declare(
 }
 
 pub(crate) fn restore(domain: &mut Domain, number: u32, holder: Holder, name: Box<[u8]>, signed_out: bool) -> bool {
-    if number == u32::MAX || domain.accounts.contains_key(&number) || !crate::records::program_name(&name) {
+    let Some(name) = crate::SourceName::new(&name) else { return false };
+    if number == u32::MAX || domain.accounts.contains_key(&number) {
         return false;
     }
     for (other_number, issued) in &domain.issued {
@@ -141,7 +140,7 @@ pub(crate) fn finish_restore(domain: &mut Domain, out: &mut Queue<Request>) {
         let valid = match source.kind {
             Kind::Program => match domain.issued.get(number) {
                 Some(issued) => match domain.accounts.get(&source.account) {
-                    Some(account) => issued.holder == account.holder && issued.name == source.name,
+                    Some(account) => issued.holder == account.holder && issued.name.as_bytes() == source.name.as_ref(),
                     None => false,
                 },
                 None => false,
@@ -190,11 +189,13 @@ pub(crate) fn finish_restore(domain: &mut Domain, out: &mut Queue<Request>) {
 pub const PROGRAM_HOSTS: u32 = 128;
 #[derive(Debug)]
 pub(crate) struct Pending {
-    hosts: Option<List<Host>>,
+    pub(crate) leaving: crate::changes::Leaving,
+    hosts: List<Host>,
+    targeted: bool,
 }
 #[derive(Debug)]
 pub(crate) struct Host {
-    worker: u32,
+    worker: crate::Worker,
     result: Option<crate::ProgramResult>,
 }
 #[must_use]
@@ -203,7 +204,7 @@ pub fn name(domain: &Domain, source: u32, holder: Holder) -> Option<&[u8]> {
     if issued.holder != holder {
         return None;
     }
-    Some(&issued.name)
+    Some(issued.name.as_bytes())
 }
 pub(crate) fn publish(domain: &Domain, out: &mut Queue<Request>) {
     if domain.issued.is_empty() {
@@ -213,7 +214,7 @@ pub(crate) fn publish(domain: &Domain, out: &mut Queue<Request>) {
     for (number, issued) in &domain.issued {
         names
             .push(crate::Program {
-                name: issued.name.clone(),
+                name: issued.name,
                 cleanup: issued.signed_out || !domain.sources.contains_key(number),
             })
             .expect("one desired state per reservation");
@@ -225,94 +226,121 @@ pub(crate) fn publish(domain: &Domain, out: &mut Queue<Request>) {
 /// A foreign, retired or unknown source, or a closing child.
 pub fn check(domain: &mut Domain, holder: Holder, source: u32, out: &mut Queue<Request>) -> Result<(), Refusal> {
     crate::changes::source(domain, holder, source)?;
-    if domain.signing_out.contains_key(&source) {
+    if domain.programs.contains_key(&source) {
         return Err(Refusal::Limit { bound: crate::Bound::Sources });
     }
     let issued = domain.issued.get_mut(&source).ok_or(Refusal::Unknown)?;
     issued.signed_out = false;
-    let name = issued.name.clone();
+    let name = issued.name;
     out.push(Request::Save {
-        record: Stored::Issued { number: source, holder, name: name.clone(), signed_out: false },
+        record: Stored::Issued {
+            number: source,
+            holder,
+            name: skein_lib::bytes::copy_of(name.as_bytes()),
+            signed_out: false,
+        },
     });
     publish(domain, out);
     out.push(Request::CheckProgram { name });
     Ok(())
 }
-pub(crate) fn begin(domain: &mut Domain, source: u32, leaving: crate::changes::Leaving, out: &mut Queue<Request>) {
+pub(crate) fn begin(
+    domain: &mut Domain,
+    limits: &Limits,
+    source: u32,
+    leaving: crate::changes::Leaving,
+    out: &mut Queue<Request>,
+) {
     let Some(issued) = domain.issued.get_mut(&source) else { return };
     issued.signed_out = true;
-    let name = issued.name.clone();
+    let name = issued.name;
     out.push(Request::Save {
-        record: Stored::Issued { number: source, holder: issued.holder, name: name.clone(), signed_out: true },
+        record: Stored::Issued {
+            number: source,
+            holder: issued.holder,
+            name: skein_lib::bytes::copy_of(name.as_bytes()),
+            signed_out: true,
+        },
     });
-    assert!(domain.signing_out.insert(source, leaving) == Ok(None), "admitted sign-out");
-    assert!(domain.programs.insert(source, Pending { hosts: None }).is_ok(), "admitted program operation");
+    assert!(
+        domain
+            .programs
+            .insert(source, Pending { leaving, hosts: List::with_capacity(limits.program_hosts), targeted: false })
+            .is_ok(),
+        "admitted program operation"
+    );
     publish(domain, out);
     out.push(Request::SignOutProgram { source, name });
 }
-pub(crate) fn targets(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    source: u32,
-    hosts: Box<[u32]>,
-    out: &mut Queue<Request>,
-) {
+pub(crate) fn targets(domain: &mut Domain, source: u32, hosts: Box<[crate::Worker]>, out: &mut Queue<Request>) {
     let Some(pending) = domain.programs.get_mut(&source) else { return };
-    if pending.hosts.is_some() {
+    if pending.targeted {
         return;
     }
-    let mut rows = List::<Host>::with_capacity(env.limits.program_hosts);
     for worker in hosts {
         let mut duplicate = false;
-        for row in &rows {
+        for row in &pending.hosts {
             duplicate |= row.worker == worker;
         }
         if !duplicate {
-            rows.push(Host { worker, result: None }).expect("configured target count checked at startup");
+            pending.hosts.push(Host { worker, result: None }).expect("configured target count checked at startup");
         }
     }
-    let empty = rows.is_empty();
-    pending.hosts = Some(rows);
-    if empty {
-        finish(domain, source, out);
-    }
+    pending.targeted = true;
+    complete(domain, source, out);
 }
 pub(crate) fn signed_out(
     domain: &mut Domain,
     source: u32,
-    host: u32,
+    host: crate::Worker,
     result: crate::ProgramResult,
     out: &mut Queue<Request>,
 ) {
     let Some(pending) = domain.programs.get_mut(&source) else { return };
-    let Some(rows) = &mut pending.hosts else { return };
-    let mut finished = true;
-    for index in 0..rows.len() {
-        let Some(row) = rows.get_mut(index) else { continue };
-        if row.worker == host && row.result.is_none() {
-            row.result = Some(result);
+    let mut found = false;
+    for index in 0..pending.hosts.len() {
+        let Some(row) = pending.hosts.get_mut(index) else { continue };
+        if row.worker == host {
+            found = true;
+            if row.result.is_none() {
+                row.result = Some(result);
+            }
         }
-        finished &= row.result.is_some();
     }
-    if finished {
-        finish(domain, source, out);
+    if !found && !pending.targeted {
+        pending
+            .hosts
+            .push(Host { worker: host, result: Some(result) })
+            .expect("one early terminal per configured target");
     }
+    complete(domain, source, out);
 }
-fn finish(domain: &mut Domain, source: u32, out: &mut Queue<Request>) {
-    let Some(pending) = domain.programs.remove(&source) else { return };
-    let Some(leaving) = domain.signing_out.remove(&source) else { return };
-    let Some(rows) = pending.hosts else { return };
-    let mut failed = List::with_capacity(rows.capacity());
-    for row in rows.into_boxed() {
-        if let Some(result) = row.result
-            && result != crate::ProgramResult::SignedOut
-        {
+fn complete(domain: &mut Domain, source: u32, out: &mut Queue<Request>) {
+    let Some(pending) = domain.programs.get(&source) else { return };
+    if !pending.targeted {
+        return;
+    }
+    for row in &pending.hosts {
+        if row.result.is_none() {
+            return;
+        }
+    }
+    let pending = domain.programs.remove(&source).expect("the completed program operation is still held");
+    let mut failed = List::with_capacity(pending.hosts.capacity());
+    for row in pending.hosts.into_boxed() {
+        let failure = match row.result {
+            Some(crate::ProgramResult::NotInContact) => Some(crate::ProgramFailure::NotInContact),
+            Some(crate::ProgramResult::Lost) => Some(crate::ProgramFailure::Lost),
+            Some(crate::ProgramResult::Failed) => Some(crate::ProgramFailure::Failed),
+            Some(crate::ProgramResult::SignedOut) | None => None,
+        };
+        if let Some(result) = failure {
             failed.push(crate::ProgramHost { worker: row.worker, result }).expect("one per configured worker");
         }
     }
     let failed_hosts = failed.into_boxed();
     let confirmed = failed_hosts.is_empty();
-    match leaving {
+    match pending.leaving {
         crate::changes::Leaving::Source(request) => {
             out.push(Request::Answer { request, answer: crate::Answer::SignedOut { confirmed, failed_hosts } });
         }
@@ -335,13 +363,13 @@ pub fn sign_out(
     if name(domain, source, holder).is_none() {
         return Err(Refusal::Unknown);
     }
-    if domain.signing_out.contains_key(&source)
-        || domain.signing_out.len() == domain.signing_out.capacity()
+    if domain.programs.contains_key(&source)
         || domain.programs.len() >= env.limits.program_names
+        || domain.programs.len() == domain.programs.capacity()
     {
         return Err(Refusal::Limit { bound: crate::Bound::Sources });
     }
-    begin(domain, source, crate::changes::Leaving::Source(request), out);
+    begin(domain, &env.limits, source, crate::changes::Leaving::Source(request), out);
     Ok(())
 }
 
@@ -349,7 +377,7 @@ pub fn sign_out(
 #[must_use]
 pub fn owner(domain: &Domain, name: &[u8]) -> Option<Holder> {
     for (_, issued) in &domain.issued {
-        if issued.name.as_ref() == name {
+        if issued.name.as_bytes() == name {
             return Some(issued.holder);
         }
     }

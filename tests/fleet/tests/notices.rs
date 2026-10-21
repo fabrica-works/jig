@@ -29,7 +29,7 @@ fn step(domain: &mut Domain, event: Event) -> Vec<Request> {
 
 fn hello(channel: Token) -> Event {
     Event::Hello {
-        worker: 0,
+        worker: u32::try_from(channel.raw()).expect("fixture channel") % jig_fleet_world::LIMITS.configured_workers,
         channel,
         hello: Hello {
             bounds: jig_fleet_world::fixtures::bounds(),
@@ -43,7 +43,7 @@ fn hello(channel: Token) -> Event {
 
 /// An attempt hosted by `WORKER`, with `OTHER` also in contact.
 fn hosted() -> Domain {
-    let mut domain = Domain::new(&LIMITS, jig_fleet_world::fixtures::needs());
+    let mut domain = jig_fleet_world::fixtures::domain(&LIMITS, jig_fleet_world::fixtures::needs());
     assert!(step(&mut domain, hello(WORKER)).is_empty());
     let start = Event::Start {
         placement: None,
