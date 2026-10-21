@@ -1,5 +1,6 @@
 //! Binary, native person and independent provider on Skein's real ring.
 pub mod d2;
+pub mod trace;
 use jig_client_protocol_world::native::{NativeClient, Script};
 use skein_io::kernel::{Complete, Done, Fd, Op, Signal, Submit};
 use skein_lib::{Duration, Queue, Time, Token, Wall};
@@ -22,17 +23,24 @@ pub(super) fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
 }
-pub fn agent_configuration(directory: &Path) {
-    let value = serde_json::json!({
+pub(super) fn agent_value(directory: &Path) -> serde_json::Value {
+    serde_json::json!({
         "profile":{"name":"standard","declared":{"tool_payload":512,"read_window":256},
             "policy":{"max_turns":5,"group_stop":10}},
         "endpoints":[{"name":"fake","number":0,"dialect":3,"account":1,"provider":"openai",
             "address":"127.0.0.1:34443","transport":"tls","server_name":"skein.test","trust_der":directory.join("root.der"),"identity":"plain","connect":1000,"handshake":1000,
             "models":[{"name":"fake","window":1_048_576,"output":1024,"reasoning_item":64,"prices":{"input":1,"cached":1,"output":1,"unit":1000},"head":60000,"idle":30000}]}],
-        "environment":[]});
+        "environment":[]})
+}
+pub fn agent_configuration(directory: &Path) {
+    let value = agent_value(directory);
     private(&directory.join("agent.json"), &serde_json::to_vec(&value).expect("agent JSON"));
 }
 pub fn configuration(directory: &Path) {
+    let value = configuration_value(directory);
+    private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
+}
+pub(super) fn configuration_value(directory: &Path) -> serde_json::Value {
     for name in ["secrets", "charters", "state", "agent-root"] {
         fs::create_dir(directory.join(name)).expect("deployment directory");
     }
@@ -59,7 +67,7 @@ pub fn configuration(directory: &Path) {
     value["engine"]["llm"]["endpoints"][0]["dialect"] = 3.into();
     value["engine"]["limits"]["overrides"]["core.load_slots"] = 8.into();
     value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
-    private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
+    value
 }
 pub fn start(directory: &Path) -> Binary {
     Binary::start(
@@ -255,7 +263,7 @@ impl Host for Person {
         512
     }
 }
-enum Process {
+pub(super) enum Process {
     Binary(Box<Binary>),
     Person(Box<Person>),
     Peer(Box<skein_fake_peers::llm::Peer>),

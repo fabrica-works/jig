@@ -381,6 +381,10 @@ section 2).
   on its test worker's host (`llm.md`, 5.4 and 5.5), a native client
   signing in by the printed link, and a request answered by a real
   model, within a bound on calls. No record is read from a file.
+  Run `scripts/live-sign-in.sh` for a fresh ChatGPT sign-in, a model answer
+  and confirmed sign-out; it prints the browser link and the SSH tunnel
+  needed for the fixed loopback callback on port 1455, and however the
+  run ends, the sign-in's record does not outlive it.
 - **The browser tier:** `jig-test` serving jig's test application's
   bundle and the mapping at `/jig`, and Chromium, children of the
   harness's loop, a person in a page, and jig's attack stories against

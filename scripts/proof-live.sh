@@ -35,6 +35,6 @@ except Exception:
 PY
 started=$SECONDS
 status=0
-timeout --signal=TERM --kill-after=5s 300s cargo nextest run -p jig-test --profile live --success-output immediate || status=$?
+timeout --signal=TERM --kill-after=5s 300s cargo nextest run -p jig-test --profile live --success-output immediate -E 'test(=a_native_client_s_chat_is_answered_by_a_real_model)' || status=$?
 printf "Live proof script wall=%ss; exit=%s\n" "$((SECONDS-started))" "$status"
 exit "$status"

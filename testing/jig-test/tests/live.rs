@@ -1,12 +1,15 @@
-//! One borrowed account, a real agent completion, and the native person's answer.
-#[expect(dead_code, reason = "shared process support; live uses only the explicit D2 entry")]
+//! Real accounts and model answers through the shipped service and native client.
+#[expect(dead_code, reason = "shared process support; live uses the account sign-in and explicit D2 entries")]
 mod support;
 use jig_client_protocol_world::native::Script;
 use jig_protocol_config as config;
 use jig_protocol_store::{codec, transcripts};
 use skein_lib::Duration;
 use skein_shell::Clock;
-use std::{fs, path::Path};
+use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+
+#[path = "support/live_sign_in.rs"]
+mod live_sign_in;
 
 const INSTRUCTIONS: &str = "Report exactly: Process answer";
 const WORDS: &str = "Follow the first sentence.";
@@ -35,14 +38,7 @@ fn configuration(directory: &Path, source: &Path) -> codec::Limits {
     engine["charters"][0]["waiting_ms"] = 10_000.into();
     let bytes = serde_json::to_vec(&value).expect("live deployment JSON");
     fs::write(&path, &bytes).expect("live deployment configuration");
-    let document = config::document(&bytes, &config::DocumentLimits { bytes: 1 << 20, tokens: 1 << 20, depth: 32 })
-        .expect("live document");
-    let at = config::read::Object::new(&document, 0)
-        .expect("document object")
-        .member(&document, b"engine")
-        .expect("engine member");
-    let engine = config::engine(&document, at, &config::Directories::working()).expect("live engine configuration");
-    let limits = codec::limits(&engine.limits.core).expect("live store codec limits");
+    let limits = store_limits(&bytes);
     let raw = fs::read(settings["account_file"].as_str().expect("D2 record path")).expect("D2 handed-in fixture");
     support::d2::preseed(directory, &raw);
     let path = directory.join("agent.json");
@@ -69,6 +65,17 @@ fn configuration(directory: &Path, source: &Path) -> codec::Limits {
     fs::write(path, serde_json::to_vec(&agent).expect("live agent JSON")).expect("live agent configuration");
     fs::write(directory.join("charters/chat.txt"), INSTRUCTIONS.as_bytes()).expect("live charter");
     limits
+}
+
+fn store_limits(bytes: &[u8]) -> codec::Limits {
+    let document = config::document(bytes, &config::DocumentLimits { bytes: 1 << 20, tokens: 1 << 20, depth: 32 })
+        .expect("live document");
+    let at = config::read::Object::new(&document, 0)
+        .expect("document object")
+        .member(&document, b"engine")
+        .expect("engine member");
+    let engine = config::engine(&document, at, &config::Directories::working()).expect("live engine configuration");
+    codec::limits(&engine.limits.core).expect("live store codec limits")
 }
 
 fn completions(directory: &Path, limits: &codec::Limits) -> u32 {
@@ -144,4 +151,45 @@ fn a_native_client_s_chat_is_answered_by_a_real_model() {
     assert!(captured, "the provider request includes charter and task words");
     assert!((1..=5).contains(&count), "at most five real completions, and at least one answer");
     assert_eq!(outcome, (1, 1));
+}
+
+#[test]
+fn a_person_signs_in_to_chatgpt_and_a_real_model_answers() {
+    let directory = support::scratch();
+    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).expect("private live scratch");
+    let clock = Clock::new();
+    let started = clock.now().now;
+    let result = std::panic::catch_unwind(|| {
+        let limits = live_sign_in::configuration(directory.path());
+        let outcome = live_sign_in::run(directory.path(), started);
+        let count = completions(directory.path(), &limits);
+        eprintln!("live completions={count}");
+        assert!(
+            capture(directory.path(), &directory.path().join("live-request.json")),
+            "the provider request includes charter and task words"
+        );
+        support::trace::check(directory.path(), None);
+        assert!((1..=5).contains(&count), "at most five real completions, and at least one answer");
+        assert_eq!(outcome, (1, 1));
+    });
+    let wall_ms = clock.now().now.saturating_since(started).as_nanos() / 1_000_000;
+    eprintln!("live ChatGPT wall={wall_ms}ms");
+    if let Err(failed) = result {
+        // The secrets' store holds the sign-in's record (store.md, section 2), and a
+        // trace that failed its check may hold a credential.
+        for secret in ["state/secrets", "secrets", "agent-trace.jsonl"] {
+            let path = directory.path().join(secret);
+            if path.is_dir() {
+                fs::remove_dir_all(path).expect("erase failed live test's secrets before retaining diagnostics");
+            } else if path.exists() {
+                fs::remove_file(path).expect("erase failed live test's trace before retaining diagnostics");
+            }
+        }
+        let path = directory.keep();
+        eprintln!("live failed state retained without secrets at {}", path.display());
+        eprintln!(
+            "A sign-in that did not sign out may still be listed at the issuer. Disconnect it in ChatGPT's settings, under Apps."
+        );
+        std::panic::resume_unwind(failed);
+    }
 }

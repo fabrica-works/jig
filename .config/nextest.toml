@@ -34,9 +34,16 @@ test-threads = 1
 
 [profile.live]
 default-filter = "binary(=live)"
-global-timeout = "5m"
+global-timeout = "12m"
+slow-timeout = { period = "5m", terminate-after = 1 }
 test-threads = 1
 retries = 0
+
+# The driver's five-minute sign-in, then a bounded answer and confirmed
+# sign-out, within the test's own ten minutes: this only backs that bound up.
+[[profile.live.overrides]]
+filter = "test(=a_person_signs_in_to_chatgpt_and_a_real_model_answers)"
+slow-timeout = { period = "11m", terminate-after = 1 }
 
 # Chromium against jig-test, within one minute.
 [profile.browser]

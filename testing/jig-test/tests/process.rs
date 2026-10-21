@@ -37,6 +37,15 @@ fn the_explicit_d2_preseed_reaches_the_shipped_driver_without_a_configured_accou
     );
 }
 
+#[test]
+fn an_agent_trace_captures_content_without_the_grant_or_authorization_header() {
+    let directory = support::scratch();
+    support::configuration(directory.path());
+    support::trace::configure(directory.path());
+    assert_eq!(support::run(directory.path(), Script::answered_chat(b"Hello", support::ANSWER), Some(peer())), (1, 1));
+    support::trace::check(directory.path(), Some(b"token"));
+}
+
 #[path = "support/browser.rs"]
 mod browser;
 #[test]

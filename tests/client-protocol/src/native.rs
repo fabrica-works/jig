@@ -106,6 +106,7 @@ pub struct NativeClient {
     address: client::Address,
     started: bool,
     person_done: bool,
+    hold_after_script: bool,
     account_sign_in_controlled: bool,
     wake: Option<Time>,
     closing: bool,
@@ -139,6 +140,7 @@ impl NativeClient {
             address: jig_client_world::stories::conversation(),
             started: false,
             person_done: false,
+            hold_after_script: false,
             account_sign_in_controlled: false,
             wake: None,
             closing: false,
@@ -177,8 +179,17 @@ impl NativeClient {
         self.account_sign_in_controlled = false;
         self.wake = Some(self.env.now);
     }
+    /// Keep the answered script's client open for the referee's account sign-out.
+    pub fn hold_after_script(&mut self) {
+        self.hold_after_script = true;
+    }
+    #[must_use]
+    pub fn script_finished(&self) -> bool {
+        self.person_done
+    }
     /// Drain the native client after the account sign-in referee saw its answers.
     pub fn finish_account_sign_in(&mut self) {
+        self.hold_after_script = false;
         self.account_sign_in_controlled = false;
         self.person_done = true;
         self.wake = Some(self.env.now);
@@ -350,7 +361,7 @@ impl Host for NativeClient {
             self.outputs();
         }
         self.text_step(now, changed);
-        if !self.closing && self.person_done && self.root.jig().chats().starting.is_none() {
+        if !self.closing && !self.hold_after_script && self.person_done && self.root.jig().chats().starting.is_none() {
             self.closing = true;
             self.shell.close();
         }
