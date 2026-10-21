@@ -1697,6 +1697,7 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
         Stored::Policy { .. } | Stored::EndedRead { .. } => false,
         Stored::Answer { key, ask, models, outcome, at } => {
             valid_ask(&env.limits, ask)
+                && crate::batch::restore_shaped(ask)
                 && crate::valid_model_context(ask, models)
                 && valid_program_outcome(&env.limits, outcome)
                 && valid_answer_shape(ask, outcome.clone())

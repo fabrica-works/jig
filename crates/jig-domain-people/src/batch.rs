@@ -180,3 +180,54 @@ pub enum EndedBy {
     Result,
     Requester,
 }
+
+/// An open task is an agent's conversation (5.8).
+#[must_use]
+pub fn shaped(member: &Member) -> bool {
+    if member.flags.ended_by == EndedBy::Result {
+        return true;
+    }
+    let agent = match member.executor {
+        TaskExecutor::Agent { .. } => true,
+        TaskExecutor::Person(_) | TaskExecutor::Procedure { .. } => false,
+    };
+    member.flags.conversation && agent
+}
+
+pub(crate) fn restore_shaped(ask: &crate::Ask) -> bool {
+    let batch = match ask {
+        crate::Ask::Create { batch, .. } | crate::Ask::Propose { action: Action::Batch(batch), .. } => batch,
+        crate::Ask::Propose { action: Action::Amend { .. }, .. }
+        | crate::Ask::Compound { .. }
+        | crate::Ask::MarkSeen { .. }
+        | crate::Ask::Application { .. }
+        | crate::Ask::EditNote { .. }
+        | crate::Ask::MakeService { .. }
+        | crate::Ask::Adopt { .. }
+        | crate::Ask::Withdraw { .. }
+        | crate::Ask::Stop { .. }
+        | crate::Ask::Cancel { .. }
+        | crate::Ask::Release { .. }
+        | crate::Ask::TakePerson { .. }
+        | crate::Ask::HandBackPerson { .. }
+        | crate::Ask::AnswerPerson { .. }
+        | crate::Ask::Move { .. }
+        | crate::Ask::DecideProposal { .. }
+        | crate::Ask::Say { .. }
+        | crate::Ask::AnswerQuestion { .. }
+        | crate::Ask::Amend { .. }
+        | crate::Ask::SetRoles { .. }
+        | crate::Ask::ChangePolicy { .. }
+        | crate::Ask::SetPool { .. }
+        | crate::Ask::DecideEscalation { .. }
+        | crate::Ask::AccountSignIn { .. }
+        | crate::Ask::AccountSignOut { .. }
+        | crate::Ask::AccountChange { .. } => return true,
+    };
+    for member in batch {
+        if !shaped(member) {
+            return false;
+        }
+    }
+    true
+}

@@ -346,7 +346,7 @@ fn well_formed(batch: &[people::Member]) -> Result<(), people::Refusal> {
             people::Budget::Named => false,
             people::Budget::AsAllowed { .. } => true,
         };
-        let why = if member.flags.ended_by == people::EndedBy::Requester && (!agent || !member.flags.conversation) {
+        let why = if !people::shaped(member) {
             Some(people::Malformed::EndedBy)
         } else if member.flags.conversation && !agent {
             Some(people::Malformed::Conversation)
