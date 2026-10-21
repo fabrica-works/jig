@@ -59,6 +59,19 @@ fn configured_accounts_are_unknown_at_their_exact_path() {
     );
 }
 #[test]
+fn a_zero_price_or_unit_is_refused_at_its_path() {
+    let cases: &[(&[u8], &[u8], &[u8])] = &[
+        (br#""input": 1"#, br#""input": 0"#, b"input"),
+        (br#""cached": 1"#, br#""cached": 0"#, b"cached"),
+        (br#""output": 1,"#, br#""output": 0,"#, b"output"),
+        (br#""unit": 1000"#, br#""unit": 0"#, b"unit"),
+        (br#""unit": 1000"#, br#""unit": 1000, "cache_write": 0"#, b"cache_write"),
+    ];
+    for (from, to, member) in cases {
+        fixtures::refuses(from, to, model_path(b"prices").member(member), What::Bound);
+    }
+}
+#[test]
 fn a_cache_write_price_may_be_left_out() {
     assert_eq!(model(fixtures::ENGINE_SMALL).cache_write_price, None);
 }
@@ -67,6 +80,48 @@ fn a_cache_write_price_is_kept_when_named() {
     let bytes = fixtures::with(fixtures::ENGINE_SMALL, br#""unit": 1000"#, br#""unit": 1000, "cache_write": 3"#);
     let bytes = fixtures::with(&bytes, br#""spend": 20"#, br#""spend": 60"#);
     assert_eq!(model(&bytes).cache_write_price, Some(3));
+}
+fn with_description(description: &str) -> Box<[u8]> {
+    let member = format!(r#""output": 1024, "description": {description},"#);
+    fixtures::with(fixtures::ENGINE_SMALL, br#""output": 1024,"#, member.as_bytes())
+}
+#[test]
+fn a_model_description_holds_512_bytes_of_text() {
+    // 256 two-byte characters reach MODEL_DESCRIPTION_BYTES without counting characters.
+    let description = "é".repeat(256);
+    let bytes = with_description(&format!("\"{description}\""));
+    let engine = fixtures::engine(&bytes).unwrap();
+    assert_eq!(engine.llm.descriptions.as_ref(), [Some(description.into_bytes().into_boxed_slice())]);
+}
+#[test]
+fn a_model_without_a_description_keeps_none() {
+    let engine = fixtures::engine(fixtures::ENGINE_SMALL).unwrap();
+    assert_eq!(engine.llm.descriptions.as_ref(), [None]);
+}
+#[test]
+fn invalid_model_descriptions_are_refused_at_their_path() {
+    // One byte beyond MODEL_DESCRIPTION_BYTES.
+    let long = format!("\"{}\"", "d".repeat(513));
+    for (description, what) in [(long.as_str(), What::Bound), (r#""""#, What::Form), ("7", What::Kind)] {
+        let problems = fixtures::engine(&with_description(description)).unwrap_err();
+        assert_eq!(problems.problems.get(0), Some(&crate::Problem { path: model_path(b"description"), what }));
+    }
+}
+#[test]
+fn a_later_model_keeps_its_description_in_order() {
+    let bytes = fixtures::with(
+        fixtures::ENGINE_SMALL,
+        br#""unit": 1000}
+}]"#,
+        br#""unit": 1000}
+}, {"name":"later","description":"For later work","endpoint":"fake","window":8192,"output":1024,
+"prices":{"input":1,"cached":1,"output":1,"unit":1000}}]"#,
+    );
+    let bytes = fixtures::with(&bytes, br#""models":["small"]"#, br#""models":["small","later"]"#);
+    let engine = fixtures::engine(&bytes).unwrap();
+    let names: Vec<_> = engine.llm.models.iter().map(|model| model.name.as_ref()).collect();
+    assert_eq!(names, [b"small".as_slice(), b"later".as_slice()]);
+    assert_eq!(engine.llm.descriptions.as_ref(), [None, Some(Box::from(b"For later work".as_slice()))]);
 }
 #[test]
 fn a_model_takes_the_efforts_it_names_in_order() {

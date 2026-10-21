@@ -62,7 +62,8 @@ pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, Template
 mod amendment;
 mod models;
 pub use models::{
-    MODEL_NAME_BYTES, Models, model_names_worst_case, remap_models, valid_model_context, valid_model_names,
+    MODEL_DESCRIPTION_BYTES, MODEL_NAME_BYTES, Models, model_names_worst_case, remap_models, valid_model_context,
+    valid_model_names,
 };
 mod batch;
 pub use batch::{

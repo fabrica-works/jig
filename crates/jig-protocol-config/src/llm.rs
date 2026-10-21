@@ -11,6 +11,8 @@ pub(crate) const MODELS: u32 = 64;
 pub struct Llm {
     pub endpoints: Box<[Endpoint]>,
     pub models: Box<[Model]>,
+    /// Optional descriptions, one per model in the same order (configuration.md, 3).
+    pub descriptions: Box<[Option<Box<[u8]>>]>,
     /// Every model belongs to one numbered provider (configuration.md, 3).
     pub providers: Box<[Provider]>,
 }
@@ -65,23 +67,30 @@ pub(crate) fn parse(
         }
     }
     let mut models = List::<Model>::with_capacity(document.len());
+    let mut descriptions = List::with_capacity(document.len());
     if let Some(items) = check::list(&mut object, document, b"models", MODELS, path, problems) {
         for (index, at) in items.iter().enumerate() {
             let path = path.member(b"models").child(Segment::Index(u32::try_from(index).expect("list bounded by u32")));
             if let Some(value) = model(document, *at, &path, endpoints.as_slice(), problems) {
                 for previous in &models {
-                    if previous.name == value.name {
+                    if previous.name == value.model.name {
                         problems.push(path.member(b"name"), What::Unique);
                         break;
                     }
                 }
-                models.push(value).expect("input count bounded");
+                models.push(value.model).expect("input count bounded");
+                descriptions.push(value.description).expect("one description per model");
             }
         }
     }
     let providers = providers::parse(&mut object, document, path, models.as_slice(), directories, problems);
     object.finish(document, path, problems);
-    Some(Llm { endpoints: endpoints.into_boxed(), models: models.into_boxed(), providers: providers.into_boxed() })
+    Some(Llm {
+        endpoints: endpoints.into_boxed(),
+        models: models.into_boxed(),
+        descriptions: descriptions.into_boxed(),
+        providers: providers.into_boxed(),
+    })
 }
 fn endpoint(
     document: &Document,
@@ -180,7 +189,17 @@ fn headers(object: &mut read::Object, document: &Document, path: &Path, problems
     }
     result
 }
-fn model(document: &Document, at: u32, path: &Path, endpoints: &[Endpoint], problems: &mut Problems) -> Option<Model> {
+struct ParsedModel {
+    model: Model,
+    description: Option<Box<[u8]>>,
+}
+fn model(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    endpoints: &[Endpoint],
+    problems: &mut Problems,
+) -> Option<ParsedModel> {
     let mut object = check::object(document, at, path, problems)?;
     let mut name = None;
     if let Some(at) = object.required(document, b"name", path, problems) {
@@ -199,6 +218,14 @@ fn model(document: &Document, at: u32, path: &Path, endpoints: &[Endpoint], prob
     let mut prices = None;
     if let Some(at) = object.required(document, b"prices", path, problems) {
         prices = price(document, at, &path.member(b"prices"), problems);
+    }
+    let mut description = None;
+    if let Some(at) = object.member(document, b"description") {
+        match read::text(document, at, jig_domain_core::MODEL_DESCRIPTION_BYTES) {
+            Ok(value) if value.is_empty() => problems.push(path.member(b"description"), What::Form),
+            Ok(value) => description = Some(value),
+            Err(what) => problems.push(path.member(b"description"), what),
+        }
     }
     object.finish(document, path, problems);
     let mut found = None;
@@ -221,7 +248,7 @@ fn model(document: &Document, at: u32, path: &Path, endpoints: &[Endpoint], prob
     model.window = window?;
     model.output = output?;
     model.efforts = efforts?;
-    Some(model)
+    Some(ParsedModel { model, description })
 }
 /// The efforts a model takes, by name in order, none when absent (configuration.md, 3).
 fn model_efforts(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Box<[Box<[u8]>]>> {
@@ -268,6 +295,17 @@ fn price(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         match read::integer(document, at, u64::MAX) {
             Ok(value) => cache_write_price = Some(value),
             Err(what) => problems.push(path.member(b"cache_write"), what),
+        }
+    }
+    for (member, zero) in [
+        (b"input".as_slice(), input_price == Some(0)),
+        (b"cached".as_slice(), cached_price == Some(0)),
+        (b"output".as_slice(), output_price == Some(0)),
+        (b"unit".as_slice(), price_unit == Some(0)),
+        (b"cache_write".as_slice(), cache_write_price == Some(0)),
+    ] {
+        if zero {
+            problems.push(path.member(member), What::Bound);
         }
     }
     object.finish(document, path, problems);

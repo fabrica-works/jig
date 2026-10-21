@@ -340,9 +340,8 @@ pub const EFFORTS: u32 = 16;
 /// The most bytes in an effort's name: the bound smith's charter holds an effort to
 /// (smith's protocol/charter.md, sections 2 and 6).
 pub const EFFORT_BYTES: u32 = 32;
-/// The most bytes in a configured model's name, configuration's bound on a text
-/// (configuration.md, 3).
-pub use jig_domain_people::MODEL_NAME_BYTES;
+/// Byte bounds on a configured model's name and description (configuration.md, 6).
+pub use jig_domain_people::{MODEL_DESCRIPTION_BYTES, MODEL_NAME_BYTES};
 
 /// Root-owned charter policy, independent of Smith's run vocabulary.
 #[derive(Clone, PartialEq, Eq, Debug)]

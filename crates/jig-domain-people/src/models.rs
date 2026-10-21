@@ -4,6 +4,8 @@ use alloc::boxed::Box;
 
 use crate::MODELS;
 pub const MODEL_NAME_BYTES: u32 = 4_096;
+/// The most bytes in a configured model's description (configuration.md, 6).
+pub const MODEL_DESCRIPTION_BYTES: u32 = 512;
 
 /// A literal ALL or a frozen mask into its enclosing record's model-name context.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
