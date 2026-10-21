@@ -102,7 +102,7 @@ impl Files {
                 terminal(owner, result, file::Event::Removed { owner })
             }
             file::Request::Rename { owner, from_root, to_root, from, to } => {
-                let result = self.machine.rename(opened(from_root), &from, opened(to_root), &to);
+                let result = self.machine.rename(opened(from_root), &from, opened(to_root), &to, false);
                 terminal(owner, result, file::Event::Renamed { owner })
             }
             file::Request::OpenPrivate { .. }

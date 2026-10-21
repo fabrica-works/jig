@@ -157,7 +157,12 @@ impl Tier {
             server: jig_test(),
             args: args.clone(),
             restart: args,
-            printed: Printed { prefix: b"http://127.0.0.1:", on: Output::Stdout, names: Names::Url },
+            printed: Printed {
+                sent: skein_fake_person_browser::Sent::Page,
+                prefix: b"http://127.0.0.1:",
+                on: Output::Stdout,
+                names: Names::Url,
+            },
             chromium: chromium(),
             expected: vec![],
             origins: vec![],

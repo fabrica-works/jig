@@ -140,8 +140,6 @@ fn agent_document(directory: &std::path::Path, program: bool) -> PathBuf {
         "environment":[{"name":"JIG_SOURCE_CHECK","value":"configured"}]
     });
     if program {
-        // Smith's program backend exceeds the standard profile's default memory declaration.
-        value["profile"]["declared"]["memory"] = (3_u64 << 30).into();
         value["programs"] = serde_json::json!({"claude_code":{
             "path":directory.join("private-claude"),"directory":directory.join("private-programs")
         }});

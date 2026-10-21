@@ -536,7 +536,9 @@ fn owner_history_normal_selected_language_checks_all_holes_and_nested_tree_bindi
         for hole in &shape.holes {
             let value = match hole.kind {
                 skein_ui::phrases::HoleKind::Number => Hole::Number(u64::MAX),
-                skein_ui::phrases::HoleKind::Wall => Hole::Wall(Wall::from_nanos(u64::MAX)),
+                skein_ui::phrases::HoleKind::Wall
+                | skein_ui::phrases::HoleKind::Date
+                | skein_ui::phrases::HoleKind::Moment => Hole::Wall(Wall::from_nanos(u64::MAX)),
                 skein_ui::phrases::HoleKind::Amount
                 | skein_ui::phrases::HoleKind::Span
                 | skein_ui::phrases::HoleKind::Name
