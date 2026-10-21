@@ -205,7 +205,7 @@ pub(crate) fn engine_application_generation(inherited: &Inherited) -> Proc {
 fn engine_configured(inherited: &Inherited, calls: bool) -> Proc {
     engine_document(inherited, &if calls { fixtures::engine_call_document() } else { fixtures::engine_document() })
 }
-fn engine_document(inherited: &Inherited, document: &[u8]) -> Proc {
+pub(crate) fn engine_document(inherited: &Inherited, document: &[u8]) -> Proc {
     let mut service =
         jig_test_service::startup(document, &fixtures::files(false), None, &fixtures::seeds(), None, None)
             .expect("engine configuration");
@@ -230,12 +230,29 @@ pub(crate) fn worker_providers(root: kernel::Fd) -> Proc {
     worker_configured(root, false, false, true)
 }
 fn worker_configured(root: kernel::Fd, bad_charter: bool, message: bool, providers: bool) -> Proc {
-    worker_document(root, bad_charter, message, providers, fixtures::WORKER_DOCUMENT)
+    worker_document(root, bad_charter, message, providers, Backend::Direct, fixtures::WORKER_DOCUMENT)
 }
-fn worker_document(root: kernel::Fd, bad_charter: bool, message: bool, providers: bool, document: &[u8]) -> Proc {
+#[derive(Clone, Copy)]
+enum Backend {
+    Direct,
+    Program,
+}
+fn worker_document(
+    root: kernel::Fd,
+    bad_charter: bool,
+    message: bool,
+    providers: bool,
+    backend: Backend,
+    document: &[u8],
+) -> Proc {
     let mut roots = skein_lib::List::with_capacity(1);
     roots.push(root).expect("one worker root");
-    let mut agent = fixtures::agent();
+    let programs = matches!(backend, Backend::Program);
+    let mut agent =
+        if programs { fixtures::agent_with_limits(&crate::program_runs::limits()) } else { fixtures::agent() };
+    if programs {
+        agent.bounds.models[0].window = 272_000;
+    }
     if providers {
         let mut models = agent.bounds.models.into_vec();
         models.push(jig_domain_host::ModelBound { name: b"other".as_slice().into(), window: 1_048_576, output: 512 });
@@ -543,11 +560,26 @@ pub(crate) fn auth(spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
     Proc::Auth(Box::new((smith_fake_claude::hosted(b"claude").make)(spawn, inherited)))
 }
 pub(crate) fn worker_programs(root: kernel::Fd) -> Proc {
-    let document = String::from_utf8(fixtures::WORKER_DOCUMENT.to_vec())
-        .expect("fixture JSON")
-        .replace(r#""hub.slots":1"#, r#""hub.detail_bytes":8,"hub.slots":1"#);
-    assert!(document.contains(r#""hub.detail_bytes":8"#), "tiny source detail fixture");
-    let mut worker = worker_document(root, false, false, false, document.as_bytes());
+    worker_programs_with(root, false)
+}
+pub(crate) fn worker_program_runs(root: kernel::Fd) -> Proc {
+    worker_programs_with(root, true)
+}
+fn worker_programs_with(root: kernel::Fd, runs: bool) -> Proc {
+    let document = String::from_utf8(fixtures::WORKER_DOCUMENT.to_vec()).expect("fixture JSON");
+    let document = if runs {
+        document.replace("agent-program", "program-agent")
+    } else {
+        document.replace(r#""hub.slots":1"#, r#""hub.detail_bytes":8,"hub.slots":1"#)
+    };
+    let mut worker = worker_document(
+        root,
+        false,
+        false,
+        false,
+        if runs { Backend::Program } else { Backend::Direct },
+        document.as_bytes(),
+    );
     let Proc::Worker(host) = &mut worker else { unreachable!("worker factory") };
     host.service
         .configure_program_sources(
@@ -555,7 +587,11 @@ pub(crate) fn worker_programs(root: kernel::Fd) -> Proc {
             jig_test_service::program_sources::Resources::new(
                 smith_protocol_program::Programs {
                     directory: b"/private/programs".as_slice().into(),
-                    claude: b"claude".as_slice().into(),
+                    claude: if runs {
+                        b"/private/programs/claude".as_slice().into()
+                    } else {
+                        b"claude".as_slice().into()
+                    },
                 },
                 Box::new([
                     Box::from(b"HOME=/private/home".as_slice()),

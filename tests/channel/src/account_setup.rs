@@ -5,7 +5,14 @@ use jig_client_protocol_world::native::Received;
 use skein_lib::Secret;
 
 #[derive(Default)]
+enum SourceKind {
+    #[default]
+    Key,
+    Program,
+}
+#[derive(Default)]
 pub(crate) struct Setup {
+    kind: SourceKind,
     phase: u32,
     answers: usize,
     source: Option<u32>,
@@ -17,6 +24,13 @@ pub(crate) struct Setup {
     work_pending: Option<jig_fake_parties::Up>,
 }
 impl Setup {
+    pub(crate) fn program() -> Self {
+        Self { kind: SourceKind::Program, ..Self::default() }
+    }
+
+    pub(crate) fn source(&self) -> Option<u32> {
+        self.source
+    }
     pub(crate) fn ready(&self) -> bool {
         self.phase == 3
     }
@@ -40,14 +54,25 @@ impl Setup {
         }
         if self.phase == 0 && client.account_sign_in_ready() {
             let value = if matches!(story, Story::Key { .. }) { crate::fixtures::KEY } else { crate::fixtures::TOKEN };
-            client.account_request(accounts::add_key(
-                key(1),
-                [71; 16],
-                c::AccountHolder::Deployment,
-                1,
-                None,
-                Secret::new(value.into()),
-            ));
+            if matches!(self.kind, SourceKind::Program) {
+                client.account_request(accounts::declare_program(
+                    key(1),
+                    [71; 16],
+                    c::AccountHolder::Own,
+                    1,
+                    None,
+                    b"alice".as_slice().into(),
+                ));
+            } else {
+                client.account_request(accounts::add_key(
+                    key(1),
+                    [71; 16],
+                    c::AccountHolder::Deployment,
+                    1,
+                    None,
+                    Secret::new(value.into()),
+                ));
+            }
             self.phase = 1;
         }
         let replies: Vec<_> = client
@@ -55,7 +80,10 @@ impl Setup {
             .iter()
             .filter_map(|r| {
                 if let Received::Answer {
-                    answer: answer @ c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountKeyKept { .. })),
+                    answer:
+                        answer @ c::Answer::Done(c::Outcome::Owner(
+                            c::OwnerOutcome::AccountKeyKept { .. } | c::OwnerOutcome::AccountProgramDeclared { .. },
+                        )),
                     ..
                 } = r
                 {
@@ -66,8 +94,11 @@ impl Setup {
             })
             .collect();
         for answer in &replies[self.answers..] {
-            let c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountKeyKept { source })) = answer else {
-                panic!("fixture key kept: {answer:?}");
+            let c::Answer::Done(c::Outcome::Owner(
+                c::OwnerOutcome::AccountKeyKept { source } | c::OwnerOutcome::AccountProgramDeclared { source, .. },
+            )) = answer
+            else {
+                panic!("fixture source admitted: {answer:?}");
             };
             self.source = Some(*source);
             if self.phase == 1 && matches!(story, Story::Providers) {

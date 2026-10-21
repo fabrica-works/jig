@@ -557,7 +557,9 @@ holds, and neither of its components reads them.
   follows: jig's accounts' for an LLM credential, the application's for
   the application form, and the form's own name for a program source.
   The worker's link derives the form from the value as it decodes it,
-  and hands that form to smith with the grant.
+  and hands that form to smith with the grant. A program grant takes no
+  entry in the worker's table: the adapter hands smith the form's source
+  name as its program value, at start and on renewal.
   The notices limited, refused and unauthorized are LLM accounts' only
   (`../domain/engine.md`, section 12). A worker's configuration holds no
   credential but its own secret; a program's login is the program's own,

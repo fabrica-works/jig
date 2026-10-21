@@ -158,8 +158,10 @@ pub(crate) fn endpoints() -> smith_protocol_channel::Endpoints {
 }
 #[must_use]
 pub fn agent() -> jig_test_service::Agent {
+    agent_with_limits(&smith_agent_process_world::limits())
+}
+pub(crate) fn agent_with_limits(agent_limits: &smith_agent_service::Limits) -> jig_test_service::Agent {
     use skein_lib::Duration;
-    let agent_limits = smith_agent_process_world::limits();
     let host_limits = smith_host_domain::Limits {
         agents: 1,
         directories: 1,

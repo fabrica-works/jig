@@ -97,6 +97,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+serde_json = "1"
 skein-fake-person-browser = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-ui-bundle = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-scratch = { git = "https://github.com/fabrig-dev/skein.git" }

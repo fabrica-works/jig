@@ -563,8 +563,10 @@ The check joins each candidate host's kept program logins to the accounts' issue
 names and their original holders. Every bound account must satisfy that host's
 rule, including retained providers. Deployment-held logins restrict no run;
 a deployment with at most one person is unaffected. A program source is chosen
-only where its login is usable; the engine never takes one. Program grants and
-backends follow in JP12. Until configuration's providers-only conversion, legacy
+only where its login is usable; the engine never takes one. A program source's
+run is granted its source's name and runs on smith's program backend, for the
+program its endpoint names (`../protocol/configuration.md`, section 3). Until
+configuration's providers-only conversion, legacy
 model account fields seed deployment-held accounts only; neither admission nor
 the per-run charter routes by them.
 

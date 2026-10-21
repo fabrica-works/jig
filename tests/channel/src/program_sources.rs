@@ -19,9 +19,9 @@ use std::{
     rc::Rc,
 };
 
-struct Files {
-    files: skein_fake_machine::Machine,
-    base: Opened,
+pub(crate) struct Files {
+    pub(crate) files: skein_fake_machine::Machine,
+    pub(crate) base: Opened,
 }
 impl Machine for Files {
     fn open_root(&mut self, path: &[u8]) -> Result<skein_sim::Handle, kernel::Error> {

@@ -8,6 +8,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+serde_json.workspace = true
+smith-transcript.workspace = true
 jig-domain-fleet.workspace = true
 smith-fake-claude.workspace = true
 smith-protocol-program.workspace = true

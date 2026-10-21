@@ -325,6 +325,7 @@ dependencies = [
  "jig-test-domain",
  "jig-test-service",
  "jig-test-store",
+ "serde_json",
  "skein-channel",
  "skein-fake-channel",
  "skein-fake-llm-domain",
@@ -349,6 +350,7 @@ dependencies = [
  "smith-protocol-channel",
  "smith-protocol-llm",
  "smith-protocol-program",
+ "smith-transcript",
 ]
 
 [[package]]
