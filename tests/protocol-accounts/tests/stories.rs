@@ -77,7 +77,21 @@ fn a_partys_account_sign_in_is_made_with_an_issued_client_id() {
     );
 }
 #[test]
-fn an_account_visit_address_carries_the_installation_id_and_the_name_hint() {
+fn a_new_registration_carries_the_installation_id_and_the_name_hint() {
+    let configured = fixtures::party_registration(Story::SignIn);
+    let account = jig_protocol_accounts::party::party_account(
+        &configured,
+        skein_oauth_accounts::Endpoint {
+            address: "127.0.0.1:31000".parse().expect("issuer socket"),
+            transport: skein_oauth_accounts::Transport::Plaintext,
+        },
+        skein_lib::List::with_capacity(0),
+        &[0; 16],
+    );
+    let skein_oauth_accounts::Account::SignIn { registration, .. } = account else { panic!("sign-in registration") };
+    let terms = registration.terms.expect("public sign-in terms");
+    let hint = terms.parameters.iter().find(|p| p.name.as_ref() == b"agent_name_hint").expect("name hint");
+    assert_eq!(hint.sent, oauth::Sent::NewRegistration);
     let outcome = world::run(1, Story::SignIn);
     let url = world::owner(&outcome).visit().expect("account sign-in visit");
     assert!(url.windows(b"ext_agent_host_id=urn%3Auuid%3A".len()).any(|w| w == b"ext_agent_host_id=urn%3Auuid%3A"));

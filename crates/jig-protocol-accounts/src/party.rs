@@ -56,7 +56,7 @@ pub fn party_account(
             oauth::Parameter {
                 name: b"agent_name_hint".as_slice().into(),
                 value: hint.clone(),
-                sent: oauth::Sent::EverySignIn,
+                sent: oauth::Sent::NewRegistration,
             },
         ]);
     }

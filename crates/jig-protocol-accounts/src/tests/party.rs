@@ -59,9 +59,8 @@ fn party_account_sign_in_carries_the_installation_id_and_the_name_hint() {
         (&*terms.parameters[1].name, &*terms.parameters[1].value),
         (b"agent_name_hint".as_slice(), b"jig".as_slice())
     );
-    for parameter in &terms.parameters {
-        assert_eq!(parameter.sent, skein_oauth::Sent::EverySignIn);
-    }
+    assert_eq!(terms.parameters[0].sent, skein_oauth::Sent::EverySignIn);
+    assert_eq!(terms.parameters[1].sent, skein_oauth::Sent::NewRegistration);
     assert_eq!(terms.resource.as_deref(), Some(b"api".as_slice()));
     assert_eq!(terms.revocation_endpoint.as_deref(), Some(b"http://127.0.0.1:31000/revoke".as_slice()));
 }
