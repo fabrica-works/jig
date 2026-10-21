@@ -820,3 +820,27 @@ fn two_grants_of_one_account_in_different_forms_are_refused() {
         panic!("expected invalid grants: {requests:?}")
     };
 }
+
+fn program_endpoints(count: u32) -> Box<[u32]> {
+    let mut endpoints = List::with_capacity(count);
+    for endpoint in 0..count {
+        endpoints.push(endpoint).expect("one slot per endpoint");
+    }
+    endpoints.into_boxed()
+}
+
+#[test]
+fn program_endpoints_are_valid_up_to_the_cap_and_distinct() {
+    // hosts.md, 8.1: 64 distinct endpoint identities per hello.
+    const ENDPOINT_CAP: u32 = 64;
+    let mut duplicate = program_endpoints(ENDPOINT_CAP);
+    *duplicate.last_mut().expect("nonempty endpoint list") = 0;
+    for (endpoints, valid) in [
+        (program_endpoints(0), true),
+        (program_endpoints(ENDPOINT_CAP), true),
+        (program_endpoints(ENDPOINT_CAP + 1), false),
+        (duplicate, false),
+    ] {
+        assert_eq!(crate::valid_program_endpoints(&endpoints), valid, "endpoints: {endpoints:?}");
+    }
+}

@@ -369,3 +369,29 @@ fn a_refused_later_program_grant_leaves_no_value_queued() {
 fn the_hosts_endpoint_cap_is_the_worker_wires_ceiling() {
     assert_eq!(host::PROGRAM_ENDPOINTS, wire::v4::CEILINGS.bounds_program_endpoints);
 }
+
+fn hello_with_program_endpoints(count: u32) -> host::Hello {
+    let mut hello = fixtures::hello();
+    let mut endpoints = List::with_capacity(count);
+    for endpoint in 0..count {
+        endpoints.push(endpoint).expect("one slot per endpoint");
+    }
+    hello.bounds.program_endpoints = endpoints.into_boxed();
+    hello
+}
+
+#[test]
+fn the_hello_admits_the_endpoint_cap_and_refuses_past_it_or_a_duplicate() {
+    // hosts.md, 8.1: 64 distinct endpoint identities per hello.
+    const ENDPOINT_CAP: u32 = 64;
+    let mut duplicate = hello_with_program_endpoints(ENDPOINT_CAP);
+    *duplicate.bounds.program_endpoints.last_mut().expect("nonempty endpoint list") = 0;
+    let limits = fixtures::codec();
+    for (hello, admitted) in [
+        (hello_with_program_endpoints(ENDPOINT_CAP), true),
+        (hello_with_program_endpoints(ENDPOINT_CAP + 1), false),
+        (duplicate, false),
+    ] {
+        assert_eq!(translate::hello(hello, &limits).is_some(), admitted);
+    }
+}

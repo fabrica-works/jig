@@ -122,6 +122,66 @@ fn a_hello_one_model_past_its_list_bound_is_refused() {
     );
 }
 
+fn append_hello_program_endpoint(hello: &Hello, bytes: &[u8], endpoint: u32) -> Box<[u8]> {
+    // The endpoint list is the hello's final record: a u32 count followed by u32 identities.
+    const U32_BYTES: u32 = 4;
+    let endpoints = hello.bounds().program_endpoints();
+    let identities_bytes = endpoints.len().checked_mul(U32_BYTES).expect("small endpoint list");
+    let record_bytes = U32_BYTES.checked_add(identities_bytes).expect("count and identities");
+    let prefix_bytes = hello.measure().checked_sub(record_bytes).expect("trailing endpoint list");
+    let mut reader = Reader::new(bytes);
+    let prefix = reader.bytes(prefix_bytes).expect("hello before its endpoint list");
+    let count = reader.u32().expect("endpoint count");
+    assert_eq!(count, endpoints.len(), "edit exactly the hello's endpoint count");
+    let extra_bytes = usize::try_from(U32_BYTES).expect("u32 width");
+    let edited_bytes = bytes.len().checked_add(extra_bytes).expect("one extra identity");
+    let mut writer = skein_lib::Writer::new(edited_bytes);
+    writer.put(prefix).expect("unchanged hello prefix");
+    let raised_count = count.checked_add(1).expect("one extra endpoint");
+    writer.put(&raised_count.to_be_bytes()).expect("raised endpoint count");
+    for _ in 0..count {
+        let identity = reader.u32().expect("recorded endpoint identity");
+        writer.put(&identity.to_be_bytes()).expect("unchanged endpoint identity");
+    }
+    assert!(reader.is_empty(), "the endpoint list is the hello's final record");
+    writer.put(&endpoint.to_be_bytes()).expect("one appended endpoint");
+    writer.finish()
+}
+
+#[test]
+fn a_hello_past_the_endpoint_ceiling_is_refused_at_its_bound() {
+    // hosts.md, 8.1: 64 distinct endpoint identities per hello.
+    const ENDPOINT_CAP: u32 = 64;
+    let limits = crate::sizes::limits(&fixtures::SIZES_ONE_SLOT).expect("real one-slot codec limits");
+    let mut hello = fixtures::hello_smallest().into_parts();
+    let mut bounds = hello.bounds.into_parts();
+    let mut endpoints = List::with_capacity(ENDPOINT_CAP);
+    for endpoint in 0..ENDPOINT_CAP {
+        endpoints.push(endpoint).expect("one slot per endpoint");
+    }
+    bounds.program_endpoints = endpoints;
+    hello.bounds = Bounds::new(&fixtures::LIMITS, bounds).expect("endpoint cap fits");
+    let hello = Hello::new(&fixtures::LIMITS, hello).expect("hello at the endpoint cap");
+    let at_cap = fixtures::encode(&hello);
+    let past_cap = append_hello_program_endpoint(&hello, &at_cap, ENDPOINT_CAP);
+    for (bytes, expected) in [
+        (at_cap, Ok(ENDPOINT_CAP)),
+        (
+            past_cap,
+            Err(crate::v4::Problem {
+                path: crate::v4::Path::BoundsProgramEndpoints,
+                reason: skein_codec::Reason::Bound,
+            }),
+        ),
+    ] {
+        let decoded = match Hello::decode(&limits, &mut Reader::new(&bytes)) {
+            Ok(hello) => Ok(hello.bounds().program_endpoints().len()),
+            Err(problem) => Err(problem),
+        };
+        assert_eq!(decoded, expected);
+    }
+}
+
 #[test]
 fn every_reason_reads_back_from_its_code() {
     for (reason, code) in [

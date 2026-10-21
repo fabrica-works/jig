@@ -258,4 +258,11 @@ fn hello_endpoint_storage_is_priced_at_its_actual_length() {
     assert_eq!(crate::worst_case(&limits), Some(before + u64::from(host::PROGRAM_ENDPOINTS) * 4));
     limits.bounds.program_endpoints = Box::new([0, 0]);
     assert_eq!(crate::worst_case(&limits), None);
+    let past_cap = host::PROGRAM_ENDPOINTS + 1;
+    let mut endpoints = skein_lib::List::with_capacity(past_cap);
+    for endpoint in 0..past_cap {
+        endpoints.push(endpoint).expect("one slot per endpoint");
+    }
+    limits.bounds.program_endpoints = endpoints.into_boxed();
+    assert_eq!(crate::worst_case(&limits), None);
 }
