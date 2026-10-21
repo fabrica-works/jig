@@ -1,6 +1,6 @@
 # The store
 
-Provisional, 2026-10-12, revised 2026-10-19. What lies beneath the
+Provisional, 2026-10-12, revised 2026-10-21. What lies beneath the
 engine's store vocabulary: skein's key-value store, embedded in the
 engine's process, holds every record jig's core and the application
 keep, transcripts are files beside it, and secrets are in a second
@@ -264,6 +264,18 @@ secrets' store (section 9).
   Live/ended authorities, pending or decided proposals, recurring members
   and amendment history remap effective masks on load. These are effective
   snapshots; the original keyed ask remains people's.
+- **Added dependencies keep when and by whom.** The tasks family's
+  version 6 rows keep each live task's dependency with whether it was
+  named when the task was made or added by an amendment, and for an
+  added one its wall and its maker, a party or a task
+  (`../domain/tasks.md`, section 7); a hold for a circle of waits, with
+  the circle's tasks, cut at their limit, and when the held task began
+  to wait for holds (`../domain/tasks.md`, 6.7). The index of holders,
+  waiters and dependents is not stored: the restart rebuilds it from
+  the live tasks, and judges their waits whole (`../domain/engine.md`,
+  section 6). People's retained answers keep the refusals for added
+  dependencies as the client's contract has them
+  (`../client/domain/contract.md`, section 4).
 - **Golden bytes** per family and version; a fuzz target per family's
   decoder; bounds at their limit and one past it.
 

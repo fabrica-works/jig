@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-19. jig's API: what crosses
+Provisional, 2026-10-09, revised 2026-10-21. jig's API: what crosses
 between a party's client and the engine, at the level of the two
 domains. It says who the party is; the plumbing operations a party asks,
 alone or several in one compound request, each keyed and answered once
@@ -181,7 +181,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 | `Propose` | a project; the action: a batch, or an amendment (a widening of a task's authority among them); a party makes no effect (`../../domain/people.md`, 5.1); a reason | a proposal to whoever may accept it, its number answered (3.5) |
 | `Withdraw` | the party's own pending proposal | withdrawn |
 | `Message` | a task; the words | words in its inbox, their message number answered |
-| `Amend` | a task; its spec's revision, or a person task's for its address; the change: spec and parameters, instructions, authority, wake policy, dependencies removed, a person task's address, tracked and priority, its LLM choice, which its next run takes; a reason | amended. A change of priority alone names no revision: the first commit decides |
+| `Amend` | a task; its spec's revision, or a person task's for its address; the change: spec and parameters, instructions, authority, wake policy, its dependencies as a whole list (those it names anew added, those it leaves out removed: `../../domain/tasks.md`, section 7), a person task's address, tracked and priority, its LLM choice, which its next run takes; a reason | amended; an active task given a pending dependency kept until it is done (`../../domain/tasks.md`, 5.7). A change of priority alone names no revision: the first commit decides |
 | `Cancel` | a task; a reason; a grace, or none | it and its tree closing; with a grace, the task first hears that it is asked to finish, as it hears an amendment, and is cancelled when the grace ends unless it ended first |
 | `Release` | a held task; its hold's revision; for an uncertain effect that cannot be recovered, whether to make it again | its hold lifted, judged afresh |
 | `Stop` | a task | its run cancelled, the task held for the party |
@@ -224,7 +224,9 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
   any task of the project for a maintainer; its tasks' requester is the
   party. An agent reaches its
   delegates and the tasks it was introduced to (`../../domain/tasks.md`,
-  8.5).
+  8.5). An `Amend` that adds a dependency reaches as far as a `Create`
+  would, and below the task it amends (`../../domain/tasks.md`,
+  section 7).
 - **A party's root has someone to escalate to.** A party may create a
   root task only when its escalations have a holder: their role covers
   escalations, or the project's policy names an escalation role. It is
@@ -435,10 +437,18 @@ Every request has one answer, of one of these kinds:
   - *unknown:* nothing by that name the party may see;
   - *not offered:* the deployment does not offer it (an executor it does
     not have);
+  - *circle:* the batch or the dependencies an amendment adds would close
+    a circle of waits, with the live tasks or among its own: the circle's
+    tasks, in order, each waiting for the next, cut at its limit
+    (`../../domain/tasks.md`, 6.7);
+  - *dependency:* a dependency an amendment adds has failed or was
+    cancelled, naming it and how it ended (`../../domain/tasks.md`,
+    section 7);
+  - *kept:* a person task's answer while it is kept, naming its pending
+    dependencies (`../../domain/tasks.md`, 5.7);
   - *not well formed:* which task or operation, and why (two tasks of a
     batch giving `AsAllowed`; the conversation flag on a task that is not
-    an agent's; a proposed batch giving `AsAllowed`; a cycle among a
-    batch's dependencies);
+    an agent's; a proposed batch giving `AsAllowed`);
   - *key conflict:* the key names another ask, which is a client's bug
     where the client drew the key (3.1);
 - **busy** or **not ready:** nothing was made and nothing kept; send it
@@ -489,7 +499,10 @@ served is held, kept and unsent, for its owner's version (client.md,
     the separate account kept by the last successful claim, and its next-run
     account/source wait with the source's typed state and optional wall reset
     (unknown stays unknown), or a credential or host wait; its hold
-    and its escalation if held; the proposals waiting in its subtree; how
+    and its escalation if held; its dependencies, each a task's number
+    and phase, pending or done, with when and by whom each was added
+    after the task was made, and whether they keep it
+    (`../../domain/tasks.md`, 5.7); the proposals waiting in its subtree; how
     far its activity has committed; and the acts the party may make on
     it, with what each would do (5.3, 5.4);
   - *a task line:* one record for every list of tasks (6.1): the task's
@@ -557,8 +570,10 @@ result and the desired cleanup state. Bounded diagnostics say when cut.
 
 - **What a task waits on** is the engine's to compute, since only it
   holds the tree and the inbox together: a party (who), for a question,
-  a proposal or a person task in its tree; its delegates; news; or
-  nothing (`../../domain/tasks.md`, section 3).
+  a proposal, an escalation or a person task in its tree; its
+  dependencies, for a kept task: the pending ones, the oldest first, and
+  how many; its delegates; news; or nothing (`../../domain/tasks.md`,
+  section 3).
 - **Its last activity** is when it last heard words, replied, or had a
   delegate end: a wall time, kept on every task, by which lists order.
 

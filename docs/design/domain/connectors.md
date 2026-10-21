@@ -1,6 +1,6 @@
 # Connectors
 
-Provisional, 2026-10-07, revised 2026-10-18. The contract an external
+Provisional, 2026-10-07, revised 2026-10-21. The contract an external
 system meets to be driven by an application on jig: what a connector is,
 what crosses between it and the core through the application's root, and
 what every connector does: resources and holds, effects and the outbox,
@@ -144,7 +144,11 @@ connector says what they apply to:
 - **what a release does** to the resource, per way its task ended (4.6).
 
 Shared resources take no hold: writing into them is ordered by the
-connector's own mechanics, such as a landing queue.
+connector's own mechanics, such as a landing queue. Such a queue is
+outside the waits the core checks for circles (tasks.md, 6.7), so its
+connector keeps it clear of them: a task kept by a dependency (tasks.md,
+5.7) leaves it, and comes back once it goes on, so that no task in it
+waits behind one that waits for it.
 
 ### 3.4 Live resources
 
@@ -168,6 +172,11 @@ which it keeps. What the core gets is its **description:**
   comment), a **transition** (a rollback, a merge, a scale to a size), or
   a **set** (a body, a label, a silence's end);
 - **its recovery class,** which its kind declares (4.3);
+- **whether it waits for dependencies,** which its kind declares: one
+  that does (a merge, a deploy, a release) is what a task kept by a
+  pending dependency must not make, and is refused while it is, naming
+  them (tasks.md, 5.7); one that does not (a comment, a status, a draft)
+  is made as ever;
 - **its price,** if its kind is priced: its maximum, in the deployment's
   unit (authority.md, section 7);
 - **the state its requirements are judged at:** what the judges are
@@ -405,12 +414,16 @@ connector keeps them under the task's number. Its state is a plain
 value, kept in the store with the connector's records and committed with
 each step, including the effects it has asked for that are not yet
 settled and the wall times of what it waits for. It knows its task's
-number, its delegates by number, and the facts it reads. A projection
+number, its delegates by number, which of its task's dependencies are
+pending (tasks.md, 5.7), and the facts it reads. A projection
 (section 8) is not a procedure: no task asked for it.
 
 ### 6.2 When it steps
 
 - when its task becomes active;
+- when its task is kept or goes on again: an amendment adding a
+  dependency, and the notice that its last pending one is done or
+  removed (tasks.md, 5.7 and 8.1);
 - when a message its owner lets through reaches its task: a delegate's
   result, an amendment, a cancel, an answer, news it subscribed to; a
   cancel's grace, asking it to finish, comes as an amendment does
@@ -452,6 +465,13 @@ One decision, committed with its new state:
 Every effect and batch is checked against its task's authority, as any
 decision is (authority.md, section 8); a procedure's authority is its
 task's, given by its creator.
+
+**Kept, it steps as ever.** While its task is kept (tasks.md, 5.7), a
+step may do all of the above but two: ask an effect of a kind that
+waits for dependencies (4.1), and end its task done. A step that does
+either is refused whole, its connector told which dependencies are
+pending, and the procedure steps again once they are done. A step may
+still hold its task, or end it failed.
 
 **The same operations, by the same rules.** A step's batches,
 amendments, cancels, proposals and messages are the operations a
@@ -722,7 +742,10 @@ delegates, an amendment refused as moved when a party amended the
 delegate first, and the procedure stepping again on what it is told,
 never writing over that change; verdicts that never say met on facts
 older than their freshness; facts that change between a verdict and its
-effect; pools that shrink while held and while waited for; topics whose
+effect; pools that shrink while held and while waited for; a procedure
+whose task is kept, its effect that waits for dependencies and its
+result refused, stepping again when they are done, and its own queue
+left while kept and rejoined after; topics whose
 news reaches every subscriber once, classified; values it keeps for the
 root handed over once, or dropped when the core drops their token; and a
 load that follows change, the system preloaded with ten times the

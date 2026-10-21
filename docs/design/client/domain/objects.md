@@ -1,6 +1,6 @@
 # Objects and cards
 
-Provisional, 2026-10-09, revised 2026-10-18. The objects the reference
+Provisional, 2026-10-09, revised 2026-10-21. The objects the reference
 UI (`jig-client-view`) shows, each as one card wherever it appears:
 tasks as chips, proposals, escalations, questions, person tasks,
 results, refusals, the conversation; and the requests a party makes
@@ -112,6 +112,7 @@ while it shows, linking to its page.
 |---|---|
 | waiting | waiting for T2, T3: each a chip, with its phase; or for a hold: "waiting for a slot in staging" |
 | active, an agent: idle | waiting on what its task says it waits on (a party, its delegates, news), and what would wake it, from its wake policy |
+| active, kept by its dependencies | kept until T7, T8 are done: each a chip, with its phase, and who added it and when ("kept until T7 is done, added by P at 10:42"); a run still live is shown as running is, and then that it parked (`../../domain/tasks.md`, 5.7) |
 | due, preparing, claimed | starting |
 | running | running: writing, or a tool (which, when its host names it), on its host's last report (`../../domain/hosts.md`, 6.5), and working otherwise; its attempt, for how long |
 | backing off | retrying at a time, and why: "host lost, try 2 of 3" |
@@ -220,6 +221,7 @@ A held task whose escalation reached the party
 | past its deadline | its deadline | move the deadline and release; cancel |
 | stopped | by whom, and when | release; amend and release; cancel |
 | waiting for a hold past its bound | the resource, and who holds it | release, to wait again; amend to drop it; cancel |
+| a circle of waits | the circle's tasks, as chips in order, each waiting for the next; that the hold lifts on its own once the circle breaks (`../../domain/tasks.md`, 6.7) | amend a task on the circle to drop a dependency; cancel; release, judged afresh |
 | its pool lost its allocation | the pool, and its slots (a part) | release, to wait for a slot; cancel |
 | its procedure needs a decision | the procedure's reason, in its connector's words (a part) | release, its counts reset; amend and release; cancel |
 
@@ -270,6 +272,9 @@ A task whose executor is the party, or a role they hold
   answer at once; the others see who took it; *hand it back* (a
   `HandBack`).
 - **Its stall:** when it will become news for its requester.
+- **Kept by its dependencies** (`../../domain/tasks.md`, 5.7): the card
+  names the pending ones, as chips, and offers no answer until they are
+  done; it may still be taken.
 
 The answer is the task's result: a choice reaches the tasks that depend
 on it, an approval the procedure that asked for it.
@@ -301,6 +306,11 @@ What a request asked, and why it was refused, from the refusal's facts
   5.3);
 - **a limit:** the project's live tasks, the inbox full, the chat's words
   too long, a compound request's operations past their bound;
+- **a circle:** the tasks that would wait for one another, as chips in
+  order ("T5 would wait for T7, which waits for T4, which ends after its
+  delegate T5");
+- **a dependency:** one added that failed or was cancelled, and how; or
+  a person task's answer while it is kept, and what it waits for;
 - **no one to escalate to:** the party would become the requester of a
   task (a chat, a goal, a task taken over) whose escalations nobody in
   the project would hold;
@@ -358,7 +368,10 @@ will do:
   in one compound request: the `Message`, and a `Release` naming the
   hold's revision the card showed.
 - **Amend:** an `Amend` naming the spec's revision: its spec; its wake
-  policy; its dependencies, removing some while it waits; its authority,
+  policy; its dependencies, added and removed until it closes, the form
+  saying what an add does (a waiting task waits longer; an active one is
+  kept, its live run finishing its turn and its next waiting for them:
+  `../../domain/tasks.md`, 5.7); its authority,
   narrowed freely and widened within the party's own (beyond it,
   proposed); its charter's instructions. A procedure's parameters are
   its connector's, amended through its form in a slot, as the

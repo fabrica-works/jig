@@ -1,6 +1,6 @@
 # Pages
 
-Provisional, 2026-10-09, revised 2026-10-19. The reference UI's pages:
+Provisional, 2026-10-09, revised 2026-10-21. The reference UI's pages:
 jig's optional pages, in `jig-client-view`, for `ops` and jig's test
 application: how they are organised, what a party finds where, and what
 they do there. They are built on the public client alone (`jig-client`
@@ -311,7 +311,8 @@ A section with nothing in it is not shown.
   results; for an agent, its charter; for a party, the question. What
   counts as done: its result contract in words. Its result once it has
   one, by its contract (objects.md, section 8). Its dependencies as
-  chips with their phases. What it hears: its requester, its
+  chips with their phases, those added later with who added them and
+  when, and whether they keep it (objects.md, section 3). What it hears: its requester, its
   references, its subscriptions and its wake policy in words ("wakes on
   your words and its delegates' results"). What it holds: the resources
   it writes alone, and which run holds the writer slot.

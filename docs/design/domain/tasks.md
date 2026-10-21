@@ -1,6 +1,6 @@
 # Tasks
 
-Provisional, 2026-10-07, revised 2026-10-19. The core's tasks: what a
+Provisional, 2026-10-07, revised 2026-10-21. The core's tasks: what a
 task is, how tasks are made, how each moves from asked to ended, the
 resources it holds, what it hears and when it wakes, and how proposals
 and escalations travel the tree. It is the first primitive of core.md
@@ -21,8 +21,8 @@ is still open is listed in section 13.
   of runs, connectors or clients: an executor is a kind and an opaque
   reference, a connector's news a message it is handed.
 - **Batches, whole or not at all.** Tasks are made in batches, checked
-  whole (no cycles, within the limits, within the creator's authority as
-  authority.md answers) and committed at once.
+  whole (no circle of waits, within the limits, within the creator's
+  authority as authority.md answers) and committed at once.
 - **Parties and agents ask alike.** A party's request and an agent's tool
   make the same batches, amendments, cancels and proposals, against the
   same checks; only the source of their authority differs. Nothing
@@ -35,8 +35,14 @@ is still open is listed in section 13.
   executor works, closes (its run ended, its delegates closed, its
   effects settled, its holds released), and ends done, failed or
   cancelled. It may be held for a decision at any point before it ends.
-- **Holds are taken whole.** A task takes every resource it writes at
-  once, or waits with none, so no two tasks wait on each other.
+- **A dependency may be added to a live task.** It stops the task going
+  on and never sends it back: while it is pending, an active task is
+  kept, starts no run, asks no effect that waits for dependencies, and
+  ends no way but failed or cancelled (5.7).
+- **Holds are taken whole, and no waits circle.** A task takes every
+  resource it writes at once, or waits with none. A task holding some
+  may still wait, for its delegates or, kept, for its dependencies, so
+  every new wait is checked to close no circle (6.7).
 - **Decisions go up the tree.** What a task may not do alone, and what
   holds it, waits for the nearest task or party above it with the
   authority to decide, and wakes them.
@@ -111,8 +117,10 @@ it is live:
   configuration or a connector starts on a project's behalf (a recurring
   task, a standing watch). Its **proposer,** when an accepted proposal
   made it requested by the accepter (section 9).
-- **Its dependencies:** live tasks it starts after, each done before it
-  starts.
+- **Its dependencies:** tasks it waits for, each done before it goes
+  on: those its batch named, which it starts after, and those an
+  amendment added (section 7), each kept with when it was added and by
+  whom.
 - **Its references:** tasks it may message beyond its requester and its
   delegates (8.5).
 - **Its executor** (2) and, for an agent, its **charter**: the role's
@@ -214,7 +222,7 @@ What a task **waits on** is not kept: the engine computes it when a
 document shows the task, since only the engine holds the tree and the
 inbox together (engine.md, section 11). It is a party, and who, for a
 question, a proposal, an escalation or a person task in its tree; its
-delegates; news; or nothing.
+dependencies, for a kept task (5.7); its delegates; news; or nothing.
 
 ## 4. Batches
 
@@ -242,11 +250,13 @@ dependencies among them.
 - **Dependencies** name tasks in the same batch, or live tasks the
   creator reaches: for a task, its own delegates, or a task it is
   introduced to (8.5); for a party, a task in their tree, or any task of
-  the project for a maintainer (people.md, 5.1). A task's dependencies
-  are never added to once it is made (section 7). Admission checks the
-  new edges with the existing dependencies and delegation waits, so that
-  no reference makes a new task depend on an ancestor, or joins two
-  subtrees into a wait cycle. A result of a task that has ended reaches
+  the project for a maintainer (people.md, 5.1). An amendment may add
+  more once a task is made (section 7). Admission checks the batch's new
+  waits with the live ones (6.7): its tasks' dependencies, the queues
+  they join and the holds handed down to them, and its creator's wait
+  for them. So no new task depends on an ancestor or waits in the queue
+  of a resource an ancestor holds, and no two subtrees join into a
+  circle of waits. A result of a task that has ended reaches
   a new task as one of its inputs, not as a dependency, within the same
   reach.
 - **A budget as `AsAllowed`.** A creator gives each task's budget as an
@@ -266,7 +276,7 @@ dependencies among them.
     and an LLM choice on an agent's task only, its models configured
     and its efforts among those its models declare;
   - at most one task giving `AsAllowed`;
-  - no cycle;
+  - no circle of waits, with the live ones (6.7);
   - within the limits: live tasks in the deployment, tasks in the tree,
     depth below its root, delegates of the creator, goals in its project
     (section 11);
@@ -310,7 +320,9 @@ waiting ──► active ──► closing ──► done, failed or cancelled
 - **Waiting:** some dependency is not done, or some hold it needs is
   not yet free (section 6).
 - **Active:** its executor is engaged (5.2 to 5.4). It enters active in
-  the commit that makes it ready, which takes its holds.
+  the commit that makes it ready, which takes its holds. An active task
+  with a pending dependency, which only an amendment gives it, is
+  **kept** (5.7).
 - **Closing:** its executor has finished, failed, or the task was
   cancelled, and it is settling before it ends. In order:
   1. its run, if one is live, has ended: cancelled, and its answer
@@ -365,7 +377,9 @@ contract (5.6), or by **parking**, its transcript kept, the task idle
 until its next wake. A task has one run at most at a time. Whether a
 waiting run holds its host's slot or parks is engine.md, 7.4. A claim
 that no host reports after a restart, its attempt having committed no
-turn and no call, counts as not started: no try is spent on it.
+turn and no call, counts as not started: no try is spent on it. A kept
+task is never due, and a run of it that finishes done parks instead
+(5.7).
 
 ### 5.3 Procedure tasks
 
@@ -377,7 +391,9 @@ messages up, the result) as one decision, committed with the
 procedure's state.
 It steps when it is first active, when a message its policy lets through
 arrives, and whenever what it reads changes, which its owner knows
-(level-triggered).
+(level-triggered). Kept, it steps as ever and reads which of its
+dependencies are pending; a step that asks an effect waiting for them,
+or ends the task done, is refused whole (5.7).
 
 ### 5.4 Person tasks
 
@@ -385,7 +401,9 @@ An active person task is in the inbox of the party, or of the parties
 holding the role, its executor names (people.md, section 8). Its result
 is the answer one of them gives, checked against its contract. A person
 task waiting past its stall (section 11) is news for its requester,
-which may amend, cancel or re-address it.
+which may amend, cancel or re-address it. Kept, it stays in the inbox,
+shown waiting on its dependencies, and an answer is refused, naming
+them (5.7).
 
 ### 5.5 Failures and holds
 
@@ -420,7 +438,8 @@ which may amend, cancel or re-address it.
   little left for its next run's reserve and one completion more of its
   main model, and on a program backend one more again, with nothing to
   free more), a party stops it, it waits for a hold past its
-  bound (6.2), its pool lost its allocation (6.6), or its procedure says
+  bound (6.2), its joining a queue would close a circle of waits (6.7),
+  its pool lost its allocation (6.6), or its procedure says
   it needs a decision. A hold keeps whatever the task had: its result
   while closing, its inbox, its attempt number.
 - **A hold is escalated** (section 9): it waits for the nearest task or
@@ -456,6 +475,9 @@ which may amend, cancel or re-address it.
   finish asks for them to be cancelled, so a task that depends on another
   waits for that task's whole subtree. Its result goes to its requester
   once it has closed (5.1).
+- **A task ends done after its dependencies.** A done result while one
+  of them is pending is not taken (5.7), so a task's requester and
+  dependents never see it done before what it depends on is done.
 - **Delivered once,** as a message to the requester, committed with the
   task's end. A party requester sees it in their inbox.
 - **Kept.** A result is read by every task that depends on its task, or
@@ -465,6 +487,54 @@ which may amend, cancel or re-address it.
 - **Failure is a result.** An executor that finds the task cannot be done
   as asked ends it failed, saying why. A failed task's dependents are
   held (5.5); its requester decides what follows.
+
+### 5.7 Kept by a dependency
+
+An active task with a pending dependency is kept: it stays active, with
+its holds, its delegates and what its executor has done, and goes no
+further until each is done. The tasks child keeps the promise, not the
+executor: a charter or a procedure may also behave, but the refusals
+hold if they don't. While kept, a task:
+
+- **starts no run.** An agent task is never due. A run already live
+  hears the amendment that kept it (section 7), and may finish its turn.
+  Its last pending dependency done or removed is a notice that wakes it
+  (8.1), and its next run goes on from what the last one left, its brief
+  saying what it waited for (engine.md, section 9).
+- **asks no effect that waits for dependencies.** Its connector says
+  which kinds of effect do (connectors.md, 4.1). One asked while a
+  dependency is pending is refused, naming it.
+- **ends no way but failed or cancelled.** An agent's run that finishes
+  done, with a result its contract takes, parks instead: its saved state
+  is kept, no try is spent, and the task's activity names what it waits
+  for (engine.md, 7.4). A procedure's step that ends it done is refused
+  whole (connectors.md, 6.2). A person's answer is refused, naming the
+  dependencies (people.md, section 8). A failure or a cancel ends it as
+  ever.
+
+What reaches it:
+
+- **Messages wait in its inbox,** as for a waiting task, and wake it, as
+  its policy says, once it is no longer kept. A live run hears what its
+  policy lets through, as ever, and a procedure steps as ever (5.3).
+- **Decisions wait above it.** A proposal or an escalation that would
+  wait at a kept task waits at the nearest holder above it instead,
+  since a kept task starts no run to decide it (section 9).
+- **A cancel's grace** reaches a live run, as ever. A kept task with no
+  live run, a kept person task, and one whose run parks during the grace
+  cannot finish on their own, and are cancelled at once (section 7).
+
+What it keeps:
+
+- **Its holds and pool slots.** Releasing them would run their
+  connectors' release effects, and taking them again would mean queueing
+  whole. So a kept task keeps them, and the waits they make for others
+  are checked to close no circle (6.7).
+- **One rule for going on.** Whether an active task may go on, and why
+  not, is decided in one place of the tasks child, its reason typed: a
+  pending dependency is one. A further reason to keep a live task from
+  going on, its state and holds kept, is one more reason there, not
+  another rule.
 
 ## 6. Holds
 
@@ -486,8 +556,10 @@ which may amend, cancel or re-address it.
 ### 6.2 Taking holds
 
 - **All at once.** A task takes every hold it needs in the commit that
-  makes it active, or takes none and waits. A task never holds one while
-  waiting for another, so no set of tasks waits in a circle.
+  makes it active, or takes none and waits, so a task in a queue holds
+  nothing. That alone does not keep waits from circling: a task holding
+  a resource may wait for its delegates or, kept, for its dependencies.
+  The check of 6.7 does.
 - **Refuse or wait.** For each kind of resource, its connector says
   whether a hold that is taken refuses or waits. A batch whose task needs
   a hold that refuses is refused, naming the holder. A task whose hold
@@ -496,6 +568,10 @@ which may amend, cancel or re-address it.
   (core.md, 6.2), then by when it began to wait, and bounded per
   resource. A task waiting past its bound is held (5.5), and its
   requester hears why.
+- **A queue is joined once the dependencies are done.** A waiting task
+  given another (section 7) leaves its queues, keeping when it began to
+  wait, and comes back at its place once its dependencies are done
+  again, its bound counted afresh from then.
 - **Freed holds go to the queue** in the commit that frees them: the
   first waiter whose every hold is now free takes them all and becomes
   active. A pool slot is free only while the pool has fewer holders than
@@ -547,6 +623,62 @@ tasks holding it: a quota cut, a machine gone.
   release frees its slot.
 - **The promise is about admission:** no holder is admitted beyond the
   slots the pool was known to have when it was admitted.
+- **A shrink is judged for circles.** Fewer slots make each waiter need
+  more holders to end, so each is judged as if it joined again (6.7).
+
+### 6.7 Circles of waits
+
+A live task may wait for others to end. No set of tasks waits in a
+circle, each for another of the set, so that none of them could end.
+
+- **The waits:**
+  - *a dependency:* a task, waiting or kept, waits for each pending
+    dependency;
+  - *a delegate:* a task waits for each live delegate, since it ends
+    after them (5.6);
+  - *a queue:* a task waiting for holds waits for the holders of each
+    resource it needs that is not free. A write hold needs its holder to
+    end. A pool needs as many of its holders to end as bring them below
+    its slots, so a wait for it is stuck once as many of its holders are
+    stuck as it has slots, one at least.
+
+  A held task waits for a decision, not a task, and a closing one for
+  its delegates alone, so neither waits for a dependency or a queue: a
+  release judges again the waits it gives back.
+- **Checked where a wait is added,** with the live ones:
+  - *a batch:* its tasks' dependencies, the queues they join, the holds
+    handed down to them and its creator's wait for them. One that would
+    close a circle is refused whole, naming the circle's tasks (section
+    4).
+  - *an amendment adding a dependency* is refused so (section 7).
+  - *a queue joined on its own,* by a task whose dependencies are done,
+    and *the waits a release gives back:* a task that would close a
+    circle is held instead, naming the circle (5.5). One held from a
+    queue leaves it, keeping when it began to wait. Its hold lifts on
+    its own, back where it was, once a task on the circle ends or is
+    held, or has a pending dependency done or removed; a release judges
+    it afresh.
+  - *a pool that shrinks* (6.6): each waiter, as a join.
+
+  Taking holds adds no wait: a task becomes active with its dependencies
+  done and no delegates yet.
+- **How.** A new wait from a task can close a circle only through what
+  already waits for that task. The check walks back from it along the
+  live waits, marking what would be stuck were the task stuck, and
+  counting each pool's stuck holders against its slots; the new wait
+  closes a circle when what it waits for is marked. It costs a walk of
+  what waits for the task, for most its ancestors and their dependents,
+  within the limits (section 11; engine.md, section 13). The tasks child
+  keeps, per resource, its holders and waiters, and, per task, its
+  dependents, so that the walk reads them without a scan.
+- **Restored, judged whole.** A restart judges every wait at once, ending
+  in turn what can end and counting down what waits for it. A queue's
+  waiter left on a circle an older rule allowed is held, as at a join.
+- **The bound stays the backstop.** Writer slots, effects in flight and
+  a connector's own queues, such as a landing queue, are not among these
+  waits. A task waiting for holds past its bound is held all the same
+  (6.2), and a connector keeps its own queue from circling: a kept task
+  leaves it (connectors.md, 3.3).
 
 ## 7. Amending, cancelling, moving
 
@@ -557,8 +689,8 @@ tasks holding it: a quota cut, a machine gone.
   procedure's step reach the same rules (people.md, 5.1; engine.md, 7.3;
   connectors.md, 6.3).
 - **What an amendment may change:** the spec and its parameters; the wake
-  policy; the dependencies of a task still waiting, by removing some,
-  never adding; the authority, narrowed freely and widened only within
+  policy; the dependencies, added or removed (below); the authority,
+  narrowed freely and widened only within
   the amender's own (beyond it, refused, and proposed if the amender asks:
   section 9), the amender, or the proposal's accepter, funding the
   widened task from then on (authority.md, section 7); an agent task's
@@ -583,6 +715,27 @@ tasks holding it: a quota cut, a machine gone.
   amendment's commit, even when the preference itself was already the same;
   the next successful claim keeps the new account. Clearing the optional
   preference alone keeps the pin. The live claim retains its recorded binding.
+- **Adding and removing dependencies.** An amendment names a task's
+  whole list of dependencies, with its spec's revision: what it names
+  anew is added, what it leaves out is removed, at any phase before
+  closing.
+  - *What may be added:* a task the amender could name in a batch
+    (section 4), or, for a task, any task below it. An added dependency
+    moves no authority and funds nothing.
+  - *By phase:* a waiting task waits for it as for any other, and leaves
+    the queues it was in (6.2); an active one is kept (5.7); a held one
+    is released, when it is, with it pending.
+  - *Its prerequisite:* one already done counts as met, the add recorded
+    and nothing waiting, so an amender racing its end is not refused. One
+    failed or cancelled is refused, naming it. One that fails or is
+    cancelled later holds its dependent (5.5).
+  - *Circles:* an add that would close a circle of waits is refused,
+    naming its tasks (6.7); a task after itself or after an ancestor is
+    the plainest.
+  - *Removing* one lifts it: a task that waits on nothing else goes on,
+    a waiting one to its queues at its place, a kept one woken.
+  - *Kept:* each added dependency with when it was added and by whom
+    (section 3), and its history as every amendment's.
 - **Tracking and untracking.** A task an amendment tracks is a goal from
   that commit, with all a goal has (core.md, 6.2). One it untracks is no
   goal from that commit: the core ends its goals' topics, and its
@@ -611,7 +764,8 @@ tasks holding it: a quota cut, a machine gone.
   which charter's text was in effect.
 - **An amendment is a message** to the task's executor, committed with
   the change: it wakes an agent, steps a procedure, and shows a person
-  what changed. A run already live hears it as it arrives; a narrowing it
+  what changed. One that keeps an idle agent task (5.7) wakes it only
+  once it goes on. A run already live hears it as it arrives; a narrowing it
   cannot honour (a grant its live run is using) cancels that run, and the
   next starts with the narrower authority.
 - **Cancelling closes down the tree.** A cancelled task, and every task
@@ -630,8 +784,9 @@ tasks holding it: a quota cut, a machine gone.
   hear an amendment. It is cancelled, as above and with the cancel's
   reason, when the grace ends, unless it ended first. The grace's end is
   kept with the task, on a timer of the tasks child's, so a restart
-  keeps it. A task that cannot finish on its own, waiting or held, is
-  cancelled at once. A cancel made during a grace ends the task no later
+  keeps it. A task that cannot finish on its own, waiting, held or kept
+  with no live run (5.7), is cancelled at once. A cancel made during a
+  grace ends the task no later
   than that grace would: one without a grace cancels it at once. One with
   a grace asks nothing more, since a task is asked to finish once, by
   the first. If its grace ends sooner, the task's grace now ends with
@@ -669,6 +824,7 @@ tasks holding it: a quota cut, a machine gone.
 | words | a party; a task holding a reference to it | a party's, yes; a task's, by policy |
 | news: a connector's event, classified | its subscriptions (8.4) | by policy |
 | a notice: a task it references done or held; a proposal passing through; a hold it waits for | its subscriptions; the core | by policy |
+| a notice: its last pending dependency done or removed (5.7) | the core | yes |
 | a timer | itself | yes |
 
 Proposals and escalations waiting for its decision are not messages: they
@@ -814,14 +970,15 @@ proposed, what an action needs, and what an acceptance funds.
   a notice, which merges.
 - **Where they wait.** At the nearest task above the proposer, or the
   held task, whose authority covers the decision (authority.md,
-  section 9), skipping procedures, which decide nothing. Above the tree's
+  section 9), skipping procedures, which decide nothing, and kept tasks,
+  which start no run to decide (5.7). Above the tree's
   root task is whoever requested it: a party is the next holder there,
   when their authority covers it; past them, or past a root the
   deployment requested, it waits for the parties whose role the project's
   policy names for that kind of decision (people.md, section 4). A
   party's own proposal waits there from the start. Where one waits is
-  decided again when that holder ends, is held, or no longer covers it,
-  and when it stalls.
+  decided again when that holder ends, is held or kept, or no longer
+  covers it, and when it stalls.
 - **A proposal nobody may accept is refused.** A proposal is never
   committed to wait for nobody. When the first holder it would wait for
   is the parties the project's policy names (a party's own proposal; a
@@ -897,12 +1054,13 @@ worst case (engine.md, section 13):
   the entrance like live tasks per project, whether a batch, an
   amendment or an accepted proposal tracks them;
 - tasks per tree, and the depth of a tree;
-- delegates per task, and batch size;
+- delegates and dependencies per task, and batch size;
 - a spec's and a result's bytes, and inputs per task;
 - messages and bytes per inbox, and a message's bytes, within what a run
   reads (8.2);
 - subscriptions, references, holds and saved resources per task;
 - waiters per resource's queue, and how long a task may wait for holds;
+- the tasks a circle of waits names, in a refusal or a hold (6.7);
 - pending proposals per task, and in the deployment; open questions per
   task;
 - tries per class of failure, and their backoff;
@@ -940,6 +1098,27 @@ go beyond its task's authority, their proposal accepted and the
 follow-ups run before the result reaches the requester, and another
 whose proposal is rejected, its result delivered at once.
 
+Its stories of added dependencies (5.7; 6.7; section 7): the
+reordering, two tasks waiting for one write hold, the first given a
+dependency on the second, leaving the queue, the second taking the
+hold and ending, and the first back at its place, ahead of a third that
+queued after it; a procedure task kept, its effect that waits for
+dependencies refused and its result refused, stepping again when its
+dependency is done and ending done; a person task kept, its answer
+refused naming the dependency, then taken; a dependency on a person
+task, answered, and its dependent going on; a held task given one and
+released, kept; circles refused, naming their tasks: A after B, then B
+after A, a task after its ancestor, a holder after B while a task under
+B waits in the holder's queue, and a batch whose task waits in the queue
+of a resource its grandparent holds; a waiting task whose dependencies
+are done joining a queue onto a circle, held, and back at its place
+once the circle breaks; a pool shrinking onto a circle, its waiter held;
+a restart restoring a circle an older rule allowed, its waiter held; a
+prerequisite already done, met at once, one failed, refused, and one
+that fails later, its dependent held; one removed, its task woken; a
+grace given to a kept task with no live run, cancelled at once; a
+proposal from below a kept task waiting above it.
+
 Its stories of what parties and agents ask alike: a party's batch of an
 agent's task and a person task, made as an agent's would be; a party's
 batch beyond their role refused, naming what it lacked, then proposed
@@ -965,7 +1144,9 @@ Its referee: a task starts only after its dependencies are done and its
 holds taken; batches are made whole or not at all, and compound requests
 too; one run at most per task; a resource has one holder, and a pool
 admits no holder beyond the slots it is known to have;
-no task holds one resource while waiting for another; every result
+no task in a queue holds a resource, and no circle of waits forms; no
+kept task starts a run, asks an effect that waits for dependencies, or
+ends done; every result
 reaches its requester once, after the task has closed; a cancel ends
 every task below it, deepest first, and one with a grace ends its task
 by the grace's end; no amendment or release is made against a revision
@@ -983,8 +1164,6 @@ included.
 - **Dependencies on a failure:** whether a task should be able to depend
   on another's ending, whatever its result, for clean-ups; until wanted,
   a requester makes the clean-up task itself.
-- **Adding dependencies by amendment,** which the model forbids so that
-  the cycle check stays local to a batch.
 - **Priorities among tasks that are not goals,** when hosts or pools are
   scarce: they are ordered by when each became due.
 - **Pools across projects:** whether a pool's slots are shared fairly

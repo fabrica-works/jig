@@ -1,6 +1,6 @@
 # Parties
 
-Provisional, 2026-10-07, revised 2026-10-19. How people, and the
+Provisional, 2026-10-07, revised 2026-10-21. How people, and the
 services that act like them, take part: who they are and the credentials
 they sign in with, what their role in a project lets them do, the
 operations they ask of the engine and what waits for them, the
@@ -199,13 +199,13 @@ The operations as the client sends them are
 | `Propose`, an action | member; a batch or an amendment beyond their authority, of a kind a role the project's policy names may accept | a proposal of theirs, waiting for that role (tasks.md, section 9), its number answered |
 | `Withdraw` | their own pending proposal | withdrawn (tasks.md, section 9) |
 | `Message` | the task in their tree, or maintainer | words in its inbox (tasks.md, 8.1), their message number answered |
-| `Amend` | the task in their tree, or maintainer, and a change within their authority; the spec's revision they saw, but for a change of priority alone; maintainer, for tracked or priority | tasks.md, section 7: its spec, instructions, authority, wake policy, a person task's address, whether it is tracked, its priority; a widened task funded from their pool (authority.md, section 7) |
+| `Amend` | the task in their tree, or maintainer, and a change within their authority; the spec's revision they saw, but for a change of priority alone; maintainer, for tracked or priority; dependencies added within their reach, as a batch's | tasks.md, section 7: its spec, instructions, authority, wake policy, a person task's address, whether it is tracked, its priority, its dependencies added or removed; a widened task funded from their pool (authority.md, section 7) |
 | `Cancel`, with or without a grace | the task in their tree, or maintainer; a grace within the tasks child's bound (tasks.md, section 11) | the task and its tree closing (tasks.md, section 7); with a grace, the task first asked to finish, and cancelled when the grace ends unless it ended first |
 | `Release` | the task in their tree, or maintainer; the hold's revision they saw; for an effect held uncertain, whether to make it again | its hold lifted, the task judged again (tasks.md, 5.5) |
 | `Stop` | the task in their tree, or maintainer | its run cancelled and its task held for a party's stop |
 | `Move` | they may amend the task; a holder for its escalations (below) | the party its requester, funded from their pool (tasks.md, section 7) |
 | `Decide` | the proposal or escalation waiting for them, as the requester of its tree or in a role the policy names; for an escalation, its hold's revision | accepted, if their authority covers it, and funded from their pool (authority.md, section 9: a batch's tasks, an effect's price, the task an amendment or a widening changes); rejected, with a reason; or passed up (tasks.md, section 9) |
-| `Answer` | addressed to them or their role; a person task's revision as they saw it | an answer to a question, or a person task's result (section 8) |
+| `Answer` | addressed to them or their role; a person task's revision as they saw it; for a person task, none of its dependencies pending (section 8) | an answer to a question, or a person task's result (section 8) |
 | `Take`, `HandBack` | a person task addressed to a role they hold | held by them, so no other answers it; or back to the role (section 8) |
 | `Seen` | the party themselves | their read position moved over results, or over one conversation's turns (section 6) |
 | a compound request | one project; each operation's own needs; within operations per request | its operations made in one decision, or none of them (below) |
@@ -514,6 +514,11 @@ A task whose executor is a party, or a role (core.md, 3.2):
   addressed to, and answer it through its requests.
 - **Stalled,** past its bound, it is news for its requester, which may
   amend, cancel or address it to someone else.
+- **Kept** by a dependency an amendment added (tasks.md, 5.7), it stays
+  in its party's inbox, shown waiting on its dependencies, and an
+  `Answer` is refused, naming them; once they are done, it is answered
+  as ever. A take stands while it is kept. A task that depends on a
+  person task goes on once the person task is answered.
 
 ## 9. Notifications
 
@@ -568,7 +573,10 @@ service creates a goal its role allows; a request sent twice is made
 once across a restart; roles are seeded from an adopted resource's
 parties; an application's server mints a credential for an identity it
 verified, and a mint naming a provider not of kind application, the
-deployment's among them, is refused.
+deployment's among them, is refused; a person task given a dependency by
+its requester, its answer refused naming it, then answered once the
+dependency is done; a member's amendment adding a dependency beyond
+their reach, refused.
 
 Its referee: every request is answered once, after its commit; a
 compound request is made whole or not at all; no request is acted on

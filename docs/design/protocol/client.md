@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-19. What carries jig's API
+Provisional, 2026-10-10, revised 2026-10-21. What carries jig's API
 (`../client/domain/contract.md`) as messages and bytes, whatever the
 transport: jig's messages; the clients' component's messages toward the
 application's transport and server, and the client's link toward its
@@ -212,6 +212,15 @@ channel. Existing tags stay fixed. These are bounded secret-free
 configuration/derived facts
 (`../client/domain/contract.md`, 5.1 and 7.1); people v5 and accounts v1 do not
 change.
+
+Client v11 carries added dependencies (`../domain/tasks.md`, 5.7, 6.7 and
+section 7): an `Amend` names a task's dependencies as one whole list; the
+refusals *circle*, naming its tasks in order, cut at its limit, which a
+batch's cycle becomes, *dependency* and *kept*; a task document's
+dependencies, each with its phase, its wall and maker when it was added,
+and whether they keep the task; a kept task's pending dependencies in what
+it waits on; and a hold for a circle of waits, naming it
+(`../client/domain/contract.md`, sections 3 to 5). Existing tags stay fixed.
 
 ## 4. The connection
 

@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-19. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-21. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -405,8 +405,10 @@ next only once the root says this one is done (root.md, section 8).
    policies and parties' roles; parties with a live sign-in or a role,
    and their requests' keys within the retention; parties' read
    positions over live conversations, never ended ones' (11.4); live
-   tasks with their inboxes, subscriptions, holds and queues; pending
-   proposals; the calls committed since each live task's last turn;
+   tasks with their inboxes, subscriptions, holds and queues, and their
+   dependencies with when and by whom each was added, the waits among
+   them judged whole, so that a queue's waiter left on a circle of waits
+   is held (tasks.md, 6.7); pending proposals; the calls committed since each live task's last turn;
    each live agent task's conversation; the funders' numbers; LLM
    accounts. The core's limits bound what is live (tasks.md,
    section 11), so what is loaded fits; a live set past limits lowered
@@ -467,7 +469,10 @@ then starts from the store as section 6 says.
 
 ### 7.1 From a task to a run
 
-When an agent task is due (tasks.md, 5.2), the core:
+When an agent task is due (tasks.md, 5.2), the core does as below. A
+kept task is never due (tasks.md, 5.7), and one kept while it prepares
+has its claim refused, its preparation abandoned with no try spent; it
+is due again once its dependencies are done.
 
 1. **Checks** that the run may start, and with what budget
    (authority.md, 8.3), and chooses the accounts that pay for it: one
@@ -647,14 +652,14 @@ These per-tool declarations change within the existing call envelope.
 |---|---|---|
 | `delegate` | makes a batch of tasks as its delegates, each with what a party's `Create` names, its label, flags and LLM choice among them (tasks.md, section 4) | their numbers and their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why; beyond authority, naming what it lacked and whether a proposal could be accepted |
 | `message` | words, a question or an answer to a task it references | sent; no reference; the inbox full; too large for a run to read |
-| `amend`, `release` | a task below it: an amendment naming its spec's revision as the run last read it, but for a change of priority alone; a release naming its hold's, and, for an effect held uncertain, whether to make it again (tasks.md, 5.5 and section 7) | done, with the task's spec revision after the commit, the one its next amendment names (a release moves none); refused, and why; moved, with what it is now |
+| `amend`, `release` | a task below it: an amendment naming its spec's revision as the run last read it, but for a change of priority alone, and adding or removing dependencies within its reach (tasks.md, section 7); a release naming its hold's, and, for an effect held uncertain, whether to make it again (tasks.md, 5.5 and section 7) | done, with the task's spec revision after the commit, the one its next amendment names (a release moves none); refused, and why; moved, with what it is now |
 | `cancel` | a task below it and its tree, with a reason, and a grace if the run gives one, within the tasks child's bound: the task is asked to finish first (tasks.md, section 7) | done; refused, and why |
 | `decide` | accepts, rejects or passes up a proposal or an escalation waiting for it, an escalation naming its hold's revision (tasks.md, section 9) | done; beyond its authority, and passed up; moved, with what it is now |
 | `propose` | an action beyond its authority, with a reason: a batch, an amendment, an effect, or a widening of its own authority (authority.md, section 9) | proposed, and to whom; refused, when nobody may accept it (tasks.md, section 9) |
 | `withdraw` | its own pending proposal (tasks.md, section 9) | withdrawn; already decided, and how |
 | `introduce` | two tasks it references, each given a reference to the other, within their limits (tasks.md, 8.5) | done; no reference; refused, and why |
 | `subscribe`, `unsubscribe` | a topic a connector offers to agents (connectors.md, 5.3), under a read grant on the resources the connector says it concerns (authority.md, 8.5); a referenced task's state; a timer (tasks.md, 8.4) | done; refused, and why |
-| `effect` | one of a connector's kinds of effect offered to agents (connectors.md, 4.5) | made, with what it made; committed and pending, past the call's deadline; waiting for a verdict; failed |
+| `effect` | one of a connector's kinds of effect offered to agents (connectors.md, 4.5) | made, with what it made; committed and pending, past the call's deadline; waiting for a verdict; failed; refused, naming them, for a kind that waits for dependencies while its task is kept (tasks.md, 5.7) |
 | `note`, `recall` | writes a note in a scope; reads entries by name or by a search (section 10) | written; the entries |
 | a connector's reads | reads its system (connectors.md, section 9) | the answer, within the read's budget |
 
@@ -714,6 +719,15 @@ call writes over a change its run was not shown.
   one is idle, a failed one retries or is held (tasks.md, 5.5). What the
   answer says the run left on resources goes to their connectors
   (connectors.md, section 10).
+- **Finished done while kept, it parks.** A run whose task is kept
+  (tasks.md, 5.7) and finishes done, with a result its contract takes,
+  is committed as parked: its turns first, then its saved state, kept,
+  with no try spent, and a line in its task's activity naming the
+  dependencies it waits for. Woken once they are done, its next run goes
+  on from what it left, its brief or its start saying what it waited
+  for (section 9), and finishes again. The tasks child decides it, as it
+  decides every reason a task may not go on, so the run and its host
+  know nothing of it.
 - **Waiting holds the slot; parking frees it.** A run that calls `wait`
   keeps its host's slot while it waits, so a run that is talked with
   answers at once. Idle
@@ -856,7 +870,9 @@ Its sections come from two places:
 
 - **The core's,** which it holds typed: the task (its spec and contract,
   and its lineage: its requesters' specs, cut); its dependencies' and
-  inputs' results in jig's terms; its delegates, their states, and the
+  inputs' results in jig's terms, and, for a run after its task was kept
+(tasks.md, 5.7), what it waited for: each dependency added, when and by
+whom; its delegates, their states, and the
   revisions a decision about them names, each one's spec's and a held
   one's hold's (7.3), and the results that came since (the plan, for a
   coordinator); its earlier
@@ -1089,6 +1105,8 @@ section 3):
     a role. It names whom the oldest such entry waits for, a party or a
     role, and how many wait;
   - *nothing,* when it is working: its run live and not waiting;
+  - *its dependencies,* when it is kept (tasks.md, 5.7): the pending
+    ones, the oldest first, and how many;
   - *its delegates,* when it has live delegates;
   - *news,* when it is idle, its run parked or waiting, or its procedure
     waiting on its facts: what moves it next is a message its wake
@@ -1193,7 +1211,9 @@ What the core holds, each bounded by its limits and summed into its
 worst case (programming-model.md, 6.3):
 
 - live tasks, with their inboxes, subscriptions, references, holds and
-  queues; pending proposals (tasks.md, section 11);
+  queues, and their dependencies, with the index of each resource's
+  holders and waiters and each task's dependents (tasks.md, 6.7);
+  pending proposals (tasks.md, section 11);
 - the rules and the live projects' policies, within limits on projects,
   resources per project and parties holding roles;
 - parties signed in, and their pending requests; their read positions
@@ -1225,6 +1245,12 @@ why. The root adds the core's worst case to its connectors' and its own
   the worst case with the rest, as every decision is (`../README.md`,
   6.2), so one request holding a whole conversation's close, or a whole
   project's goals reordered, fits.
+- **The check for circles of waits** is priced as a walk of every live
+  task, with a mark and a counter per task and per resource, within the
+  live tasks' and holds' limits; its scratch is sized at start, as the
+  index is, and the tasks a circle names within their limit (tasks.md,
+  6.7 and section 11). A restart's judgement of every wait at once
+  takes the same.
 - **What reads and deliveries compute** is priced with them: a task
   query's live part is one pass over the live tasks, and what each of
   its lines waits on a walk of a tree, within tasks per tree (11.2 and
@@ -1316,6 +1342,17 @@ marks them seen, the conversation ended and read after a restart with
 the position its person left, and one forgotten once read leaving
 nothing that shows; `me` marked as a pool is spent from, deliveries
 coalesced; a budget given `AsAllowed` answered with what was given.
+
+Its stories of added dependencies (tasks.md, 5.7): an agent task given
+a dependency while its run is live, the run finishing done and parked,
+its activity naming what it waits for, woken when the dependency is
+done and finishing again, after a restart too; an idle agent task kept,
+a message to it waiting in its inbox and never waking it, then
+delivered as it goes on; a kept task's run asking an effect that waits
+for dependencies, refused; a run amending a delegate to wait for
+another, and one whose add would close a circle, refused naming it; the
+reordering of two tasks queued for one write hold, ended done in the
+new order.
 
 Its stories of agents and procedures doing what parties do: a run
 amending a delegate a party amended since it was shown, answered moved
