@@ -98,6 +98,7 @@ pub fn limits() -> jig_client_test_domain::Limits {
                 kept: 4,
                 parts: 10,
                 authority: AUTHORITY_ENTRIES,
+                accounts: jig_client::AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
                 heartbeat: Duration::from_millis(100),
             },
             exchanges: 8,

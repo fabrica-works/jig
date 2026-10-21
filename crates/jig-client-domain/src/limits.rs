@@ -9,6 +9,13 @@ pub struct Backoff {
     pub first: Duration,
     pub most: Duration,
 }
+/// Whole account-list receiving counts (client/domain/client.md, 14).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct AccountCounts {
+    pub accounts: u32,
+    pub sources: u32,
+    pub sign_ins: u32,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     pub owners: &'static [crate::Spoken],
@@ -21,6 +28,7 @@ pub struct Limits {
     pub document_bytes: u64,
     pub backoff: Backoff,
     pub rows: u32,
+    pub accounts: AccountCounts,
     pub segments: u32,
     pub authority: u32,
     pub text: u32,

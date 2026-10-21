@@ -28,6 +28,7 @@ pub fn client_limits() -> jig_client_protocol_link::Limits {
         rows: 2,
         backoff: jig_client_domain::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
         authority: 8,
+        accounts: jig_client_domain::AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
         heartbeat: Duration::from_nanos(100),
     };
     jig_client_protocol_link::Limits::new(client, 4).expect("valid receiving limits")

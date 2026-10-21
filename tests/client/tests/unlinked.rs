@@ -33,6 +33,7 @@ fn limits() -> jig_client::Limits {
             kept: l.kept,
             parts: l.parts,
             authority: 8,
+            accounts: jig_client::AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
             heartbeat: world.client.domain.heartbeat,
             handles: 8,
             turn_bytes: 32,

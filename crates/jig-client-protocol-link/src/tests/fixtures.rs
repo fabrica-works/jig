@@ -34,6 +34,7 @@ const CLIENT: jig_client_domain::Limits = jig_client_domain::Limits {
     segments: 4,
     backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
     authority: 8,
+    accounts: jig_client_domain::AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
     heartbeat: Duration::from_nanos(100),
 };
 

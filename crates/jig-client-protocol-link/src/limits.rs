@@ -24,6 +24,9 @@ impl Limits {
                 }
             }
         }
+        if client.accounts.accounts == 0 || client.accounts.sources == 0 || client.accounts.sign_ins == 0 {
+            return Err(Unusable::Limits);
+        }
         let wire = wire(&client).ok_or(Unusable::Limits)?;
         let value = Self { client, exchanges, wire };
         worst_case(&value).ok_or(Unusable::Limits)?;

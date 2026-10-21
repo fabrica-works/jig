@@ -38,6 +38,7 @@ pub(crate) fn limits() -> Limits {
         kept: 4,
         parts: 8,
         authority: 8,
+        accounts: AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
         heartbeat: Duration::from_millis(100),
         handles: 8,
         turn_bytes: 32,        // tests/client/src/test.rs:42

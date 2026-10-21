@@ -299,6 +299,7 @@ pub fn client_limits() -> jig_client::Limits {
             kept: 4,
             parts: 10,
             authority: 8,
+            accounts: jig_client::AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
             heartbeat: skein_lib::Duration::from_millis(100),
         },
         exchanges: 8,

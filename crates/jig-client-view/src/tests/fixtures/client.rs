@@ -80,6 +80,7 @@ impl Fixture {
             kept: limits.kept,
             parts: limits.parts,
             authority: 8,
+            accounts: jig_client::AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
             heartbeat: HEARTBEAT,
         };
         let mut value = Self {

@@ -381,3 +381,17 @@ fn a_refused_worker_position_survives_wire_receipt() {
     let record = w::OwnerDeployment::new(&limits.wire, record).expect("deployment");
     assert_eq!(crate::translate::documents::owner_deployment(record, &limits), Ok(expected));
 }
+
+#[test]
+fn zero_account_receiving_counts_make_limits_unusable() {
+    use jig_client_domain::AccountCounts;
+    let bounds = fixtures::limits();
+    for accounts in [
+        AccountCounts { accounts: 0, ..bounds.client.accounts },
+        AccountCounts { sources: 0, ..bounds.client.accounts },
+        AccountCounts { sign_ins: 0, ..bounds.client.accounts },
+    ] {
+        let client = jig_client_domain::Limits { accounts, ..bounds.client };
+        assert_eq!(crate::Limits::new(client, bounds.exchanges), Err(crate::Unusable::Limits), "{accounts:?}");
+    }
+}

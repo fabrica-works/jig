@@ -158,6 +158,7 @@ pub fn domain_limits() -> jig_client_domain::Limits {
         kept: jig.kept,
         parts: jig.parts,
         authority: 8,
+        accounts: jig_client::AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
         heartbeat: jig_client_world::test::limits().client.domain.heartbeat,
     }
 }
