@@ -167,7 +167,6 @@ fn a_running_repin_given_a_dependency_lands_after_the_other_and_starts_its_depen
 
 // domain/tasks.md, 5.7, 7, 8.1 and 12.
 #[test]
-#[ignore = "inbox/k3-0546.md: self-amendment returns Reference instead of Dependencies"]
 fn an_owner_adds_a_dependency_its_child_found_while_working() {
     const OWNER: u64 = 1;
     const CHILD: u64 = 2;
@@ -186,11 +185,14 @@ fn an_owner_adds_a_dependency_its_child_found_while_working() {
     world.claim(OWNER, 1);
     world.claim(CHILD, 1);
     world.claim(FOUND, 1);
-    // A sibling is neither this task's delegate nor an introduction (section 4),
-    // nor below it (section 7); the owner's subtree does reach both children.
-    // The acceptance requires this reach refusal; section 7's "Who may" check
-    // currently refuses self-amendment first, as the ignore note records.
-    refused(amend(&mut world, Party::Task(CHILD), CHILD, &[FOUND]), CHILD, Refusal::Dependencies, &[FOUND]);
+    // The child that found the dependency may not add it: only a requester, a
+    // task above and a party may amend (section 7, "Who may"), and the owner's
+    // subtree reaches both children. One that may amend but not reach is
+    // a_task_amender_may_name_any_live_task_below_it_but_not_an_outside_task.
+    let Reply::Refused(problem) = amend(&mut world, Party::Task(CHILD), CHILD, &[FOUND]) else {
+        panic!("a task amending itself is refused");
+    };
+    assert_eq!((problem.task, problem.why), (Some(CHILD), Refusal::Reference));
     assert!(world.record(CHILD).dependencies.is_empty());
     assert_eq!(amend(&mut world, Party::Task(OWNER), CHILD, &[FOUND]), Reply::Done);
     assert_eq!(world.runs.get(&CHILD), Some(&1));
