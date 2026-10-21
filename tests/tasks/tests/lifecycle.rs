@@ -266,7 +266,7 @@ fn batch_is_atomic_and_cycles_and_limits_refuse_at_entrance() {
         assert_eq!(w.records, before);
     }
     let mut w = World::new(1, LIMITS);
-    refused(&w.make(Party::Person(1), vec![task(1, &[2]), task(2, &[1])]), Refusal::Cycle);
+    refused(&w.make(Party::Person(1), vec![task(1, &[2]), task(2, &[1])]), Refusal::Circle { cut: false });
     refused(&w.make(Party::Person(1), vec![task(1, &[]), task(1, &[])]), Refusal::Duplicate);
     refused(&w.make(Party::Person(1), vec![]), Refusal::Empty);
     for (new, why) in [
@@ -339,7 +339,7 @@ fn a_dependency_on_an_introduced_sibling_is_accepted_and_a_cross_subtree_wait_cy
         assert_eq!(w.record(3).references.as_ref(), [2]);
         let answer = w.make(Party::Task(2), vec![task(4, &[3])]);
         if cycle {
-            refused(&answer, Refusal::Cycle);
+            refused(&answer, Refusal::Circle { cut: false });
         } else {
             assert_eq!(answer, Reply::Made(vec![4]));
         }

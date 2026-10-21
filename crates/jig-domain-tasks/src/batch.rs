@@ -143,7 +143,7 @@ fn check_with_result_proposal(
         return Err(problem(None, Refusal::Funding));
     }
     if !acyclic(domain, limits, creator, batch) {
-        return Err(problem(Some(batch.first().expect("nonempty batch admitted").number), Refusal::Cycle));
+        return Err(problem(Some(batch.first().expect("nonempty batch admitted").number), Refusal::Circle { cut: false }));
     }
     Ok(())
 }

@@ -52,6 +52,8 @@ pub struct Limits {
     pub grace: skein_lib::Duration,
     /// Wall-clock bound before a task waiting for holds is held for review.
     pub hold_wait: skein_lib::Duration,
+    /// Maximum tasks a circle of waits names in a refusal or a hold (domain/tasks.md, 6.7).
+    pub circle: u32,
     /// Shape bound for historical input identities checked by the root before delegation.
     pub inputs: u32,
     /// Maximum combined specification words and byte-valued parameter bytes per task.

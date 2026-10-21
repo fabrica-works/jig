@@ -117,7 +117,7 @@ mod writers;
 pub use activity::{ActivityLine, EndKind, Line, Why, line_bytes_limit, lines_per_decision};
 pub use batch::{bounded_batch, valid_authority, valid_contract, valid_spec};
 pub use boundary::{
-    Accepted, Active, Cause, Closing, Contract, Deadline, DelegateState, DelegationContext, End, Ending, Event,
+    Accepted, Active, Added, Cause, Circle, Closing, Contract, Deadline, DelegateState, DelegationContext, End, Ending, Event,
     Executor, FieldRule, Hold, HoldKind, HoldSource, Holding, InvalidResult, Key, Kind, MessageKind, Name, New,
     NewsClass, NoticeState, Parameter, Party, PersonAddress, PersonAnswer, PersonStallNotice, PersonWait, Phase,
     PoolSlots, Problem, ProcedureAmendment, ProcedureCancel, ProcedureDecision, ProcedureEnd, ProcedureMessage,

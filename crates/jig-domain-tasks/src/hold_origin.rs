@@ -1,8 +1,10 @@
-//! Bounded references to connector explanations (`client/domain/objects.md`, 5).
-use crate::{Hold, HoldSource, Limits};
+//! Bounded references to connector explanations (`client/domain/objects.md`, 5) and the circles
+//! of waits that hold a task (domain/tasks.md, 6.7).
+use crate::{Circle, Hold, HoldSource, Limits};
 pub(crate) fn valid(limits: &Limits, why: Hold, source: Option<&HoldSource>) -> bool {
     match source {
-        None => true,
+        None => why != Hold::Circle,
+        Some(HoldSource::Circle(circle)) => why == Hold::Circle && valid_circle(limits, circle),
         Some(HoldSource::Resource(name)) => why == Hold::Drift && crate::holds::valid_name(limits, name),
         Some(HoldSource::Effect { entry, .. }) => {
             *entry != 0
@@ -21,8 +23,24 @@ pub(crate) fn valid(limits: &Limits, why: Hold, source: Option<&HoldSource>) -> 
                     | Hold::ResourceUnavailable
                     | Hold::ResourceAccess
                     | Hold::PoolLost { .. }
-                    | Hold::Procedure => false,
+                    | Hold::Procedure
+                    | Hold::Circle => false,
                 }
         }
     }
+}
+
+/// A circle names at least one task, none twice, and is cut only at its limit.
+pub(crate) fn valid_circle(limits: &Limits, circle: &Circle) -> bool {
+    let Ok(count) = u32::try_from(circle.tasks.len()) else { return false };
+    if count == 0 || count > limits.circle || (circle.cut && count != limits.circle) {
+        return false;
+    }
+    for (index, task) in circle.tasks.iter().enumerate() {
+        let Some(before) = circle.tasks.get(..index) else { return false };
+        if *task == 0 || before.contains(task) {
+            return false;
+        }
+    }
+    true
 }

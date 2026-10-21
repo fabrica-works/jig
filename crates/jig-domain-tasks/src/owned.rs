@@ -315,6 +315,9 @@ pub fn phase_bytes(phase: &Phase) -> Option<u64> {
                         }
                     }
                     crate::HoldSource::Effect { .. } => {}
+                    crate::HoldSource::Circle(circle) => {
+                        total = total.checked_add(bytes(size_of_val(&*circle.tasks))?)?;
+                    }
                 }
             }
             Some(total)

@@ -36,6 +36,7 @@ pub const LIMITS: Limits = Limits {
     hold_waiters: 8,
     grace: skein_lib::Duration::from_secs(600),
     hold_wait: Duration::from_secs(10),
+    circle: 8,
     inputs: 4,
     spec_bytes: 64,
     parameters: 4,

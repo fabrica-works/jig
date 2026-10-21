@@ -601,6 +601,9 @@ pub enum Hold {
     PoolLost { pool: u64 },
     /// A procedure asked its requester for a decision.
     Procedure,
+    /// Joining a queue, or the waits a release gives back, would close a circle of waits; the
+    /// hold's source names the circle, and the hold lifts once it breaks (domain/tasks.md, 6.7).
+    Circle,
 }
 
 impl Hold {
@@ -621,7 +624,8 @@ impl Hold {
             | Hold::Budget
             | Hold::Deadline
             | Hold::HoldsWaited
-            | Hold::Procedure => true,
+            | Hold::Procedure
+            | Hold::Circle => true,
         }
     }
 }
@@ -719,11 +723,24 @@ pub enum Phase {
     Ended(/** Historical final ending; this phase is excluded from the live restore arena. */ Ending),
 }
 
-/// Reference to the connector-owned explanation of a hold (client/domain/objects.md, 5).
+/// What explains a hold beyond its reason: a connector's resource or effect, or the circle of
+/// waits a `Hold::Circle` names (client/domain/objects.md, 5; domain/tasks.md, 6.7).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum HoldSource {
     Resource(Name),
     Effect { connector: u16, entry: u64 },
+    Circle(Circle),
+}
+
+/// A circle of waits: tasks each waiting for the next, the last for the first, so that none of
+/// them could end (domain/tasks.md, 6.7).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Circle {
+    /// The circle's tasks in order, from the one whose new wait would close it, at most
+    /// `Limits::circle`.
+    pub tasks: Box<[u64]>,
+    /// The circle has more tasks than these.
+    pub cut: bool,
 }
 
 /// A connector resource name opaque to the tasks hub (domain/tasks.md, 6.1).
@@ -999,10 +1016,15 @@ pub struct TaskRecord {
     pub numbers: Numbers,
     /// Source of the current allotment, kept separate from requester ancestry.
     pub funder: Funder,
-    /// Immutable admitted dependency identities, bounded by `Limits::dependencies`.
+    /// Admitted dependency identities, bounded by `Limits::dependencies`: those named at creation,
+    /// then those amendments added, the oldest first (domain/tasks.md, section 7).
     pub dependencies: Box<[u64]>,
+    /// The dependencies an amendment added, each with when and by whom, in their order among
+    /// `dependencies`.
+    pub added: Box<[Added]>,
     /// `Exact` still-live subset of dependencies, bounded by `Limits::dependencies`; removed once
-    /// per dependency end in the same decision. `Restore` checks count/uniqueness/subset before
+    /// per dependency end in the same decision. A waiting task waits for them; an active one is
+    /// kept by them (domain/tasks.md, 5.7). `Restore` checks count/uniqueness/subset before
     /// retention and complete live coverage after all pages.
     pub waiting_on: Box<[u64]>,
     /// Resources currently held or awaited; a connector may pass a failed delegate's hold to its tree root during release.
@@ -1175,8 +1197,16 @@ pub enum Refusal {
     Subscription,
     /// `Dependency` count, uniqueness or current-live/same-batch identity is invalid.
     Dependencies,
-    /// Combined live delegation waits and immutable dependencies would cycle.
-    Cycle,
+    /// The new waits would close a circle of waits; `blocked_by` names its tasks in order, each
+    /// waiting for the next, at most `Limits::circle` (domain/tasks.md, 6.7).
+    Circle { cut: bool },
+    /// A dependency an amendment adds has ended failed or cancelled; `blocked_by` names it
+    /// (domain/tasks.md, section 7).
+    DependencyEnded { how: Status },
+    /// The task is kept by pending dependencies, which `blocked_by` names, the oldest first: a
+    /// person's answer, a procedure's step ending it done, or an effect that waits for them
+    /// (domain/tasks.md, 5.7).
+    Kept,
     /// `Agent` charter is absent from the admitted configured table.
     Executor,
     /// Specification count or aggregate owned bytes are invalid.
@@ -1223,8 +1253,9 @@ pub struct Problem {
     pub task: Option<u64>,
     /// Bounded structural, lifecycle, financial or restore admission reason.
     pub why: Refusal,
-    /// All live delegates that prevented a finish, in the requester's current order.
-    /// Absent for every other refusal.
+    /// The tasks the refusal names: the live delegates that prevented a finish, in the requester's
+    /// current order; a circle's tasks; an ended dependency; or the pending dependencies keeping
+    /// the task. Absent for every other refusal.
     pub blocked_by: Option<Box<[u64]>>,
     /// Exact room check metadata; absent for shape, state and other refusals.
     pub capacity: Option<crate::Capacity>,
@@ -1246,7 +1277,13 @@ impl Problem {
     /// A finish refused until these named delegates end or are cancelled.
     #[must_use]
     pub fn live_delegates(task: u64, delegates: &[u64]) -> Self {
-        Self { task: Some(task), why: Refusal::LiveDelegates, blocked_by: Some(Box::from(delegates)), capacity: None }
+        Self::naming(Some(task), Refusal::LiveDelegates, delegates)
+    }
+
+    /// A refusal naming these tasks.
+    #[must_use]
+    pub fn naming(task: Option<u64>, why: Refusal, tasks: &[u64]) -> Self {
+        Self { task, why, blocked_by: Some(Box::from(tasks)), capacity: None }
     }
 }
 
@@ -1813,6 +1850,16 @@ pub enum Cause {
     Unpriced,
 }
 
+/// A dependency an amendment added to a live task (domain/tasks.md, section 7).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Added {
+    pub task: u64,
+    /// When the amendment was committed.
+    pub at: Wall,
+    /// The amendment's maker: a party, or a task amending one below it.
+    pub by: Party,
+}
+
 /// Owned semantic preparation snapshot emitted to root, bounded by task limits; not a
 /// second mutable `TaskRecord` or `funding` ledger. (domain/tasks.md, section 3).
 /// (domain/engine.md, sections 7.1 and 9).
@@ -1828,8 +1875,15 @@ pub struct RunContext {
     pub inbox: Box<[Word]>,
     /// Current direct children and their lifecycle at preparation time.
     pub delegates: Box<[DelegateState]>,
-    /// Immutable dependency identities whose ended results the root loads.
+    /// Dependency identities whose ended results the root loads; those still pending are in
+    /// `pending`.
     pub dependencies: Box<[u64]>,
+    /// The dependencies an amendment added, with when and by whom, for the brief's account of
+    /// what the task waited for (domain/engine.md, section 9).
+    pub added: Box<[Added]>,
+    /// Pending dependencies keeping the task, the oldest first; a procedure steps knowing them
+    /// (domain/tasks.md, 5.7; domain/connectors.md, 6.1).
+    pub pending: Box<[u64]>,
     /// Resources whose next activation resumes saved state.
     pub saved: Box<[SavedResource]>,
     /// Last claimed attempt; a task-wide transcript load must not use turns from a later claim.
