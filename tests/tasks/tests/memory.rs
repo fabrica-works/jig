@@ -624,9 +624,11 @@ fn a_wide_back_walk_with_ancestors_and_dependents_fits_its_priced_scratch() {
 fn the_wait_index_and_walk_have_an_explicit_memory_delta() {
     // abf728e0's bound for this profile; the added index owns resource keys,
     // per-task comparison payloads, reversed edges and all simultaneous scratch.
+    // An amendment's staged plan carries its list, its provenance and its Met.
     const SEED_BYTES: u64 = 9_808_904;
     const WAIT_BYTES: u64 = 1_485_368;
-    assert_eq!(tasks::worst_case(&LIMITS), Some(SEED_BYTES + WAIT_BYTES));
+    const PROMISE_BYTES: u64 = 768;
+    assert_eq!(tasks::worst_case(&LIMITS), Some(SEED_BYTES + WAIT_BYTES + PROMISE_BYTES));
 }
 
 #[test]
