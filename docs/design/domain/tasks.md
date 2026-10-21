@@ -449,7 +449,8 @@ them (5.7).
   section 7 names, wherever its escalation waits.
 - **A release lifts what it releases:** tries count again from it, and
   what held the task is judged afresh; a deadline still past holds it
-  again, with a fresh escalation.
+  again, with a fresh escalation, and so does a dependency ended failed
+  or cancelled, until an amendment removes it (5.1, section 7).
 
 ### 5.6 Results
 
@@ -655,20 +656,37 @@ circle, each for another of the set, so that none of them could end.
     and *the waits a release gives back:* a task that would close a
     circle is held instead, naming the circle (5.5). One held from a
     queue leaves it, keeping when it began to wait. Its hold lifts on
-    its own, back where it was, once a task on the circle ends or is
-    held, or has a pending dependency done or removed; a release judges
-    it afresh.
+    its own, back where it was, once a task the circle names ends, is
+    held or loses a wait (a pending dependency done or removed, a queue
+    left), or a pool on it changes its slots; one whose names were cut
+    at the limit, at every such change. A release judges it afresh.
   - *a pool that shrinks* (6.6): each waiter, as a join.
 
   Taking holds adds no wait: a task becomes active with its dependencies
   done and no delegates yet.
-- **How.** A new wait from a task can close a circle only through what
-  already waits for that task. The check walks back from it along the
-  live waits, marking what would be stuck were the task stuck, and
-  counting each pool's stuck holders against its slots; the new wait
-  closes a circle when what it waits for is marked. It costs a walk of
-  what waits for the task, for most its ancestors and their dependents,
-  within the limits (section 11; engine.md, section 13). The tasks child
+- **How.** A new wait from a task can close a circle only among what
+  waits for that task, directly or through others: any other circle was
+  one already. The check takes two steps over them.
+  - *It marks them,* walking back from the task along the live waits:
+    what depends on a marked task, the requester of a marked delegate,
+    and a resource's waiters once one of its holders is marked. It
+    counts each resource's marked holders.
+  - *It judges them as a restart does,* with the task's new wait: in
+    turn it frees a marked task none of whose waits is stuck, counting
+    down what waits for it. A wait for a task is stuck while that task
+    is marked and not freed; one for a resource, while as many of its
+    holders are left as it has slots, one at least. The new wait closes
+    a circle when the task is left.
+
+  Marking only what would be stuck were the task stuck is not enough: a
+  pool's holders can each be stuck only through the circle they close
+  together. The circle named is its knot: from the task, each named
+  task's first wait still stuck (its dependencies, then its delegates,
+  then its resources), and for a resource as many of its holders left
+  as it has slots, so that a change to any wait the circle needs
+  changes a task it names. It costs two passes over what waits for the
+  task, for most its ancestors and their dependents, within the limits
+  (section 11; engine.md, section 13). The tasks child
   keeps, per resource, its holders and waiters, and, per task, its
   dependents, so that the walk reads them without a scan.
 - **Restored, judged whole.** A restart judges every wait at once, ending
@@ -1114,8 +1132,13 @@ of a resource its grandparent holds; a waiting task whose dependencies
 are done joining a queue onto a circle, held, and back at its place
 once the circle breaks; a pool shrinking onto a circle, its waiter held;
 a restart restoring a circle an older rule allowed, its waiter held; a
+pool's two holders each given a dependency on a task that waits, through
+its delegate, for that pool: the first accepted, the second refused,
+naming the knot; a waiter joining a pool onto a circle through a holder's
+delegate, held, and lifted when that delegate ends; a
 prerequisite already done, met at once, one failed, refused, and one
-that fails later, its dependent held; one removed, its task woken; a
+that fails later, its dependent held, and released, held again; one
+removed, its task woken; a
 grace given to a kept task with no live run, cancelled at once; a
 proposal from below a kept task waiting above it.
 
