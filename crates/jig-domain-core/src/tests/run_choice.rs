@@ -1189,3 +1189,27 @@ fn program_metadata_on_an_ineligible_probe_does_not_refuse_a_native_choice() {
     host(&mut core, &limits, SECOND, &[b"scripted", b"same", b"other"]);
     assert_eq!(core.run_choice(OPEN_TASK).unwrap().placement.channel, SECOND);
 }
+
+#[test]
+fn an_open_start_takes_the_first_eligible_hosts_answer_in_either_order() {
+    // Equal free slots probe in channel order; exchange which channel is program-marked.
+    for (program, native, refused) in [(FIRST, SECOND, true), (SECOND, FIRST, false)] {
+        let (mut core, limits) = ready(false);
+        open(&mut core, &limits);
+        let endpoint = core.chosen_main(OPEN_TASK).endpoint;
+        let mut old = placement_fleet(&core, &limits);
+        core::mem::swap(&mut core.fleet, &mut old);
+        host_with_endpoints(&mut core, &limits, program, &[b"scripted", b"same"], Box::new([]), Box::new([endpoint]));
+        host(&mut core, &limits, native, &[b"scripted", b"same"]);
+        let choice = core.run_choice(OPEN_TASK);
+        if refused {
+            assert_eq!(choice, Err(RunWait::OpenProgram(OpenProgram::Model)));
+            core.due.push(core.tasks.run_context(OPEN_TASK).unwrap());
+            assert!(core.take_due().is_none());
+            assert!(core.proofs.get(&OPEN_TASK).is_none());
+            assert_eq!(core.tasks.task(OPEN_TASK).unwrap().attempt, 0);
+        } else {
+            assert_eq!(choice.unwrap().placement.channel, native);
+        }
+    }
+}
