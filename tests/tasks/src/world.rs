@@ -149,6 +149,7 @@ pub struct Frozen {
     ended_topics: Vec<(u64, u64, u16)>,
     deadlines: BTreeMap<u64, (Wall, Time)>,
     kinds: Vec<tasks::Kind>,
+    reports: BTreeMap<tasks::Name, tasks::HoldKind>,
     restoring: bool,
     facts: Vec<Fact>,
     consume_facts: bool,
@@ -211,6 +212,7 @@ pub struct World {
     restoring: bool,
     deadlines: BTreeMap<u64, (Wall, Time)>,
     kinds: Vec<tasks::Kind>,
+    reports: BTreeMap<tasks::Name, tasks::HoldKind>,
 }
 
 impl World {
@@ -247,6 +249,7 @@ impl World {
             restoring: true,
             deadlines: BTreeMap::new(),
             kinds: Vec::new(),
+            reports: BTreeMap::new(),
         };
         world.send(Event::Restored);
         world.open_period(0, 100_000);
@@ -269,6 +272,7 @@ impl World {
             ended_topics: self.ended_topics,
             deadlines: self.deadlines,
             kinds: self.kinds,
+            reports: self.reports,
             restoring: self.restoring,
             facts: self.facts,
             consume_facts: self.consume_facts,
@@ -600,6 +604,9 @@ impl World {
         } else {
             (event, None)
         };
+        if let Event::Resource { name, hold } = &event {
+            self.reports.insert(name.clone(), *hold);
+        }
         self.remember_input(&event);
         self.trace.input(self.env.now, &event);
         tasks::step(&mut self.domain, &self.env, event, &mut self.out);
@@ -673,22 +680,17 @@ impl World {
 
     /// Commit state and requester results together before executor delivery
     /// (domain/tasks.md, 5; domain/engine.md, 7).
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one commit records writes before observing topology, amendments and endings"
-    )]
     pub fn durable(&mut self) {
         self.commit += 1;
         let mut terminals = Vec::new();
-        let mut ended = Vec::new();
-        let mut amended = Vec::new();
+        let mut ordered = Vec::new();
         for request in &self.pending {
             match request {
                 Request::Save { record } => {
                     if let Stored::History(history) = record
                         && let Some(amendment) = &history.amendment
                     {
-                        amended.push(Seen::Amended {
+                        ordered.push(Seen::Amended {
                             task: history.task,
                             dependencies: amendment.after.dependencies.to_vec(),
                         });
@@ -700,7 +702,7 @@ impl World {
                 }
                 Request::Ended { task, ending, .. } => {
                     assert!(self.results.insert(*task, ending.clone()).is_none(), "requester result committed once");
-                    ended.push((*task, status(ending)));
+                    ordered.push(Seen::Ended { task: *task, status: status(ending), after: self.commit });
                 }
                 Request::Acknowledged { task, attempt, accepted: Accepted::New, .. } => {
                     terminals.push((*task, *attempt));
@@ -773,15 +775,12 @@ impl World {
         for seen in made {
             self.observe(seen);
         }
-        for seen in amended {
-            self.observe(seen);
-        }
         for (task, attempt) in terminals {
             self.runs.remove(&task);
             self.observe(Seen::Terminal { task, attempt });
         }
-        for (task, status) in ended {
-            self.observe(Seen::Ended { task, status, after: self.commit });
+        for seen in ordered {
+            self.observe(seen);
         }
     }
 
@@ -880,7 +879,11 @@ impl World {
                 | Stored::PersonProposal(_) => {}
             }
         }
-        self.observe(Seen::Resources { live, pools, writers });
+        let mut reports = Vec::new();
+        for (name, hold) in &self.reports {
+            reports.push((name.clone(), *hold));
+        }
+        self.observe(Seen::Resources { live, pools, writers, kinds: self.kinds.clone(), reports });
         self.domain.reclaim();
     }
 
@@ -1106,6 +1109,9 @@ impl World {
         for configured in kinds {
             self.send(Event::Kinds { connector: configured.connector, kinds: Box::new([configured]) });
         }
+        for (name, hold) in self.reports.clone() {
+            self.send(Event::Resource { name, hold });
+        }
         self.activations.clear();
         self.contexts.clear();
         self.stops.clear();
@@ -1130,6 +1136,11 @@ impl World {
         }
         self.observe(Seen::Finished);
         self.referee.assert_passed(self.seed);
+    }
+
+    /// Report and retain the connector's latest named rule (domain/tasks.md, section 6).
+    pub fn report_resource(&mut self, name: tasks::Name, hold: tasks::HoldKind) {
+        self.send(Event::Resource { name, hold });
     }
 }
 

@@ -1,6 +1,8 @@
+//! Independent judgements from committed records and world inputs
+//! (domain/tasks.md, 5.7, 6.7, sections 7 and 12).
 use jig_domain_tasks::{
-    Contract, Ending, Holding, Last, Limits, Name as ResourceName, Parameter, Party, Phase, PoolSlots, Status,
-    TaskRecord, TaskResult, Was, WriterSlot,
+    Contract, Ending, HoldKind, Holding, Kind, Last, Limits, Name as ResourceName, Parameter, Party, Phase, PoolSlots,
+    Status, TaskRecord, TaskResult, Was, WriterSlot,
 };
 use skein_lib::Duration;
 use skein_world::domain::{Expectations, Judge};
@@ -8,20 +10,67 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Seen {
-    Batch { members: Vec<u64>, accepted: bool, made: Vec<u64> },
-    Made { task: u64, parent: Party, dependencies: Vec<u64>, depth: u32 },
-    Amended { task: u64, dependencies: Vec<u64> },
-    Durable { commit: u64 },
-    Replied { call: u64, after: u64 },
-    Assigned { task: u64, attempt: u64, after: u64, adopted: bool },
-    Terminal { task: u64, attempt: u64 },
-    Closing { task: u64 },
-    Settled { task: u64 },
-    Ended { task: u64, status: Status, after: u64 },
-    Cancelled { task: u64 },
-    Limit { live: usize, cap: u32 },
-    Stored { live: Vec<TaskRecord>, limits: Box<Limits> },
-    Resources { live: Vec<TaskRecord>, pools: Vec<PoolSlots>, writers: Vec<WriterSlot> },
+    Batch {
+        members: Vec<u64>,
+        accepted: bool,
+        made: Vec<u64>,
+    },
+    Made {
+        task: u64,
+        parent: Party,
+        dependencies: Vec<u64>,
+        depth: u32,
+    },
+    Amended {
+        task: u64,
+        dependencies: Vec<u64>,
+    },
+    Durable {
+        commit: u64,
+    },
+    Replied {
+        call: u64,
+        after: u64,
+    },
+    Assigned {
+        task: u64,
+        attempt: u64,
+        after: u64,
+        adopted: bool,
+    },
+    Terminal {
+        task: u64,
+        attempt: u64,
+    },
+    Closing {
+        task: u64,
+    },
+    Settled {
+        task: u64,
+    },
+    Ended {
+        task: u64,
+        status: Status,
+        after: u64,
+    },
+    Cancelled {
+        task: u64,
+    },
+    Limit {
+        live: usize,
+        cap: u32,
+    },
+    Stored {
+        live: Vec<TaskRecord>,
+        limits: Box<Limits>,
+    },
+    Resources {
+        live: Vec<TaskRecord>,
+        pools: Vec<PoolSlots>,
+        writers: Vec<WriterSlot>,
+        kinds: Vec<Kind>,
+        reports: Vec<(ResourceName, HoldKind)>,
+    },
     Finished,
 }
 
@@ -56,9 +105,10 @@ impl Tasks {
         live: &[TaskRecord],
         pools: &[PoolSlots],
         writers: &[WriterSlot],
+        rules: &Rules,
         judge: &mut Judge<Name, Stimulus>,
     ) {
-        if circle_of_waits(live, pools) {
+        if circle_of_waits(live, pools, rules) {
             judge.fail("circle of waits");
         }
         for row in live {
@@ -69,13 +119,9 @@ impl Tasks {
                 continue;
             }
             for holding in &row.holdings {
-                if let Holding::Write { resource, .. } = holding {
-                    let holders = live
-                        .iter()
-                        .filter(|other| other.holds_taken)
-                        .flat_map(|other| &other.holdings)
-                        .filter(|other| matches!(other, Holding::Write { resource: name, .. } if name == resource))
-                        .count();
+                if matches!(rules.rule(holding), Some(HoldKind::Exclusive { .. })) {
+                    let resource = holding_name(holding);
+                    let holders = holder_count(live, resource);
                     if holders != 1 {
                         judge.fail("resource has multiple holders");
                     }
@@ -85,16 +131,12 @@ impl Tasks {
         let mut counts = Vec::new();
         for row in live.iter().filter(|row| row.holds_taken) {
             for holding in &row.holdings {
-                if let Holding::Slot { pool, .. } = holding {
+                if matches!(rules.rule(holding), Some(HoldKind::Pooled { .. })) {
+                    let pool = holding_name(holding);
                     if counts.iter().any(|(name, _)| name == pool) {
                         continue;
                     }
-                    let current = live
-                        .iter()
-                        .filter(|other| other.holds_taken)
-                        .flat_map(|other| &other.holdings)
-                        .filter(|other| matches!(other, Holding::Slot { pool: name, .. } if name == pool))
-                        .count();
+                    let current = holder_count(live, pool);
                     let before = self.pool_counts.iter().find(|(name, _)| name == pool).map_or(0, |(_, count)| *count);
                     let slots = pools.iter().find(|row| row.pool == *pool).map_or(0, |row| row.slots);
                     if current > before && current > usize::try_from(slots).expect("u32 fits usize") {
@@ -165,35 +207,6 @@ impl Tasks {
         }
         judge.meet(&Name::End(task));
     }
-
-    fn cycle(&self) -> bool {
-        for start in self.parents.keys() {
-            let mut pending = self.dependencies.get(start).cloned().unwrap_or_default();
-            for (child, parent) in &self.parents {
-                if *parent == Party::Task(*start) && !self.ended.contains_key(child) {
-                    pending.push(*child);
-                }
-            }
-            let mut visited = BTreeSet::new();
-            while let Some(task) = pending.pop() {
-                if task == *start {
-                    return true;
-                }
-                if !visited.insert(task) {
-                    continue;
-                }
-                if let Some(dependencies) = self.dependencies.get(&task) {
-                    pending.extend(dependencies);
-                }
-                for (child, parent) in &self.parents {
-                    if *parent == Party::Task(task) && !self.ended.contains_key(child) {
-                        pending.push(*child);
-                    }
-                }
-            }
-        }
-        false
-    }
 }
 
 impl Expectations for Tasks {
@@ -229,11 +242,18 @@ impl Expectations for Tasks {
                     judge.fail("delegate has no live parent");
                 }
                 self.dependencies.insert(task, dependencies);
-                if self.cycle() {
-                    judge.fail("cycle through dependencies or delegates");
-                }
             }
             Seen::Amended { task, dependencies } => {
+                for dependency in &dependencies {
+                    // Retaining a prerequisite that failed later is not an add (section 7).
+                    let mut retained = false;
+                    if let Some(before) = self.dependencies.get(&task) {
+                        retained = before.contains(dependency);
+                    }
+                    if !retained && matches!(self.ended.get(dependency), Some(Status::Failed | Status::Cancelled)) {
+                        judge.fail(format!("amendment of {task} adds failed or cancelled dependency {dependency}"));
+                    }
+                }
                 self.dependencies.insert(task, dependencies);
             }
             Seen::Durable { commit } => self.durable = commit,
@@ -349,7 +369,9 @@ impl Expectations for Tasks {
                     }
                 }
             }
-            Seen::Resources { live, pools, writers } => self.resources(&live, &pools, &writers, judge),
+            Seen::Resources { live, pools, writers, kinds, reports } => {
+                self.resources(&live, &pools, &writers, &Rules { kinds, reports }, judge);
+            }
             Seen::Finished => {
                 if self.cancelled.iter().any(|task| !self.ended.contains_key(task)) {
                     judge.fail("cancelled task did not end");
@@ -460,7 +482,7 @@ fn stored(live: &[TaskRecord], limits: &Limits, judge: &mut Judge<Name, Stimulus
 }
 
 // Compute live waits independently of the tasks child's indexes and back walk.
-fn circle_of_waits(live: &[TaskRecord], pools: &[PoolSlots]) -> bool {
+fn circle_of_waits(live: &[TaskRecord], pools: &[PoolSlots], rules: &Rules) -> bool {
     let mut pending = BTreeMap::<u64, usize>::new();
     let mut dependents = BTreeMap::<u64, Vec<u64>>::new();
     let mut held = BTreeMap::<ResourceName, Vec<u64>>::new();
@@ -494,9 +516,10 @@ fn circle_of_waits(live: &[TaskRecord], pools: &[PoolSlots]) -> bool {
         {
             for holding in &row.holdings {
                 let name = holding_name(holding);
-                let threshold = match holding {
-                    Holding::Write { .. } => 1,
-                    Holding::Slot { .. } => pools
+                let threshold = match rules.rule(holding) {
+                    Some(HoldKind::Shared) | None => continue,
+                    Some(HoldKind::Exclusive { .. }) => 1,
+                    Some(HoldKind::Pooled { .. }) => pools
                         .iter()
                         .find(|pool| pool.pool == *name)
                         .map_or(1, |pool| usize::try_from(pool.slots.max(1)).expect("u32 fits usize")),
@@ -549,4 +572,42 @@ fn holding_name(holding: &Holding) -> &ResourceName {
         Holding::Write { resource, .. } => resource,
         Holding::Slot { pool, .. } => pool,
     }
+}
+
+// Only the rules sent by the world resolve a resource (domain/tasks.md, section 6).
+struct Rules {
+    kinds: Vec<Kind>,
+    reports: Vec<(ResourceName, HoldKind)>,
+}
+
+impl Rules {
+    fn rule(&self, holding: &Holding) -> Option<HoldKind> {
+        let name = holding_name(holding);
+        for (reported, rule) in &self.reports {
+            if reported == name {
+                return Some(*rule);
+            }
+        }
+        let (Holding::Write { kind, .. } | Holding::Slot { kind, .. }) = holding;
+        for configured in &self.kinds {
+            if configured.connector == name.connector && configured.kind == *kind {
+                return Some(configured.hold);
+            }
+        }
+        None
+    }
+}
+
+fn holder_count(live: &[TaskRecord], name: &ResourceName) -> usize {
+    let mut count = 0;
+    for row in live {
+        if row.holds_taken {
+            for holding in &row.holdings {
+                if holding_name(holding) == name {
+                    count += 1;
+                }
+            }
+        }
+    }
+    count
 }

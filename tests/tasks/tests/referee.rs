@@ -153,9 +153,21 @@ fn resource_referee_rejects_duplicate_holds_partial_holds_pool_overadmission_and
     let mut second = world.record(2).clone();
     second.holdings = Box::new([holding]);
     second.holds_taken = true;
-    rejects(vec![Seen::Resources { live: vec![first.clone(), second.clone()], pools: vec![], writers: vec![] }]);
+    rejects(vec![Seen::Resources {
+        live: vec![first.clone(), second.clone()],
+        pools: vec![],
+        writers: vec![],
+        kinds: rules(),
+        reports: vec![],
+    }]);
     second.phase = jig_domain_tasks::Phase::Waiting;
-    rejects(vec![Seen::Resources { live: vec![second], pools: vec![], writers: vec![] }]);
+    rejects(vec![Seen::Resources {
+        live: vec![second],
+        pools: vec![],
+        writers: vec![],
+        kinds: rules(),
+        reports: vec![],
+    }]);
 
     let pool = ResourceName { connector: 1, path: Box::new([Box::new([2])]) };
     let slot = Holding::Slot { pool: pool.clone(), kind: 2 };
@@ -165,14 +177,26 @@ fn resource_referee_rejects_duplicate_holds_partial_holds_pool_overadmission_and
     second.holds_taken = true;
     let slots = vec![PoolSlots { number: 1, pool, slots: 1 }];
     rejects(vec![
-        Seen::Resources { live: vec![first.clone()], pools: slots.clone(), writers: vec![] },
-        Seen::Resources { live: vec![first, second], pools: slots, writers: vec![] },
+        Seen::Resources {
+            live: vec![first.clone()],
+            pools: slots.clone(),
+            writers: vec![],
+            kinds: rules(),
+            reports: vec![],
+        },
+        Seen::Resources { live: vec![first, second], pools: slots, writers: vec![], kinds: rules(), reports: vec![] },
     ]);
 
     let writer =
         WriterSlot { number: 1, resource: resource.clone(), writer: Writer::Run { task: 1, attempt: 1 }, lost: false };
     let other = WriterSlot { number: 2, resource, writer: Writer::Effect { entry: 2 }, lost: false };
-    rejects(vec![Seen::Resources { live: vec![], pools: vec![], writers: vec![writer, other] }]);
+    rejects(vec![Seen::Resources {
+        live: vec![],
+        pools: vec![],
+        writers: vec![writer, other],
+        kinds: rules(),
+        reports: vec![],
+    }]);
 }
 
 #[test]
@@ -206,14 +230,25 @@ fn each_initial_invariant_catches_an_independent_violation() {
 }
 
 fn dependency_cycle() {
-    rejects(vec![
-        Seen::Made { task: 1, parent: Party::Person(1), dependencies: vec![2], depth: 0 },
-        Seen::Made { task: 2, parent: Party::Person(1), dependencies: vec![1], depth: 0 },
-    ]);
+    use jig_tasks_world::{LIMITS, World, task};
+    let mut world = World::new(0, LIMITS);
+    world.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
+    let mut first = world.record(1).clone();
+    let mut second = world.record(2).clone();
+    first.waiting_on = Box::new([2]);
+    second.waiting_on = Box::new([1]);
+    rejects(vec![resources(vec![first, second], vec![])]);
 }
 
 fn cycle_through_delegate() {
-    rejects(vec![made(1), Seen::Made { task: 2, parent: Party::Task(1), dependencies: vec![1], depth: 1 }]);
+    use jig_tasks_world::{LIMITS, World, task};
+    let mut world = World::new(0, LIMITS);
+    world.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
+    let mut parent = world.record(1).clone();
+    let mut child = world.record(2).clone();
+    parent.delegates = Box::new([2]);
+    child.waiting_on = Box::new([1]);
+    rejects(vec![resources(vec![parent, child], vec![])]);
 }
 
 fn missing_end_deadline() {
@@ -440,18 +475,143 @@ fn live_queue_and_dependency_circles_are_judged_from_rows() {
     waiter.hold_wait_since = Some(skein_lib::Wall::EPOCH);
     for pooled in [false, true] {
         let holding = if pooled {
-            Holding::Slot { pool: resource.clone(), kind: 1 }
+            Holding::Slot { pool: resource.clone(), kind: 2 }
         } else {
             Holding::Write { resource: resource.clone(), kind: 1 }
         };
         holder.holdings = Box::new([holding.clone()]);
         waiter.holdings = Box::new([holding]);
         let pools = if pooled { vec![PoolSlots { number: 1, pool: resource.clone(), slots: 0 }] } else { vec![] };
-        rejects(vec![Seen::Resources { live: vec![holder.clone(), waiter.clone()], pools, writers: vec![] }]);
+        rejects(vec![Seen::Resources {
+            live: vec![holder.clone(), waiter.clone()],
+            pools,
+            writers: vec![],
+            kinds: rules(),
+            reports: vec![],
+        }]);
     }
     holder.holdings = Box::new([]);
     waiter.hold_wait_since = None;
     waiter.holdings = Box::new([]);
     waiter.waiting_on = Box::new([holder.number]);
-    rejects(vec![Seen::Resources { live: vec![holder, waiter], pools: vec![], writers: vec![] }]);
+    rejects(vec![Seen::Resources {
+        live: vec![holder, waiter],
+        pools: vec![],
+        writers: vec![],
+        kinds: rules(),
+        reports: vec![],
+    }]);
+}
+
+fn rules() -> Vec<jig_domain_tasks::Kind> {
+    use jig_domain_tasks::{HoldKind, Kind, Taken};
+    vec![
+        Kind { connector: 1, kind: 1, hold: HoldKind::Exclusive { taken: Taken::Waits } },
+        Kind { connector: 1, kind: 2, hold: HoldKind::Pooled { taken: Taken::Waits } },
+    ]
+}
+
+fn resources(
+    live: Vec<jig_domain_tasks::TaskRecord>,
+    reports: Vec<(jig_domain_tasks::Name, jig_domain_tasks::HoldKind)>,
+) -> Seen {
+    Seen::Resources { live, pools: vec![], writers: vec![], kinds: rules(), reports }
+}
+
+fn passes(seen: Vec<Seen>) {
+    let mut referee = Referee::new(Tasks::default());
+    let mut out = Vec::new();
+    for observation in seen {
+        referee.observe(Time::ZERO, observation, &mut out);
+    }
+    referee.assert_passed(0);
+}
+
+#[test]
+fn shared_writes_allow_two_holders_but_exclusive_writes_do_not() {
+    use jig_domain_tasks::{HoldKind, Holding, Name};
+    use jig_tasks_world::{LIMITS, World, task};
+    let mut world = World::new(0, LIMITS);
+    world.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
+    let name = Name { connector: 1, path: Box::new([Box::new([1])]) };
+    let mut live = Vec::new();
+    for number in [1, 2] {
+        let mut row = world.record(number).clone();
+        row.holdings = Box::new([Holding::Write { resource: name.clone(), kind: 1 }]);
+        live.push(row);
+    }
+    // A named report wins over the configured Exclusive kind.
+    passes(vec![resources(live.clone(), vec![(name, HoldKind::Shared)])]);
+    rejects(vec![resources(live, vec![])]);
+}
+
+#[test]
+fn a_shared_waiter_adds_no_queue_edge_even_when_its_holder_waits_for_it() {
+    use jig_domain_tasks::{HoldKind, Holding, Kind, Name, Phase};
+    use jig_tasks_world::{LIMITS, World, task};
+    let mut world = World::new(0, LIMITS);
+    world.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
+    let name = Name { connector: 1, path: Box::new([Box::new([1])]) };
+    let mut holder = world.record(1).clone();
+    let mut waiter = world.record(2).clone();
+    holder.waiting_on = Box::new([2]);
+    holder.holdings = Box::new([Holding::Write { resource: name.clone(), kind: 1 }]);
+    waiter.phase = Phase::Waiting;
+    waiter.holds_taken = false;
+    waiter.hold_wait_since = Some(skein_lib::Wall::EPOCH);
+    waiter.holdings = holder.holdings.clone();
+    let live = vec![holder, waiter];
+    passes(vec![resources(live.clone(), vec![(name, HoldKind::Shared)])]);
+    for kinds in [vec![], vec![Kind { connector: 1, kind: 1, hold: HoldKind::Shared }]] {
+        passes(vec![Seen::Resources { live: live.clone(), pools: vec![], writers: vec![], kinds, reports: vec![] }]);
+    }
+}
+
+fn end_observations(status: Status) -> Vec<Seen> {
+    vec![
+        made(1),
+        made(2),
+        Seen::Closing { task: 2 },
+        Seen::Settled { task: 2 },
+        Seen::Ended { task: 2, status, after: 0 },
+    ]
+}
+
+#[test]
+fn an_amendment_cannot_name_an_already_failed_or_cancelled_dependency() {
+    for status in [Status::Failed, Status::Cancelled] {
+        let mut seen = end_observations(status);
+        seen.push(Seen::Amended { task: 1, dependencies: vec![2] });
+        rejects(seen);
+    }
+}
+
+#[test]
+fn a_done_dependency_is_met_and_a_later_failure_in_the_same_commit_is_allowed() {
+    let mut seen = end_observations(Status::Done);
+    seen.push(Seen::Amended { task: 1, dependencies: vec![2] });
+    passes(seen);
+    for status in [Status::Failed, Status::Cancelled] {
+        passes(vec![
+            made(1),
+            made(2),
+            Seen::Amended { task: 1, dependencies: vec![2] },
+            Seen::Closing { task: 2 },
+            Seen::Settled { task: 2 },
+            Seen::Ended { task: 2, status, after: 0 },
+        ]);
+    }
+}
+
+#[test]
+fn retaining_a_dependency_that_failed_later_is_not_a_new_add() {
+    passes(vec![
+        made(1),
+        made(2),
+        Seen::Amended { task: 1, dependencies: vec![2] },
+        Seen::Closing { task: 2 },
+        Seen::Settled { task: 2 },
+        Seen::Ended { task: 2, status: Status::Failed, after: 0 },
+        Seen::Amended { task: 1, dependencies: vec![2] },
+    ]);
 }

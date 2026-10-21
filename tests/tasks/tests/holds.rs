@@ -335,3 +335,34 @@ fn a_held_notice_carries_the_holds_revision() {
         &MessageKind::Notice { subscription: SUBSCRIPTION, target: CHILD, state: NoticeState::Held { revision: 1 } }
     );
 }
+
+#[test]
+fn shared_writers_coexist_while_an_exclusive_waiter_resolves_in_order() {
+    let mut world = configured(318);
+    let Holding::Write { resource: shared, .. } = resource(11) else { unreachable!() };
+    // The latest named report overrides the connector's default.
+    world.report_resource(shared.clone(), HoldKind::Exclusive { taken: Taken::Waits });
+    world.report_resource(shared.clone(), HoldKind::Shared);
+    let mut first = task(1, &[]);
+    first.holdings = Box::new([resource(11), resource(12)]);
+    let mut second = task(2, &[]);
+    second.holdings = Box::new([resource(11)]);
+    let mut third = task(3, &[]);
+    third.holdings = Box::new([resource(12)]);
+    assert_eq!(world.make(Party::Person(1), vec![first, second, third]), Reply::Made(vec![1, 2, 3]));
+    assert!(world.record(1).holds_taken && world.record(2).holds_taken);
+    assert_eq!(world.record(3).phase, Phase::Waiting);
+    world.restart();
+    world.claim_fresh(2);
+    world.finish(2);
+    world.settle(2);
+    assert_eq!(world.record(3).phase, Phase::Waiting);
+    world.claim_fresh(1);
+    world.finish(1);
+    world.settle(1);
+    assert!(world.record(3).holds_taken);
+    world.claim_fresh(3);
+    world.finish(3);
+    world.settle(3);
+    world.referee.assert_passed(318);
+}
