@@ -32,8 +32,8 @@ fn check(store: &skein_kv::Limits) -> Result<sizes::Sizes, sizes::SizeRefusal> {
 fn a_format_row_of_another_tasks_version_is_refused_naming_tasks() {
     let wanted = format::current(fixtures::APPLICATION.version, fixtures::DEPLOYMENT);
     let mut found = wanted;
-    found.tasks = 4;
-    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 4, wanted: 5 }));
+    found.tasks = 5;
+    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 5, wanted: 6 }));
 }
 #[test]
 fn a_format_row_of_another_deployment_is_refused() {
@@ -51,7 +51,7 @@ fn another_family_is_refused_naming_the_first_difference() {
     for (family, found) in [
         (Family::Component, codec::component::Format { component: 3, core: 5, ..wanted }),
         (Family::Core, codec::component::Format { core: 5, tasks: 4, ..wanted }),
-        (Family::People, codec::component::Format { people: 6, notes: 2, ..wanted }),
+        (Family::People, codec::component::Format { people: 7, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, accounts: 2, ..wanted }),
         (Family::Accounts, codec::component::Format { accounts: 2, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
@@ -62,13 +62,13 @@ fn another_family_is_refused_naming_the_first_difference() {
                 family,
                 found: match family {
                     Family::Core => 5,
-                    Family::People => 6,
+                    Family::People => 7,
                     Family::Component => 3,
                     Family::Tasks | Family::Notes | Family::Accounts | Family::Application => 2,
                 },
                 wanted: match family {
                     Family::Core => 4,
-                    Family::Tasks | Family::People => 5,
+                    Family::Tasks | Family::People => 6,
                     Family::Component => 2,
                     Family::Notes | Family::Accounts | Family::Application => 1,
                 }

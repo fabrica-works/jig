@@ -15,7 +15,7 @@ mod runs;
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
     pub core: wire::Limits,
-    pub tasks: crate::tasks_v5::Limits,
+    pub tasks: crate::tasks_v6::Limits,
     pub notes: crate::notes_v1::Limits,
 }
 #[must_use]
@@ -23,9 +23,9 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
     let tasks = crate::codec::tasks::limits(&domain.tasks)?;
     let notes = crate::codec::notes::limits(&domain.notes)?;
     let core = wire::Limits {
-        phase_bytes_value: u32::try_from(crate::tasks_v5::PhaseRecord::worst_case_bytes(&tasks)?).ok()?,
-        change_bytes_value: u32::try_from(crate::tasks_v5::ChangeRecord::worst_case_bytes(&tasks)?).ok()?,
-        end_bytes_value: u32::try_from(crate::tasks_v5::EndRecord::worst_case_bytes(&tasks)?).ok()?,
+        phase_bytes_value: u32::try_from(crate::tasks_v6::PhaseRecord::worst_case_bytes(&tasks)?).ok()?,
+        change_bytes_value: u32::try_from(crate::tasks_v6::ChangeRecord::worst_case_bytes(&tasks)?).ok()?,
+        end_bytes_value: u32::try_from(crate::tasks_v6::EndRecord::worst_case_bytes(&tasks)?).ok()?,
         projection_goal_words: domain.tasks.spec_bytes,
         projection_task_words: domain.tasks.spec_bytes,
         projection_milestone_words: domain.tasks.message_bytes.max(domain.tasks.result_bytes),
@@ -44,7 +44,7 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
         call_part_delegated_value: domain.tasks.batch,
         call_part_delegation_denied_findings: jig_domain_authority::max_out(&domain.authority)?,
         call_part_note_recalled_entries: domain.notes.recalled,
-        task_bytes_value: u32::try_from(crate::tasks_v5::TaskProblem::worst_case_bytes(&tasks)?).ok()?,
+        task_bytes_value: u32::try_from(crate::tasks_v6::TaskProblem::worst_case_bytes(&tasks)?).ok()?,
         note_bytes_value: u32::try_from(crate::notes_v1::Row::worst_case_bytes(&notes)?).ok()?,
     };
     wire::check_limits(&core).ok()?;
@@ -95,7 +95,7 @@ pub fn decode(bytes: &[u8], limits: &Limits) -> Result<domain::CoreRecord, wire:
 fn problem(reason: skein_codec::Reason) -> wire::Problem {
     wire::Problem { path: wire::Path::RowValue, reason }
 }
-fn task_problem(value: crate::tasks_v5::Problem) -> wire::Problem {
+fn task_problem(value: crate::tasks_v6::Problem) -> wire::Problem {
     wire::Problem { path: wire::Path::TaskBytesValue, reason: value.reason }
 }
 fn note_problem(value: crate::notes_v1::Problem) -> wire::Problem {
