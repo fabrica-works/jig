@@ -1039,9 +1039,9 @@ impl JigPhrase {
             Self::OpenProgramChooseModel => 7818,
             Self::OpenProgramSource => 7819,
             Self::OpenProgramNoSwitch => 7820,
-            Self::RefusedWorkerAt => 7822,
-            Self::RefusedEngineAt => 7823,
-            Self::MalformedEndedBy => 7824,
+            Self::RefusedWorkerAt => 7821,
+            Self::RefusedEngineAt => 7822,
+            Self::MalformedEndedBy => 7823,
 
             Self::Word(word) => return word.id(),
             Self::DependencyParked => 7815,

@@ -89,7 +89,7 @@ pub struct ModelBound {
 pub const PROGRAM_ENDPOINTS: u32 = 64;
 
 /// Reject an oversized or ambiguous endpoint declaration before retaining it.
-/// A prefix scan: at most 2,016 comparisons at the cap.
+/// A quadratic prefix scan, bounded by 64 endpoints: at most 2,016 comparisons.
 #[must_use]
 pub fn valid_program_endpoints(endpoints: &[u32]) -> bool {
     if endpoints.len() > usize::try_from(PROGRAM_ENDPOINTS).expect("u32 fits usize") {
