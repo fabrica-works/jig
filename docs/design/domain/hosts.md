@@ -810,7 +810,8 @@ hold:
 - its start was refused with the Grants cause;
 - its saved work and its result passed their fences;
 - it spent nothing and committed no turn;
-- its task's ordinary program source was offered.
+- its task's ordinary program source, on its main binding or an
+  alternative, was offered.
 
 Whatever class the host's refusal was given, the recheck is the same;
 the selection then refuses an unsupported start again. A structural
