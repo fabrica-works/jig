@@ -53,6 +53,7 @@ pub(crate) fn message(task: &mut TaskRecord, word: &Word, bound: u32) {
         | MessageKind::Proposal { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Amendment { .. }
+        | MessageKind::Met { .. }
         | MessageKind::Notice { .. }
         | MessageKind::Timer { .. }
         | MessageKind::News { .. }

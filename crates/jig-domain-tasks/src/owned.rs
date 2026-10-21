@@ -19,6 +19,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         Stored::Activity(row) => match &row.line {
             crate::Line::Words { words, kind, .. } => bytes(words.len())?.checked_add(kind_bytes(kind)?),
             crate::Line::Heard(word) | crate::Line::Notified { word, .. } => word_bytes(word),
+            crate::Line::Kept { pending, .. } => bytes(size_of_val(&**pending)),
             crate::Line::Decided { .. }
             | crate::Line::Milestone { .. }
             | crate::Line::RunBegan { .. }
@@ -230,6 +231,7 @@ fn kind_bytes(kind: &crate::MessageKind) -> Option<u64> {
         | crate::MessageKind::Words
         | crate::MessageKind::EffectNotMade { .. }
         | crate::MessageKind::Amendment { .. }
+        | crate::MessageKind::Met { .. }
         | crate::MessageKind::Question
         | crate::MessageKind::Answer { .. }
         | crate::MessageKind::Notice { .. }
@@ -258,6 +260,7 @@ fn word_bytes(word: &crate::Word) -> Option<u64> {
         | crate::MessageKind::Words
         | crate::MessageKind::EffectNotMade { .. }
         | crate::MessageKind::Amendment { .. }
+        | crate::MessageKind::Met { .. }
         | crate::MessageKind::Question
         | crate::MessageKind::Answer { .. }
         | crate::MessageKind::Notice { .. }

@@ -361,8 +361,17 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     let mut amendments = 0_usize;
     let mut amendment_bytes = 0_usize;
     let mut ordinary_amendment = false;
+    let mut met = false;
     for word in &task.inbox {
         match word.kind {
+            // One merged notice per task, from the ended dependency or, for a
+            // removal, from its amender (domain/tasks.md, 5.7 and 8.1).
+            crate::MessageKind::Met { dependency, removed } => {
+                if met || dependency == 0 || !removed && word.from != Party::Task(dependency) {
+                    return false;
+                }
+                met = true;
+            }
             crate::MessageKind::Amendment { revision } => {
                 let finish = crate::inbox::finish_word(task, word.number);
                 if !finish && ordinary_amendment {
@@ -393,6 +402,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         .inbox
         .len()
         .saturating_sub(amendments)
+        .saturating_sub(usize::from(met))
         .saturating_add(task.delegates.len())
         .saturating_add(task.questions.len())
         .saturating_add(usize::from(task.proposal.is_some()))
@@ -449,7 +459,9 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                     Party::Deployment { .. } => false,
                 }
             }
-            crate::MessageKind::EffectNotMade { .. } | crate::MessageKind::Amendment { .. } => match word.from {
+            crate::MessageKind::EffectNotMade { .. }
+            | crate::MessageKind::Amendment { .. }
+            | crate::MessageKind::Met { .. } => match word.from {
                 Party::Task(_) | Party::Person(_) => true,
                 Party::Deployment { .. } => false,
             },
@@ -485,6 +497,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                 | crate::MessageKind::Proposal { .. }
                 | crate::MessageKind::Escalation { .. }
                 | crate::MessageKind::PersonStalled { .. }
+                | crate::MessageKind::Met { .. }
                 | crate::MessageKind::Timer { .. } => 0,
             }
         };
@@ -501,6 +514,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                 | crate::MessageKind::Result(_)
                 | crate::MessageKind::ProposalDecision { .. }
                 | crate::MessageKind::Amendment { .. }
+                | crate::MessageKind::Met { .. }
                 | crate::MessageKind::Notice { .. }
                 | crate::MessageKind::News { .. }
                 | crate::MessageKind::Timer { .. } => false,
@@ -901,7 +915,9 @@ fn links(domain: &Domain, env: &Env<Limits>, task: &TaskRecord) -> bool {
     let mut amendments = 0_usize;
     for word in &task.inbox {
         match word.kind {
-            crate::MessageKind::Amendment { .. } => amendments = amendments.checked_add(1).expect("bounded amendments"),
+            crate::MessageKind::Amendment { .. } | crate::MessageKind::Met { .. } => {
+                amendments = amendments.checked_add(1).expect("bounded amendments");
+            }
             crate::MessageKind::EffectNotMade { .. }
             | crate::MessageKind::Words
             | crate::MessageKind::PersonStalled { .. }

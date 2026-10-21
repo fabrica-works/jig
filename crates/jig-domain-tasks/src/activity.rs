@@ -51,6 +51,13 @@ pub enum Line {
     Milestone {
         position: u64,
     },
+    /// The run finished done while its task was kept, and parked: the
+    /// dependencies it waits for, at most `Limits.dependencies`
+    /// (domain/tasks.md, 5.7; domain/engine.md, 7).
+    Kept {
+        attempt: u64,
+        pending: Box<[u64]>,
+    },
 }
 
 /// The durable cause carried through preparation to the committed claim.
@@ -97,6 +104,7 @@ pub(crate) fn message(task: &mut TaskRecord, word: &Word, bound: u32, out: &mut 
         | MessageKind::Proposal { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Amendment { .. }
+        | MessageKind::Met { .. }
         | MessageKind::Notice { .. }
         | MessageKind::Timer { .. }
         | MessageKind::News { .. }

@@ -30,6 +30,7 @@ fn merge_key(kind: &MessageKind) -> Option<(u8, u64)> {
         | MessageKind::Timer { subscription }
         | MessageKind::News { subscription, .. } => Some((1, *subscription)),
         MessageKind::Amendment { .. } => Some((0, 0)),
+        MessageKind::Met { .. } => Some((2, 0)),
         MessageKind::EffectNotMade { .. }
         | MessageKind::Words
         | MessageKind::Question
@@ -80,7 +81,7 @@ pub(crate) fn prepare_staged(
         Admission::Merged => merge_key(&word.kind),
         Admission::Refusable | Admission::RoomKept => None,
     };
-    let mut inbox = List::with_capacity(limits.inbox_messages.saturating_add(2));
+    let mut inbox = List::with_capacity(limits.inbox_messages.saturating_add(3));
     for old in task.inbox {
         if key.is_some()
             && key == merge_key(&old.kind)
@@ -115,6 +116,7 @@ pub(crate) fn prepare_staged(
                 | MessageKind::Notice { .. }
                 | MessageKind::Timer { .. }
                 | MessageKind::Amendment { .. }
+                | MessageKind::Met { .. }
                 | MessageKind::News { class: NewsClass::Kept | NewsClass::Dropped, .. } => {}
             }
         } else {
@@ -278,6 +280,7 @@ pub(crate) fn check_message(
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::Amendment { .. }
+        | MessageKind::Met { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::PersonStalled { .. }
         | MessageKind::Result(_)
@@ -375,6 +378,7 @@ pub(crate) fn check_message(
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::Amendment { .. }
+        | MessageKind::Met { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::PersonStalled { .. }
         | MessageKind::Result(_)
@@ -489,6 +493,7 @@ pub(crate) fn delegate_result(
         | MessageKind::Escalation { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Amendment { .. }
+        | MessageKind::Met { .. }
         | MessageKind::Question
         | MessageKind::Answer { .. }
         | MessageKind::Notice { .. }

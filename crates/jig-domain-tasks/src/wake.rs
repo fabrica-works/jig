@@ -26,6 +26,7 @@ fn category(kind: &MessageKind) -> u8 {
         MessageKind::Words => 0,
         MessageKind::EffectNotMade { .. }
         | MessageKind::Amendment { .. }
+        | MessageKind::Met { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. } => 7,
@@ -47,6 +48,7 @@ fn rule(domain: &Domain, number: u64, word: &Word) -> WakeRule {
         },
         MessageKind::EffectNotMade { .. }
         | MessageKind::Amendment { .. }
+        | MessageKind::Met { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. } => WakeRule::Immediate,
@@ -126,6 +128,7 @@ pub(crate) fn after_message(
             MessageKind::EffectNotMade { .. }
             | MessageKind::Words
             | MessageKind::Amendment { .. }
+            | MessageKind::Met { .. }
             | MessageKind::ProposalDecision { .. }
             | MessageKind::Proposal { .. }
             | MessageKind::Escalation { .. }

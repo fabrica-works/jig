@@ -108,6 +108,12 @@ pub enum MessageKind {
     News { subscription: u64, class: NewsClass },
     /// A delegate's terminal result, sent with its end.
     Result(ResultKind),
+    /// The core's notice that a kept task's last pending dependency is done,
+    /// or was removed by an amendment: always waking, one per task, merged
+    /// (domain/tasks.md, 5.7 and 8.1). `dependency` is the one whose end or
+    /// removal emptied the pending set; of several removed at once, the
+    /// first in the old list.
+    Met { dependency: u64, removed: bool },
 }
 
 /// Terminal shape carried with a delegate's bounded message words.
@@ -176,6 +182,7 @@ impl Word {
             | MessageKind::Words
             | MessageKind::EffectNotMade { .. }
             | MessageKind::Amendment { .. }
+            | MessageKind::Met { .. }
             | MessageKind::Question
             | MessageKind::Answer { .. }
             | MessageKind::Notice { .. }
