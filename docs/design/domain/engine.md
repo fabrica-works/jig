@@ -299,7 +299,12 @@ answers to a run's reads.
 - **A load is a request** with a token and one terminal event, rows in
   bounded pages (programming-model.md, 4.4). What waits on it is in a
   state that says so: a brief gathering, a run being prepared to resume,
-  a party's page.
+  a party's page, an amendment adding an ended task (tasks.md, section
+  7). That amendment's request stays unanswered while the rows load,
+  one at a time: each ended task it adds, then the ended tasks above it
+  that its reach is read through, at most one per level of the tree. Once
+  they are in, it is admitted again from the start, on the rows and on
+  live state as it then is.
 - **What a decision loads stays as loaded until it is decided.** Its
   loads are held (4.2): each is sent once every commit made before it is
   durable, so it sees them. While they are in flight, a request whose

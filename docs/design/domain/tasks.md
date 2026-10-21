@@ -741,6 +741,17 @@ circle, each for another of the set, so that none of them could end.
   - *What may be added:* a task the amender could name in a batch
     (section 4), or, for a task, any task below it. An added dependency
     moves no authority and funds nothing.
+  - *An ended one* is judged on its stored row, which the core loads
+    (engine.md, 5.3), by its place in the tree, as a live one is. For a
+    task amender, it is reached when the amender was introduced to it (8.5), or
+    when its requesters, read up the tree until the first live one, reach
+    the amender: a former delegate is one, and nothing above the
+    amender's depth is read. For a party, it is reached when it or its
+    root was the party's request, or the party reaches its live root; a
+    maintainer reaches any task of the project. A stub the working set
+    keeps of it holds no place, and a live task naming it widens no
+    reach: neither decides. One the store does not hold is refused as
+    unknown, naming it.
   - *By phase:* a waiting task waits for it as for any other, and leaves
     the queues it was in (6.2); an active one is kept (5.7); a held one
     is released, when it is, with it pending.
