@@ -62,6 +62,8 @@ fn an_open_text_reply_parks_after_one_call() {
 #[test]
 fn a_finite_text_reply_fails_as_a_run_and_retries() {
     let chat = text_chat(fixtures::Chat::FiniteText);
+    assert_eq!(chat.reply, [fixtures::TEXT, fixtures::TEXT].concat());
+    assert_eq!(chat.last_reply, 2);
     assert_eq!(chat.calls, 2, "initial completion and one unfinished nudge");
     assert_eq!(chat.tries.run, 1);
     assert_eq!(chat.tries.invalid, 0);
