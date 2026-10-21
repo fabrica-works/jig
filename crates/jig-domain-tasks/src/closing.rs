@@ -109,6 +109,27 @@ fn previous_result(phase: &Phase) -> Option<TaskResult> {
     }
 }
 
+/// The same closing phase for a committed cancel and its compound projection (domain/tasks.md, 7).
+pub(crate) fn cancelled(phase: &Phase, by: Party, at: skein_lib::Wall, reason: &[u8]) -> Phase {
+    let partial = previous_result(phase);
+    let stage = match phase {
+        Phase::Closing(closing) | Phase::Held { was: Was::Closing(closing), .. } => closing.stage,
+        Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => {
+            match crate::run::run_attempt(phase) {
+                Some(attempt) => Stage::Run { attempt },
+                None => Stage::Delegates,
+            }
+        }
+        Phase::Ended(_) => unreachable!("selected task live"),
+    };
+    // Reuse the root's already-open closing gate for the final cancelled result.
+    let stage = match stage {
+        Stage::Settled => Stage::Delegates,
+        Stage::Run { .. } | Stage::Delegates | Stage::Effects | Stage::Releases => stage,
+    };
+    Phase::Closing(Closing { stage, ending: Ending::Cancelled { by, at, reason: reason.into(), result: partial } })
+}
+
 pub(crate) fn cancel_tree(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -136,27 +157,10 @@ pub(crate) fn cancel_tree(
                 continue;
             }
             let attempt = crate::run::run_attempt(&old.phase);
-            let partial = previous_result(&old.phase);
-            let stage = match &old.phase {
-                Phase::Closing(closing) | Phase::Held { was: Was::Closing(closing), .. } => closing.stage,
-                Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => {
-                    match attempt {
-                        Some(attempt) => Stage::Run { attempt },
-                        None => Stage::Delegates,
-                    }
-                }
-                Phase::Ended(_) => unreachable!("selected task live"),
-            };
-            // Reuse the root's already-open closing gate; replaying Close is
-            // required to associate the final cancelled result with it.
-            let stage = match stage {
-                Stage::Settled => Stage::Delegates,
-                Stage::Run { .. } | Stage::Delegates | Stage::Effects | Stage::Releases => stage,
-            };
-            task_mut(domain, *number).expect("selected task live").record.phase = Phase::Closing(Closing {
-                stage,
-                ending: Ending::Cancelled { by, at: env.wall, reason: reason.into(), result: partial },
-            });
+            let phase = cancelled(&old.phase, by, env.wall, reason);
+            let Phase::Closing(Closing { stage, .. }) = &phase else { unreachable!("cancelled phase") };
+            let stage = *stage;
+            task_mut(domain, *number).expect("selected task live").record.phase = phase;
             publish(domain, env, *number, out);
             if let Some(attempt) = attempt {
                 out.push(Request::Stop { task: *number, attempt });

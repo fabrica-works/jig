@@ -628,7 +628,16 @@ fn the_wait_index_and_walk_have_an_explicit_memory_delta() {
     const SEED_BYTES: u64 = 9_808_904;
     const WAIT_BYTES: u64 = 1_485_368;
     const PROMISE_BYTES: u64 = 768;
-    assert_eq!(tasks::worst_case(&LIMITS), Some(SEED_BYTES + WAIT_BYTES + PROMISE_BYTES));
+    // 128 reverse dependency pairs * 16 bytes; 1,024 queue pairs *
+    // (32 inline bytes + 128 name bytes), rebuilt once for each staged walk.
+    const STAGED_EDGE_BYTES: u64 = 165_888;
+    // 16 optional (task, circle) slots * 32 bytes, plus a 32-byte source
+    // and eight named u64 tasks per projected return.
+    const STAGED_RETURN_BYTES: u64 = 2_048;
+    assert_eq!(
+        tasks::worst_case(&LIMITS),
+        Some(SEED_BYTES + WAIT_BYTES + PROMISE_BYTES + STAGED_EDGE_BYTES + STAGED_RETURN_BYTES)
+    );
 }
 
 #[test]

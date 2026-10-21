@@ -277,7 +277,7 @@ fn check_cancels(
             Err(problem) => return Err(*problem),
         };
         let plan = crate::compound::Plan::Cancel(Box::new(plan));
-        staged.after(domain, &plan);
+        staged.after(domain, &env.limits, &plan);
         assert!(staged.plans.push(plan).is_ok(), "cancel batch bounded");
     }
     Ok(())

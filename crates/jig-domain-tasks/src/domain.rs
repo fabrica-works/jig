@@ -712,9 +712,13 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 out.push(Request::PersonStallDue { task: number });
             }
             Phase::Active(Active::BackingOff { .. }) => {
-                task.record.phase = Phase::Active(Active::Due);
+                task.record.phase = crate::run::ends::for_record(&task.record)
+                    .amended(task.record.executor, Phase::Active(Active::Due));
+                let due = task.record.phase == Phase::Active(Active::Due);
                 publish(domain, env, number, out);
-                activate(domain, number, out);
+                if due {
+                    activate(domain, number, out);
+                }
             }
             Phase::Waiting
             | Phase::Active(

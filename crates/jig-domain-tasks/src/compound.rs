@@ -42,6 +42,7 @@ pub(crate) struct Staged {
     pub(crate) moved: List<u64>,
     pub(crate) reserved: u64,
     pub(crate) plans: List<Plan>,
+    pub(crate) circles: List<Option<(u64, crate::Circle)>>,
     pub(crate) funding: List<(Funder, Numbers)>,
 }
 impl Staged {
@@ -51,21 +52,16 @@ impl Staged {
             moved: List::with_capacity(bound),
             reserved: 0,
             plans: List::with_capacity(bound),
+            circles: List::with_capacity(bound),
             funding: List::with_capacity(bound.saturating_mul(4)),
         }
     }
-    pub(crate) fn after(&mut self, domain: &Domain, plan: &Plan) {
+    pub(crate) fn after(&mut self, domain: &Domain, limits: &Limits, plan: &Plan) {
+        let circle = self.returned_circle(domain, limits, plan);
+        self.circles.push(circle).expect("one return judgement per operation");
         match plan {
             Plan::Cancel(plan) => {
-                let closing = match &plan.finish {
-                    None => Some(plan.selected.as_ref()),
-                    Some(crate::grace::FinishPlan::Cancel { selected, .. }) => Some(selected.as_ref()),
-                    Some(
-                        crate::grace::FinishPlan::Sooner { .. }
-                        | crate::grace::FinishPlan::Word { .. }
-                        | crate::grace::FinishPlan::Unchanged,
-                    ) => None,
-                };
+                let closing = plan.closing();
                 if let Some(closing) = closing {
                     for task in closing {
                         if !has(&self.closing, *task) {
@@ -271,7 +267,7 @@ impl<'a> CompoundAdmission<'a> {
             return Err(Box::new(Problem::new(Some(number), why)));
         }
         let plan = check(self.domain, &self.staged, env, context, operation)?;
-        self.staged.after(self.domain, &plan);
+        self.staged.after(self.domain, &env.limits, &plan);
         assert!(self.staged.plans.push(plan).is_ok(), "operation bound");
         Ok(())
     }
@@ -381,6 +377,7 @@ pub(crate) fn has(list: &List<u64>, number: u64) -> bool {
 pub(crate) fn worst_case(limits: &Limits, payload: u64) -> Option<u64> {
     let tasks = limits.tasks;
     List::<Plan>::worst_case(tasks)?
+        .checked_add(List::<Option<(u64, crate::Circle)>>::worst_case(tasks)?)?
         .checked_add(List::<Operation>::worst_case(tasks)?)?
         .checked_add(List::<u64>::worst_case(tasks)?.checked_mul(2)?)?
         .checked_add(List::<(Funder, Numbers)>::worst_case(tasks.checked_mul(4)?)?)?
@@ -390,6 +387,14 @@ pub(crate) fn worst_case(limits: &Limits, payload: u64) -> Option<u64> {
                     .ok()?
                     .checked_add(payload.checked_mul(4)?)?
                     .checked_add(List::<u64>::worst_case(tasks)?.checked_mul(2)?)?,
+            )?,
+        )?
+        // Each projected return can carry a fresh bounded circle, beside the input hold.
+        .checked_add(
+            u64::from(tasks).checked_mul(
+                u64::try_from(size_of::<crate::HoldSource>())
+                    .ok()?
+                    .checked_add(u64::from(limits.circle).checked_mul(8)?)?,
             )?,
         )?
         .checked_add(payload)

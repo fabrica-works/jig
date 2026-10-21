@@ -1,8 +1,8 @@
 //! Held person-chat decisions, independent of root authentication, policy and
 //! transport history (domain/tasks.md, section 9).
 
-use crate::domain::{Domain, activate, publish, record, task_mut};
-use crate::{Active, Hold, Limits, Party, Phase, Request, Tries, Was};
+use crate::domain::{Domain, publish, record, task_mut};
+use crate::{Hold, Limits, Party, Phase, Request, Tries, Was};
 use alloc::boxed::Box;
 use skein_lib::{Env, Queue, ReplyTo, Time, Wall};
 
@@ -393,22 +393,24 @@ pub(crate) fn decide(
                 task.record.tries = Tries::NONE;
                 task.record.refusals = 0;
                 let was = match core::mem::replace(&mut task.record.phase, Phase::Waiting) {
-                    Phase::Held { was, .. } => was,
+                    Phase::Held { was, why, .. } => {
+                        if was == Was::Waiting && why != Hold::Circle {
+                            task.record.hold_wait_since = None;
+                            task.record.hold_bound_since = None;
+                        }
+                        was
+                    }
                     Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => {
                         unreachable!("release validated a held task")
                     }
                 };
                 task.record.phase = match was {
-                    Was::Waiting => {
-                        task.record.hold_wait_since = None;
-                        task.record.hold_bound_since = None;
-                        Phase::Waiting
-                    }
+                    Was::Waiting => Phase::Waiting,
                     Was::Active(active) => Phase::Active(active),
                     Was::Closing(closing) => Phase::Closing(closing),
                 };
-                task.record.phase = crate::run::ends::pending(&task.record.waiting_on)
-                    .amended(task.record.executor, task.record.phase.clone());
+                task.record.phase =
+                    crate::run::ends::for_record(&task.record).amended(task.record.executor, task.record.phase.clone());
             }
             EscalationDecision::Reject { reason } => {
                 task.record.escalation = Escalation::Rejected { revision, by, reason }
@@ -419,12 +421,8 @@ pub(crate) fn decide(
             }
         }
         publish(domain, env, number, out);
-        let due = match record(domain, number) {
-            Some(task) => task.phase == Phase::Active(Active::Due),
-            None => false,
-        };
-        if outcome == EscalationOutcome::Released && due {
-            activate(domain, number, out);
+        if outcome == EscalationOutcome::Released {
+            crate::control::return_to_waits(domain, env, number, out);
         }
         match outcome {
             EscalationOutcome::Passed { .. } => wake_holder(domain, env, number, out),

@@ -103,33 +103,15 @@ impl CompoundTask<'_> {
 impl Staged {
     pub(crate) fn record<'a>(&'a self, domain: &'a crate::Domain, number: u64) -> Option<CompoundTask<'a>> {
         let base = crate::domain::record(domain, number)?;
-        let mut row = CompoundTask {
-            base,
-            phase: base.phase.clone(),
-            revision: base.revision,
-            revisions: base.revisions,
-            tracked: base.tracked,
-            executor: base.executor,
-            taken_by: base.taken_by,
-            requester: base.requester,
-            funder: base.funder,
-            numbers: base.numbers,
-            root: base.root,
-            depth: base.depth,
-            last_message: base.last_message,
-            inbox: &base.inbox,
-            instructions: &base.instructions,
-            spec: &base.spec,
-            wake: base.wake,
-            dependencies: &base.dependencies,
-            waiting_on: &base.waiting_on,
-            added: &base.added,
-            authority: &base.authority,
-            llm: &base.llm,
-            kept_account: base.kept_account,
-            grace: base.grace.clone(),
-        };
-        for plan in &self.plans {
+        let mut row = borrowed(base);
+        for (at, plan) in self.plans.as_slice().iter().enumerate() {
+            if let Plan::Cancel(cancel) = plan
+                && let Some(selected) = cancel.closing()
+                && crate::batch::contains(selected, number)
+            {
+                row.phase = crate::closing::cancelled(&row.phase, cancel.by, cancel.at, &cancel.reason);
+                row.revision = row.revision.checked_add(1).expect("admission checked");
+            }
             match plan {
                 Plan::Move { plan, .. } => {
                     if super::has(&plan.subtree, number) {
@@ -150,7 +132,7 @@ impl Staged {
                     project_amend(&mut row, plan);
                 }
                 Plan::Release(plan) if plan.number == number => {
-                    row.phase = plan.next.clone();
+                    row.phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, plan.next.clone());
                     row.revision = row.revision.checked_add(1).expect("admission checked");
                     if let Some(notice) = &plan.notice {
                         row.last_message = notice.word.number;
@@ -189,11 +171,56 @@ impl Staged {
                 },
                 Plan::Amend(_) | Plan::Release(_) | Plan::Message(_) | Plan::Stop(_) | Plan::Cancel(_) => {}
             }
+            if let Some(Some((changed, circle))) = self.circles.get(u32::try_from(at).expect("bounded operations"))
+                && *changed == number
+            {
+                row.phase = Phase::Held {
+                    was: crate::run::was(row.phase),
+                    why: crate::Hold::Circle,
+                    source: Some(Box::new(crate::HoldSource::Circle(circle.clone()))),
+                };
+            }
         }
         if let Some(numbers) = self.funding_numbers(Funder::Task(number)) {
             row.numbers = numbers;
         }
         Some(row)
+    }
+
+    /// An amendment can return a waiter to its queue as well as release a hold (6.2 and 6.7).
+    pub(crate) fn amended_phase(
+        &self,
+        domain: &crate::Domain,
+        limits: &crate::Limits,
+        plan: &crate::control::AmendPlan,
+    ) -> Phase {
+        let mut row = self.record(domain, plan.number).expect("admitted amendment");
+        project_amend(&mut row, plan);
+        if plan.release.is_some() || (row.phase == Phase::Waiting && row.waiting_on.is_empty() && !row.holds_taken) {
+            crate::control::returned_phase(domain, self, limits, plan.number, row.phase, row.waiting_on)
+        } else {
+            row.phase
+        }
+    }
+
+    pub(crate) fn returned_circle(
+        &self,
+        domain: &crate::Domain,
+        limits: &crate::Limits,
+        plan: &Plan,
+    ) -> Option<(u64, crate::Circle)> {
+        match plan {
+            Plan::Amend(plan) => returned_circle(plan.number, self.amended_phase(domain, limits, plan)),
+            Plan::Release(plan) => {
+                let row = self.record(domain, plan.number).expect("admitted release");
+                let phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, plan.next.clone());
+                returned_circle(
+                    plan.number,
+                    crate::control::returned_phase(domain, self, limits, plan.number, phase, row.waiting_on),
+                )
+            }
+            Plan::Cancel(_) | Plan::Move { .. } | Plan::Message(_) | Plan::Stop(_) => None,
+        }
     }
 
     pub(crate) fn funding_numbers(&self, funder: Funder) -> Option<Numbers> {
@@ -369,7 +396,46 @@ fn project_amend<'a>(row: &mut CompoundTask<'a>, plan: &'a crate::control::Amend
         row.wake(&plan.prepared.word);
     }
     if let Some(release) = &plan.release {
-        row.phase = release.next.clone();
+        row.phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, release.next.clone());
         row.revision = row.revision.checked_add(1).expect("admission checked");
+    }
+}
+
+fn returned_circle(number: u64, phase: Phase) -> Option<(u64, crate::Circle)> {
+    match phase {
+        Phase::Held { why: crate::Hold::Circle, source: Some(source), .. } => match *source {
+            crate::HoldSource::Circle(circle) => Some((number, circle)),
+            crate::HoldSource::Resource(_) | crate::HoldSource::Effect { .. } => unreachable!("circle source"),
+        },
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } | Phase::Ended(_) => None,
+    }
+}
+
+fn borrowed(base: &TaskRecord) -> CompoundTask<'_> {
+    CompoundTask {
+        base,
+        phase: base.phase.clone(),
+        revision: base.revision,
+        revisions: base.revisions,
+        tracked: base.tracked,
+        executor: base.executor,
+        taken_by: base.taken_by,
+        requester: base.requester,
+        funder: base.funder,
+        numbers: base.numbers,
+        root: base.root,
+        depth: base.depth,
+        last_message: base.last_message,
+        inbox: &base.inbox,
+        instructions: &base.instructions,
+        spec: &base.spec,
+        wake: base.wake,
+        dependencies: &base.dependencies,
+        waiting_on: &base.waiting_on,
+        added: &base.added,
+        authority: &base.authority,
+        llm: &base.llm,
+        kept_account: base.kept_account,
+        grace: base.grace.clone(),
     }
 }

@@ -320,7 +320,7 @@ pub(crate) fn check_amend(
     }
     plan.waiting_on = waiting.into_boxed();
     plan.added = added.into_boxed();
-    if let Err(problem) = crate::waits::check_added(domain, &env.limits, number, pending.as_slice()) {
+    if let Err(problem) = crate::waits::check_added(domain, staged, &env.limits, number, pending.as_slice()) {
         return Err(Box::new(problem));
     }
     Ok(plan)
@@ -885,7 +885,7 @@ pub(crate) fn apply_release(
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } | Phase::Ended(_) => false,
     };
     task.record.narrowing |= crate::run::run_attempt(&next).is_some();
-    task.record.phase = next;
+    task.record.phase = crate::run::ends::for_record(&task.record).amended(task.record.executor, next);
     task.record.due_reason = crate::Why::Released;
     if task.record.phase == Phase::Waiting && !circle {
         task.record.hold_wait_since = None;
@@ -895,7 +895,37 @@ pub(crate) fn apply_release(
     task.record.refusals = 0;
     history(domain, number, env.wall, by, Change::Released, &[], out);
     publish(domain, env, number, out);
-    if let Err(problem) = crate::waits::check_return(domain, &env.limits, number) {
+    return_to_waits(domain, env, number, out);
+}
+
+/// Admission projects the same return judgement without changing the committed index.
+pub(crate) fn returned_phase(
+    domain: &Domain,
+    staged: &crate::compound::Staged,
+    limits: &Limits,
+    number: u64,
+    phase: Phase,
+    pending: &[u64],
+) -> Phase {
+    match crate::waits::check_waits(domain, staged, limits, number, &phase, pending) {
+        Ok(()) => phase,
+        Err(problem) => {
+            let Refusal::Circle { cut } = problem.why else { unreachable!("return judges circles") };
+            Phase::Held {
+                was: crate::run::was(phase),
+                why: crate::Hold::Circle,
+                source: Some(Box::new(crate::HoldSource::Circle(crate::Circle {
+                    tasks: problem.blocked_by.expect("circle names its tasks"),
+                    cut,
+                }))),
+            }
+        }
+    }
+}
+
+/// Rejudge every wait a release gives back before resuming it (domain/tasks.md, 6.7).
+pub(crate) fn return_to_waits(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
+    if let Err(problem) = crate::waits::check_return(domain, &crate::compound::Staged::new(0), &env.limits, number) {
         crate::waits::hold_circle(domain, env, number, problem, out);
     } else if crate::holds::queued(record(domain, number).expect("released task")) {
         crate::holds::back(domain, env, number, out);
@@ -928,6 +958,22 @@ pub(crate) struct CancelPlan {
     pub(crate) reason: Box<[u8]>,
     pub(crate) finish: Option<crate::grace::FinishPlan>,
     pub(crate) selected: Box<[u64]>,
+    pub(crate) by: Party,
+    pub(crate) at: skein_lib::Wall,
+}
+
+impl CancelPlan {
+    pub(crate) fn closing(&self) -> Option<&[u64]> {
+        match &self.finish {
+            None => Some(&self.selected),
+            Some(crate::grace::FinishPlan::Cancel { selected, .. }) => Some(selected),
+            Some(
+                crate::grace::FinishPlan::Sooner { .. }
+                | crate::grace::FinishPlan::Word { .. }
+                | crate::grace::FinishPlan::Unchanged,
+            ) => None,
+        }
+    }
 }
 
 pub(crate) fn check_cancel(
@@ -980,7 +1026,7 @@ pub(crate) fn check_cancel(
     } else {
         None
     };
-    Ok(CancelPlan { number, reason, finish, selected: selected.into_boxed() })
+    Ok(CancelPlan { number, reason, finish, selected: selected.into_boxed(), by, at: env.wall })
 }
 
 pub(crate) fn apply_cancel(
@@ -990,7 +1036,7 @@ pub(crate) fn apply_cancel(
     plan: CancelPlan,
     out: &mut Queue<Request>,
 ) {
-    let CancelPlan { number, reason, finish, selected } = plan;
+    let CancelPlan { number, reason, finish, selected, by: _, at: _ } = plan;
     if let Some(finish) = finish {
         crate::grace::apply_finish(domain, env, finish, out);
     } else {
@@ -1018,6 +1064,7 @@ pub(crate) fn preview_amend(
             amendment: part.amendment.clone(),
         },
     )?;
+    let phase = crate::compound::Staged::new(0).amended_phase(domain, &env.limits, &checked);
     let old = record(domain, part.task).expect("amendment checked");
     if let Some(authority) = &part.amendment.authority {
         let budget = authority.budget.spend;
@@ -1076,6 +1123,7 @@ pub(crate) fn preview_amend(
     if checked.person_changed {
         row.revisions.person = row.revisions.person.checked_add(1).expect("person revision checked");
     }
+    row.phase = phase;
     row.last_message = part.message;
     row.inbox = checked.prepared.inbox;
     Ok(())

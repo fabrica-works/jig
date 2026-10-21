@@ -1,6 +1,7 @@
 //! Indexed dependency, delegate and threshold queue waits (domain/tasks.md, 6.2, 6.6 and 6.7).
 #![expect(clippy::result_large_err, reason = "bounded owner refusal carries exact capacity diagnostics inline")]
 
+use crate::compound::Staged;
 use crate::domain::{Domain, publish, record, task_mut};
 use crate::{
     Circle, Hold, HoldKind, HoldSource, Holding, Limits, Name, New, Party, Phase, Problem, Refusal, Request, Was,
@@ -67,7 +68,10 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<(u64, u64), ()>::worst_case(dependencies)?)?
         .checked_add(Map::<(Name, u64), Gate>::worst_case(resources)?)?
         .checked_add(u64::from(resources).checked_mul(name)?)?
-        .checked_add(List::<u64>::worst_case(limits.circle)?)
+        .checked_add(List::<u64>::worst_case(limits.circle)?)?
+        .checked_add(List::<(u64, u64)>::worst_case(dependencies)?)?
+        .checked_add(List::<(Name, u64)>::worst_case(resources)?)?
+        .checked_add(u64::from(resources).checked_mul(name)?)
 }
 
 pub(crate) fn refresh(domain: &mut Domain, number: u64) {
@@ -193,20 +197,41 @@ impl Back {
     }
 
     /// A task creator's transferred holds cease to be waits on it in this batch.
-    fn walk(&mut self, domain: &Domain, task: u64, batch: &[New]) {
+    fn walk(&mut self, domain: &Domain, staged: &Staged, limits: &Limits, task: u64, batch: &[New]) {
+        // Previewed rows need not have been published. Build their missing reverse
+        // pairs once, then read them beside the committed index at each visit.
+        let mut added = List::with_capacity(limits.tasks.checked_mul(limits.dependencies).expect("dependency edges"));
+        let mut queued = List::with_capacity(resource_capacity(limits).expect("resource edges"));
+        for (number, _) in &domain.names {
+            let row = staged.record(domain, *number).expect("projected live row");
+            for dependency in row.waiting_on {
+                if !domain.waits.dependents.contains_key(&(*dependency, *number)) {
+                    added.push((*dependency, *number)).expect("bounded projected dependencies");
+                }
+            }
+            if queued_row(&row) {
+                for holding in &row.holdings {
+                    let pair = (crate::holds::name(holding).clone(), *number);
+                    if !domain.waits.waiters.contains_key(&pair) {
+                        queued.push(pair).expect("bounded projected queues");
+                    }
+                }
+            }
+        }
         self.mark(task, task);
         for at in 0..self.stack.capacity() {
             let Some(&number) = self.stack.get(at) else { break };
             for ((_, dependent), ()) in domain.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
-                if let Some(row) = record(domain, *dependent)
-                    && dependencies_wait(&row.phase)
-                {
-                    self.mark(*dependent, number);
+                self.dependent(domain, staged, *dependent, number);
+            }
+            for (dependency, dependent) in added.as_slice() {
+                if *dependency == number {
+                    self.dependent(domain, staged, *dependent, number);
                 }
             }
-            let Some(row) = record(domain, number) else { continue };
+            let Some(row) = staged.record(domain, number) else { continue };
             if let Party::Task(parent) = row.requester
-                && let Some(requester) = record(domain, parent)
+                && let Some(requester) = staged.record(domain, parent)
                 && delegates_wait(&requester.phase)
                 && crate::batch::contains(&requester.delegates, number)
             {
@@ -227,9 +252,31 @@ impl Back {
                     continue;
                 }
                 for ((_, waiter), ()) in domain.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
-                    self.mark(*waiter, number);
+                    self.waiter(domain, staged, *waiter, number);
+                }
+                for (resource, waiter) in queued.as_slice() {
+                    if resource == name {
+                        self.waiter(domain, staged, *waiter, number);
+                    }
                 }
             }
+        }
+    }
+
+    fn dependent(&mut self, domain: &Domain, staged: &Staged, dependent: u64, number: u64) {
+        if let Some(row) = staged.record(domain, dependent)
+            && dependencies_wait(&row.phase)
+            && crate::batch::contains(row.waiting_on, number)
+        {
+            self.mark(dependent, number);
+        }
+    }
+
+    fn waiter(&mut self, domain: &Domain, staged: &Staged, waiter: u64, number: u64) {
+        if let Some(row) = staged.record(domain, waiter)
+            && queued_row(&row)
+        {
+            self.mark(waiter, number);
         }
     }
 
@@ -261,9 +308,15 @@ fn handed(batch: &[New], holding: &Holding) -> bool {
 }
 
 /// Judge new dependencies by walking back from their waiter (domain/tasks.md, 6.7).
-pub(crate) fn check_added(domain: &Domain, limits: &Limits, task: u64, added: &[u64]) -> Result<(), Problem> {
+pub(crate) fn check_added(
+    domain: &Domain,
+    staged: &Staged,
+    limits: &Limits,
+    task: u64,
+    added: &[u64],
+) -> Result<(), Problem> {
     let mut back = Back::new(limits);
-    back.walk(domain, task, &[]);
+    back.walk(domain, staged, limits, task, &[]);
     for dependency in added {
         if back.markers.contains_key(dependency) {
             return Err(back.problem(limits, task, *dependency));
@@ -273,10 +326,10 @@ pub(crate) fn check_added(domain: &Domain, limits: &Limits, task: u64, added: &[
 }
 
 /// Judge the queue edges a waiting or released task would give back (domain/tasks.md, 6.2 and 6.7).
-pub(crate) fn check_queue(domain: &Domain, limits: &Limits, task: u64) -> Result<(), Problem> {
-    let Some(row) = record(domain, task) else { return Ok(()) };
+pub(crate) fn check_queue(domain: &Domain, staged: &Staged, limits: &Limits, task: u64) -> Result<(), Problem> {
+    let Some(row) = staged.record(domain, task) else { return Ok(()) };
     let mut back = Back::new(limits);
-    back.walk(domain, task, &[]);
+    back.walk(domain, staged, limits, task, &[]);
     for holding in &row.holdings {
         let Some(threshold) = threshold(domain, holding) else { continue };
         let name = crate::holds::name(holding);
@@ -336,14 +389,8 @@ pub(crate) fn lift(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Reque
             Phase::Held { was: Was::Closing(closing), .. } => Phase::Closing(closing.clone()),
             Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => unreachable!("circle hold"),
         };
-        let verdict = check_waits(domain, &env.limits, number, &resume);
-        let verdict = match verdict {
-            Ok(()) if resume == Phase::Waiting && row.waiting_on.is_empty() && !row.holds_taken => {
-                check_queue(domain, &env.limits, number)
-            }
-            other => other,
-        };
-        match verdict {
+        let resume = crate::run::ends::for_record(row).amended(row.executor, resume);
+        match check_waits(domain, &Staged::new(0), &env.limits, number, &resume, &row.waiting_on) {
             Ok(()) => {
                 task_mut(domain, number).expect("circle held task").record.phase = resume;
                 if crate::holds::queued(record(domain, number).expect("lifted task")) {
@@ -424,7 +471,7 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Re
             if !crate::holds::queued(row) {
                 continue;
             }
-            if let Err(problem) = check_queue(domain, &env.limits, *number) {
+            if let Err(problem) = check_queue(domain, &Staged::new(0), &env.limits, *number) {
                 match &earliest {
                     Some((old, _)) if crate::holds::earlier(domain, *old, *number, &env.limits) => {}
                     Some(_) | None => earliest = Some((*number, problem)),
@@ -511,7 +558,7 @@ pub(crate) fn check_batch(domain: &Domain, limits: &Limits, creator: Party, batc
     let mut back = Back::new(limits);
     let parent = match creator {
         Party::Task(number) if delegates_wait(&record(domain, number).expect("admitted creator").phase) => {
-            back.walk(domain, number, batch);
+            back.walk(domain, &Staged::new(0), limits, number, batch);
             Some(number)
         }
         Party::Task(_) | Party::Person(_) | Party::Deployment { .. } => None,
@@ -747,24 +794,44 @@ fn circle_cut(why: &Refusal) -> bool {
 }
 
 /// A release also restores dependency and delegation waits before it may go on (6.7).
-pub(crate) fn check_return(domain: &Domain, limits: &Limits, task: u64) -> Result<(), Problem> {
-    let phase = &record(domain, task).expect("released live row").phase;
-    check_waits(domain, limits, task, phase)
+pub(crate) fn check_return(domain: &Domain, staged: &Staged, limits: &Limits, task: u64) -> Result<(), Problem> {
+    let row = staged.record(domain, task).expect("released live row");
+    check_waits(domain, staged, limits, task, &row.phase, row.waiting_on)
 }
 
-fn check_waits(domain: &Domain, limits: &Limits, task: u64, phase: &Phase) -> Result<(), Problem> {
-    let row = record(domain, task).expect("released live row");
+pub(crate) fn check_waits(
+    domain: &Domain,
+    staged: &Staged,
+    limits: &Limits,
+    task: u64,
+    phase: &Phase,
+    pending: &[u64],
+) -> Result<(), Problem> {
+    let row = staged.record(domain, task).expect("released live row");
     if dependencies_wait(phase) {
-        check_added(domain, limits, task, &row.waiting_on)?;
+        check_added(domain, staged, limits, task, pending)?;
     }
-    let mut back = Back::new(limits);
-    back.walk(domain, task, &[]);
-    if delegates_wait(phase) {
-        for delegate in &row.delegates {
-            if back.markers.contains_key(delegate) {
-                return Err(back.problem(limits, task, *delegate));
+    {
+        let mut back = Back::new(limits);
+        back.walk(domain, staged, limits, task, &[]);
+        if delegates_wait(phase) {
+            for delegate in &row.delegates {
+                if let Some(child) = staged.record(domain, *delegate)
+                    && child.requester == Party::Task(task)
+                    && back.markers.contains_key(delegate)
+                {
+                    return Err(back.problem(limits, task, *delegate));
+                }
             }
         }
     }
-    Ok(())
+    if *phase == Phase::Waiting && pending.is_empty() && !row.holds_taken {
+        check_queue(domain, staged, limits, task)
+    } else {
+        Ok(())
+    }
+}
+
+fn queued_row(row: &crate::compound::CompoundTask<'_>) -> bool {
+    row.phase == Phase::Waiting && !row.holds_taken && row.waiting_on.is_empty()
 }

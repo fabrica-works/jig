@@ -95,7 +95,7 @@ pub(crate) fn slots(domain: &mut Domain, env: &Env<Limits>, pool: Name, slots: u
         waiters.push(*waiter).expect("one waiter per task");
     }
     for waiter in waiters.into_boxed() {
-        if let Err(problem) = crate::waits::check_queue(domain, limits, waiter) {
+        if let Err(problem) = crate::waits::check_queue(domain, &crate::compound::Staged::new(0), limits, waiter) {
             crate::waits::hold_circle(domain, env, waiter, problem, out);
         }
     }
@@ -477,7 +477,7 @@ pub(crate) fn wait(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mu
     }
     let Some(resource) = blocked else { return };
     task_mut(domain, number).expect("waiting task live").record.hold_wait_since = Some(env.wall);
-    if let Err(problem) = crate::waits::check_queue(domain, &env.limits, number) {
+    if let Err(problem) = crate::waits::check_queue(domain, &crate::compound::Staged::new(0), &env.limits, number) {
         crate::waits::hold_circle(domain, env, number, problem, out);
         return;
     }
@@ -527,7 +527,7 @@ pub(crate) fn back(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mu
             break;
         }
     }
-    if let Err(problem) = crate::waits::check_queue(domain, &env.limits, number) {
+    if let Err(problem) = crate::waits::check_queue(domain, &crate::compound::Staged::new(0), &env.limits, number) {
         crate::waits::hold_circle(domain, env, number, problem, out);
         return;
     }

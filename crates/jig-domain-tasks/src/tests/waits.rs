@@ -25,7 +25,9 @@ fn a_holders_added_dependency_cannot_circle_through_a_delegates_queue() {
     let mut waiter = task(WAITER, &[]);
     waiter.holdings = Box::new([holding()]);
     test.send(Event::Make { reply_to: to(), creator: Party::Task(REQUESTER), batch: Box::new([waiter]) });
-    let problem = crate::waits::check_added(&test.domain, &LIMITS, HOLDER, &[REQUESTER]).expect_err("circle");
+    let problem =
+        crate::waits::check_added(&test.domain, &crate::compound::Staged::new(0), &LIMITS, HOLDER, &[REQUESTER])
+            .expect_err("circle");
     assert_eq!(problem.why, Refusal::Circle { cut: false });
     assert_eq!(problem.blocked_by.as_deref(), Some([HOLDER, REQUESTER, WAITER].as_slice()));
 }
@@ -48,12 +50,17 @@ fn a_pool_only_propagates_stuckness_at_its_slot_threshold() {
     let mut waiter = task(WAITER, &[]);
     waiter.holdings = Box::new([pooled]);
     test.send(Event::Make { reply_to: to(), creator: Party::Task(REQUESTER), batch: Box::new([waiter]) });
-    assert_eq!(crate::waits::check_added(&test.domain, &LIMITS, HOLDER, &[REQUESTER]), Ok(()));
+    assert_eq!(
+        crate::waits::check_added(&test.domain, &crate::compound::Staged::new(0), &LIMITS, HOLDER, &[REQUESTER]),
+        Ok(())
+    );
     let other = &mut crate::domain::task_mut(&mut test.domain, OTHER).expect("other holder").record;
     other.dependencies = Box::new([HOLDER]);
     other.waiting_on = Box::new([HOLDER]);
     let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
     crate::domain::publish(&mut test.domain, &test.env, OTHER, &mut out);
-    let problem = crate::waits::check_added(&test.domain, &LIMITS, HOLDER, &[REQUESTER]).expect_err("both slots stuck");
+    let problem =
+        crate::waits::check_added(&test.domain, &crate::compound::Staged::new(0), &LIMITS, HOLDER, &[REQUESTER])
+            .expect_err("both slots stuck");
     assert_eq!(problem.blocked_by.as_deref(), Some([HOLDER, REQUESTER, WAITER, OTHER].as_slice()));
 }
