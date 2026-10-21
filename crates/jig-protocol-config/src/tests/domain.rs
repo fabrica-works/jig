@@ -370,7 +370,13 @@ fn memory_below_the_components_sum_is_refused() {
     // set 400, two u32 maps for two u64 maps -160, knot waits 1,024, knot
     // witnesses 8,192 and their 256 owned names 278,528, and a staged return's
     // 256 circle slots and 768 projected bytes: 18,726,769,299 + 289,872 = 18,727,059,171.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_727_059_171 });
+    // Core result reads add 2,171,840 bytes: the map for 8 reads is
+    // 2 B-tree nodes * (16 header + 11 * (8 token + 72 read) + 12 * 8 edges) = 1,984.
+    // Each read holds 8 dependencies + 8 inputs: 16 * (8 ID + 48 HistoricalResult
+    // + 512 result bytes * (32 ResultField + 1 payload byte)) = 271,232.
+    // 1,984 + 8 reads * 271,232 = 2,171,840;
+    // 18,727,059,171 + 2,171,840 = 18,729,231,011 (one byte is supplied).
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_729_231_011 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

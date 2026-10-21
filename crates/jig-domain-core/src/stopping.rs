@@ -119,6 +119,7 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
         | Event::DecidedProposal { .. }
         | Event::HistoricalPersonTask { .. }
         | Event::PartyInputsLoaded { .. }
+        | Event::EndedTaskLoaded { .. }
         | Event::HistoricalEscalation { .. }
         | Event::DelegateHoldings { .. }
         | Event::Brief(_)

@@ -11,6 +11,9 @@ fn a_kept_delegate_is_woken_by_its_last_dependencys_met() {
     let dependency = member(&world, tasks::Executor::Agent { charter: 1 }, b"prerequisite");
     let dependency = delegate(&mut world, parent, 2, dependency);
     let dependency_run = running(&world, dependency);
+    // Keep the wall time fixed so the brief names this exact amendment time.
+    let (now, _) = world.clocks();
+    world.set_clock(now, skein_lib::Wall::from_nanos(123_456));
     amend_delegate(&mut world, parent, kept, dependency);
     assert_eq!(live_row(&world, kept).waiting_on.as_ref(), [dependency]);
     finish(&mut world, kept_run, b"saved report");
@@ -40,7 +43,25 @@ fn a_kept_delegate_is_woken_by_its_last_dependencys_met() {
             "Met made the kept delegate {phase:?}"
         );
     }
-    // M2's dependency read carries this story to the next assignment.
+    let next_run = running(&world, kept);
+    assert_ne!(next_run, kept_run);
+    let assignment = world.assigned.as_ref().expect("kept delegate assigned again");
+    assert_eq!((assignment.task, assignment.attempt), next_run);
+    let dependency_text = assignment
+        .brief
+        .iter()
+        .find_map(|section| match section {
+            jig_domain_brief::GatherPlaced::Core { kind: jig_domain_brief::Core::Results, text } => Some(text),
+            jig_domain_brief::GatherPlaced::Core { .. }
+            | jig_domain_brief::GatherPlaced::CoreMissing { .. }
+            | jig_domain_brief::GatherPlaced::Connector { .. }
+            | jig_domain_brief::GatherPlaced::Missing { .. } => None,
+        })
+        .expect("dependency section in next run");
+    assert_eq!(
+        dependency_text.as_ref(),
+        format!("waited for task {dependency}, added 123456 by task {}: done\ntask {dependency}: report\nprerequisite done\n\n", parent.0).as_bytes(),
+    );
 }
 
 fn amend_delegate(world: &mut World, parent: (u64, u64), target: u64, dependency: u64) {

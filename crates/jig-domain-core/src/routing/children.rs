@@ -67,6 +67,7 @@ pub(super) fn tag_brief(
             brief::GatherRequest::Drop { connector, section } => Request::Ask { connector, ask: Ask::Drop { section } },
             brief::GatherRequest::Failed { brief, .. } | brief::GatherRequest::Refused { brief } => {
                 let task = brief.raw();
+                super::result_reads::clear(core, task);
                 drop(core.contexts.remove(&task));
                 drop(core.dependency_results.remove(&task));
                 drop(core.transcripts.remove(&task));

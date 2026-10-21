@@ -1,4 +1,4 @@
-//! The core's four archived reads translated by the kit (protocol/store.md, 3).
+//! The core's archived reads translated by the kit (protocol/store.md, 3).
 use alloc::boxed::Box;
 use jig_domain_core::{self as core, CoreKey, CoreRecord, Key, Now, Record};
 use jig_domain_tasks as tasks;
@@ -6,6 +6,7 @@ use jig_domain_tasks as tasks;
 #[must_use]
 pub fn key(now: &Now) -> Option<Key> {
     match now {
+        Now::EndedTask { task, .. } => Some(Key::Tasks(tasks::Key::Ended(*task))),
         Now::PartyInputs { tasks, .. } => Some(Key::Tasks(tasks::Key::Ended(*tasks.first()?))),
         Now::LoadEndedRead { task, party, .. } => {
             Some(Key::People(jig_domain_people::Key::EndedRead { task: *task, party: *party }))
@@ -56,6 +57,7 @@ pub fn key(now: &Now) -> Option<Key> {
 #[must_use]
 pub fn answer(now: Now, row: Option<Record>) -> Option<core::Event> {
     Some(match now {
+        Now::EndedTask { request, .. } => core::Event::EndedTaskLoaded { request, row: ended(row), busy: false },
         Now::PartyInputs { request, .. } => core::Event::PartyInputsLoaded { request, row: ended(row), busy: false },
         Now::LoadEndedRead { request, task, party } => {
             let through = match row {

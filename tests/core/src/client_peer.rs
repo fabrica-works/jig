@@ -164,6 +164,7 @@ impl ClientPeer {
             | core::Now::HistoricalProposal { .. }
             | core::Now::DecidedProposal { .. }
             | core::Now::HistoricalPersonTask { .. }
+            | core::Now::EndedTask { .. }
             | core::Now::PartyInputs { .. }
             | core::Now::CompleteBrief { .. }
             | core::Now::BriefCorePlanned { .. }

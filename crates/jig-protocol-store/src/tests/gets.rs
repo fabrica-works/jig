@@ -103,6 +103,16 @@ fn a_seen_conversation_is_answered_with_its_ended_task() {
 }
 
 #[test]
+fn an_ended_task_read_is_answered_with_its_ended_row() {
+    let now = Now::EndedTask { request: HISTORICAL, task: ENDED };
+    let event = historical_answer(now, fixtures::ended_task(ENDED));
+    let core::Event::EndedTaskLoaded { request, row, busy } = event else { panic!("ended task event") };
+    assert_eq!(request, HISTORICAL);
+    assert_eq!(row, Some(ended_record()));
+    assert!(!busy);
+}
+
+#[test]
 fn a_historical_escalation_is_answered_with_its_decision() {
     let record = Record::Core(CoreRecord::EscalationDecision(fixtures::core_rows::escalation()));
     let event = historical_answer(escalation(), record);
@@ -138,8 +148,9 @@ fn a_historical_person_task_is_answered_with_its_ended_task() {
 }
 
 #[test]
-fn the_four_historical_reads_name_their_store_keys() {
+fn historical_reads_name_their_store_keys() {
     for (now, expected) in [
+        (Now::EndedTask { request: HISTORICAL, task: ENDED }, Key::Tasks(tasks::Key::Ended(ENDED))),
         (seen_conversation(), Key::Tasks(tasks::Key::Ended(ENDED))),
         (person_task(), Key::Tasks(tasks::Key::Ended(ENDED))),
         (proposal(), Key::Core(CoreKey::ProposalDecision { proposer: people::Proposer::Party(12), proposal: 13 })),

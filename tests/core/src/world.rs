@@ -583,6 +583,7 @@ impl World {
                 }
                 root::Request::Now(
                     now @ (core::Now::HistoricalPersonTask { .. }
+                    | core::Now::EndedTask { .. }
                     | core::Now::PartyInputs { .. }
                     | core::Now::HistoricalProposal { .. }
                     | core::Now::DecidedProposal { .. }

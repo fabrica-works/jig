@@ -533,6 +533,7 @@ fn route_now(
         other @ (core::Now::SeenConversation { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalPersonTask { .. }
+        | core::Now::EndedTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::DecidedProposal { .. }

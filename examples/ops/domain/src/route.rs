@@ -1389,6 +1389,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         | core::Now::DecidedProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::HistoricalPersonTask { .. }
+        | core::Now::EndedTask { .. }
         | core::Now::PartyInputs { .. }) => {
             now(domain, Output::CoreLoad(load));
         }

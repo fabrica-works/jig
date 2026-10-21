@@ -235,6 +235,7 @@ fn start_proof(_core: &Core, task: u64, attempt: u64, conversation: u64, message
 
 fn wait_for_account(core: &mut Core, work: &mut Queue<Event>, context: Box<tasks::RunContext>) -> Requests {
     let task = context.task;
+    super::result_reads::clear(core, task);
     drop(core.contexts.remove(&task));
     work.push(Event::Tasks(tasks::Event::PreparationWaiting { task }));
     let mut out = Queue::with_capacity(2);
@@ -256,6 +257,12 @@ pub(super) fn start_brief(core: &mut Core, env: &Env<Limits>, work: &mut Queue<E
     if current.phase != tasks::Phase::Active(tasks::Active::Preparing) || current.last_message != context.last_message {
         out.push(Request::Decided);
         return Requests::Out(out);
+    }
+    if !core.dependency_results.contains_key(&task)
+        && let Some(ids) = core.preparation_ids(task)
+        && !ids.is_empty()
+    {
+        return super::result_reads::begin(core, work, task, ids);
     }
     if core.notes.busy() {
         core.pending_note_briefs.insert(task, true).expect("brief count bounds waiting notes");
@@ -434,6 +441,7 @@ pub(super) fn route_prepared_agent(
         let number = context.task;
         let previous_attempt = context.previous_attempt;
         let fresh = context.tries.transient != 0;
+        super::result_reads::clear(core, number);
         assert!(core.contexts.insert(number, context).is_ok(), "bounded activation context");
         core.begin_transcript(number, previous_attempt);
         if fresh {
@@ -492,6 +500,7 @@ pub(super) fn route_activate(
 }
 
 pub(super) fn route_preparation_failed(core: &mut Core, work: &mut Queue<Event>, task: u64) -> Requests {
+    super::result_reads::clear(core, task);
     drop(core.contexts.remove(&task));
     drop(core.dependency_results.remove(&task));
     drop(core.transcripts.remove(&task));
@@ -579,6 +588,7 @@ pub(super) fn route_claim_prepared(
 
 pub(super) fn transcript_unread(core: &mut Core, work: &mut Queue<Event>, task: u64) -> Requests {
     if core.transcripts.remove(&task).is_some() {
+        super::result_reads::clear(core, task);
         drop(core.contexts.remove(&task));
         drop(core.dependency_results.remove(&task));
         work.push(Event::Tasks(tasks::Event::PreparationUnread { task }));

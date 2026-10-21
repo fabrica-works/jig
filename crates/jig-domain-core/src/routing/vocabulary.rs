@@ -292,6 +292,8 @@ pub enum Now {
     DecidedProposal { to: ReplyTo, key: CallKey, proposal: u64 },
     /// Load the ended owner row for a person-task act whose live row is gone.
     HistoricalPersonTask { request: Token, person: u64, project: u32, task: u64 },
+    /// Load an ended task row; the core retains why it needs the result.
+    EndedTask { request: Token, task: u64 },
     /// Load the first input or ended tree root; later inputs return to the core between gets.
     PartyInputs { request: Token, person: u64, project: u32, tasks: Box<[u64]> },
     /// Assemble connector-held sections for a still-current brief.
@@ -547,6 +549,8 @@ pub enum Event {
         row: Option<crate::ProposalDecisionRecord>,
         busy: bool,
     },
+    /// One ended task row, loaded without root judgment.
+    EndedTaskLoaded { request: Token, row: Option<Box<tasks::TaskRecord>>, busy: bool },
     /// One party input or its ended tree root, loaded without root judgment.
     PartyInputsLoaded { request: Token, row: Option<Box<tasks::TaskRecord>>, busy: bool },
     /// Ended owner row loaded for an authenticated person-task act.

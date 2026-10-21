@@ -214,7 +214,10 @@ fn task_section(core: &Core, task: u64, part: BriefPart, parts: u32, bytes: u32)
             None => BriefRead::Failed,
         },
         BriefPart::Dependencies => match core.dependency_results.get(&task) {
-            Some(results) => dependency_read(results, bytes),
+            Some(results) => match core.contexts.get(&task) {
+                Some(context) => dependency_read(results, &context.added, bytes),
+                None => BriefRead::Failed,
+            },
             None => BriefRead::Failed,
         },
         BriefPart::Attempts => match core.contexts.get(&task) {
@@ -349,9 +352,55 @@ fn result_label(kind: &tasks::ResultKind) -> &'static [u8] {
     }
 }
 
-fn dependency_read(results: &[HistoricalResult], bytes: u32) -> BriefRead {
+fn waited_line(added: &tasks::Added, kind: &tasks::ResultKind) -> Box<[u8]> {
+    let (party, number) = match added.by {
+        tasks::Party::Task(task) => (b"task ".as_slice(), task),
+        tasks::Party::Person(person) => (b"person ".as_slice(), person),
+        tasks::Party::Deployment { project } => (b"deployment for project ".as_slice(), u64::from(project)),
+    };
+    let status = match kind {
+        tasks::ResultKind::Failed => b"failed".as_slice(),
+        tasks::ResultKind::Cancelled => b"cancelled".as_slice(),
+        tasks::ResultKind::Approved { .. }
+        | tasks::ResultKind::Report
+        | tasks::ResultKind::Verdict { .. }
+        | tasks::ResultKind::Change { .. } => b"done".as_slice(),
+    };
+    let task = Decimal::of(added.task);
+    let at = Decimal::of(added.at.as_nanos());
+    let number = Decimal::of(number);
+    let fragments = [
+        b"waited for task ".as_slice(),
+        task.as_bytes(),
+        b", added ",
+        at.as_bytes(),
+        b" by ",
+        party,
+        number.as_bytes(),
+        b": ",
+        status,
+        b"\n",
+    ];
+    let mut length = 0;
+    for fragment in fragments {
+        add_text_len(&mut length, fragment);
+    }
+    let mut writer = Writer::new(length);
+    for fragment in fragments {
+        writer.put(fragment).expect("measured added dependency line");
+    }
+    writer.finish()
+}
+
+fn dependency_read(results: &[HistoricalResult], added: &[tasks::Added], bytes: u32) -> BriefRead {
     let mut total = 0_usize;
     for result in results {
+        for addition in added {
+            if addition.task == result.task {
+                add_text_len(&mut total, &waited_line(addition, &result.kind));
+                break;
+            }
+        }
         total = total
             .checked_add(b"task ".len())
             .expect("bounded result text")
@@ -382,6 +431,12 @@ fn dependency_read(results: &[HistoricalResult], bytes: u32) -> BriefRead {
     }
     let mut writer = Writer::new(total);
     for result in results {
+        for addition in added {
+            if addition.task == result.task {
+                writer.put(&waited_line(addition, &result.kind)).expect("measured added dependency line");
+                break;
+            }
+        }
         writer.put(b"task ").expect("measured result text");
         writer.put(Decimal::of(result.task).as_bytes()).expect("measured result ID");
         writer.put(b": ").expect("measured result text");

@@ -32,7 +32,7 @@ fn result_notice(ending: tasks::Ending) -> (tasks::ResultKind, Box<[u8]>) {
 impl Core {
     /// Select the historical results required by one preparing run, in their task order.
     #[must_use]
-    pub fn preparation_ids(&self, task: u64) -> Option<Box<[u64]>> {
+    pub(crate) fn preparation_ids(&self, task: u64) -> Option<Box<[u64]>> {
         let context = self.contexts.get(&task)?;
         let count = context.dependencies.len().checked_add(context.spec.inputs.len())?;
         let mut ids = List::with_capacity(u32::try_from(count).ok()?);
@@ -47,7 +47,12 @@ impl Core {
 
     /// Admit one archived dependency result into the preparing task's context.
     #[must_use]
-    pub fn dependency_result(&self, task: u64, wanted: u64, row: Box<tasks::TaskRecord>) -> Option<HistoricalResult> {
+    pub(crate) fn dependency_result(
+        &self,
+        task: u64,
+        wanted: u64,
+        row: Box<tasks::TaskRecord>,
+    ) -> Option<HistoricalResult> {
         let context = self.contexts.get(&task)?;
         if row.number != wanted || row.project != context.project {
             return None;

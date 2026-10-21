@@ -497,6 +497,7 @@ impl Application for Testing {
                     | core::Now::SeenConversation { .. }
                     | core::Now::LoadEndedRead { .. }
                     | core::Now::HistoricalPersonTask { .. }
+                    | core::Now::EndedTask { .. }
                     | core::Now::PartyInputs { .. }
                     | core::Now::HistoricalProposal { .. }
                     | core::Now::DecidedProposal { .. }

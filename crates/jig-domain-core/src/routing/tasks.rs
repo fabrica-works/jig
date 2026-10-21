@@ -938,6 +938,7 @@ pub(super) fn tag_tasks(
                         None => false,
                     };
                     if stale {
+                        super::result_reads::clear(core, task.number);
                         drop(core.contexts.remove(&task.number));
                         drop(core.dependency_results.remove(&task.number));
                         drop(core.transcripts.remove(&task.number));

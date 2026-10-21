@@ -10,6 +10,7 @@ pub(crate) mod deadlines;
 pub(crate) mod key_routes;
 pub(crate) mod party_inputs;
 mod propose;
+pub(crate) mod result_reads;
 
 use crate::{CallKey, CallPart, Core, RoutedCall};
 use alloc::boxed::Box;
@@ -388,6 +389,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::DecidedProposal { .. }
         | Event::HistoricalPersonTask { .. }
         | Event::PartyInputsLoaded { .. }
+        | Event::EndedTaskLoaded { .. }
         | Event::HistoricalEscalation { .. }
         | Event::NamedAnswer { .. }
         | Event::NamedAction { .. }
@@ -575,6 +577,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::HistoricalProposal { request, person, project, proposer, proposal, row, busy } => {
             route_historical_proposal(core, work, request, person, project, proposer, proposal, row, busy)
         }
+        Event::EndedTaskLoaded { request, row, busy } => result_reads::loaded(core, work, request, row, busy),
         Event::PartyInputsLoaded { request, row, busy } => {
             let mut out = Queue::with_capacity(route_room(&env.limits));
             party_inputs::loaded(core, env, &mut out, work, party_inputs::Loaded { request, row, busy });

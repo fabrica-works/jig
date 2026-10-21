@@ -338,6 +338,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let historical = sizeof(size_of::<HistoricalResult>())?.checked_add(result_payload)?;
     let histories = task.dependencies.checked_add(task.inputs)?;
     total = total.checked_add(bytes(task.tasks, bytes(histories, historical)?)?)?;
+    total = total
+        .checked_add(Map::<skein_lib::Token, crate::routing::result_reads::ResultRead>::worst_case(task.tasks)?)?;
+    total = total.checked_add(bytes(
+        task.tasks,
+        bytes(histories, sizeof(size_of::<u64>())?)?
+            .checked_add(List::<HistoricalResult>::worst_case(histories)?)?
+            .checked_add(bytes(histories, result_payload)?)?,
+    )?)?;
     total = total.checked_add(bytes(task.tasks.checked_mul(2)?, context)?)?;
     let creations = limits
         .people

@@ -173,6 +173,7 @@ fn window(now: core::Now) -> Option<(u64, u64, u32)> {
         | core::Now::SeenConversation { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalPersonTask { .. }
+        | core::Now::EndedTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::DecidedProposal { .. }

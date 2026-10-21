@@ -88,8 +88,9 @@ pub mod fleet_needs;
 pub use charters::Charter;
 mod stored;
 mod translate;
+use run::HistoricalResult;
 pub use run::{
-    EFFORT_BYTES, EFFORTS, GoalRoute, HistoricalResult, MODEL_DESCRIPTION_BYTES, MODEL_NAME_BYTES, Model, PendingRelay,
+    EFFORT_BYTES, EFFORTS, GoalRoute, MODEL_DESCRIPTION_BYTES, MODEL_NAME_BYTES, Model, PendingRelay,
     PersonProposalRoute, PersonTaskRoute, RestoringProof, RoutedCall, RunAdmission, RunCharter, RunPolicy, Transcript,
     reserve_floor,
 };
@@ -275,7 +276,7 @@ pub struct Core {
     pub(crate) changed_views: skein_lib::Set<skein_lib::Id<WatchedSubject>>,
     pub(crate) reads: skein_lib::Slab<reads::Pending>,
     /// Historical dependency results held for preparation.
-    pub dependency_results: Map<u64, Box<[HistoricalResult]>>,
+    pub(crate) dependency_results: Map<u64, Box<[HistoricalResult]>>,
     /// Numbered task creation flights.
     pub(crate) made: Map<Token, routing::Made>,
     /// Goal proposal decisions in flight.
@@ -294,8 +295,12 @@ pub struct Core {
     pub person_tasks: Map<Token, PersonTaskRoute>,
     /// Authenticated person escalation choices awaiting task semantics.
     pub(crate) person_escalations: Map<Token, routing::PersonEscalation>,
-    /// Person task creations waiting for connector-owned resource holdings.
+    /// Ended results waiting on the store for one core-owned read.
+    pub(crate) result_reads: Map<Token, routing::result_reads::ResultRead>,
+    pub(crate) next_result_request: u64,
+    /// Person task creations waiting for their historical inputs.
     pub(crate) creating_inputs: Map<Token, routing::party_inputs::Inputs>,
+    /// Person task creations waiting for connector-owned resource holdings.
     pub(crate) creating: Map<Token, routing::Creation>,
     pub(crate) resource_roles: Map<resources::Key, connector::ResourceRole>,
     pub(crate) resource_roles_full: bool,
@@ -589,6 +594,8 @@ impl Core {
             moving: Map::with_capacity(limits.people.pending),
             person_tasks: Map::with_capacity(limits.people.pending),
             person_escalations: Map::with_capacity(limits.people.pending),
+            result_reads: Map::with_capacity(limits.tasks.tasks),
+            next_result_request: 1,
             creating_inputs: Map::with_capacity(limits.people.pending),
             creating: Map::with_capacity(limits.people.pending),
             resource_roles: Map::with_capacity(limits.tasks.resource_reports),
@@ -692,6 +699,7 @@ impl Core {
         self.counters.quiescent(journal_idle)
             && self.reads.is_empty()
             && self.dependency_results.is_empty()
+            && self.result_reads.is_empty()
             && self.pending_calls.is_empty()
             && self.effect_flights.is_empty()
             && self.proposing_effects.is_empty()

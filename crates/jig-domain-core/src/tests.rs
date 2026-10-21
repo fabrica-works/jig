@@ -3146,3 +3146,5 @@ fn configured_worker_name(length: u32) -> Box<[u8]> {
     name.fill(b'a');
     name
 }
+
+mod result_reads;

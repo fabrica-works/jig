@@ -155,6 +155,7 @@ fn immediate(engine: &mut Engine, now: core::Now) {
         value @ (core::Now::SeenConversation { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalPersonTask { .. }
+        | core::Now::EndedTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::DecidedProposal { .. }
