@@ -727,7 +727,10 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 
 - **The client's:** exchanges in flight, the stream's heartbeat
   tolerance, a record's bytes on each side (from the wire's worst cases
-  at the client's limits), the stream's message bytes.
+  at the client's limits), the stream's message bytes; account receiving
+  counts for accounts per list, sources per account and sign-ins per
+  list, checked by the link within the held document's decoded room
+  (`../client/domain/client.md`, sections 14 and 16).
 - **The transport's:** an exchange's deadline, and what it buffers of the
   stream and of the small store's writes.
 - **The component's:** streams in all, whatever their sign-ins (section

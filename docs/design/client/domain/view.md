@@ -1051,6 +1051,9 @@ Each is configured and part of its worst case:
   conversation's window holds; nodes of a plan held; the pages its reads
   were handed that it keeps (18.3), one per read handle, each priced at
   the client's bytes of a page handed over (client.md, section 14);
+- account lists at the client's counts (client.md, section 14), set
+  beside its client limits: the view renders every admitted account
+  and source, with no smaller cut;
 - its handles (watches open, `me`'s included, and reads in flight) and
   intents kept;
 - these, and the objects, windows and pages above, counted for the most

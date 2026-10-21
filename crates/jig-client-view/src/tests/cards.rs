@@ -46,6 +46,7 @@ pub(crate) const CLIENT: crate::Limits = crate::Limits {
     text: 128,
     rows: 2,
     segments: 4,
+    accounts: jig_client::AccountCounts { accounts: 8, sources: 8, sign_ins: 8 },
     conversation_words: 2,
     navigation_entries: 8,
     updates_count: 99,

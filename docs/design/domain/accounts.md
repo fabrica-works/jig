@@ -350,7 +350,9 @@ and program sources per worker are limits
 (`../protocol/configuration.md`, section 6), within which the accounts'
 records, skein's driver, the hub's grants, a worker's hello and the
 secrets' store are sized. A request that would pass one is refused,
-naming it.
+naming it. Client receiving counts for accounts, sources and sign-ins
+are at least the engine's document lines, so every list cut there fits
+(`../client/domain/client.md`, section 14).
 
 ## 4. Uses: whose work an account pays for
 

@@ -34,6 +34,8 @@ pub struct Limits {
     pub roles: u32,
     pub text: u32,
     pub rows: u32,
+    /// Whole account lists admitted by the client (client/domain/client.md, 14).
+    pub accounts: jig_client::AccountCounts,
     pub segments: u32,
     /// Whole pending or sent word snapshots kept for the displayed conversation.
     pub conversation_words: u32,

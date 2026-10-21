@@ -691,9 +691,9 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
     let accounts = crate::chip_nodes(l)?
         .checked_mul(l.rows)?
         .checked_mul(2)?
-        .checked_add(l.rows.checked_mul(13)?)?
+        .checked_add(l.accounts.sources.checked_mul(13)?)?
         .checked_add(68)?
-        .checked_mul(l.rows)?;
+        .checked_mul(l.accounts.accounts)?;
     hosts
         .checked_add(attempts)?
         .checked_add(accounts)?
@@ -718,7 +718,7 @@ pub fn limits(l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
         text_per_node,
         text_bytes: nodes
             .checked_mul(text)?
-            .checked_add(l.rows.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?
+            .checked_add(l.accounts.accounts.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?
             .checked_add(l.rows.checked_mul(jig_client::contract::PROGRAM_HOST_NAME)?)?,
         drawing_bytes: 0,
         styles_per_node: 2,
@@ -789,7 +789,7 @@ pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<sk
     if value.connectors.capacity() > l.rows
         || value.hosts.capacity() > l.rows
         || value.attempts.capacity() > l.rows
-        || value.accounts.capacity() > l.rows
+        || value.accounts.capacity() > l.accounts.accounts
         || value.projects.capacity() > l.rows
         || value.hello_refusals.capacity() > l.rows
         || value.person_room_refusals.capacity() > l.rows
@@ -817,7 +817,7 @@ pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<sk
     for account in &value.accounts {
         if account.runs.capacity() > l.rows
             || account.waiting.capacity() > l.rows
-            || account.sources.capacity() > l.rows
+            || account.sources.capacity() > l.accounts.sources
             || !account.display.bytes.fits(l.text)
         {
             return None;

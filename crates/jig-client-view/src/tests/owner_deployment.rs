@@ -787,8 +787,7 @@ fn an_agent_shortfall_refusal_is_worded() {
     assert!(contains(&tree, b"Model position 3"));
 }
 
-#[test]
-fn deployment_accounts_show_identity_sources_and_payers_in_order() {
+fn identity_accounts() -> OwnerDeployment {
     let mut value = waiting_account(None);
     value.cut = false;
     let account = value.accounts.get_mut(0).unwrap();
@@ -821,7 +820,11 @@ fn deployment_accounts_show_identity_sources_and_payers_in_order() {
             spent_until: None,
         },
     ]);
-    let tree = round_trip(value);
+    value
+}
+#[test]
+fn deployment_accounts_show_identity_sources_and_payers_in_order() {
+    let tree = round_trip(identity_accounts());
     let text: Vec<_> =
         tree.nodes().iter().flat_map(|n| n.text.as_slice().iter().flat_map(|r| r.text.iter().copied())).collect();
     let ordered = [
@@ -859,16 +862,13 @@ fn deployment_accounts_show_the_default_uses_and_deployment_holder() {
     assert!(contains(&tree, b"Held by the deployment"));
 }
 #[test]
-fn account_uses_have_their_constant_bound_and_sources_have_rows() {
+fn account_uses_keep_their_constant_receiving_bound() {
     // domain/accounts.md, 4.2; the independent client wire constant is 16.
     const USES: usize = 16;
     let mut value = waiting_account(None);
     value.accounts.get_mut(0).unwrap().uses = Some(list(vec![OwnerAccountUse::Party(23); USES]));
     let _tree = round_trip(value.clone());
     value.accounts.get_mut(0).unwrap().uses = Some(list(vec![OwnerAccountUse::Party(23); USES + 1]));
-    assert!(view::required(&value, &CLIENT, shared_words()).is_none());
-    value.accounts.get_mut(0).unwrap().uses = None;
-    value.accounts.get_mut(0).unwrap().sources = List::with_capacity(CLIENT.rows + 1);
     assert!(view::required(&value, &CLIENT, shared_words()).is_none());
 }
 
@@ -1134,4 +1134,45 @@ fn a_refused_worker_position_is_shown() {
         .unwrap();
     let tree = round_trip(value);
     assert!(contains(&tree, b"Unconfigured or occupied worker position 4294967295"));
+}
+
+fn account_lists(accounts: u32, sources: u32) -> OwnerDeployment {
+    let mut value = identity_accounts();
+    let mut account = value.accounts.get(0).unwrap().clone();
+    let source = account.sources.get(0).unwrap().clone();
+    account.sources = List::with_capacity(sources);
+    for number in 0..sources {
+        let mut source = source.clone();
+        source.number = number;
+        account.sources.push(source).unwrap();
+    }
+    value.accounts = List::with_capacity(accounts);
+    for number in 0..accounts {
+        let mut account = account.clone();
+        account.number = number;
+        value.accounts.push(account).unwrap();
+    }
+    value
+}
+#[test]
+fn whole_account_lists_above_rows_fill_the_view_counts() {
+    let value = account_lists(CLIENT.accounts.accounts, CLIENT.accounts.sources);
+    let client = domain(value.clone());
+    let bounds = view::required(&value, &CLIENT, shared_words()).unwrap();
+    let tree = build(&client, shared_words(), bounds);
+    assert_eq!(
+        tree.nodes().iter().filter(|node| node.key.is_some_and(|key| key.kind == 95)).count(),
+        usize::try_from(CLIENT.accounts.accounts).unwrap()
+    );
+    assert!(tree.len() <= bounds.nodes);
+    assert!(tree.nodes().iter().map(crate::tests::text_bytes).sum::<u32>() <= bounds.text_bytes);
+}
+#[test]
+fn account_lists_one_past_the_view_counts_are_refused() {
+    for value in [
+        account_lists(CLIENT.accounts.accounts + 1, CLIENT.accounts.sources),
+        account_lists(CLIENT.accounts.accounts, CLIENT.accounts.sources + 1),
+    ] {
+        assert!(view::required(&value, &CLIENT, shared_words()).is_none());
+    }
 }

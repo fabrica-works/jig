@@ -343,9 +343,11 @@ host's half reports it (`llm.md`, 5.5).
   `llm.md`, 2.6). Within them the accounts' table, skein's driver, the
   hub's grants, a worker's `sources` and `logins` and the secrets'
   store are sized; a request that would pass one is refused, naming it
-  (`../domain/accounts.md`, 3.6). A sign-in waits for its redirect only
-  within the sign-in deadline, a limit of the driver's (skein's
-  `oauth.md`, section 3).
+  (`../domain/accounts.md`, 3.6). Clients receive at least the engine's
+  document lines in each account, source and sign-in list
+  (`../client/domain/client.md`, section 14). A sign-in waits for its
+  redirect only within the sign-in deadline, a limit of the driver's
+  (skein's `oauth.md`, section 3).
 - **A model's description** is within its own bound on bytes, or the
   start is refused, naming the model.
 - **Configured models** are at most the bound on models an authority

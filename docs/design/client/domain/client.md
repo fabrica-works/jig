@@ -817,9 +817,9 @@ Each is configured and part of the worst case:
 - handles; the engine's watches open, `me`'s included, each until its
   terminal and one kept for `me` (8.1); reads in flight; exchanges in
   flight;
-- rows: the most items of a list, of a page and of a window, at most
-  32, the ceiling of the wire's lists (`../../protocol/client.md`,
-  section 3); a document past it is refused at decoding (section 16),
+- rows: the most items of a page, a window and lists without a bound
+  of their own, at most 32, the ceiling of the wire's lists
+  (`../../protocol/client.md`, section 3); a document past it is refused at decoding (section 16),
   and limits above it at construction;
 - a path's segments: the most segments of a resource's path or a
   pattern a document may carry, a bound of its own, never a window's
@@ -832,6 +832,11 @@ Each is configured and part of the worst case:
   bound of its own, never a window's rows; the application sets it at
   least the most its engine admits in each of them (contract.md, 5.3),
   and a document past it is refused at decoding (section 16);
+- account counts: accounts per list, sources per account and sign-ins
+  per list, independent of rows. The application sets each at least its
+  engine's document lines (`../../domain/accounts.md`, 3.6); a document
+  past one is refused at decoding (section 16). Uses keep their constant
+  bound of 16 (`../../domain/accounts.md`, section 3);
 - bytes of a document held, of a page handed over, and of a run's
   provisional turn, each priced from the wire's worst cases at the
   client's limits (`../../protocol/client.md`, section 13);
@@ -846,9 +851,15 @@ Each is configured and part of the worst case:
   (`../../protocol/client.md`, section 9).
 
 `worst_case` sums the containers' own and the bytes each entity may hold
-(programming-model.md, 6.3). Each helper's limits are its own (section
-19); the reference UI's derive from the client's and its own (view.md,
-18.9).
+(programming-model.md, 6.3). Each held document is priced at twice its
+wire byte limit as room for its decoded representation: fixed-size
+records and lists reserved at their bounds. A deployment of 169 wire
+bytes holds 512 decoded bytes, so a document limit of 169 gives only
+338 bytes of room and refuses it; it needs a document limit of at least
+256. The link refuses an accounts or deployment document whose decoded
+charge passes its room (section 16).
+Each helper's limits are its own (section 19); the reference UI's derive
+from the client's and its own (view.md, 18.9).
 
 ## 15. What it never knows
 
@@ -903,10 +914,11 @@ the client's protocol designs (`../../protocol/client.md`):
   shows of a long one (view.md, section 7). An authority is held whole,
   within the client's bound on its entries, and a draft is made from it
   whole: only the view cuts what it shows of a long one (view.md,
-  section 7). An account list is held whole, past the client's rows:
-  what its rows decode to is counted against the bytes the domain holds
-  for a document, twice the client's document limit (section 14), and a
-  document whose rows decode past them is refused as too large.
+  section 7). An account list is held whole, past the client's rows,
+  within its account, source and sign-in counts and its decoded room:
+  what its rows decode to is charged against the bytes the domain holds
+  for a document, twice the client's document limit (section 14). A
+  document past a count or that room is refused as too large.
 
 ## 17. The world
 

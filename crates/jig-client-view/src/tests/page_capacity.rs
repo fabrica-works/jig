@@ -782,14 +782,16 @@ fn full_cursor() -> Cursor {
 
 #[test]
 fn each_page_bound_keeps_its_value_at_the_client_limits() {
-    // Two account rows each add two 12-node sources and 48 identity/use nodes,
-    // and four nodes for the provider name, its cut mark and manage link.
+    // With chip_nodes 168 and runs/waiting still at two rows, the accounts term grows
+    // from (2 * 2 * 168 + 2 * 13 + 68) * 2 = 1_532 to
+    // (2 * 2 * 168 + 8 * 13 + 68) * 8 = 6_752 at eight accounts and eight sources.
+    // The 5_220-node increase raises the deployment bound from 2_979 to 8_199.
     // Two catalogue offers (two programs each), two readiness rows and six
     // list/heading/cut nodes add 2 * (2 * 2 + 12) + 2 * 5 + 6 = 48.
     // Program facts add 11 * 2 * 2 + 3 * 2 = 50 nodes at this profile.
     // Each card frame's two committed outcomes grow by 2 * (260 - 34) = 452.
     // The page formulas count these frames independently of their offered controls.
-    const DEPLOYMENT_NODES: u32 = 2_979;
+    const DEPLOYMENT_NODES: u32 = 8_199;
     assert_eq!(
         [
             crate::inbox_nodes(&CLIENT, 0),
