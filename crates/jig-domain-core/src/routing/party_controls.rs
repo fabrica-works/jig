@@ -13,6 +13,7 @@ pub(super) fn amend_route(
     core: &mut Core,
     env: &Env<Limits>,
     work: &mut Queue<Event>,
+    out: &mut Queue<Request>,
     request: Token,
     person: u64,
     role: Option<people::Role>,
@@ -21,19 +22,57 @@ pub(super) fn amend_route(
     revision: u64,
     amendment: people::Amendment,
     release: Option<u64>,
+    evidence: super::amendment_reads::Evidence,
 ) {
+    if let Some(next) = super::amendment_reads::missing(
+        core,
+        &env.limits.tasks,
+        tasks::Party::Person(person),
+        task,
+        amendment.dependencies.as_deref(),
+        &evidence,
+    ) {
+        super::result_reads::wait(
+            core,
+            work,
+            out,
+            next,
+            super::amendment_reads::AmendmentRead {
+                replay: super::amendment_reads::Replay::Person {
+                    request,
+                    person,
+                    project,
+                    task,
+                    revision,
+                    amendment,
+                    release,
+                },
+                evidence,
+            },
+        );
+        return;
+    }
     let Some(mut amendment) = crate::amendments::translate(amendment, core.kept_models(task), &env.limits.tasks) else {
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
         return;
     };
-    let stop_run =
-        match core.amend_admit(person, role, project, task, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
-            Ok(admitted) => admitted,
-            Err(why) => {
-                pool_refused(work, request, why);
-                return;
-            }
-        };
+    let stop_run = match crate::acts::bounds::amendment_admit_with_places(
+        core,
+        person,
+        role,
+        project,
+        task,
+        &amendment,
+        env.limits.tasks.depth,
+        &env.limits.tasks,
+        evidence.places.as_slice(),
+    ) {
+        Ok(admitted) => admitted,
+        Err(why) => {
+            pool_refused(work, request, why);
+            return;
+        }
+    };
     if let Err(why) = core.party_amend_revision(task, revision, &amendment) {
         pool_refused(work, request, why);
         return;
@@ -73,6 +112,7 @@ pub(super) fn amend_route(
         "one person amendment"
     );
     work.push(Event::Tasks(tasks::Event::Amend {
+        places: evidence.places.into_boxed(),
         funder: None,
         reply_to: ReplyTo::new(request),
         by: tasks::Party::Person(person),

@@ -81,6 +81,7 @@ pub(super) fn goal_decide(
                         return;
                     };
                     tasks::Event::Amend {
+                        places: Box::new([]),
                         reply_to: ReplyTo::new(request),
                         by: tasks::Party::Person(proposer),
                         funder: Some(source),
@@ -316,6 +317,7 @@ pub(super) fn person_proposal_accept(
             let before = crate::translate::authority_value(&current.authority);
             let stop_run = !authority::at_most(&before, &after, &core.authority.rules().implies);
             tasks::Event::Amend {
+                places: Box::new([]),
                 funder: Some(source),
                 reply_to: ReplyTo::new(request),
                 by: tasks::Party::Person(person),
@@ -331,6 +333,7 @@ pub(super) fn person_proposal_accept(
                 return;
             };
             tasks::Event::Amend {
+                places: Box::new([]),
                 funder: Some(source),
                 reply_to: ReplyTo::new(request),
                 by: tasks::Party::Person(person),

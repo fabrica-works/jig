@@ -4,6 +4,7 @@
 
 #![expect(clippy::mod_module_files, reason = "the route split keeps dispatch in routing/mod.rs")]
 
+pub(crate) mod amendment_reads;
 pub(crate) mod application_routes;
 mod create;
 pub(crate) mod deadlines;
@@ -577,7 +578,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::HistoricalProposal { request, person, project, proposer, proposal, row, busy } => {
             route_historical_proposal(core, work, request, person, project, proposer, proposal, row, busy)
         }
-        Event::EndedTaskLoaded { request, row, busy } => result_reads::loaded(core, work, request, row, busy),
+        Event::EndedTaskLoaded { request, row, busy } => result_reads::loaded(core, env, work, request, row, busy),
         Event::PartyInputsLoaded { request, row, busy } => {
             let mut out = Queue::with_capacity(route_room(&env.limits));
             party_inputs::loaded(core, env, &mut out, work, party_inputs::Loaded { request, row, busy });

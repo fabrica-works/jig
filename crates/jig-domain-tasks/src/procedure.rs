@@ -91,6 +91,7 @@ fn apply(domain: &mut Domain, env: &Env<Limits>, fence: Fence, decision: Procedu
             ReplyTo::new(skein_lib::Token::new(u64::MAX - 1)),
             Party::Task(number),
             crate::control::Amend {
+                places: Box::new([]),
                 number: part.task,
                 message: part.message,
                 stop_run: part.stop_run,

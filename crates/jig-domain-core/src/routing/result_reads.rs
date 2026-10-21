@@ -1,10 +1,12 @@
-//! Ended task results gathered for a preparing run (`domain/engine.md`, section 9).
+//! Ended rows gathered for preparation or amendment admission
+//! (`domain/engine.md`, sections 5.3 and 9).
 
+use super::amendment_reads::{self, AmendmentRead, Replay};
 use alloc::boxed::Box;
 use jig_domain_tasks as tasks;
-use skein_lib::{List, Queue, Token};
+use skein_lib::{Env, List, Queue, Token};
 
-use crate::{Core, Event, Held, HistoricalResult, Now, Request, Requests};
+use crate::{Core, Event, Held, HistoricalResult, Limits, Now, Request, Requests};
 
 #[derive(Debug)]
 pub(crate) struct ResultRead {
@@ -17,21 +19,38 @@ pub(crate) struct ResultRead {
 #[derive(Debug)]
 pub(crate) enum ReadFor {
     Preparation { task: u64, last_message: u64 },
+    Amendment(Box<AmendmentRead>),
 }
 
-pub(super) fn clear(core: &mut Core, task: u64) {
-    let mut request = None;
-    for (&token, read) in &core.result_reads {
-        match read.why {
-            ReadFor::Preparation { task: owner, .. } if owner == task => {
+pub(crate) fn clear(core: &mut Core, task: u64) {
+    // Several calls can wait for one run; remove all of its reads.
+    for _ in 0..core.result_reads.capacity() {
+        let mut request = None;
+        for (&token, read) in &core.result_reads {
+            let owner = match &read.why {
+                ReadFor::Preparation { task, .. } => Some(*task),
+                ReadFor::Amendment(read) => match &read.replay {
+                    Replay::Agent { key, .. } => Some(key.task),
+                    Replay::Person { .. } => None,
+                },
+            };
+            if owner == Some(task) {
                 request = Some(token);
                 break;
             }
-            ReadFor::Preparation { .. } => {}
         }
-    }
-    if let Some(request) = request {
-        drop(core.result_reads.remove(&request));
+        let Some(request) = request else { break };
+        if let Some(read) = core.result_reads.remove(&request) {
+            match read.why {
+                ReadFor::Preparation { .. } => {}
+                ReadFor::Amendment(amendment) => match amendment.replay {
+                    Replay::Agent { key, .. } => {
+                        let _pending = core.pending_calls.remove(&key);
+                    }
+                    Replay::Person { .. } => {}
+                },
+            }
+        }
     }
 }
 
@@ -43,7 +62,7 @@ pub(super) fn begin(core: &mut Core, work: &mut Queue<Event>, task: u64, ids: Bo
                 out.push(Request::Decided);
                 return Requests::Out(out);
             }
-            ReadFor::Preparation { .. } => {}
+            ReadFor::Preparation { .. } | ReadFor::Amendment(_) => {}
         }
     }
     if core.result_reads.len() == core.result_reads.capacity() {
@@ -77,15 +96,55 @@ fn ask(out: &mut Queue<Request>, request: Token, read: &ResultRead) {
 
 pub(super) fn loaded(
     core: &mut Core,
+    env: &Env<Limits>,
     work: &mut Queue<Event>,
     request: Token,
     row: Option<Box<tasks::TaskRecord>>,
     busy: bool,
 ) -> Requests {
-    let mut out = Queue::with_capacity(2);
+    let mut out = Queue::with_capacity(3);
     out.push(Request::Decided);
     let Some(mut read) = core.result_reads.remove(&request) else { return Requests::Out(out) };
     match read.why {
+        ReadFor::Amendment(mut amendment) => {
+            if !amendment_reads::current(core, &amendment.replay) {
+                return Requests::Out(out);
+            }
+            if busy {
+                amendment_reads::busy(core, work, &mut out, amendment.replay);
+                return Requests::Out(out);
+            }
+            let wanted = *read.ids.first().expect("one pending amendment place");
+            amendment.evidence.loaded.push(wanted).expect("bounded loaded places");
+            if let Some(row) = row {
+                let status = match row.phase {
+                    tasks::Phase::Ended(tasks::Ending::Done(_)) => Some(tasks::Status::Done),
+                    tasks::Phase::Ended(tasks::Ending::Failed { .. }) => Some(tasks::Status::Failed),
+                    tasks::Phase::Ended(tasks::Ending::Cancelled { .. }) => Some(tasks::Status::Cancelled),
+                    tasks::Phase::Waiting
+                    | tasks::Phase::Active(_)
+                    | tasks::Phase::Closing(_)
+                    | tasks::Phase::Held { .. } => None,
+                };
+                if row.number == wanted
+                    && let Some(status) = status
+                {
+                    amendment
+                        .evidence
+                        .places
+                        .push(tasks::DependencyPlace {
+                            number: row.number,
+                            project: row.project,
+                            requester: row.requester,
+                            root: row.root,
+                            depth: row.depth,
+                            status,
+                        })
+                        .expect("bounded loaded places");
+                }
+            }
+            return amendment_reads::resume(core, env, work, *amendment);
+        }
         ReadFor::Preparation { task, last_message } => {
             let current = match core.contexts.get(&task) {
                 Some(context) if context.last_message == last_message => match core.tasks.task(task) {
@@ -126,4 +185,54 @@ pub(super) fn loaded(
         }
     }
     Requests::Out(out)
+}
+
+/// Holds only transient replay inputs; no call record or task change precedes the load.
+pub(super) fn wait(
+    core: &mut Core,
+    work: &mut Queue<Event>,
+    out: &mut Queue<Request>,
+    next: u64,
+    amendment: AmendmentRead,
+) {
+    if core.result_reads.len() == core.result_reads.capacity() {
+        amendment_reads::busy(core, work, out, amendment.replay);
+        return;
+    }
+    match &amendment.replay {
+        Replay::Agent { key, .. } => {
+            assert!(core.pending_calls.insert(*key, true).is_ok(), "waiting amendment call room");
+        }
+        Replay::Person { .. } => {}
+    }
+    let request = Token::new(core.next_result_request);
+    core.next_result_request = core.next_result_request.checked_add(1).expect("transient result request space");
+    let read = ResultRead {
+        why: ReadFor::Amendment(Box::new(amendment)),
+        ids: Box::new([next]),
+        at: 0,
+        results: List::with_capacity(0),
+    };
+    ask(out, request, &read);
+    assert!(core.result_reads.insert(request, read).is_ok(), "admitted amendment read");
+}
+
+pub(super) fn clear_person(core: &mut Core, person: u64) {
+    for _ in 0..core.result_reads.capacity() {
+        let mut found = None;
+        for (&request, read) in &core.result_reads {
+            match &read.why {
+                ReadFor::Amendment(read) => match &read.replay {
+                    Replay::Person { person: owner, .. } if *owner == person => {
+                        found = Some(request);
+                        break;
+                    }
+                    Replay::Person { .. } | Replay::Agent { .. } => {}
+                },
+                ReadFor::Preparation { .. } => {}
+            }
+        }
+        let Some(request) = found else { break };
+        drop(core.result_reads.remove(&request));
+    }
 }

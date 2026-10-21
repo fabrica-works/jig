@@ -130,8 +130,8 @@ pub use boundary::{
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
 
 pub use control::{
-    AddressChange, Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings, Tracking, address_admit,
-    instruction_admit,
+    AddressChange, Amendment, AmendmentHistory, Change, Control, DependencyPlace, History, Milestone, Settings,
+    Tracking, address_admit, instruction_admit,
 };
 pub use domain::{Domain, ViewTask, fire, max_out, step, view_phase};
 pub use escalation::{Escalation, EscalationContext, EscalationDecision, EscalationHolder, EscalationOutcome};

@@ -62,6 +62,7 @@ fn goals_per_project_count_only_live_tracked_tasks_after_a_restart() {
     };
     let call = world.to().into_token().raw();
     world.send(Event::Amend {
+        places: Box::new([]),
         funder: None,
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
         by: Party::Person(REQUESTER),
@@ -81,6 +82,7 @@ fn goals_per_project_count_only_live_tracked_tasks_after_a_restart() {
     world.restart();
     let call = world.to().into_token().raw();
     world.send(Event::Amend {
+        places: Box::new([]),
         funder: None,
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
         by: Party::Person(REQUESTER),

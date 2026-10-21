@@ -203,8 +203,21 @@ fn save_history(domain: &mut Domain, mut row: History, out: &mut Queue<Request>)
     out.push(Request::Save { record: Stored::History(row) });
 }
 
+/// An ended task's stored place, used only while admitting an amendment
+/// (`domain/tasks.md`, section 7). A stub supplies none of this evidence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DependencyPlace {
+    pub number: u64,
+    pub project: u32,
+    pub requester: Party,
+    pub root: u64,
+    pub depth: u32,
+    pub status: crate::Status,
+}
+
 /// An authenticated amendment and its root-issued message.
 pub(crate) struct Amend {
+    pub places: Box<[DependencyPlace]>,
     pub funder: Option<crate::Funder>,
     pub number: u64,
     pub message: u64,
@@ -259,6 +272,8 @@ pub(crate) fn check_amend(
     amendment: Amend,
 ) -> Result<AmendPlan, Box<crate::Problem>> {
     let number = amendment.number;
+    let mut amendment = amendment;
+    let places = core::mem::replace(&mut amendment.places, Box::new([]));
     let mut plan = match check_amend_fields(domain, staged, env, by, amendment) {
         Ok(plan) => plan,
         Err(why) => return Err(Box::new(crate::Problem::new(Some(number), why))),
@@ -284,28 +299,25 @@ pub(crate) fn check_amend(
             }
             continue;
         }
-        if record(domain, *dependency).is_none() && domain.stub(*dependency).is_none() {
-            return Err(Box::new(crate::Problem::new(Some(number), Refusal::Unknown)));
+        if record(domain, *dependency).is_none() && place(&places, *dependency).is_none() {
+            return Err(Box::new(crate::Problem::new(Some(*dependency), Refusal::Unknown)));
         }
-        if !dependency_reached(domain, staged, env, by, old.project, number, *dependency) {
+        if !dependency_reached(domain, staged, env, by, old.project, number, *dependency, &places) {
             return Err(Box::new(crate::Problem::naming(Some(number), Refusal::Dependencies, &[*dependency])));
         }
         if record(domain, *dependency).is_some() {
             waiting.push(*dependency).expect("dependency bound");
             pending.push(*dependency).expect("pending adds bounded");
         } else {
-            match domain.stub(*dependency) {
-                Some(stub) => match stub.phase {
-                    crate::Status::Done => {}
-                    how @ (crate::Status::Failed | crate::Status::Cancelled) => {
-                        return Err(Box::new(crate::Problem::naming(
-                            Some(number),
-                            Refusal::DependencyEnded { how },
-                            &[*dependency],
-                        )));
-                    }
-                },
-                None => return Err(Box::new(crate::Problem::new(Some(number), Refusal::Unknown))),
+            match place(&places, *dependency).expect("loaded dependency checked").status {
+                crate::Status::Done => {}
+                how @ (crate::Status::Failed | crate::Status::Cancelled) => {
+                    return Err(Box::new(crate::Problem::naming(
+                        Some(number),
+                        Refusal::DependencyEnded { how },
+                        &[*dependency],
+                    )));
+                }
             }
         }
         added.push(crate::Added { task: *dependency, at: env.wall, by }).expect("added subset bounded");
@@ -326,7 +338,19 @@ pub(crate) fn check_amend(
     Ok(plan)
 }
 
-/// A batch creator's reach, extended by a task amender's live subtree (domain/tasks.md, section 7).
+#[expect(clippy::manual_find, reason = "step code uses explicit bounded scans without closures")]
+fn place(places: &[DependencyPlace], number: u64) -> Option<&DependencyPlace> {
+    for row in places {
+        if row.number == number {
+            return Some(row);
+        }
+    }
+    None
+}
+
+/// Live reach stays as for a batch; ended reach follows stored requesters
+/// (`domain/tasks.md`, section 7).
+#[expect(clippy::too_many_arguments, reason = "dependency reach includes loaded places")]
 fn dependency_reached(
     domain: &Domain,
     staged: &crate::compound::Staged,
@@ -335,41 +359,55 @@ fn dependency_reached(
     project: u32,
     task: u64,
     dependency: u64,
+    places: &[DependencyPlace],
 ) -> bool {
     if task == dependency {
-        return true; // The wait judge names this as a circle.
+        return true;
     }
     match by {
         Party::Person(_) => match record(domain, dependency) {
             Some(row) => row.project == project,
-            None => {
-                // A stub is retained only while a live task names it. That task
-                // witnesses its project without loading the ended history.
-                for (number, _) in &domain.names {
-                    let row = record(domain, *number).expect("live task name");
-                    if row.project == project
-                        && (crate::batch::contains(&row.dependencies, dependency)
-                            || crate::batch::contains(&row.spec.inputs, dependency)
-                            || crate::batch::contains(&row.references, dependency))
-                    {
-                        return true;
-                    }
-                }
-                false
-            }
+            None => match place(places, dependency) {
+                Some(row) => row.project == project,
+                None => false,
+            },
         },
         Party::Task(amender) => {
-            if record(domain, dependency).is_some() && below(domain, dependency, amender, env.limits.tasks) {
+            if record(domain, dependency).is_some() {
+                return below(domain, dependency, amender, env.limits.tasks)
+                    || match staged.record(domain, amender) {
+                        Some(parent) => {
+                            crate::batch::contains(&parent.delegates, dependency)
+                                || staged.reference(domain, amender, dependency)
+                        }
+                        None => false,
+                    };
+            }
+            let Some(parent) = staged.record(domain, amender) else { return false };
+            if staged.reference(domain, amender, dependency) {
                 return true;
             }
-            match staged.record(domain, amender) {
-                Some(parent) => {
-                    (crate::batch::contains(&parent.delegates, dependency)
-                        || staged.reference(domain, amender, dependency))
-                        && (record(domain, dependency).is_some() || domain.stub(dependency).is_some())
+            let Some(holder) = record(domain, amender) else { return false };
+            let mut next = dependency;
+            for _ in 0..=env.limits.depth {
+                if record(domain, next).is_some() {
+                    return below(domain, next, amender, env.limits.tasks);
                 }
-                None => false,
+                let Some(row) = place(places, next) else { return false };
+                if row.project != parent.project || row.root != holder.root || row.depth <= holder.depth {
+                    return false;
+                }
+                match row.requester {
+                    Party::Task(requester) => {
+                        if requester == amender {
+                            return true;
+                        }
+                        next = requester;
+                    }
+                    Party::Person(_) | Party::Deployment { .. } => return false,
+                }
             }
+            false
         }
         Party::Deployment { .. } => false,
     }
@@ -383,7 +421,7 @@ fn check_amend_fields(
     by: Party,
     amendment: Amend,
 ) -> Result<AmendPlan, Refusal> {
-    let Amend { number, message, stop_run, funder, amendment } = amendment;
+    let Amend { number, message, stop_run, funder, amendment, places: _ } = amendment;
     if !domain.ready() {
         return Err(Refusal::NotReady);
     }
@@ -1083,6 +1121,7 @@ pub(crate) fn preview_amend(
         env,
         by,
         Amend {
+            places: Box::new([]),
             number: part.task,
             message: part.message,
             stop_run: part.stop_run,

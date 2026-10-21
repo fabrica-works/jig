@@ -1396,6 +1396,8 @@ pub enum Event {
     Control { reply_to: ReplyTo, by: Party, task: u64, control: crate::Control },
     /// Root-checked amendment of a live delegate, with a fresh commit-order message number.
     Amend {
+        /// Ended dependencies and the ended requesters used to judge their reach.
+        places: Box<[crate::DependencyPlace]>,
         reply_to: ReplyTo,
         by: Party,
         task: u64,

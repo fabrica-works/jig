@@ -660,6 +660,7 @@ fn a_circle_held_agent_given_a_dependency_lifts_idle_and_is_not_due() {
     let reply_to = world.to();
     let message = world.record(HOLDER).last_message + 1;
     world.send(Event::Amend {
+        places: Box::new([]),
         reply_to,
         by: Party::Task(ROOT),
         task: HOLDER,

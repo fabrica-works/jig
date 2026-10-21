@@ -101,6 +101,7 @@ fn amend_choice(h: &mut Harness, account: Option<u32>) {
     let mut choice = row.llm.clone().unwrap();
     choice.account = account;
     h.send(Event::Amend {
+        places: Box::new([]),
         funder: None,
         reply_to: to(),
         by: crate::Party::Person(9),

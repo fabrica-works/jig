@@ -21,6 +21,7 @@ fn amend(world: &mut World, dependencies: &[u64]) {
     let message = world.record(KEPT).last_message + 1;
     assert_eq!(
         response(world, |reply_to| Event::Amend {
+            places: Box::new([]),
             reply_to,
             by: AMENDER,
             task: KEPT,

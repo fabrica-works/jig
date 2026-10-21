@@ -32,6 +32,7 @@ fn change(instructions: &[u8]) -> Amendment {
 }
 fn amend(h: &mut Harness, change: Amendment) -> Vec<Request> {
     h.send(Event::Amend {
+        places: Box::new([]),
         funder: None,
         reply_to: to(),
         by: Party::Person(9),

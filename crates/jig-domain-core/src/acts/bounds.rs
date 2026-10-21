@@ -325,6 +325,41 @@ pub(crate) fn amendment_admit_in(
     limits: &tasks::Limits,
     admission: &tasks::CompoundAdmission<'_>,
 ) -> Result<bool, people::Refusal> {
+    amendment_admit_places_in(core, party, amendment, depth, limits, admission, &[])
+}
+
+#[expect(clippy::too_many_arguments, reason = "authenticated amendment with loaded places")]
+pub(crate) fn amendment_admit_with_places(
+    core: &Core,
+    person: u64,
+    role: Option<people::Role>,
+    project: u32,
+    task: u64,
+    amendment: &tasks::Amendment,
+    depth: u32,
+    limits: &tasks::Limits,
+    places: &[tasks::DependencyPlace],
+) -> Result<bool, people::Refusal> {
+    amendment_admit_places_in(
+        core,
+        crate::compound::PartyTask { person, project, role, task },
+        amendment,
+        depth,
+        limits,
+        &tasks::CompoundAdmission::new(&core.tasks, 0),
+        places,
+    )
+}
+
+pub(crate) fn amendment_admit_places_in(
+    core: &Core,
+    party: crate::compound::PartyTask,
+    amendment: &tasks::Amendment,
+    depth: u32,
+    limits: &tasks::Limits,
+    admission: &tasks::CompoundAdmission<'_>,
+    places: &[tasks::DependencyPlace],
+) -> Result<bool, people::Refusal> {
     let crate::compound::PartyTask { person, project, role, task } = party;
     standing::role(core, project, role, super::Act::Amend)?;
     if amendment.tracked.is_some() {
@@ -343,13 +378,7 @@ pub(crate) fn amendment_admit_in(
         return Err(people::Refusal::Role { held: Some(role) });
     }
     if let Some(dependencies) = &amendment.dependencies {
-        for dependency in dependencies {
-            if !context.dependencies.contains(dependency)
-                && !core.reaches_in(crate::compound::PartyTask { task: *dependency, ..party }, depth, admission)
-            {
-                return Err(people::Refusal::Unknown);
-            }
-        }
+        amendment_dependencies(core, party, context.dependencies, dependencies, depth, admission, places)?;
     }
     let row = &context;
     if let Err(why) = admission.address_admit(task, &amendment.addressed) {
@@ -431,4 +460,54 @@ pub(crate) fn proposal_has_recipient(core: &Core, holder: tasks::ProposalHolder)
         tasks::ProposalKind::Release => authority::ProposalKind::Escalation,
     };
     recipient(core, project, kind).is_some()
+}
+
+/// Live names use staged reach; ended names use only their loaded place and root.
+fn amendment_dependencies(
+    core: &Core,
+    party: crate::compound::PartyTask,
+    existing: &[u64],
+    dependencies: &[u64],
+    depth: u32,
+    admission: &tasks::CompoundAdmission<'_>,
+    places: &[tasks::DependencyPlace],
+) -> Result<(), people::Refusal> {
+    let crate::compound::PartyTask { person, project, role, .. } = party;
+    let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };
+    for dependency in dependencies {
+        if existing.contains(dependency) {
+            continue;
+        }
+        if admission.task(*dependency).is_some() {
+            if !core.reaches_in(crate::compound::PartyTask { task: *dependency, ..party }, depth, admission) {
+                return Err(people::Refusal::Unknown);
+            }
+            continue;
+        }
+        for row in places {
+            if row.number != *dependency {
+                continue;
+            }
+            let mut reached = row.project == project
+                && (core.reaches_project(role, project)
+                    || row.requester == tasks::Party::Person(person)
+                    || Core::person_tree_in(person, row.root, depth, admission));
+            if row.project == project && !reached {
+                for root in places {
+                    if root.number == row.root
+                        && root.project == project
+                        && root.requester == tasks::Party::Person(person)
+                    {
+                        reached = true;
+                        break;
+                    }
+                }
+            }
+            if !reached {
+                return Err(people::Refusal::Unknown);
+            }
+            break;
+        }
+    }
+    Ok(())
 }

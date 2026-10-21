@@ -43,6 +43,7 @@ fn keep(world: &mut World, release: bool) -> Reply {
     let amendment = amendment(world, release);
     let message = world.record(KEPT).last_message + 1;
     response(world, |reply_to| Event::Amend {
+        places: Box::new([]),
         reply_to,
         by: Party::Person(PERSON),
         task: KEPT,
@@ -204,6 +205,7 @@ fn an_escalation_release_reholds_a_circle_and_keeps_its_queue_place() {
     remove.dependencies = Some(Box::new([]));
     let message = world.record(KEPT).last_message + 1;
     response(&mut world, |reply_to| Event::Amend {
+        places: Box::new([]),
         reply_to,
         by: Party::Person(PERSON),
         task: KEPT,

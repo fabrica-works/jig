@@ -144,6 +144,7 @@ pub(super) fn named_proposal_accept(
             let before = crate::translate::authority_value(&current.authority);
             let stop_run = !authority::at_most(&before, &after, &core.authority.rules().implies);
             tasks::Event::Amend {
+                places: Box::new([]),
                 funder: Some(tasks::Funder::Task(key.task)),
                 reply_to: ReplyTo::new(token),
                 by: tasks::Party::Task(key.task),
@@ -158,6 +159,7 @@ pub(super) fn named_proposal_accept(
                 return proposal_refused(core, ReplyTo::new(token), key, tasks::Refusal::Busy);
             };
             tasks::Event::Amend {
+                places: Box::new([]),
                 funder: Some(tasks::Funder::Task(key.task)),
                 reply_to: ReplyTo::new(token),
                 by: tasks::Party::Task(key.task),
@@ -413,6 +415,11 @@ pub(super) fn named_action(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
+    if super::amendment_reads::waiting(core, key) {
+        let mut out = Queue::with_capacity(1);
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
     if let Some(part) = core.authorize_tool(key, named_tool_kind(&action)) {
         let mut out = Queue::with_capacity(3);
         call_decision(core, &mut out, to, key, part);
@@ -581,73 +588,18 @@ pub(super) fn named_action(
         NamedAction::Control { target, control } => {
             return super::run_controls::control(core, work, ReplyTo::new(token), key, target, control);
         }
-        NamedAction::Amend { target, revision, mut amendment } => {
-            core.keep_models(target, &mut amendment);
-            let stop_run =
-                match core.task_amend_admit(key.task, target, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
-                    Ok(stop_run) => stop_run,
-                    Err(crate::TaskAmendDenied::Refused { task, why }) => {
-                        call_decision(
-                            core,
-                            &mut out,
-                            ReplyTo::new(token),
-                            key,
-                            CallPart::ControlRefused(tasks::Problem {
-                                task: Some(task),
-                                why,
-                                blocked_by: None,
-                                capacity: None,
-                            }),
-                        );
-                        out.push(Request::Decided);
-                        return Requests::Out(out);
-                    }
-                    Err(crate::TaskAmendDenied::Denied(answer)) => {
-                        call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::ControlDenied { answer });
-                        out.push(Request::Decided);
-                        return Requests::Out(out);
-                    }
-                };
-            let moved = match core.party_amend_revision(target, revision, &amendment) {
-                Ok(()) => None,
-                Err(jig_domain_people::Refusal::Moved { now }) => Some(now),
-                Err(_) => unreachable!("admitted amendment target exists"),
-            };
-            if let Some(now) = moved {
-                call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::Moved { task: target, now });
-                out.push(Request::Decided);
-                return Requests::Out(out);
-            }
-            let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
-                call_decision(
-                    core,
-                    &mut out,
-                    ReplyTo::new(token),
-                    key,
-                    CallPart::ControlRefused(tasks::Problem {
-                        task: Some(target),
-                        why: tasks::Refusal::Busy,
-                        blocked_by: None,
-                        capacity: None,
-                    }),
-                );
-                out.push(Request::Decided);
-                return Requests::Out(out);
-            };
-            assert!(core.pending_calls.insert(key, true).is_ok(), "call record room reserved");
-            assert!(
-                core.routing_calls.insert(token, RoutedCall::Control { key, target, revised: true }) == Ok(None),
-                "one amendment route"
-            );
-            work.push(Event::Tasks(tasks::Event::Amend {
-                funder: None,
-                reply_to: ReplyTo::new(token),
-                by: tasks::Party::Task(key.task),
-                task: target,
-                message,
-                stop_run,
+        NamedAction::Amend { target, revision, amendment } => {
+            return named_amend(
+                core,
+                env,
+                work,
+                token,
+                key,
+                target,
+                revision,
                 amendment,
-            }));
+                super::amendment_reads::Evidence::new(&env.limits.tasks),
+            );
         }
         NamedAction::DecideEscalation { task, revision, choice } => {
             return named_escalation(core, env, work, ReplyTo::new(token), key, task, revision, choice);
@@ -796,6 +748,111 @@ pub(super) fn route_refused_payload(
         Some(PayloadRefusal::Turn { .. } | PayloadRefusal::Answer { .. }) | None => {}
     }
     let mut out = Queue::with_capacity(1);
+    out.push(Request::Decided);
+    Requests::Out(out)
+}
+
+#[expect(clippy::too_many_arguments, reason = "replay retains the original keyed amendment")]
+pub(super) fn named_amend(
+    core: &mut Core,
+    env: &Env<Limits>,
+    work: &mut Queue<Event>,
+    token: Token,
+    key: CallKey,
+    target: u64,
+    revision: u64,
+    mut amendment: tasks::Amendment,
+    evidence: super::amendment_reads::Evidence,
+) -> Requests {
+    let mut out = Queue::with_capacity(3);
+    if let Some(part) = core.authorize_tool(key, ToolKind::Control) {
+        call_decision(core, &mut out, ReplyTo::new(token), key, part);
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
+    if let Some(next) = super::amendment_reads::missing(
+        core,
+        &env.limits.tasks,
+        tasks::Party::Task(key.task),
+        target,
+        amendment.dependencies.as_deref(),
+        &evidence,
+    ) {
+        super::result_reads::wait(
+            core,
+            work,
+            &mut out,
+            next,
+            super::amendment_reads::AmendmentRead {
+                replay: super::amendment_reads::Replay::Agent { token, key, target, revision, amendment },
+                evidence,
+            },
+        );
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
+    core.keep_models(target, &mut amendment);
+    let stop_run = match core.task_amend_admit(key.task, target, &amendment, env.limits.tasks.depth, &env.limits.tasks)
+    {
+        Ok(stop_run) => stop_run,
+        Err(crate::TaskAmendDenied::Refused { task, why }) => {
+            call_decision(
+                core,
+                &mut out,
+                ReplyTo::new(token),
+                key,
+                CallPart::ControlRefused(tasks::Problem { task: Some(task), why, blocked_by: None, capacity: None }),
+            );
+            out.push(Request::Decided);
+            return Requests::Out(out);
+        }
+        Err(crate::TaskAmendDenied::Denied(answer)) => {
+            call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::ControlDenied { answer });
+            out.push(Request::Decided);
+            return Requests::Out(out);
+        }
+    };
+    let moved = match core.party_amend_revision(target, revision, &amendment) {
+        Ok(()) => None,
+        Err(jig_domain_people::Refusal::Moved { now }) => Some(now),
+        Err(_) => unreachable!("admitted amendment target exists"),
+    };
+    if let Some(now) = moved {
+        call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::Moved { task: target, now });
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
+    let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
+        call_decision(
+            core,
+            &mut out,
+            ReplyTo::new(token),
+            key,
+            CallPart::ControlRefused(tasks::Problem {
+                task: Some(target),
+                why: tasks::Refusal::Busy,
+                blocked_by: None,
+                capacity: None,
+            }),
+        );
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    };
+    assert!(core.pending_calls.insert(key, true).is_ok(), "call record room reserved");
+    assert!(
+        core.routing_calls.insert(token, RoutedCall::Control { key, target, revised: true }) == Ok(None),
+        "one amendment route"
+    );
+    work.push(Event::Tasks(tasks::Event::Amend {
+        places: evidence.places.into_boxed(),
+        funder: None,
+        reply_to: ReplyTo::new(token),
+        by: tasks::Party::Task(key.task),
+        task: target,
+        message,
+        stop_run,
+        amendment,
+    }));
     out.push(Request::Decided);
     Requests::Out(out)
 }

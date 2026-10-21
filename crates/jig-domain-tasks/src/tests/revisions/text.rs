@@ -24,6 +24,7 @@ fn refuse_amendment(spec: Spec) {
     let mut test = Harness::new();
     test.make(vec![task(TASK, &[])]);
     let out = test.send(Event::Amend {
+        places: Box::new([]),
         funder: None,
         reply_to: to(),
         by: Party::Person(REQUESTER),

@@ -346,6 +346,19 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             .checked_add(List::<HistoricalResult>::worst_case(histories)?)?
             .checked_add(bytes(histories, result_payload)?)?,
     )?)?;
+    // Each amendment retains only places, attempted IDs and its original replay bytes.
+    let places = task.dependencies.checked_mul(task.depth.checked_add(1)?)?;
+    let amendment_read = sizeof(size_of::<crate::routing::amendment_reads::AmendmentRead>())?
+        .checked_add(List::<tasks::DependencyPlace>::worst_case(places)?)?
+        .checked_add(List::<u64>::worst_case(places)?)?
+        .checked_add(sizeof(size_of::<u64>())?)?
+        .checked_add(
+            new_task
+                .checked_add(u64::from(task.spec_bytes))?
+                .checked_add(u64::from(task.message_bytes))?
+                .max(u64::from(limits.people.amendment_bytes)),
+        )?;
+    total = total.checked_add(bytes(task.tasks, amendment_read)?)?;
     total = total.checked_add(bytes(task.tasks.checked_mul(2)?, context)?)?;
     let creations = limits
         .people

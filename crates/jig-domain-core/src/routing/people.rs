@@ -57,6 +57,12 @@ pub(super) fn route_people(
             unused = unused.or(key_unused);
             people::Event::Decided { request, outcome }
         }
+        people::Event::SignOut { reply_to, sign_in } => {
+            if let Some(person) = core.people.person(sign_in, env.now, env.wall) {
+                super::result_reads::clear_person(core, person);
+            }
+            people::Event::SignOut { reply_to, sign_in }
+        }
         other @ (people::Event::ChatState { .. }
         | people::Event::MoveChat { .. }
         | people::Event::ConversationSeen { .. }
@@ -66,7 +72,6 @@ pub(super) fn route_people(
         | people::Event::Waiting { .. }
         | people::Event::ApplyRoles { .. }
         | people::Event::SignedIn { .. }
-        | people::Event::SignOut { .. }
         | people::Event::Roles { .. }
         | people::Event::Ask { .. }
         | people::Event::Restore { .. }
@@ -267,7 +272,19 @@ pub(super) fn tag_people(
                     }
                     people::Ask::Amend { task, revision, amendment, release, .. } => {
                         amend_route(
-                            core, env, work, request, person, role, project, task, revision, amendment, release,
+                            core,
+                            env,
+                            work,
+                            &mut out,
+                            request,
+                            person,
+                            role,
+                            project,
+                            task,
+                            revision,
+                            amendment,
+                            release,
+                            super::amendment_reads::Evidence::new(&env.limits.tasks),
                         );
                     }
                     people::Ask::ChangePolicy { change, .. } => {

@@ -29,8 +29,38 @@ fn amendment(dependencies: &[u64]) -> Amendment {
 }
 
 fn amend(world: &mut World, by: Party, task: u64, dependencies: &[u64]) -> Reply {
+    amend_with_places(world, by, task, dependencies, Box::new([]))
+}
+
+fn amend_ended(world: &mut World, by: Party, task: u64, dependency: u64) -> Reply {
+    let Some(Stored::Ended(row)) = world.records.get(&Key::Ended(dependency)) else { panic!("stored ended row") };
+    let status = match row.phase {
+        Phase::Ended(Ending::Done(_)) => Status::Done,
+        Phase::Ended(Ending::Failed { .. }) => Status::Failed,
+        Phase::Ended(Ending::Cancelled { .. }) => Status::Cancelled,
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } => panic!("ended row"),
+    };
+    let places = Box::new([tasks::DependencyPlace {
+        number: row.number,
+        project: row.project,
+        requester: row.requester,
+        root: row.root,
+        depth: row.depth,
+        status,
+    }]);
+    amend_with_places(world, by, task, &[dependency], places)
+}
+
+fn amend_with_places(
+    world: &mut World,
+    by: Party,
+    task: u64,
+    dependencies: &[u64],
+    places: Box<[tasks::DependencyPlace]>,
+) -> Reply {
     let message = world.record(task).last_message + 1;
     response(world, |reply_to| Event::Amend {
+        places,
         reply_to,
         by,
         task,
@@ -427,7 +457,7 @@ fn an_already_done_dependency_is_recorded_as_met_without_keeping_the_task() {
     world.make(Party::Person(9), vec![task(3, &[2])]);
     done(&mut world, 2);
     assert!(world.records.contains_key(&Key::Stub(2)));
-    assert_eq!(amend(&mut world, Party::Person(9), 1, &[2]), Reply::Done);
+    assert_eq!(amend_ended(&mut world, Party::Person(9), 1, 2), Reply::Done);
     assert!(world.record(1).waiting_on.is_empty());
     assert_eq!(world.record(1).dependencies.as_ref(), [2]);
     assert_eq!(world.record(1).added.as_ref(), [tasks::Added { task: 2, at: world.env.wall, by: Party::Person(9) }]);
@@ -456,18 +486,18 @@ fn an_already_failed_or_cancelled_dependency_is_refused_naming_it() {
             });
         }
         world.settle(2);
-        refused(amend(&mut world, Party::Person(9), 1, &[2]), 1, Refusal::DependencyEnded { how }, &[2]);
+        refused(amend_ended(&mut world, Party::Person(9), 1, 2), 1, Refusal::DependencyEnded { how }, &[2]);
     }
 }
 
 #[test]
-fn an_ended_dependency_without_a_stub_is_unknown_to_the_child() {
+fn an_ended_dependency_without_a_loaded_place_is_unknown_to_the_child() {
     let mut world = pair();
     done(&mut world, 2);
     assert!(!world.records.contains_key(&Key::Stub(2)));
     assert_eq!(
         amend(&mut world, Party::Person(9), 1, &[2]),
-        Reply::Refused(tasks::Problem::new(Some(1), Refusal::Unknown))
+        Reply::Refused(tasks::Problem::new(Some(2), Refusal::Unknown))
     );
 }
 
@@ -661,7 +691,7 @@ fn removing_the_last_live_name_of_a_met_dependency_prunes_its_stub_before_restar
     let mut world = pair();
     world.make(Party::Person(9), vec![task(3, &[2])]);
     done(&mut world, 2);
-    assert_eq!(amend(&mut world, Party::Person(9), 1, &[2]), Reply::Done);
+    assert_eq!(amend_ended(&mut world, Party::Person(9), 1, 2), Reply::Done);
     assert_eq!(amend(&mut world, Party::Person(9), 3, &[]), Reply::Done);
     assert!(world.records.contains_key(&Key::Stub(2)));
     assert_eq!(amend(&mut world, Party::Person(9), 1, &[]), Reply::Done);
@@ -744,6 +774,7 @@ fn remove_and_release(world: &mut World, number: u64) -> Reply {
     amendment.release = Some(world.record(number).revisions.hold);
     let message = world.record(number).last_message + 1;
     response(world, |reply_to| Event::Amend {
+        places: Box::new([]),
         reply_to,
         by: Party::Person(9),
         task: number,

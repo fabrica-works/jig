@@ -551,13 +551,13 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Control { reply_to, by, task, control } => {
             crate::control::apply(domain, env, reply_to, by, task, control, out);
         }
-        Event::Amend { reply_to, by, task, message, stop_run, amendment, funder } => {
+        Event::Amend { reply_to, by, task, message, stop_run, amendment, funder, places } => {
             crate::control::amend(
                 domain,
                 env,
                 reply_to,
                 by,
-                crate::control::Amend { number: task, message, stop_run, funder, amendment },
+                crate::control::Amend { number: task, message, stop_run, funder, amendment, places },
                 out,
             );
         }

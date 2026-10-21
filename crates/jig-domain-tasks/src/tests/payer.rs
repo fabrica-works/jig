@@ -84,6 +84,7 @@ fn refunding_changes_the_payer_of_financial_descendants() {
     let mut h = funded_tree();
     h.send(Event::CarvePool { reply_to: to(), project: PROJECT, person: OTHER, period: 0, budget: 100 });
     h.send(Event::Amend {
+        places: Box::new([]),
         reply_to: to(),
         by: Party::Person(OTHER),
         task: ROOT,

@@ -21,7 +21,7 @@ fn preparing() -> (Core, Limits) {
     (core, limits)
 }
 
-fn requested(out: &[Request], wanted: u64) -> Token {
+pub(super) fn requested(out: &[Request], wanted: u64) -> Token {
     for request in out {
         if let Request::Held(held) = request
             && let Held::Load(now) = held.as_ref()
