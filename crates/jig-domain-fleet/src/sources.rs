@@ -34,8 +34,14 @@ impl Sources {
         if self.waiting || self.desired.is_some() || self.retained_removed {
             return false;
         }
+        true
+    }
+    pub(crate) fn clear(&self) -> bool {
+        if !self.ready() {
+            return false;
+        }
         for login in &self.logins {
-            if !absent(&login.state) {
+            if login.state.kept() {
                 return false;
             }
         }
@@ -163,7 +169,7 @@ pub(crate) fn logins(
     }
     if bounded && covers(&sources.sent, &rows) {
         for old in &sources.logins {
-            if !absent(&old.state) && !sources.sent.contains(&old.name) {
+            if old.state.kept() && !sources.sent.contains(&old.name) {
                 sources.retained_removed = true;
             }
         }
@@ -261,13 +267,6 @@ fn unique(names: &[SourceName]) -> bool {
         }
     }
     true
-}
-
-pub(crate) fn absent(state: &LoginState) -> bool {
-    match state {
-        LoginState::NotSignedIn | LoginState::Failed { reason: crate::SourceFailure::Unconfigured, .. } => true,
-        LoginState::Usable | LoginState::SignedInOtherwise(_) | LoginState::Failed { .. } => false,
-    }
 }
 
 #[derive(Debug)]

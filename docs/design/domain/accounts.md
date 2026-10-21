@@ -234,7 +234,8 @@ Account
   contained from them: the fleet places no other run there (engine.md,
   section 8), and the deployment's document says why. One person's
   several logins on one host change nothing, and a deployment of one
-  person is unaffected.
+  person is unaffected. Deployment-held logins restrict no run; only runs
+  bound to their account can use their source.
 - **Signing out or removing a program's source** has each worker run the
   program's own sign-out in the source's configuration directory (smith's
   `protocol/hosts.md`, section 2); the answer names any host that did

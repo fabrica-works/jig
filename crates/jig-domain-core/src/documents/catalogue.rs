@@ -179,9 +179,7 @@ fn eligible_host(core: &Core, provider: u32) -> Readiness {
             continue;
         }
         match host.kind {
-            fleet::HostKind::Worker
-                if core.fleet.awaiting_logins(host.channel) || !fleet::host_rule(!unknown_logins, &[], &[]) =>
-            {
+            fleet::HostKind::Worker if core.fleet.awaiting_logins(host.channel) || unknown_logins => {
                 unknown = true;
                 continue;
             }

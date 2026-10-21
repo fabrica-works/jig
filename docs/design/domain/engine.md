@@ -559,11 +559,12 @@ an unavailable recorded grant can renew on its original source, and an absent
 worker settles through fleet's existing grace. A new assignment rechecks the
 recorded bindings and current coverage.
 
-The current program seam accepts positive login and holder facts in fleet's
-pure predicates. No program source is eligible in the live check without those
-facts. If program rows exist, unknown retained-login facts also hold direct runs
-off workers; engine hosts never retain program logins. T12 supplies the host
-half and its exchange. Until configuration's providers-only conversion, legacy
+The check joins each candidate host's kept program logins to the accounts' issued
+names and their original holders. Every bound account must satisfy that host's
+rule, including retained providers. Deployment-held logins restrict no run;
+a deployment with at most one person is unaffected. A program source is chosen
+only where its login is usable; the engine never takes one. Program grants and
+backends follow in JP12. Until configuration's providers-only conversion, legacy
 model account fields seed deployment-held accounts only; neither admission nor
 the per-run charter routes by them.
 

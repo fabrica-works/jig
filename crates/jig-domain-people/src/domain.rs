@@ -281,7 +281,11 @@ impl Domain {
     #[must_use]
     pub fn kind(&self, party: u64) -> Option<Kind> {
         let identity = self.identity(party)?;
-        Some(if identity.key.provider == self.deployment_provider { Kind::Service } else { Kind::Person })
+        Some(self.kind_of(identity))
+    }
+
+    fn kind_of(&self, identity: &Identity) -> Kind {
+        if identity.key.provider == self.deployment_provider { Kind::Service } else { Kind::Person }
     }
 
     /// Project roles of a retained party, bounded by the role table; no admission changes.

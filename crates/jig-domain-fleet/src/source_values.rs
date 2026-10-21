@@ -46,6 +46,16 @@ pub enum LoginState {
     SignedInOtherwise(LoginMethod),
     Failed { reason: SourceFailure, detail: Box<[u8]> },
 }
+impl LoginState {
+    /// A failed check does not prove absence, except when the program is unconfigured.
+    #[must_use]
+    pub fn kept(&self) -> bool {
+        match self {
+            Self::NotSignedIn | Self::Failed { reason: SourceFailure::Unconfigured, .. } => false,
+            Self::Usable | Self::SignedInOtherwise(_) | Self::Failed { .. } => true,
+        }
+    }
+}
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Login {
     pub name: SourceName,

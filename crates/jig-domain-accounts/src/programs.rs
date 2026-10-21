@@ -371,10 +371,20 @@ pub fn sign_out(
 
 /// Original holder evidence remains available after the live source is removed.
 #[must_use]
+#[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches without closures")]
 pub fn owner(domain: &Domain, name: &[u8]) -> Option<Holder> {
-    for (_, issued) in &domain.issued {
+    match issued(domain, name) {
+        Some((_, holder)) => Some(holder),
+        None => None,
+    }
+}
+
+/// Issued source number and original holder, including signed-out and retired names.
+#[must_use]
+pub fn issued(domain: &Domain, name: &[u8]) -> Option<(u32, Holder)> {
+    for (number, issued) in &domain.issued {
         if issued.name.as_bytes() == name {
-            return Some(issued.holder);
+            return Some((*number, issued.holder));
         }
     }
     None

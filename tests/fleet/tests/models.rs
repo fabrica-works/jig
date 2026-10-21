@@ -224,18 +224,3 @@ fn a_pending_assignment_keeps_its_checked_host_when_room_is_lost() {
     assert!(fleet.settle().is_empty(), "the second same-kind host is not a substitute");
     assert_eq!(fleet.domain.waiting(), 0, "the stale check is refused for a fresh allowance");
 }
-
-#[test]
-fn unknown_logins_and_other_holders_cannot_establish_host_eligibility() {
-    let login = fleet::ProgramLogin { source: 17, holder: 19, retained: true, usable: true };
-    for (known, logins, holders, allowed) in [
-        (false, &[][..], &[Some(19)][..], false),
-        (true, &[login][..], &[Some(19)][..], true),
-        (true, &[login][..], &[Some(19), None][..], false),
-        (true, &[login][..], &[Some(23)][..], false),
-    ] {
-        assert_eq!(fleet::host_rule(known, logins, holders), allowed);
-        assert_eq!(fleet::program_usable(HostKind::Worker, known, 17, logins, holders), allowed && !logins.is_empty());
-        assert!(!fleet::program_usable(HostKind::Engine, known, 17, logins, holders));
-    }
-}

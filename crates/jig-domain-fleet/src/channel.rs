@@ -281,7 +281,7 @@ pub(crate) fn choose(domain: &Domain, workstream: u64, kinds: Kinds, charter: u3
     for (_, &id) in &domain.tokens {
         let channel = domain.channels.get(id).expect("a named channel is in contact");
         let free = channel.slots.saturating_sub(channel.hosts.len());
-        if !channel.sources.ready()
+        if !channel.sources.clear()
             || channel.draining
             || free == 0
             || !kinds.allows(channel.kind)

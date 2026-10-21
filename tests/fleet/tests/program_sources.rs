@@ -61,14 +61,7 @@ impl World {
         })
     }
     fn available(&self) -> bool {
-        let available = self.domain.free_kind(fleet::Kinds::Workers, 1, 0).is_some();
-        assert_eq!(self.domain.probe(fleet::Kinds::Workers, 1, &[], &[]).is_some(), available);
-        assert_eq!(
-            self.domain
-                .placement_available(fleet::PlacementConstraint { channel: CHANNEL, kind: fleet::HostKind::Worker }),
-            available
-        );
-        available
+        self.domain.free_kind(fleet::Kinds::Workers, 1, 0).is_some()
     }
 }
 fn source(name: &[u8]) -> fleet::SourceName {
@@ -130,7 +123,7 @@ fn partial_foreign_or_duplicate_snapshots_fault_the_link() {
     }
 }
 #[test]
-fn only_absence_lifts_the_conservative_personal_login_restriction() {
+fn a_kept_login_no_longer_withholds_a_probe() {
     for state in [
         fleet::LoginState::Usable,
         fleet::LoginState::SignedInOtherwise(jig_domain_fleet::LoginMethod::new(b"api-key").expect("method")),
@@ -140,9 +133,12 @@ fn only_absence_lifts_the_conservative_personal_login_restriction() {
         let mut world = World::new(&[b"a"]);
         world.hello(CHANNEL);
         world.step(Event::Logins { channel: CHANNEL, logins: Box::new([fleet::Login { name: source(b"a"), state }]) });
-        assert!(!world.available());
-        world.inventory(&[b"a"]);
-        assert!(world.available());
+        assert!(world.domain.probe(fleet::Kinds::Workers, 1, &[], &[]).is_some());
+        assert!(
+            world
+                .domain
+                .placement_available(fleet::PlacementConstraint { channel: CHANNEL, kind: fleet::HostKind::Worker })
+        );
     }
 }
 #[test]
@@ -469,4 +465,28 @@ fn a_full_pending_map_answers_the_holder_failed() {
             Request::ProgramSignedOut { source: 7, worker: worker(1), result: fleet::ProgramResult::NotInContact }
         ]
     );
+}
+
+#[test]
+fn an_unconstrained_choice_avoids_kept_logins() {
+    let mut world = World::new(&[b"a"]);
+    world.hello(CHANNEL);
+    world.step(Event::Logins {
+        channel: CHANNEL,
+        logins: Box::new([fleet::Login { name: source(b"a"), state: fleet::LoginState::Usable }]),
+    });
+    assert_eq!(world.domain.free_kind(fleet::Kinds::Workers, 1, 0), None);
+}
+
+#[test]
+fn a_held_retired_name_still_withholds_its_host() {
+    let mut world = World::new(&[b"a"]);
+    world.hello(CHANNEL);
+    world.step(Event::Logins {
+        channel: CHANNEL,
+        logins: Box::new([fleet::Login { name: source(b"a"), state: fleet::LoginState::Usable }]),
+    });
+    world.step(Event::Sources { sources: Box::new([]) });
+    world.inventory(&[]);
+    assert!(world.domain.probe(fleet::Kinds::Workers, 1, &[], &[]).is_none());
 }

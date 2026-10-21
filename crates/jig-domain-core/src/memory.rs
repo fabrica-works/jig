@@ -318,7 +318,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             sizeof(size_of::<fleet::ModelNeed>())?.checked_add(u64::from(crate::MODEL_NAME_BYTES))?,
         )?)?;
     // One run check's transient people/account coverage proofs; selection itself allocates nothing.
-    total = total.checked_add(List::<accounts::Coverage>::worst_case(limits.accounts.accounts)?)?;
+    total = total.checked_add(List::<accounts::Coverage>::worst_case(limits.accounts.accounts)?)?.checked_add(
+        List::<accounts::HostSource>::worst_case(limits.accounts.accounts.checked_mul(limits.accounts.sources)?)?,
+    )?;
     let task = &limits.tasks;
     let new_task = task_carrier(limits)?;
     let context = context_carrier(limits)?;

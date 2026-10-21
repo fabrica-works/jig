@@ -79,7 +79,7 @@ pub(crate) fn cleanup(domain: &mut Domain, channel: Token, out: &mut Queue<Reque
         let mut retained = false;
         for row in host.sources.logins() {
             if row.name == *name {
-                retained = !crate::sources::absent(&row.state);
+                retained = row.state.kept();
             }
         }
         if retained {

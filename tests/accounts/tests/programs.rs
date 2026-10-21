@@ -534,3 +534,14 @@ fn account_removal_prefers_failure_to_absent_contact() {
         assert_eq!(removal_failures(first, last), removal_answer(Failure::Failed));
     }
 }
+
+#[test]
+fn an_issued_name_answers_its_source_holder() {
+    for signed_out in [false, true] {
+        let world = World::with(
+            configured(),
+            &[Stored::Issued { number: 21, holder: HOLDER, name: b"personal".as_slice().into(), signed_out }],
+        );
+        assert_eq!(programs::issued(&world.domain, b"personal"), Some((21, HOLDER)));
+    }
+}

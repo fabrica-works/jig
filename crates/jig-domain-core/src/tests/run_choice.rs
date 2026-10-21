@@ -31,7 +31,10 @@ fn granted(core: &mut Core, limits: &Limits, source: u32) {
         }),
     );
 }
-fn host(core: &mut Core, limits: &Limits, channel: Token, names: &[&[u8]]) {
+pub(super) fn host(core: &mut Core, limits: &Limits, channel: Token, names: &[&[u8]]) {
+    host_with_logins(core, limits, channel, names, Box::new([]));
+}
+fn host_with_logins(core: &mut Core, limits: &Limits, channel: Token, names: &[&[u8]], logins: Box<[fleet::Login]>) {
     let mut bounds = fixtures::bounds();
     bounds.models =
         names.iter().map(|name| fleet::ModelBound { name: (*name).into(), window: 8192, output: 1024 }).collect();
@@ -55,13 +58,15 @@ fn host(core: &mut Core, limits: &Limits, channel: Token, names: &[&[u8]]) {
     fleet::step(
         &mut core.fleet,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
-        fleet::Event::Logins { channel, logins: Box::new([]) },
+        fleet::Event::Logins { channel, logins },
         &mut out,
     );
 }
 fn ready(none: bool) -> (Core, Limits) {
     let (base, mut limits) = core();
-    limits.accounts.accounts = 2;
+    limits.accounts.accounts = 4;
+    limits.accounts.holder_accounts = 4;
+    limits.accounts.credentials = 3;
     limits.fleet.workers = 2;
     limits.run_bytes = 4096;
     let mut config = config(41);
@@ -224,57 +229,6 @@ fn a_default_chooses_a_usable_provider_once_with_its_first_effort() {
     assert_eq!(core.chosen_policy(2).model.name.as_ref(), b"other");
 }
 
-#[test]
-fn unknown_program_login_facts_also_hold_a_direct_run_off_workers() {
-    let (mut core, limits) = ready(false);
-    core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
-    restore_key_account(&mut core, &limits, 0, 1, 1);
-    account(
-        &mut core,
-        &limits,
-        accounts::Event::Restore {
-            record: accounts::Stored::Account {
-                number: 2,
-                provider: 2,
-                holder: accounts::Holder::Party(2),
-                place: 0,
-                uses: None,
-                subject: Box::new([]),
-                display: Box::new([]),
-            },
-        },
-    );
-    account(
-        &mut core,
-        &limits,
-        accounts::Event::Restore {
-            record: accounts::Stored::Source {
-                account: 2,
-                number: 3,
-                place: 0,
-                kind: accounts::Kind::Program,
-                name: b"personal".as_slice().into(),
-                held: None,
-            },
-        },
-    );
-    account(
-        &mut core,
-        &limits,
-        accounts::Event::Restore {
-            record: accounts::Stored::Issued {
-                number: 3,
-                holder: accounts::Holder::Party(2),
-                name: b"personal".as_slice().into(),
-                signed_out: false,
-            },
-        },
-    );
-    account(&mut core, &limits, accounts::Event::Want);
-    granted(&mut core, &limits, 1);
-    assert_eq!(core.run_choice(TASK), Err(RunWait::Host));
-}
-
 fn terminal_after_zero_reset(account_terminal: bool) -> tasks::Tries {
     let (mut core, limits) = ready(false);
     account(&mut core, &limits, accounts::Event::Limited { account: 1, reset: Some(Time::ZERO) });
@@ -422,4 +376,304 @@ fn a_progress_count_leaves_due_task_watches_unmarked() {
         }),
     );
     assert!(core.changed_views.is_empty());
+}
+
+const OWNER: u64 = 1;
+const OTHER_PERSON: u64 = 2;
+const PERSONAL_SOURCE: u32 = 3;
+fn login(name: &[u8], state: fleet::LoginState) -> fleet::Login {
+    fleet::Login { name: fleet::SourceName::new(name).unwrap(), state }
+}
+fn inventory(core: &mut Core, limits: &Limits, channel: Token, logins: Box<[fleet::Login]>) {
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
+        fleet::Event::Logins { channel, logins },
+        &mut out,
+    );
+}
+fn placement_fleet(core: &Core, limits: &Limits) -> fleet::Domain {
+    let mut config = config(41);
+    config.settings.charters[0].hosts = core.settings.charters[0].hosts;
+    config.settings.charters[0].policy = core.settings.charters[0].policy.clone();
+    config.settings.charters[0].policy.alternatives = core.settings.models[1..].into();
+    let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs::configured(&config, limits));
+    fleet.configure_workers(
+        fleet::Membership::new(config.worker_names, limits.fleet.configured_workers, limits.fleet.worker_name_bytes)
+            .unwrap(),
+    );
+    fleet
+}
+fn placement_fixture(
+    main_holder: accounts::Holder,
+    login_holder: accounts::Holder,
+    personal_first: bool,
+) -> (Core, Limits) {
+    placement_with_accounts(main_holder, login_holder, personal_first, Vec::new())
+}
+fn placement_with_accounts(
+    main_holder: accounts::Holder,
+    login_holder: accounts::Holder,
+    personal_first: bool,
+    extra: Vec<accounts::Stored>,
+) -> (Core, Limits) {
+    let (mut core, limits) = ready(false);
+    core.settings.charters[0].policy.alternatives = Box::new([]);
+    core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
+    let program_account = if main_holder == login_holder { 0 } else { 2 };
+    let mut records = vec![
+        accounts::Stored::Account {
+            number: 0,
+            provider: 1,
+            holder: main_holder,
+            place: 0,
+            uses: Some(Box::new([Use::Project(1)])),
+            subject: Box::new([]),
+            display: Box::new([]),
+        },
+        accounts::Stored::Source {
+            account: 0,
+            number: 1,
+            place: u32::from(personal_first),
+            kind: accounts::Kind::Key,
+            name: Box::new([]),
+            held: None,
+        },
+        accounts::Stored::Source {
+            account: program_account,
+            number: PERSONAL_SOURCE,
+            place: u32::from(!personal_first),
+            kind: accounts::Kind::Program,
+            name: b"personal".as_slice().into(),
+            held: None,
+        },
+        accounts::Stored::Issued {
+            number: PERSONAL_SOURCE,
+            holder: login_holder,
+            name: b"personal".as_slice().into(),
+            signed_out: false,
+        },
+    ];
+    if program_account != 0 {
+        records.insert(
+            1,
+            accounts::Stored::Account {
+                number: program_account,
+                provider: 2,
+                holder: login_holder,
+                place: 0,
+                uses: None,
+                subject: Box::new([]),
+                display: Box::new([]),
+            },
+        );
+    }
+    records.extend(extra);
+    for record in records {
+        account(&mut core, &limits, accounts::Event::Restore { record });
+    }
+    account(&mut core, &limits, accounts::Event::Want);
+    granted(&mut core, &limits, 1);
+    core.people = people::Domain::new(&limits.people, Box::new([]), u16::MAX);
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+    for person in [OWNER, OTHER_PERSON] {
+        people::step(
+            &mut core.people,
+            &env,
+            people::Event::Restore {
+                record: people::Stored::Person {
+                    number: person,
+                    identity: people::Identity {
+                        key: people::IdentityKey { provider: 0, subject: person.to_be_bytes().into() },
+                        login: b"person".as_slice().into(),
+                        name: b"Person".as_slice().into(),
+                    },
+                },
+            },
+            &mut out,
+        );
+    }
+    people::step(
+        &mut core.people,
+        &env,
+        people::Event::Restore {
+            record: people::Stored::Roles {
+                project: 1,
+                holdings: Box::new([people::Holding { person: OWNER, role: people::Role::Owner }]),
+            },
+        },
+        &mut out,
+    );
+    people::step(&mut core.people, &env, people::Event::Restored, &mut out);
+    core.fleet = placement_fleet(&core, &limits);
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
+        fleet::Event::Sources { sources: Box::new([fleet::SourceName::new(b"personal").unwrap()]) },
+        &mut out,
+    );
+    host_with_logins(
+        &mut core,
+        &limits,
+        FIRST,
+        &[b"scripted", b"other"],
+        Box::new([login(b"personal", fleet::LoginState::Usable)]),
+    );
+    host_with_logins(
+        &mut core,
+        &limits,
+        SECOND,
+        &[b"scripted"],
+        Box::new([login(b"personal", fleet::LoginState::NotSignedIn)]),
+    );
+    (core, limits)
+}
+#[test]
+fn another_person_s_kept_login_keeps_a_run_off_its_host() {
+    let (mut core, limits) =
+        placement_fixture(accounts::Holder::Deployment, accounts::Holder::Party(OTHER_PERSON), false);
+    for state in [
+        fleet::LoginState::Usable,
+        fleet::LoginState::SignedInOtherwise(fleet::LoginMethod::new(b"api-key").unwrap()),
+        fleet::LoginState::Failed { reason: fleet::SourceFailure::Exited, detail: Box::new([]) },
+        fleet::LoginState::Failed { reason: fleet::SourceFailure::Deadline, detail: Box::new([]) },
+    ] {
+        inventory(&mut core, &limits, FIRST, Box::new([login(b"personal", state)]));
+        assert_eq!(core.run_choice(TASK).unwrap().placement.channel, SECOND);
+    }
+}
+#[test]
+fn a_person_s_own_run_takes_the_host_keeping_their_logins() {
+    let (core, _) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), false);
+    assert_eq!(core.run_choice(TASK).unwrap().placement.channel, FIRST);
+}
+#[test]
+fn a_program_source_is_chosen_only_where_its_login_is_usable() {
+    let (core, _) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
+    let choice = core.run_choice(TASK).unwrap();
+    assert_eq!((choice.placement.channel, choice.accounts[0].source), (FIRST, PERSONAL_SOURCE));
+}
+#[test]
+fn an_unusable_login_lets_the_next_source_serve_there() {
+    let (mut core, limits) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
+    inventory(&mut core, &limits, FIRST, Box::new([login(b"personal", fleet::LoginState::NotSignedIn)]));
+    let choice = core.run_choice(TASK).unwrap();
+    assert_eq!((choice.placement.channel, choice.accounts[0].source), (FIRST, 1));
+}
+#[test]
+fn a_deployment_held_login_restricts_no_run() {
+    let (core, _) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Deployment, false);
+    assert_eq!(core.run_choice(TASK).unwrap().placement.channel, FIRST);
+}
+#[test]
+fn a_direct_run_takes_a_worker_without_kept_logins() {
+    let (mut core, limits) =
+        placement_fixture(accounts::Holder::Deployment, accounts::Holder::Party(OTHER_PERSON), false);
+    inventory(&mut core, &limits, FIRST, Box::new([login(b"personal", fleet::LoginState::NotSignedIn)]));
+    assert_eq!(core.run_choice(TASK).unwrap().placement.channel, FIRST);
+}
+#[test]
+fn an_unnamed_kept_login_closes_a_host() {
+    let (mut core, limits) = placement_fixture(accounts::Holder::Deployment, accounts::Holder::Party(OWNER), false);
+    core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
+    restore_key_account(&mut core, &limits, 0, 1, 1);
+    account(&mut core, &limits, accounts::Event::Want);
+    granted(&mut core, &limits, 1);
+    assert_eq!(core.run_choice(TASK).unwrap().placement.channel, SECOND);
+}
+#[test]
+fn one_person_s_deployment_places_every_run_on_their_host() {
+    let (mut core, _) = placement_fixture(accounts::Holder::Deployment, accounts::Holder::Party(OTHER_PERSON), false);
+    core.people = super::core().0.people;
+    assert_eq!(core.run_choice(TASK).unwrap().placement.channel, FIRST);
+}
+#[test]
+fn two_people_s_kept_logins_close_a_host() {
+    let (mut core, limits) = placement_with_accounts(
+        accounts::Holder::Party(OWNER),
+        accounts::Holder::Party(OWNER),
+        false,
+        vec![accounts::Stored::Issued {
+            number: 4,
+            holder: accounts::Holder::Party(OTHER_PERSON),
+            name: b"other".as_slice().into(),
+            signed_out: false,
+        }],
+    );
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
+        fleet::Event::Sources {
+            sources: Box::new([
+                fleet::SourceName::new(b"personal").unwrap(),
+                fleet::SourceName::new(b"other").unwrap(),
+            ]),
+        },
+        &mut out,
+    );
+    inventory(
+        &mut core,
+        &limits,
+        FIRST,
+        Box::new([login(b"personal", fleet::LoginState::Usable), login(b"other", fleet::LoginState::Usable)]),
+    );
+    inventory(
+        &mut core,
+        &limits,
+        SECOND,
+        Box::new([login(b"personal", fleet::LoginState::NotSignedIn), login(b"other", fleet::LoginState::NotSignedIn)]),
+    );
+    assert_eq!(core.run_choice(TASK).unwrap().placement.channel, SECOND);
+}
+#[test]
+fn the_engine_never_takes_a_program_source() {
+    let (mut core, limits) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
+    core.settings.charters[0].hosts = fleet::Kinds::Engine;
+    let mut limits = limits;
+    limits.fleet.engine_slots = 1;
+    core.fleet = placement_fleet(&core, &limits);
+    host(&mut core, &limits, Token::new(0), &[b"scripted"]);
+    let choice = core.run_choice(TASK).unwrap();
+    assert_eq!((choice.placement.kind, choice.accounts[0].source), (fleet::HostKind::Engine, 1));
+}
+
+#[test]
+fn a_retained_provider_binds_an_account_the_rule_allows() {
+    let mut extra = Vec::new();
+    for (number, source, holder) in [(2, 7, accounts::Holder::Deployment), (5, 6, accounts::Holder::Party(OWNER))] {
+        extra.push(accounts::Stored::Account {
+            number,
+            provider: 2,
+            holder,
+            place: number,
+            uses: Some(Box::new([Use::Project(1)])),
+            subject: Box::new([]),
+            display: Box::new([]),
+        });
+        extra.push(accounts::Stored::Source {
+            account: number,
+            number: source,
+            place: 0,
+            kind: accounts::Kind::Key,
+            name: Box::new([]),
+            held: None,
+        });
+    }
+    let (mut core, limits) =
+        placement_with_accounts(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), false, extra);
+    core.settings.charters[0].policy.alternatives = Box::new([core.settings.models[2].clone()]);
+    granted(&mut core, &limits, 7);
+    granted(&mut core, &limits, 6);
+    let choice = core.run_choice(TASK).unwrap();
+    assert_eq!(
+        choice.accounts.as_ref(),
+        [
+            authority::AccountBinding { provider: 1, account: 0, source: 1 },
+            authority::AccountBinding { provider: 2, account: 5, source: 6 }
+        ]
+    );
 }

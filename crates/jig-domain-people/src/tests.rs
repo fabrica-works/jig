@@ -1844,3 +1844,20 @@ fn a_restored_program_sign_out_replays_its_original_host_name() {
     assert!(test.send(Event::Restored).is_empty());
     assert_eq!(reply(&test.request(10, 7, ask)), Reply::Outcome(outcome));
 }
+
+#[test]
+fn services_are_not_persons() {
+    let mut test = Test::new(LIMITS);
+    test.d = Domain::new(&LIMITS, Box::new([]), 2);
+    for (number, provider) in [(1, 0), (2, 2)] {
+        test.send(Event::Restore { record: Stored::Person { number, identity: identity(provider, number) } });
+    }
+    test.send(Event::Restored);
+    assert_eq!(test.d.persons(), 1);
+}
+
+#[test]
+fn restoration_cannot_open_the_one_person_host_exception() {
+    let domain = Domain::new(&LIMITS, Box::new([]), 2);
+    assert_eq!(domain.persons(), u32::MAX);
+}

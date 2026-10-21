@@ -66,7 +66,7 @@ mod grants;
 mod history;
 mod limits;
 mod needs;
-pub use needs::{AgentShortfall, CharterNeeds, ModelNeed, Needs, ProgramLogin, host_rule, program_usable, shortfall};
+pub use needs::{AgentShortfall, CharterNeeds, ModelNeed, Needs, shortfall};
 mod progress;
 #[cfg(test)]
 mod tests;

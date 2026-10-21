@@ -26,8 +26,8 @@ pub struct RunAllowance {
 }
 
 impl Core {
-    /// No state, grants or second ledger are retained by probing. Program sources have no
-    /// positive login facts until T12 supplies them, and therefore cannot be selected here.
+    /// Probing retains no state or grants. At most accounts × (hosts + 1) probes build
+    /// at most one fact per source, joining each host's kept logins to issued holders.
     #[must_use = "retain the checked choice or its waiting reason"]
     #[expect(clippy::too_many_lines, reason = "one bounded joint account/source/host selection")]
     pub fn run_choice(&self, task: u64) -> Result<RunChoice, RunWait> {
@@ -54,92 +54,90 @@ impl Core {
         {
             excluded = Some(accounts::Excluded { holder: account.holder(), provider: account.provider() });
         }
-        let mut unknown_program_logins = false;
-        // Workers cannot establish the holder rule until their program half supplies facts.
-        for source in &self.accounts.source_views() {
-            if source.kind == accounts::Kind::Program {
-                unknown_program_logins = true;
-            }
-        }
         let candidates =
             self.accounts.candidates(crate::coverage::payer(payer), provider, preferred, excluded, coverage.as_slice());
         let mut waiting = None;
         let mut host_wait = false;
+        let kinds = self.charter_of(task).hosts;
+        let main = crate::fleet_needs::model(&policy.model);
+        let mut facts = List::with_capacity(self.host_fact_capacity());
         for account in &candidates {
-            let selection = self.accounts.select(
-                crate::coverage::payer(payer),
-                provider,
-                Some(*account),
-                None,
-                coverage.as_slice(),
-                &[],
-                self.run_now,
-            );
-            let source = match selection {
-                accounts::Selection::Chosen { source, .. } => source,
-                accounts::Selection::Wait { why: accounts::WaitWhy::Host, .. } => {
+            let mut tried = List::with_capacity(self.fleet.host_capacity());
+            for _ in 0..=self.fleet.host_capacity() {
+                let Some(placement) = self.fleet.probe(kinds, task, core::slice::from_ref(&main), tried.as_slice())
+                else {
                     host_wait = true;
-                    continue;
-                }
-                accounts::Selection::Wait { account, source, why } => {
-                    if waiting.is_none() {
-                        waiting = Some(RunWait::Account { account: Some(account), source, why });
+                    break;
+                };
+                self.host_facts(placement, self.host_rule(placement), &mut facts);
+                let selection = self.accounts.select(
+                    crate::coverage::payer(payer),
+                    provider,
+                    Some(*account),
+                    None,
+                    coverage.as_slice(),
+                    facts.as_slice(),
+                    self.run_now,
+                );
+                let source = match selection {
+                    accounts::Selection::Chosen { source, .. } => source,
+                    accounts::Selection::Wait { why: accounts::WaitWhy::Host, .. } => {
+                        host_wait = true;
+                        tried.push(placement.channel).expect("one rejected channel per host");
+                        continue;
                     }
-                    continue;
-                }
-                accounts::Selection::NoAccount => continue,
-            };
-            host_wait = true;
-            let kinds = if unknown_program_logins {
-                match self.charter_of(task).hosts {
-                    fleet::Kinds::Engine | fleet::Kinds::Both => fleet::Kinds::Engine,
-                    fleet::Kinds::Workers => continue,
-                }
-            } else {
-                self.charter_of(task).hosts
-            };
-            let mut bindings = List::with_capacity(jig_domain_tasks::MODELS);
-            bindings.push(authority::AccountBinding { provider, account: *account, source }).expect("main binding");
-            let mut retained = List::with_capacity(jig_domain_tasks::MODELS);
-            for model in &policy.alternatives {
-                let Some(other) = self.provider(model) else { continue };
-                let mut bound = false;
-                for binding in &bindings {
-                    if binding.provider == other {
+                    accounts::Selection::Wait { account, source, why } => {
+                        if waiting.is_none() {
+                            waiting = Some(RunWait::Account { account: Some(account), source, why });
+                        }
+                        break;
+                    }
+                    accounts::Selection::NoAccount => break,
+                };
+                host_wait = true;
+                let mut bindings = List::with_capacity(jig_domain_tasks::MODELS);
+                bindings.push(authority::AccountBinding { provider, account: *account, source }).expect("main binding");
+                let mut retained = List::with_capacity(jig_domain_tasks::MODELS);
+                for model in &policy.alternatives {
+                    let Some(other) = self.provider(model) else { continue };
+                    let mut bound = false;
+                    for binding in &bindings {
+                        if binding.provider == other {
+                            bound = true;
+                        }
+                    }
+                    if !bound
+                        && let accounts::Selection::Chosen { account, source } = self.accounts.select(
+                            crate::coverage::payer(payer),
+                            other,
+                            None,
+                            None,
+                            coverage.as_slice(),
+                            facts.as_slice(),
+                            self.run_now,
+                        )
+                    {
+                        bindings
+                            .push(authority::AccountBinding { provider: other, account, source })
+                            .expect("one binding per retained provider");
                         bound = true;
                     }
+                    if bound {
+                        retained.push(model.clone()).expect("configured model bound");
+                    }
                 }
-                if !bound
-                    && let accounts::Selection::Chosen { account, source } = self.accounts.select(
-                        crate::coverage::payer(payer),
-                        other,
-                        None,
-                        None,
-                        coverage.as_slice(),
-                        &[],
-                        self.run_now,
-                    )
-                {
-                    bindings
-                        .push(authority::AccountBinding { provider: other, account, source })
-                        .expect("one binding per retained provider");
-                    bound = true;
+                let mut needs = List::with_capacity(jig_domain_tasks::MODELS.checked_add(1).expect("main need"));
+                needs.push(main.clone()).expect("main need");
+                for model in &retained {
+                    needs.push(crate::fleet_needs::model(model)).expect("retained models");
                 }
-                if bound {
-                    retained.push(model.clone()).expect("configured model bound");
+                if self.fleet.supports(placement, needs.as_slice()) {
+                    let mut selected = policy.clone();
+                    selected.alternatives = retained.into_boxed();
+                    return Ok(RunChoice { placement, accounts: bindings.into_boxed(), policy: selected });
                 }
+                tried.push(placement.channel).expect("one rejected channel per host");
             }
-            let mut needs = List::with_capacity(jig_domain_tasks::MODELS.checked_add(1).expect("main need"));
-            needs.push(crate::fleet_needs::model(&policy.model)).expect("main need");
-            for model in &retained {
-                needs.push(crate::fleet_needs::model(model)).expect("retained models");
-            }
-            let Some(placement) = self.fleet.probe(kinds, task, needs.as_slice(), &[]) else {
-                continue;
-            };
-            let mut selected = policy.clone();
-            selected.alternatives = retained.into_boxed();
-            return Ok(RunChoice { placement, accounts: bindings.into_boxed(), policy: selected });
         }
         if host_wait { Err(RunWait::Host) } else { Err(waiting.unwrap_or(account_wait(None))) }
     }

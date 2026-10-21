@@ -1709,6 +1709,7 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
 #[test]
 fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     let (mut core, mut limits) = make_tree();
+    run_choice::host(&mut core, &limits, Token::new(10), &[b"scripted"]);
     limits.people.projects = 2;
     restore_document_party(&mut core, &limits, &[0, 1]);
     let env = Env { now: Time::from_nanos(100), wall: Wall::from_nanos(1000), limits: limits.accounts };
