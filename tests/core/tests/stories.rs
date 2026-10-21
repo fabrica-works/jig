@@ -518,7 +518,7 @@ fn an_exhausted_delegate_escalates_to_a_person_who_releases_it_to_finish() {
     }
 }
 
-fn resource_member(world: &World, id: u64, words: &[u8]) -> core::Delegate {
+pub(crate) fn resource_member(world: &World, id: u64, words: &[u8]) -> core::Delegate {
     let mut child = member(world, tasks::Executor::Agent { charter: 1 }, words);
     child.spec.parameters = Box::new([tasks::Parameter::Resource { name: 1, connector: 1, resource: id }]);
     child.authority.budget.spend = 10;
@@ -526,7 +526,7 @@ fn resource_member(world: &World, id: u64, words: &[u8]) -> core::Delegate {
     child
 }
 
-fn configure_resources(world: &mut World) {
+pub(crate) fn configure_resources(world: &mut World) {
     for id in [1, 2] {
         world.send(root::Event::Connector {
             number: 1,
@@ -1038,7 +1038,7 @@ fn a_party_deciding_a_cancelled_task_hears_who_cancelled_it_and_when() {
     );
 }
 
-fn person_world_fixture(seed: u64) -> (root::Config, root::Limits) {
+pub(crate) fn person_world_fixture(seed: u64) -> (root::Config, root::Limits) {
     let (mut configuration, mut limits) = jig_core_world::faults::plan_fixture(seed);
     limits.core.tasks.person_stall = skein_lib::Duration::from_secs(1);
     let kinds: Box<[authority::Executor]> = Box::new([authority::Executor::Charter(1), authority::Executor::Role(0)]);
@@ -1880,3 +1880,6 @@ mod historical;
 
 #[path = "stories/dependencies.rs"]
 mod dependencies;
+
+#[path = "stories/kept.rs"]
+mod kept;
