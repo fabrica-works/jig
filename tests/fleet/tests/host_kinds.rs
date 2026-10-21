@@ -269,10 +269,7 @@ fn refs() -> jig_domain_fleet::Assignment {
 fn a_worker_refused_for_its_agent_hosts_nothing() {
     let limits = jig_fleet_world::LIMITS;
     let mut domain = waiting_worker(limits);
-    let bounds = fleet::Bounds {
-        models: Box::new([fleet::ModelBound { name: b"model".as_slice().into(), window: 8191, output: 1024 }]),
-        ..jig_fleet_world::fixtures::bounds()
-    };
+    let bounds = fleet::Bounds { turns: 7, ..jig_fleet_world::fixtures::bounds() };
     assert_eq!(
         step(
             &mut domain,
@@ -290,6 +287,10 @@ fn a_worker_refused_for_its_agent_hosts_nothing() {
             }
         ),
         vec![Request::Refuse { channel: Token::new(5) }]
+    );
+    assert_eq!(
+        domain.hello_refusals().as_slice()[0].why,
+        fleet::HelloRefusal::Agent { why: fleet::AgentShortfall::Turns { charter: 1 } }
     );
     assert!(place(&mut domain, limits).is_empty());
     assert_eq!(domain.workers(), 0);
@@ -336,4 +337,60 @@ fn waiting_worker(limits: Limits) -> Domain {
         .is_empty()
     );
     domain
+}
+
+#[test]
+fn startup_and_hello_check_only_the_charters_for_the_host_kind() {
+    for (kinds, kind, applies) in [
+        (Kinds::Workers, HostKind::Worker, true),
+        (Kinds::Workers, HostKind::Engine, false),
+        (Kinds::Engine, HostKind::Worker, false),
+        (Kinds::Engine, HostKind::Engine, true),
+        (Kinds::Both, HostKind::Worker, true),
+        (Kinds::Both, HostKind::Engine, true),
+    ] {
+        let mut needs = worker_needs();
+        needs.charters[0].kinds = kinds;
+        let bounds = fleet::Bounds { turns: 7, ..jig_fleet_world::fixtures::bounds() };
+        let expected = applies.then_some(fleet::AgentShortfall::Turns { charter: 1 });
+        assert_eq!(fleet::shortfall(&needs, &bounds, kind), expected);
+        let limits = Limits { engine_slots: 1, ..jig_fleet_world::LIMITS };
+        let mut domain = jig_fleet_world::fixtures::domain(&limits, needs);
+        let channel = match kind {
+            HostKind::Engine => Token::new(0),
+            HostKind::Worker => Token::new(5),
+        };
+        let requests = step(
+            &mut domain,
+            limits,
+            Event::Hello {
+                worker: 0,
+                channel,
+                hello: Hello {
+                    bounds,
+                    slots: 1,
+                    stop_bound: Duration::ZERO,
+                    workstreams: Box::new([]),
+                    hosting: Box::new([]),
+                },
+            },
+        );
+        if let Some(why) = expected {
+            assert_eq!(requests, vec![Request::Refuse { channel }]);
+            assert_eq!(domain.hello_refusals().as_slice()[0].why, fleet::HelloRefusal::Agent { why });
+        } else {
+            assert!(requests.is_empty());
+            assert!(domain.hello_refusals().is_empty());
+        }
+    }
+}
+
+#[test]
+fn the_global_message_bound_applies_only_when_a_charter_does() {
+    let needs = worker_needs();
+    let adequate = fleet::Bounds { message_bytes: 64, ..jig_fleet_world::fixtures::bounds() };
+    assert_eq!(fleet::shortfall(&needs, &adequate, HostKind::Worker), None);
+    let short = fleet::Bounds { message_bytes: 63, ..adequate };
+    assert_eq!(fleet::shortfall(&needs, &short, HostKind::Worker), Some(fleet::AgentShortfall::Message));
+    assert_eq!(fleet::shortfall(&needs, &short, HostKind::Engine), None);
 }

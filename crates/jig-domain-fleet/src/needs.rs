@@ -32,11 +32,11 @@ pub enum AgentShortfall {
     Model { charter: u32, model: u32 },
     Window { charter: u32, model: u32 },
     Output { charter: u32, model: u32 },
-    Turns,
+    Turns { charter: u32 },
     Spend,
-    Time,
-    Waiting,
-    Checks,
+    Time { charter: u32 },
+    Waiting { charter: u32 },
+    Checks { charter: u32 },
     Message,
     Inbox,
     Unacknowledged,
@@ -56,7 +56,14 @@ pub(crate) fn owned_bytes(needs: &Needs) -> Option<u64> {
     Some(bytes)
 }
 
-pub(crate) fn shortfall(needs: &Needs, bounds: &Bounds, kind: HostKind) -> Option<AgentShortfall> {
+/// The first agent bound that cannot hold this host kind's configured charters.
+///
+/// Checks applicable charters in their configured order, then deployment-wide
+/// bounds if any charter applies. Missing models narrow placement eligibility;
+/// only models the host declares have their window and output checked here.
+/// This is the same decision used for hello admission (domain/engine.md, section 8).
+#[must_use]
+pub fn shortfall(needs: &Needs, bounds: &Bounds, kind: HostKind) -> Option<AgentShortfall> {
     let mut applicable = false;
     for charter in &needs.charters {
         if !charter.kinds.allows(kind) {
@@ -81,18 +88,18 @@ pub(crate) fn shortfall(needs: &Needs, bounds: &Bounds, kind: HostKind) -> Optio
             }
         }
         if bounds.turns < charter.turns {
-            return Some(AgentShortfall::Turns);
+            return Some(AgentShortfall::Turns { charter: charter.charter });
         }
         if bounds.time < charter.time {
-            return Some(AgentShortfall::Time);
+            return Some(AgentShortfall::Time { charter: charter.charter });
         }
         if bounds.waiting < charter.waiting {
-            return Some(AgentShortfall::Waiting);
+            return Some(AgentShortfall::Waiting { charter: charter.charter });
         }
         if let Some(reserve) = charter.change_reserve
             && bounds.checks > reserve
         {
-            return Some(AgentShortfall::Checks);
+            return Some(AgentShortfall::Checks { charter: charter.charter });
         }
     }
     if applicable {

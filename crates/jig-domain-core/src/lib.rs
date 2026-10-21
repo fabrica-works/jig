@@ -82,7 +82,7 @@ pub use sibling_routes::{MadeRoute, PersonMessage, SentRoute};
 mod conversation;
 pub use conversation::{DeliveryOutcome, SettledAnswer, SettledCall, conversation_worst_case};
 pub mod charters;
-mod fleet_needs;
+pub mod fleet_needs;
 pub use charters::Charter;
 mod stored;
 mod translate;

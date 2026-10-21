@@ -3,7 +3,18 @@ use crate::{Config, Limits};
 use jig_domain_fleet::{CharterNeeds, ModelNeed, Needs};
 use skein_lib::List;
 
-pub(crate) fn configured(config: &Config, limits: &Limits) -> Needs {
+/// Build the owned requirements used by the core for fleet admission.
+///
+/// `config` and `limits` must describe the same validated deployment as for
+/// [`crate::Core::new`]. This only projects its requirements; it does not validate
+/// configuration. The result owns its charter list, models and model names and
+/// can outlive `config`.
+///
+/// # Panics
+/// The charter count must fit `limits.tasks.charters`, and each charter's
+/// alternative count plus its main model must fit a `u32`.
+#[must_use]
+pub fn configured(config: &Config, limits: &Limits) -> Needs {
     let mut charters = List::with_capacity(limits.tasks.charters);
     for charter in &config.settings.charters {
         let policy = &charter.policy;

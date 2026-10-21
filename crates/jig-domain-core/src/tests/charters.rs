@@ -52,3 +52,50 @@ fn take_due_skips_an_unusable_account_and_starts_a_procedure() {
     assert!(!core.due_ready());
     assert_eq!(core.due.pop().expect("account wait retains order").task, 1);
 }
+
+#[test]
+fn startup_needs_own_models_and_preserve_charter_requirements() {
+    let mut config = config(1);
+    let mut limits = limits();
+    limits.tasks.charters = 2;
+    limits.run_bytes = 1024;
+    let mut alternative = scripted_model();
+    alternative.name = b"alternative".as_slice().into();
+    alternative.window = 4096;
+    alternative.output = 512;
+    config.settings.models = Box::new([scripted_model(), alternative.clone()]);
+    config.settings.charters[0].policy.alternatives = Box::new([alternative]);
+    let mut engine = config.settings.charters[0].clone();
+    engine.number = 73;
+    engine.hosts = fleet::Kinds::Engine;
+    engine.policy.modify = false;
+    config.settings.charters = Box::new([config.settings.charters[0].clone(), engine]);
+    crate::charters::assert_configured(&config.settings, &limits);
+
+    let needs = fleet_needs::configured(&config, &limits);
+    assert_eq!(needs.spend, config.authority.rules().maximum_run_spend);
+    assert_eq!(needs.message_bytes, limits.tasks.message_bytes);
+    assert_eq!(needs.start_messages, limits.tasks.run_inbox);
+    assert_eq!(needs.unacknowledged, config.hub_turns);
+    drop(config);
+
+    assert_eq!(needs.charters.len(), 2);
+    let worker = &needs.charters[0];
+    assert_eq!(worker.charter, 1);
+    assert_eq!(worker.kinds, fleet::Kinds::Workers);
+    assert_eq!(worker.turns, 8);
+    assert_eq!(worker.time, Duration::from_secs(60));
+    assert_eq!(worker.waiting, Duration::from_secs(1));
+    assert_eq!(worker.change_reserve, Some(Duration::from_secs(10)));
+    assert_eq!(
+        worker.models.as_ref(),
+        &[
+            fleet::ModelNeed { name: b"scripted".as_slice().into(), window: 8192, output: 1024 },
+            fleet::ModelNeed { name: b"alternative".as_slice().into(), window: 4096, output: 512 },
+        ]
+    );
+    let engine = &needs.charters[1];
+    assert_eq!(engine.charter, 73);
+    assert_eq!(engine.kinds, fleet::Kinds::Engine);
+    assert_eq!(engine.change_reserve, None);
+}

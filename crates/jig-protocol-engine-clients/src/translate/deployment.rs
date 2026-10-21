@@ -28,6 +28,7 @@ fn attempt(value: fleet::AttemptState) -> w::OwnerAttemptState {
         fleet::AttemptState::Closed => w::OwnerAttemptState::Closed,
     }
 }
+// The current client wire reports these dimensions without their charter numbers.
 fn shortfall(value: fleet::AgentShortfall, limits: &w::Limits) -> Result<w::OwnerAgentShortfall, w::Problem> {
     Ok(match value {
         fleet::AgentShortfall::Model { charter, model } => w::OwnerAgentShortfall::Model(
@@ -39,11 +40,11 @@ fn shortfall(value: fleet::AgentShortfall, limits: &w::Limits) -> Result<w::Owne
         fleet::AgentShortfall::Output { charter, model } => w::OwnerAgentShortfall::Output(
             w::OwnerAgentShortfallOutput::new(limits, w::OwnerAgentShortfallOutputParts { charter, model })?,
         ),
-        fleet::AgentShortfall::Turns => w::OwnerAgentShortfall::Turns,
+        fleet::AgentShortfall::Turns { charter: _ } => w::OwnerAgentShortfall::Turns,
         fleet::AgentShortfall::Spend => w::OwnerAgentShortfall::Spend,
-        fleet::AgentShortfall::Time => w::OwnerAgentShortfall::Time,
-        fleet::AgentShortfall::Waiting => w::OwnerAgentShortfall::Waiting,
-        fleet::AgentShortfall::Checks => w::OwnerAgentShortfall::Checks,
+        fleet::AgentShortfall::Time { charter: _ } => w::OwnerAgentShortfall::Time,
+        fleet::AgentShortfall::Waiting { charter: _ } => w::OwnerAgentShortfall::Waiting,
+        fleet::AgentShortfall::Checks { charter: _ } => w::OwnerAgentShortfall::Checks,
         fleet::AgentShortfall::Message => w::OwnerAgentShortfall::Message,
         fleet::AgentShortfall::Inbox => w::OwnerAgentShortfall::Inbox,
         fleet::AgentShortfall::Unacknowledged => w::OwnerAgentShortfall::Unacknowledged,

@@ -774,7 +774,11 @@ host tools' calls (6.8).
   budget (authority.md, 7 and 8.3); the fleet admits no host whose agent
   cannot run the engine's charters, and places a run only on a host that
   declares its models and where its sources are usable (engine.md,
-  section 8). A start smith refuses all the same fails its
+  section 8). The same admission decision is public as
+  `jig_domain_fleet::shortfall`, using the core's owned
+  `fleet_needs::configured` requirements, so an application's startup can
+  diagnose its prospective host before it says hello. A start smith refuses
+  all the same fails its
   attempt as invalid, naming why (6.3).
 
 ## 9. Messages and delivery

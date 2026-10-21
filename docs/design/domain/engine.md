@@ -820,6 +820,20 @@ The fleet child domain knows the hosts and the runs they host:
   unacknowledged than the hub's bound (hosts.md, 6.4). So no run is
   placed where smith would refuse its start, and no run refuses a
   message as too large or its start's messages as full.
+  The core exposes these owned requirements as
+  `jig_domain_core::fleet_needs::configured(&Config, &Limits)`, for a
+  validated configuration with the same limits used to construct the core.
+  Its charter count must fit `limits.tasks.charters`, and each charter's
+  main model plus alternatives must fit a `u32`. This projection does not
+  validate configuration. A root may check a prospective host at startup
+  with `jig_domain_fleet::shortfall(&Needs, &Bounds, HostKind)`, the same
+  checker used by hello admission. It returns the first shortfall for
+  applicable charters in configuration order, then checks deployment-wide
+  bounds if any charter applies. Turns, time, waiting and checks name the
+  failing charter's number; model window and output also name the model's
+  position. Callers can then read required and offered amounts without
+  repeating admission policy. The current client wire still reports turns,
+  time, waiting and checks as dimensions without a charter number.
 - **Grants follow their attempts:** each new generation of an LLM
   account's source or an application's credential goes to every live
   attempt that holds one (section 12), and each attempt the fleet keeps
