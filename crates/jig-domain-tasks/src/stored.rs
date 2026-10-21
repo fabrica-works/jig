@@ -175,6 +175,7 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
             }
             for (at, member) in batch.iter().enumerate() {
                 if member.number == 0
+                    || !crate::flags::shaped(member.flags, member.executor)
                     || member.project != task.project
                     || member.funder != crate::Funder::Task(task.number)
                     || !crate::batch::valid_spec(limits, &member.spec)
@@ -750,6 +751,11 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
         Stored::PersonProposal(row) => {
             if !crate::proposals::valid_person_proposal(&row, &env.limits) {
                 return failed(domain, None, Refusal::Restore, out);
+            }
+            for member in row.batch() {
+                if !crate::flags::shaped(member.flags, member.executor) {
+                    return failed(domain, None, Refusal::Restore, out);
+                }
             }
             match row.state {
                 crate::PersonProposalState::Pending { .. } => {

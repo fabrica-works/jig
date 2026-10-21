@@ -34,8 +34,8 @@ pub enum EndedBy {
     Requester,
 }
 
-/// Requester authority uses the existing requester, never a new cancel right.
-pub(crate) fn valid(flags: Flags, executor: crate::Executor, requester: crate::Party) -> bool {
+/// An open task is an agent's conversation (5.8).
+pub(crate) fn shaped(flags: Flags, executor: crate::Executor) -> bool {
     if flags.ended_by == EndedBy::Result {
         return true;
     }
@@ -43,9 +43,19 @@ pub(crate) fn valid(flags: Flags, executor: crate::Executor, requester: crate::P
         crate::Executor::Agent { .. } => true,
         crate::Executor::Person(_) | crate::Executor::Procedure { .. } => false,
     };
-    let person = match requester {
+    flags.conversation && agent
+}
+
+/// Requester authority uses the existing requester, never a new cancel right.
+pub(crate) fn valid(flags: Flags, executor: crate::Executor, requester: crate::Party) -> bool {
+    if !shaped(flags, executor) {
+        return false;
+    }
+    if flags.ended_by == EndedBy::Result {
+        return true;
+    }
+    match requester {
         crate::Party::Person(number) => number != 0,
         crate::Party::Task(_) | crate::Party::Deployment { .. } => false,
-    };
-    flags.conversation && agent && person
+    }
 }

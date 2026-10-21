@@ -340,3 +340,38 @@ fn a_restart_restores_no_decided_person_proposal() {
     assert!(world.records.contains_key(&tasks::Key::PersonProposal(2)), "startup completed without historical rows");
     assert!(world.records.contains_key(&tasks::Key::DecidedProposal(1)), "history remains durable");
 }
+
+#[test]
+fn a_live_proposal_leaves_the_open_shape_to_core() {
+    const PROPOSAL: u64 = 1;
+    const PERSON: u64 = 9;
+    let rows = [
+        ("person", Executor::Person(PersonAddress::Person(PERSON)), true),
+        ("procedure", Executor::Procedure { connector: 1, code: 1 }, true),
+        ("no conversation", Executor::Agent { charter: 1 }, false),
+    ];
+    for (name, executor, conversation) in rows {
+        let mut world = World::new(252, LIMITS);
+        let mut proposal = goal_proposal(PROPOSAL);
+        let tasks::PersonAction::Batch(batch) = &mut proposal.action else { panic!("batch fixture") };
+        for member in batch {
+            member.executor = executor;
+            member.flags.ended_by = tasks::EndedBy::Requester;
+            member.flags.conversation = conversation;
+        }
+        let records = world.records.len();
+        let replies = world.replies.len();
+        assert_eq!(
+            response(&mut world, |reply_to| Event::ProposePerson { reply_to, proposal: proposal.clone() }),
+            Reply::Done,
+            "{name}"
+        );
+        assert_eq!(world.records.len(), records + 1, "{name}");
+        assert_eq!(world.replies.len(), replies + 1, "{name}");
+        assert_eq!(
+            world.records.get(&tasks::Key::PersonProposal(PROPOSAL)),
+            Some(&tasks::Stored::PersonProposal(Box::new(proposal))),
+            "{name}"
+        );
+    }
+}
