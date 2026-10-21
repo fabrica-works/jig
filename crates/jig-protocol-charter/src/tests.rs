@@ -270,11 +270,25 @@ fn endpoint_resolution_still_refuses_wrong_dialects_and_unknown_numbers() {
 
 #[test]
 fn open_mode_is_encoded_and_never_grants_delivery() {
+    let decoded = encoded_mode(smith_domain_run::Mode::Open);
+    assert_eq!(*decoded.mode(), wire::Mode::Open);
+    assert!(decoded.tools().deliver().is_none());
+    assert!(decoded.tools().wait());
+}
+
+#[test]
+fn finite_mode_is_encoded_with_delivery() {
+    let decoded = encoded_mode(smith_domain_run::Mode::Finite);
+    assert_eq!(*decoded.mode(), wire::Mode::Finite);
+    assert!(decoded.tools().deliver().is_some());
+}
+
+fn encoded_mode(mode: smith_domain_run::Mode) -> wire::Charter {
     let mut value = source();
-    value.mode = smith_domain_run::Mode::Open;
+    value.mode = mode;
     value.contract.change = Some(crate::ChangeRule { checks_must_pass: false, fields: Box::new([]) });
     let value = charter(value, Box::new([]), false).unwrap();
-    assert_eq!(value.mode, smith_domain_run::Mode::Open);
-    assert!(value.grants.deliver.is_none());
-    assert!(value.grants.wait);
+    let names = [EndpointName { number: 7, dialect: 4, name: b"primary".as_slice().into() }];
+    let bytes = encode(value, &names, &crate::limits()).expect("bounded encoding");
+    wire::Charter::decode(&wire::CEILINGS, &mut Reader::new(&bytes)).expect("Smith codec accepts it")
 }
