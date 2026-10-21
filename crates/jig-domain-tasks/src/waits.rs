@@ -9,14 +9,15 @@ use crate::{
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Map, Queue, Set};
 
-/// A per-task comparison point: only changed membership is refreshed at publication.
+/// Compare every wait lost at publication, including phase and delegate changes (domain/tasks.md, 6.7).
 #[derive(Debug)]
 pub(crate) struct Indexed {
     holdings: Box<[Holding]>,
     pending: Box<[u64]>,
     taken: bool,
     queued: bool,
-    held: bool,
+    phase: WaitPhase,
+    children: Box<[u64]>,
 }
 
 /// Ordered resource ranges and reversed dependency pairs, bounded by the live edge limits.
@@ -60,8 +61,13 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
             name.checked_mul(4)?.checked_add(u64::try_from(size_of::<Holding>()).ok()?.checked_mul(2)?)?,
         )?)?
         .checked_add(u64::from(dependencies).checked_mul(16)?)?
-        .checked_add(Set::<u64>::worst_case(limits.tasks)?.checked_mul(2)?)?
-        .checked_add(Map::<u64, u64>::worst_case(limits.tasks)?.checked_mul(3)?)?
+        // Old/new delegate comparison rows, including a refresh's replacement.
+        .checked_add(u64::from(limits.tasks).checked_mul(u64::from(limits.delegates))?.checked_mul(16)?)?
+        // Changes being drained, changes made by lifts, and the knot's visited set.
+        .checked_add(Set::<u64>::worst_case(limits.tasks)?.checked_mul(3)?)?
+        // The judgement and a restore remainder; the knot's chosen wait per task.
+        .checked_add(Map::<u64, u32>::worst_case(limits.tasks)?.checked_mul(2)?)?
+        .checked_add(Map::<u64, u64>::worst_case(limits.tasks)?)?
         .checked_add(Map::<Name, u32>::worst_case(resources)?.checked_mul(2)?)?
         .checked_add(u64::from(resources).checked_mul(name)?.checked_mul(2)?)?
         .checked_add(List::<u64>::worst_case(limits.tasks)?.checked_mul(3)?)?
@@ -76,14 +82,15 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
 
 pub(crate) fn refresh(domain: &mut Domain, number: u64) {
     let row = record(domain, number).expect("published live row");
-    let held = is_held(&row.phase);
+    let phase = WaitPhase::for_phase(&row.phase);
     let queued = crate::holds::queued(row);
     if let Some(old) = domain.waits.rows.get(&number)
         && old.holdings == row.holdings
         && old.pending == row.waiting_on
         && old.taken == row.holds_taken
         && old.queued == queued
-        && old.held == held
+        && old.phase == phase
+        && old.children == row.delegates
     {
         return;
     }
@@ -92,28 +99,34 @@ pub(crate) fn refresh(domain: &mut Domain, number: u64) {
         pending: row.waiting_on.clone(),
         taken: row.holds_taken,
         queued,
-        held,
+        phase,
+        children: row.delegates.clone(),
     };
     let old = domain.waits.rows.remove(&number);
     if let Some(old) = &old {
-        let mut freed = next.held && !old.held;
+        let mut freed = old.phase.loses(next.phase) || (old.queued && !next.queued);
+        for child in &old.children {
+            freed |= !crate::batch::contains(&next.children, *child);
+        }
         for dependency in &old.pending {
             if !crate::batch::contains(&next.pending, *dependency) {
                 domain.waits.dependents.remove(&(*dependency, number));
                 freed = true;
             }
         }
-        if freed {
-            domain.circle_changes.insert(number).expect("one change per live task");
-        }
         for holding in &old.holdings {
             let key = (crate::holds::name(holding).clone(), number);
             if old.taken && (!next.taken || !has(&next.holdings, holding)) {
                 domain.waits.holders.remove(&key);
+                freed = true;
             }
             if old.queued && (!next.queued || !has(&next.holdings, holding)) {
                 domain.waits.waiters.remove(&key);
+                freed = true;
             }
+        }
+        if freed {
+            domain.circle_changes.insert(number);
         }
     }
     for dependency in &next.pending {
@@ -159,7 +172,7 @@ pub(crate) fn remove(domain: &mut Domain, number: u64) {
         };
         domain.waits.dependents.remove(&pair);
     }
-    domain.circle_changes.insert(number).expect("changes drained before another lifecycle cascade");
+    domain.circle_changes.insert(number);
 }
 
 fn threshold(domain: &Domain, holding: &Holding) -> Option<u32> {
@@ -173,128 +186,627 @@ fn threshold(domain: &Domain, holding: &Holding) -> Option<u32> {
     }
 }
 
-struct Back {
-    markers: Map<u64, u64>,
+/// Changes may outnumber live rows during a cascade; saturation rejudges all holds (domain/tasks.md, 6.7).
+#[derive(Debug)]
+pub(crate) struct CircleChanges {
+    tasks: Set<u64>,
+    all: bool,
+}
+
+impl CircleChanges {
+    pub(crate) fn new(limits: &Limits) -> Self {
+        Self { tasks: Set::with_capacity(limits.tasks), all: false }
+    }
+
+    fn insert(&mut self, task: u64) {
+        if self.tasks.insert(task).is_err() {
+            self.all = true;
+        }
+    }
+}
+
+/// Only the joining task differs from the staged rows (domain/tasks.md, 6.7).
+#[derive(Clone, Copy)]
+struct Entry {
+    task: u64,
+    phase: WaitPhase,
+    waiting: bool,
+    creator: Party,
+}
+
+struct WaitState {
+    requester: Party,
+    phase: WaitPhase,
+    queued: bool,
+    taken: bool,
+}
+
+// Borrowed query inputs remain function arguments, never fields (programming-model.md, 10.3).
+fn rows<'a>(
+    view: &'a (&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+    number: u64,
+) -> (&'a [u64], &'a [u64], &'a [u64], &'a [Holding], WaitState) {
+    let (domain, staged, entry, pending, added, batch) = view;
+    if let Some(row) = staged.record(domain, number) {
+        let (phase, waiting, pending, added) = if number == entry.task {
+            (entry.phase, entry.waiting, *pending, *added)
+        } else {
+            (WaitPhase::for_phase(&row.phase), row.phase == Phase::Waiting, row.waiting_on, &[][..])
+        };
+        (
+            pending,
+            added,
+            &row.base.delegates,
+            &row.base.holdings,
+            WaitState {
+                requester: row.requester,
+                phase,
+                queued: waiting && pending.is_empty() && added.is_empty() && !row.holds_taken,
+                taken: row.holds_taken,
+            },
+        )
+    } else {
+        let row = member(batch, number);
+        (
+            &row.dependencies,
+            &[],
+            &[],
+            &row.holdings,
+            WaitState {
+                requester: entry.creator,
+                phase: WaitPhase::Tasks,
+                queued: row.dependencies.is_empty(),
+                taken: false,
+            },
+        )
+    }
+}
+
+fn row_state(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64) -> WaitState {
+    rows(view, number).4
+}
+
+fn is_child(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), parent: u64, number: u64) -> bool {
+    let (_, _, delegates, _, state) = rows(view, parent);
+    state.phase.delegates()
+        && (crate::batch::contains(delegates, number)
+            || (view.2.creator == Party::Task(parent) && member_named(view.5, number)))
+}
+
+fn transferred(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64, holding: &Holding) -> bool {
+    view.2.creator == Party::Task(number) && handed(view.5, holding)
+}
+
+fn is_holder(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64, holding: &Holding) -> bool {
+    row_state(view, number).taken && !transferred(view, number, holding)
+}
+
+fn gate(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), waiter: u64, holding: &Holding) -> bool {
+    // A first member receiving the creator's hold takes it without a queue (6.4).
+    for prior in view.5 {
+        if prior.number == waiter {
+            break;
+        }
+        if has(&prior.holdings, holding) {
+            return true;
+        }
+    }
+    match view.2.creator {
+        Party::Task(parent) => !row_state(view, parent).taken || !has(rows(view, parent).3, holding),
+        Party::Person(_) | Party::Deployment { .. } => true,
+    }
+}
+
+/// Mark reachability first, then eliminate within it at the resource thresholds (domain/tasks.md, 6.7).
+struct Judge {
+    pending: Map<u64, u32>,
     counts: Map<Name, u32>,
     stack: List<u64>,
 }
 
-impl Back {
+impl Judge {
     fn new(limits: &Limits) -> Self {
         Self {
-            markers: Map::with_capacity(limits.tasks),
+            pending: Map::with_capacity(limits.tasks),
             counts: Map::with_capacity(resource_capacity(limits).expect("resource count")),
             stack: List::with_capacity(limits.tasks),
         }
     }
 
-    fn mark(&mut self, task: u64, marker: u64) {
-        if self.markers.contains_key(&task) {
+    fn mark(&mut self, task: u64) {
+        if self.pending.contains_key(&task) {
             return;
         }
-        self.markers.insert(task, marker).expect("one mark per live task");
-        self.stack.push(task).expect("one stack entry per live task");
+        self.pending.insert(task, 0).expect("one mark per live task");
+        self.stack.push(task).expect("one walk entry per live task");
     }
 
-    /// A task creator's transferred holds cease to be waits on it in this batch.
-    fn walk(&mut self, domain: &Domain, staged: &Staged, limits: &Limits, task: u64, batch: &[New]) {
-        // Previewed rows need not have been published. Build their missing reverse
-        // pairs once, then read them beside the committed index at each visit.
-        let mut added = List::with_capacity(limits.tasks.checked_mul(limits.dependencies).expect("dependency edges"));
-        let mut queued = List::with_capacity(resource_capacity(limits).expect("resource edges"));
-        for (number, _) in &domain.names {
-            let row = staged.record(domain, *number).expect("projected live row");
-            for dependency in row.waiting_on {
-                if !domain.waits.dependents.contains_key(&(*dependency, *number)) {
-                    added.push((*dependency, *number)).expect("bounded projected dependencies");
-                }
-            }
-            if queued_row(&row) {
-                for holding in &row.holdings {
-                    let pair = (crate::holds::name(holding).clone(), *number);
-                    if !domain.waits.waiters.contains_key(&pair) {
-                        queued.push(pair).expect("bounded projected queues");
-                    }
-                }
+    fn met(&mut self, number: u64) {
+        if let Some(count) = self.pending.get_mut(&number) {
+            *count = count.checked_sub(1).expect("each wait removed once");
+            if *count == 0 {
+                self.stack.push(number).expect("one ready entry per task");
             }
         }
-        self.mark(task, task);
-        for at in 0..self.stack.capacity() {
+    }
+
+    fn dependent(&mut self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), dependent: u64, dependency: u64) {
+        let (waiting_on, added, _, _, state) = rows(view, dependent);
+        if state.phase.dependencies()
+            && (crate::batch::contains(waiting_on, dependency) || crate::batch::contains(added, dependency))
+        {
+            self.mark(dependent);
+        }
+    }
+
+    fn waiter(&mut self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), waiter: u64) {
+        if row_state(view, waiter).queued {
+            self.mark(waiter);
+        }
+    }
+
+    fn walk(&mut self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), links: &Links, limits: &Limits) {
+        self.mark(view.2.task);
+        // Batch members can also form a circle without their creator. Judge them whole.
+        for member in view.5 {
+            self.mark(member.number);
+        }
+        for at in 0..limits.tasks {
             let Some(&number) = self.stack.get(at) else { break };
-            for ((_, dependent), ()) in domain.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
-                self.dependent(domain, staged, *dependent, number);
+            for ((_, dependent), ()) in view.0.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
+                self.dependent(view, *dependent, number);
             }
-            for (dependency, dependent) in added.as_slice() {
+            for (dependency, dependent) in links.added.as_slice() {
                 if *dependency == number {
-                    self.dependent(domain, staged, *dependent, number);
+                    self.dependent(view, *dependent, number);
                 }
             }
-            let Some(row) = staged.record(domain, number) else { continue };
-            if let Party::Task(parent) = row.requester
-                && let Some(requester) = staged.record(domain, parent)
-                && delegates_wait(&requester.phase)
-                && crate::batch::contains(&requester.delegates, number)
+            let (_, _, _, holdings, state) = rows(view, number);
+            if let Party::Task(parent) = state.requester
+                && is_child(view, parent, number)
             {
-                self.mark(parent, number);
+                self.mark(parent);
             }
-            if !row.holds_taken {
+            if !state.taken {
                 continue;
             }
-            for holding in &row.holdings {
-                if number == task && handed(batch, holding) {
+            for holding in holdings {
+                if transferred(view, number, holding) || threshold(view.0, holding).is_none() {
                     continue;
                 }
-                let Some(threshold) = threshold(domain, holding) else { continue };
                 let name = crate::holds::name(holding);
                 let count = self.counts.get(name).copied().unwrap_or(0).saturating_add(1);
-                self.counts.insert(name.clone(), count).expect("one count per indexed resource");
-                if count != threshold {
+                self.counts.insert(name.clone(), count).expect("bounded resource counts");
+                if count != 1 {
                     continue;
                 }
-                for ((_, waiter), ()) in domain.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
-                    self.waiter(domain, staged, *waiter, number);
+                for ((_, waiter), ()) in view.0.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+                    self.waiter(view, *waiter);
                 }
-                for (resource, waiter) in queued.as_slice() {
+                for (resource, waiter) in links.queued.as_slice() {
                     if resource == name {
-                        self.waiter(domain, staged, *waiter, number);
+                        self.waiter(view, *waiter);
                     }
                 }
             }
         }
     }
 
-    fn dependent(&mut self, domain: &Domain, staged: &Staged, dependent: u64, number: u64) {
-        if let Some(row) = staged.record(domain, dependent)
-            && dependencies_wait(&row.phase)
-            && crate::batch::contains(row.waiting_on, number)
-        {
-            self.mark(dependent, number);
+    fn waits(
+        &self,
+        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+        number: u64,
+        gates: &Map<(Name, u64), Gate>,
+    ) -> u32 {
+        let (waiting_on, added, delegates, holdings, state) = rows(view, number);
+        let mut pending = 0_u32;
+        if state.phase.dependencies() {
+            for list in [waiting_on, added] {
+                for dependency in list {
+                    if self.pending.contains_key(dependency) {
+                        pending = pending.checked_add(1).expect("bounded waits");
+                    }
+                }
+            }
+        }
+        if state.phase.delegates() {
+            for child in delegates {
+                if self.pending.contains_key(child) && row_state(view, *child).requester == Party::Task(number) {
+                    pending = pending.checked_add(1).expect("bounded waits");
+                }
+            }
+            if view.2.creator == Party::Task(number) {
+                pending =
+                    pending.checked_add(u32::try_from(view.5.len()).expect("batch bound")).expect("bounded waits");
+            }
+        }
+        if state.queued {
+            for holding in holdings {
+                if self.stuck(view, number, holding, gates) {
+                    pending = pending.checked_add(1).expect("bounded waits");
+                }
+            }
+        }
+        pending
+    }
+
+    fn stuck(
+        &self,
+        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+        number: u64,
+        holding: &Holding,
+        gates: &Map<(Name, u64), Gate>,
+    ) -> bool {
+        let Some(threshold) = threshold(view.0, holding) else { return false };
+        let name = crate::holds::name(holding);
+        if member_named(view.5, number) {
+            match gates.get(&(name.clone(), number)) {
+                Some(gate) => gate.count >= gate.threshold,
+                None => false,
+            }
+        } else {
+            self.counts.get(name).copied().unwrap_or(0) >= threshold
         }
     }
 
-    fn waiter(&mut self, domain: &Domain, staged: &Staged, waiter: u64, number: u64) {
-        if let Some(row) = staged.record(domain, waiter)
-            && queued_row(&row)
-        {
-            self.mark(waiter, number);
+    fn eliminate(
+        &mut self,
+        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+        links: &Links,
+        gates: &mut Map<(Name, u64), Gate>,
+        limits: &Limits,
+    ) {
+        // Reuse the marking queue to initialize counts without changing membership.
+        for at in 0..self.stack.len() {
+            let number = *self.stack.get(at).expect("marked task");
+            let count = self.waits(view, number, gates);
+            *self.pending.get_mut(&number).expect("marked task") = count;
+        }
+        self.stack.clear();
+        for (number, count) in &self.pending {
+            if *count == 0 {
+                self.stack.push(*number).expect("one ready entry per task");
+            }
+        }
+        for at in 0..limits.tasks {
+            let Some(&number) = self.stack.get(at) else { break };
+            self.pending.remove(&number);
+            for ((_, dependent), ()) in view.0.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
+                let (waiting_on, _, _, _, state) = rows(view, *dependent);
+                if state.phase.dependencies() && crate::batch::contains(waiting_on, number) {
+                    self.met(*dependent);
+                }
+            }
+            for (dependency, dependent) in links.added.as_slice() {
+                if *dependency == number {
+                    let (waiting_on, added, _, _, state) = rows(view, *dependent);
+                    if state.phase.dependencies()
+                        && (crate::batch::contains(waiting_on, number) || crate::batch::contains(added, number))
+                    {
+                        self.met(*dependent);
+                    }
+                }
+            }
+            let (_, _, _, holdings, state) = rows(view, number);
+            if let Party::Task(parent) = state.requester
+                && is_child(view, parent, number)
+            {
+                self.met(parent);
+            }
+            if state.taken {
+                for holding in holdings {
+                    if !transferred(view, number, holding) {
+                        self.free_resource(view, links, gates, holding);
+                    }
+                }
+            }
+            if member_named(view.5, number) {
+                let mut after = false;
+                for later in view.5 {
+                    if later.number == number {
+                        after = true;
+                        continue;
+                    }
+                    if after {
+                        for holding in holdings {
+                            if let Some(gate) = gates.get_mut(&(crate::holds::name(holding).clone(), later.number)) {
+                                let before = gate.count;
+                                gate.count = gate.count.checked_sub(1).expect("earlier member counted");
+                                if before == gate.threshold {
+                                    self.met(later.number);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    fn problem(&self, limits: &Limits, task: u64, first: u64) -> Problem {
-        let mut tasks = List::with_capacity(limits.circle);
-        let mut next = task;
-        let mut cut = false;
-        for at in 0..=limits.tasks {
-            if tasks.push(next).is_err() {
-                cut = true;
-                break;
+    fn free_resource(
+        &mut self,
+        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+        links: &Links,
+        gates: &mut Map<(Name, u64), Gate>,
+        holding: &Holding,
+    ) {
+        let Some(threshold) = threshold(view.0, holding) else { return };
+        let name = crate::holds::name(holding);
+        let count = self.counts.get_mut(name).expect("marked resource holder");
+        let before = *count;
+        *count = count.checked_sub(1).expect("holder counted once");
+        if before == threshold {
+            for ((_, waiter), ()) in view.0.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+                if row_state(view, *waiter).queued {
+                    self.met(*waiter);
+                }
             }
-            next = if at == 0 { first } else { *self.markers.get(&next).expect("marked circle member") };
-            if next == task {
+            for (resource, waiter) in links.queued.as_slice() {
+                if resource == name && !member_named(view.5, *waiter) && row_state(view, *waiter).queued {
+                    self.met(*waiter);
+                }
+            }
+        }
+        for member in view.5 {
+            if let Some(gate) = gates.get_mut(&(name.clone(), member.number)) {
+                let before = gate.count;
+                gate.count = gate.count.checked_sub(1).expect("live holder counted");
+                if before == gate.threshold {
+                    self.met(member.number);
+                }
+            }
+        }
+    }
+
+    /// Choose the first stuck wait's ordinal: dependencies, delegates, then resources (6.7).
+    fn choice(
+        &self,
+        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+        gates: &Map<(Name, u64), Gate>,
+        number: u64,
+    ) -> u64 {
+        let (waiting_on, added, delegates, holdings, state) = rows(view, number);
+        let mut at = 0_u64;
+        for list in [waiting_on, added] {
+            for dependency in list {
+                if state.phase.dependencies() && self.pending.contains_key(dependency) {
+                    return at;
+                }
+                at = at.checked_add(1).expect("bounded waits");
+            }
+        }
+        for child in delegates {
+            if is_child(view, number, *child)
+                && self.pending.contains_key(child)
+                && row_state(view, *child).requester == Party::Task(number)
+            {
+                return at;
+            }
+            at = at.checked_add(1).expect("bounded waits");
+        }
+        if view.2.creator == Party::Task(number) {
+            for member in view.5 {
+                if state.phase.delegates() && self.pending.contains_key(&member.number) {
+                    return at;
+                }
+                at = at.checked_add(1).expect("bounded waits");
+            }
+        }
+        for holding in holdings {
+            if state.queued && self.stuck(view, number, holding, gates) {
+                return at;
+            }
+            at = at.checked_add(1).expect("bounded waits");
+        }
+        unreachable!("each remaining task has a stuck wait")
+    }
+
+    fn problem(
+        &self,
+        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+        gates: &Map<(Name, u64), Gate>,
+        limits: &Limits,
+        task: u64,
+    ) -> Problem {
+        let mut choices = Map::with_capacity(limits.tasks);
+        for (number, _) in &self.pending {
+            let choice = self.choice(view, gates, *number);
+            choices.insert(*number, self.first(view, *number, choice)).expect("one chosen witness per remaining task");
+        }
+        let mut knot =
+            Knot { seen: Set::with_capacity(limits.tasks), tasks: List::with_capacity(limits.circle), cut: false };
+        let mut root = task;
+        if !view.5.is_empty() {
+            // A whole batch can leave a creator or member upstream of its knot.
+            // Following the first witnesses removes that prefix before breadth-first naming.
+            for _ in 0..=limits.tasks {
+                if !knot.seen.insert(root).expect("bounded remaining tasks") {
+                    break;
+                }
+                root = *choices.get(&root).expect("remaining witness");
+            }
+            knot.seen = Set::with_capacity(limits.tasks);
+        }
+        knot.visit(root);
+        for at in 0..limits.circle {
+            let Some(&number) = knot.tasks.get(at) else { break };
+            self.name_wait(view, number, self.choice(view, gates, number), &mut knot);
+            if knot.cut {
                 break;
             }
         }
-        Problem::naming(Some(task), Refusal::Circle { cut }, tasks.as_slice())
+        Problem::naming(Some(root), Refusal::Circle { cut: knot.cut }, knot.tasks.as_slice())
+    }
+
+    fn first(&self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64, choice: u64) -> u64 {
+        let at = match witness(view, number, choice) {
+            Witness::Task(task) => return task,
+            Witness::Resource(at) => at,
+        };
+        let holding =
+            rows(view, number).3.get(usize::try_from(at).expect("resource ordinal")).expect("chosen resource");
+        let name = crate::holds::name(holding);
+        if view.5.is_empty() {
+            for ((_, holder), ()) in view.0.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+                if self.pending.contains_key(holder) {
+                    return *holder;
+                }
+            }
+        } else {
+            for (holder, _) in &self.pending {
+                if witnesses_resource(view, number, *holder, holding) {
+                    return *holder;
+                }
+            }
+        }
+        unreachable!("stuck resource has a remaining holder")
+    }
+
+    fn name_wait(
+        &self,
+        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+        number: u64,
+        choice: u64,
+        knot: &mut Knot,
+    ) {
+        let at = match witness(view, number, choice) {
+            Witness::Task(task) => {
+                knot.visit(task);
+                return;
+            }
+            Witness::Resource(at) => at,
+        };
+        let holdings = rows(view, number).3;
+        let holding = holdings.get(usize::try_from(at).expect("bounded resource ordinal")).expect("chosen resource");
+        let mut left = threshold(view.0, holding).expect("stuck resource");
+        let name = crate::holds::name(holding);
+        if view.5.is_empty() {
+            for ((_, holder), ()) in view.0.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+                if self.pending.contains_key(holder) && is_holder(view, *holder, holding) {
+                    knot.visit(*holder);
+                    left = left.checked_sub(1).expect("one resource witness");
+                    if left == 0 || knot.cut {
+                        return;
+                    }
+                }
+            }
+        } else {
+            // Live holders and earlier member reservations share number order.
+            for (holder, _) in &self.pending {
+                if witnesses_resource(view, number, *holder, holding) {
+                    knot.visit(*holder);
+                    left = left.checked_sub(1).expect("one resource witness");
+                    if left == 0 || knot.cut {
+                        return;
+                    }
+                }
+            }
+        }
+        unreachable!("stuck resource has its threshold of holders left")
+    }
+}
+
+fn witness(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64, mut choice: u64) -> Witness {
+    let (waiting_on, added, delegates, _, _) = rows(view, number);
+    for list in [waiting_on, added, delegates] {
+        for witness in list {
+            if choice == 0 {
+                return Witness::Task(*witness);
+            }
+            choice = choice.checked_sub(1).expect("chosen later wait");
+        }
+    }
+    if view.2.creator == Party::Task(number) {
+        for member in view.5 {
+            if choice == 0 {
+                return Witness::Task(member.number);
+            }
+            choice = choice.checked_sub(1).expect("chosen later wait");
+        }
+    }
+    Witness::Resource(u32::try_from(choice).expect("bounded resource ordinal"))
+}
+
+enum Witness {
+    Task(u64),
+    Resource(u32),
+}
+
+fn witnesses_resource(
+    view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+    waiter: u64,
+    number: u64,
+    holding: &Holding,
+) -> bool {
+    if is_holder(view, number, holding) && has(rows(view, number).3, holding) {
+        return true;
+    }
+    if member_named(view.5, waiter) {
+        for prior in view.5 {
+            if prior.number == waiter {
+                break;
+            }
+            if prior.number == number && has(&prior.holdings, holding) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Breadth-first names stop at the configured bound; revisits never spend a name (domain/tasks.md, 6.7).
+struct Knot {
+    seen: Set<u64>,
+    tasks: List<u64>,
+    cut: bool,
+}
+
+impl Knot {
+    fn visit(&mut self, number: u64) {
+        if self.seen.insert(number).expect("bounded remaining tasks") && self.tasks.push(number).is_err() {
+            self.cut = true;
+        }
+    }
+}
+
+/// Missing staged reverse edges are built once, then shared by marking and elimination (domain/tasks.md, 6.7).
+struct Links {
+    added: List<(u64, u64)>,
+    queued: List<(Name, u64)>,
+}
+
+impl Links {
+    fn new(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), limits: &Limits) -> Self {
+        let mut links = Self {
+            added: List::with_capacity(limits.tasks.checked_mul(limits.dependencies).expect("dependency edges")),
+            queued: List::with_capacity(resource_capacity(limits).expect("resource edges")),
+        };
+        for (number, _) in &view.0.names {
+            links.row(view, *number);
+        }
+        for member in view.5 {
+            links.row(view, member.number);
+        }
+        links
+    }
+
+    fn row(&mut self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64) {
+        let (waiting_on, added, _, holdings, state) = rows(view, number);
+        for list in [waiting_on, added] {
+            for dependency in list {
+                if !view.0.waits.dependents.contains_key(&(*dependency, number)) {
+                    self.added.push((*dependency, number)).expect("bounded projected dependencies");
+                }
+            }
+        }
+        if state.queued {
+            for holding in holdings {
+                let pair = (crate::holds::name(holding).clone(), number);
+                if !view.0.waits.waiters.contains_key(&pair) {
+                    self.queued.push(pair).expect("bounded projected queues");
+                }
+            }
+        }
     }
 }
 
@@ -307,7 +819,62 @@ fn handed(batch: &[New], holding: &Holding) -> bool {
     false
 }
 
-/// Judge new dependencies by walking back from their waiter (domain/tasks.md, 6.7).
+fn batch_gates(
+    view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
+    judge: &Judge,
+    limits: &Limits,
+) -> Map<(Name, u64), Gate> {
+    let members = u32::try_from(view.5.len()).expect("admitted batch bound");
+    let mut gates = Map::with_capacity(members.checked_mul(limits.holdings).expect("batch gates"));
+    for member in view.5 {
+        if !row_state(view, member.number).queued {
+            continue;
+        }
+        for holding in &member.holdings {
+            let Some(threshold) = threshold(view.0, holding) else { continue };
+            if !gate(view, member.number, holding) {
+                continue;
+            }
+            let name = crate::holds::name(holding);
+            let mut count = judge.counts.get(name).copied().unwrap_or(0);
+            for prior in view.5 {
+                if prior.number == member.number {
+                    break;
+                }
+                if has(&prior.holdings, holding) {
+                    count = count.saturating_add(1);
+                }
+            }
+            gates.insert((name.clone(), member.number), Gate { count, threshold }).expect("bounded batch gates");
+        }
+    }
+    gates
+}
+
+fn judge(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), limits: &Limits) -> Result<(), Problem> {
+    let links = Links::new(view, limits);
+    let mut judge = Judge::new(limits);
+    judge.walk(view, &links, limits);
+    let mut gates = batch_gates(view, &judge, limits);
+    // Phase B can end an already-ready source immediately. A batch also judges
+    // its members, which can circle without their creator (domain/tasks.md, 6.7).
+    if view.5.is_empty() && judge.waits(view, view.2.task, &gates) == 0 {
+        return Ok(());
+    }
+    judge.eliminate(view, &links, &mut gates, limits);
+    if judge.pending.contains_key(&view.2.task) {
+        return Err(judge.problem(view, &gates, limits, view.2.task));
+    }
+    // A batch can contain an internal circle while its creator is held or absent.
+    for member in view.5 {
+        if judge.pending.contains_key(&member.number) {
+            return Err(judge.problem(view, &gates, limits, member.number));
+        }
+    }
+    Ok(())
+}
+
+/// Judge new dependencies with every wait they join (domain/tasks.md, 6.7).
 pub(crate) fn check_added(
     domain: &Domain,
     staged: &Staged,
@@ -315,33 +882,31 @@ pub(crate) fn check_added(
     task: u64,
     added: &[u64],
 ) -> Result<(), Problem> {
-    let mut back = Back::new(limits);
-    back.walk(domain, staged, limits, task, &[]);
-    for dependency in added {
-        if back.markers.contains_key(dependency) {
-            return Err(back.problem(limits, task, *dependency));
-        }
+    let row = staged.record(domain, task).expect("amended task");
+    if added.is_empty() || !dependencies_wait(&row.phase) {
+        return Ok(());
     }
-    Ok(())
+    judge(
+        &(
+            domain,
+            staged,
+            Entry {
+                task,
+                phase: WaitPhase::for_phase(&row.phase),
+                waiting: row.phase == Phase::Waiting,
+                creator: Party::Person(0),
+            },
+            &[],
+            added,
+            &[],
+        ),
+        limits,
+    )
 }
 
-/// Judge the queue edges a waiting or released task would give back (domain/tasks.md, 6.2 and 6.7).
+/// Judge all queues a waiting or released task would join together (domain/tasks.md, 6.7).
 pub(crate) fn check_queue(domain: &Domain, staged: &Staged, limits: &Limits, task: u64) -> Result<(), Problem> {
-    let Some(row) = staged.record(domain, task) else { return Ok(()) };
-    let mut back = Back::new(limits);
-    back.walk(domain, staged, limits, task, &[]);
-    for holding in &row.holdings {
-        let Some(threshold) = threshold(domain, holding) else { continue };
-        let name = crate::holds::name(holding);
-        if back.counts.get(name).copied().unwrap_or(0) >= threshold {
-            for ((_, holder), ()) in domain.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
-                if back.markers.contains_key(holder) {
-                    return Err(back.problem(limits, task, *holder));
-                }
-            }
-        }
-    }
-    Ok(())
+    check_waits(domain, staged, limits, task, &Phase::Waiting, &[])
 }
 
 /// Leave a circling queue at its saved place, publishing the ordinary held notice (5.5 and 6.7).
@@ -367,18 +932,18 @@ pub(crate) fn hold_circle(
 
 /// Rejudge affected circle holds outside publication; a cut circle is always reconsidered.
 pub(crate) fn lift(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
-    if domain.circle_changes.is_empty() {
+    if !domain.circle_changes.all && domain.circle_changes.tasks.is_empty() {
         return false;
     }
-    let changes = core::mem::replace(&mut domain.circle_changes, Set::with_capacity(env.limits.tasks));
+    let changes = core::mem::replace(&mut domain.circle_changes, CircleChanges::new(&env.limits));
     let numbers = crate::domain::snapshot(domain, env.limits.tasks);
     let mut lifted = false;
     for number in numbers.into_boxed() {
         let Some(row) = record(domain, number) else { continue };
         let Some(circle) = circle_held(&row.phase) else { continue };
-        let mut affected = circle.cut;
+        let mut affected = circle.cut || changes.all;
         for task in &circle.tasks {
-            affected |= changes.contains(task);
+            affected |= changes.tasks.contains(task);
         }
         if !affected {
             continue;
@@ -420,45 +985,11 @@ struct Gate {
     threshold: u32,
 }
 
-pub(crate) fn pool_changed(domain: &mut Domain, limits: &Limits) {
-    for (number, _) in &domain.names {
-        if let Some(row) = record(domain, *number)
-            && circle_held(&row.phase).is_some()
-        {
-            domain.circle_changes.insert(*number).expect("bounded circle holds");
-        }
-    }
-    // `limits` also documents that the pending set shares the live task bound.
-    assert!(domain.circle_changes.len() <= limits.tasks, "bounded circle changes");
+pub(crate) fn pool_changed(domain: &mut Domain, _limits: &Limits) {
+    domain.circle_changes.all = true;
 }
 
-struct Eliminate {
-    pending: Map<u64, u32>,
-    counts: Map<Name, u32>,
-    ready: List<u64>,
-}
-
-impl Eliminate {
-    fn new(limits: &Limits) -> Self {
-        Self {
-            pending: Map::with_capacity(limits.tasks),
-            counts: Map::with_capacity(resource_capacity(limits).expect("resource count")),
-            ready: List::with_capacity(limits.tasks),
-        }
-    }
-
-    fn met(&mut self, number: u64) {
-        if let Some(count) = self.pending.get_mut(&number) {
-            *count = count.checked_sub(1).expect("each wait removed once");
-            if *count == 0 {
-                self.ready.push(number).expect("one ready entry per task");
-            }
-        }
-    }
-}
-
-/// Judge the restored set whole by ending the tasks that can end, with threshold counters.
-/// A dependency/delegate remainder alone is corrupt; a queue circle becomes a hold (6.7).
+/// Judge the restored set whole; hold its earliest circling queue waiter (domain/tasks.md, 6.7).
 pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
     for _ in 0..=env.limits.tasks {
         let remaining = eliminate(domain, &env.limits);
@@ -485,219 +1016,57 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Re
 }
 
 fn eliminate(domain: &Domain, limits: &Limits) -> Map<u64, u32> {
-    let mut judge = Eliminate::new(limits);
+    let Some((&task, _)) = domain.names.first() else { return Map::with_capacity(limits.tasks) };
+    let staged = Staged::new(0);
+    let row = record(domain, task).expect("live task");
+    let view = (
+        domain,
+        &staged,
+        Entry {
+            task,
+            phase: WaitPhase::for_phase(&row.phase),
+            waiting: row.phase == Phase::Waiting,
+            creator: Party::Person(0),
+        },
+        row.waiting_on.as_ref(),
+        &[][..],
+        &[][..],
+    );
+    let links = Links::new(&view, limits);
+    let mut judge = Judge::new(limits);
+    for (number, _) in &domain.names {
+        judge.mark(*number);
+    }
     for ((name, _), ()) in &domain.waits.holders {
         let count = judge.counts.get(name).copied().unwrap_or(0).saturating_add(1);
         judge.counts.insert(name.clone(), count).expect("bounded resources");
     }
-    for (number, _) in &domain.names {
-        let row = record(domain, *number).expect("restored task");
-        let mut pending = 0_u32;
-        if dependencies_wait(&row.phase) {
-            pending = u32::try_from(row.waiting_on.len()).expect("bounded dependencies");
-        }
-        if delegates_wait(&row.phase) {
-            pending = pending
-                .checked_add(u32::try_from(row.delegates.len()).expect("bounded delegates"))
-                .expect("validated wait counters");
-        }
-        if crate::holds::queued(row) {
-            for holding in &row.holdings {
-                if let Some(threshold) = threshold(domain, holding)
-                    && judge.counts.get(crate::holds::name(holding)).copied().unwrap_or(0) >= threshold
-                {
-                    pending = pending.checked_add(1).expect("bounded waits");
-                }
-            }
-        }
-        judge.pending.insert(*number, pending).expect("bounded tasks");
-        if pending == 0 {
-            judge.ready.push(*number).expect("one ready entry per task");
-        }
-    }
-    for at in 0..limits.tasks {
-        let Some(&number) = judge.ready.get(at) else { break };
-        judge.pending.remove(&number);
-        for ((_, dependent), ()) in domain.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
-            if let Some(row) = record(domain, *dependent)
-                && dependencies_wait(&row.phase)
-            {
-                judge.met(*dependent);
-            }
-        }
-        let row = record(domain, number).expect("eliminated live row");
-        if let Party::Task(parent) = row.requester
-            && let Some(row) = record(domain, parent)
-            && delegates_wait(&row.phase)
-        {
-            judge.met(parent);
-        }
-        if !row.holds_taken {
-            continue;
-        }
-        for holding in &row.holdings {
-            let Some(threshold) = threshold(domain, holding) else { continue };
-            let name = crate::holds::name(holding);
-            let count = judge.counts.get_mut(name).expect("indexed held resource");
-            let before = *count;
-            *count = count.checked_sub(1).expect("held resource counted once");
-            if before != threshold {
-                continue;
-            }
-            for ((_, waiter), ()) in domain.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
-                judge.met(*waiter);
-            }
-        }
-    }
+    judge.eliminate(&view, &links, &mut Map::with_capacity(0), limits);
     judge.pending
 }
 
-/// Judge a creator's added delegation wait by a back walk, and new members by Kahn counters.
-/// Earlier declarations and hand-downs count as in whole-set hold admission (4; 6.7).
+/// Judge members, their ordered reservations and their creator's new wait together (domain/tasks.md, 6.7).
 pub(crate) fn check_batch(domain: &Domain, limits: &Limits, creator: Party, batch: &[New]) -> Result<(), Problem> {
-    let mut back = Back::new(limits);
-    let parent = match creator {
-        Party::Task(number) if delegates_wait(&record(domain, number).expect("admitted creator").phase) => {
-            back.walk(domain, &Staged::new(0), limits, number, batch);
-            Some(number)
-        }
-        Party::Task(_) | Party::Person(_) | Party::Deployment { .. } => None,
+    let staged = Staged::new(0);
+    let task = match creator {
+        Party::Task(parent) => parent,
+        Party::Person(_) | Party::Deployment { .. } => batch.first().expect("nonempty admitted batch").number,
     };
-    let mut judge = Eliminate::new(limits);
-    let mut dependencies = Map::with_capacity(limits.batch.checked_mul(limits.dependencies).expect("batch edges"));
-    let mut gates = Map::with_capacity(limits.batch.checked_mul(limits.holdings).expect("batch gates"));
-    for (at, member) in batch.iter().enumerate() {
-        let mut pending = 0_u32;
-        for dependency in &member.dependencies {
-            if back.markers.contains_key(dependency) {
-                back.mark(member.number, *dependency);
-                return Err(back.problem(limits, parent.expect("creator's back walk"), member.number));
-            }
-            if member_named(batch, *dependency) {
-                dependencies.insert((*dependency, member.number), ()).expect("bounded new dependencies");
-                pending = pending.checked_add(1).expect("bounded waits");
-            }
-        }
-        if member.dependencies.is_empty() {
-            for holding in &member.holdings {
-                let Some(threshold) = threshold(domain, holding) else { continue };
-                let name = crate::holds::name(holding);
-                let mut earlier = 0_u32;
-                for prior in batch.iter().take(at) {
-                    if has(&prior.holdings, holding) {
-                        earlier = earlier.saturating_add(1);
-                    }
-                }
-                let mut marked = 0_u32;
-                let mut first = None;
-                let mut transfer = false;
-                for ((_, holder), ()) in domain.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
-                    if creator == Party::Task(*holder) {
-                        transfer = true;
-                        continue;
-                    }
-                    if back.markers.contains_key(holder) {
-                        marked = marked.saturating_add(1);
-                        if first.is_none() {
-                            first = Some(*holder);
-                        }
-                    }
-                }
-                if transfer && earlier == 0 {
-                    continue;
-                }
-                if marked >= threshold {
-                    back.mark(member.number, first.expect("marked resource holder"));
-                    return Err(back.problem(limits, parent.expect("creator's back walk"), member.number));
-                }
-                let count = marked.saturating_add(earlier);
-                if count >= threshold {
-                    gates.insert((name.clone(), member.number), Gate { count, threshold }).expect("bounded gates");
-                    pending = pending.checked_add(1).expect("bounded waits");
-                }
-            }
-        }
-        judge.pending.insert(member.number, pending).expect("bounded members");
-        if pending == 0 {
-            judge.ready.push(member.number).expect("one ready entry per member");
-        }
-    }
-    for at in 0..limits.batch {
-        let Some(&number) = judge.ready.get(at) else { break };
-        judge.pending.remove(&number);
-        for ((_, dependent), ()) in dependencies.range((number, 0)..=(number, u64::MAX)) {
-            judge.met(*dependent);
-        }
-        let mut after = false;
-        let member = member(batch, number);
-        for later in batch {
-            if later.number == number {
-                after = true;
-                continue;
-            }
-            if !after {
-                continue;
-            }
-            for holding in &member.holdings {
-                if let Some(gate) = gates.get_mut(&(crate::holds::name(holding).clone(), later.number)) {
-                    let before = gate.count;
-                    gate.count = gate.count.checked_sub(1).expect("earlier holder counted");
-                    if before == gate.threshold {
-                        judge.met(later.number);
-                    }
-                }
-            }
-        }
-    }
-    if judge.pending.is_empty() {
-        return Ok(());
-    }
-    Err(batch_circle(limits, batch, &judge.pending, &gates))
-}
-
-fn batch_circle(limits: &Limits, batch: &[New], pending: &Map<u64, u32>, gates: &Map<(Name, u64), Gate>) -> Problem {
-    // Pick one remaining wait per member, then follow until the path repeats.
-    let mut circle = Back::new(limits);
-    for (number, _) in pending {
-        let member = member(batch, *number);
-        let mut next = None;
-        for dependency in &member.dependencies {
-            if pending.contains_key(dependency) {
-                next = Some(*dependency);
-                break;
-            }
-        }
-        if next.is_none() {
-            for holding in &member.holdings {
-                if let Some(gate) = gates.get(&(crate::holds::name(holding).clone(), *number))
-                    && gate.count >= gate.threshold
-                {
-                    for prior in batch {
-                        if prior.number == *number {
-                            break;
-                        }
-                        if pending.contains_key(&prior.number) && has(&prior.holdings, holding) {
-                            next = Some(prior.number);
-                            break;
-                        }
-                    }
-                }
-                if next.is_some() {
-                    break;
-                }
-            }
-        }
-        circle.markers.insert(*number, next.expect("remaining member has a remaining wait")).expect("bounded markers");
-    }
-    let mut next = *pending.first().expect("remaining circle").0;
-    let mut seen = Set::with_capacity(limits.tasks);
-    for _ in 0..=limits.tasks {
-        if !seen.insert(next).expect("bounded visited members") {
-            return circle.problem(limits, next, *circle.markers.get(&next).expect("remaining wait"));
-        }
-        next = *circle.markers.get(&next).expect("remaining wait");
-    }
-    unreachable!("finite remaining wait graph repeats")
+    let (phase, pending) = match record(domain, task) {
+        Some(row) => (&row.phase, row.waiting_on.as_ref()),
+        None => (&Phase::Waiting, &[][..]),
+    };
+    judge(
+        &(
+            domain,
+            &staged,
+            Entry { task, phase: WaitPhase::for_phase(phase), waiting: *phase == Phase::Waiting, creator },
+            pending,
+            &[],
+            batch,
+        ),
+        limits,
+    )
 }
 
 fn member_named(batch: &[New], number: u64) -> bool {
@@ -725,17 +1094,39 @@ fn dependencies_wait(phase: &Phase) -> bool {
     }
 }
 
-fn delegates_wait(phase: &Phase) -> bool {
-    match phase {
-        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) => true,
-        Phase::Held { .. } | Phase::Ended(_) => false,
-    }
+/// Tasks wait on dependencies and delegates, delegates alone, or no task (domain/tasks.md, 6.7).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WaitPhase {
+    Tasks,
+    Delegates,
+    None,
 }
 
-fn is_held(phase: &Phase) -> bool {
-    match phase {
-        Phase::Held { .. } => true,
-        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => false,
+impl WaitPhase {
+    fn for_phase(phase: &Phase) -> Self {
+        match phase {
+            Phase::Waiting | Phase::Active(_) => Self::Tasks,
+            Phase::Closing(_) => Self::Delegates,
+            Phase::Held { .. } | Phase::Ended(_) => Self::None,
+        }
+    }
+
+    fn dependencies(self) -> bool {
+        match self {
+            Self::Tasks => true,
+            Self::Delegates | Self::None => false,
+        }
+    }
+
+    fn delegates(self) -> bool {
+        match self {
+            Self::Tasks | Self::Delegates => true,
+            Self::None => false,
+        }
+    }
+
+    fn loses(self, next: Self) -> bool {
+        (self.dependencies() && !next.dependencies()) || (self.delegates() && !next.delegates())
     }
 }
 
@@ -807,31 +1198,46 @@ pub(crate) fn check_waits(
     phase: &Phase,
     pending: &[u64],
 ) -> Result<(), Problem> {
-    let row = staged.record(domain, task).expect("released live row");
-    if dependencies_wait(phase) {
-        check_added(domain, staged, limits, task, pending)?;
-    }
-    {
-        let mut back = Back::new(limits);
-        back.walk(domain, staged, limits, task, &[]);
-        if delegates_wait(phase) {
-            for delegate in &row.delegates {
-                if let Some(child) = staged.record(domain, *delegate)
-                    && child.requester == Party::Task(task)
-                    && back.markers.contains_key(delegate)
-                {
-                    return Err(back.problem(limits, task, *delegate));
-                }
-            }
-        }
-    }
-    if *phase == Phase::Waiting && pending.is_empty() && !row.holds_taken {
-        check_queue(domain, staged, limits, task)
-    } else {
-        Ok(())
-    }
+    judge(
+        &(
+            domain,
+            staged,
+            Entry {
+                task,
+                phase: WaitPhase::for_phase(phase),
+                waiting: *phase == Phase::Waiting,
+                creator: Party::Person(0),
+            },
+            pending,
+            &[],
+            &[],
+        ),
+        limits,
+    )
 }
 
-fn queued_row(row: &crate::compound::CompoundTask<'_>) -> bool {
-    row.phase == Phase::Waiting && !row.holds_taken && row.waiting_on.is_empty()
+#[cfg(test)]
+mod tests {
+    use super::CircleChanges;
+    use skein_lib::Set;
+
+    // No world event is known to exceed the live bound between progress drains.
+    // Exercise saturation directly: duplicate changes at capacity and one beyond (6.7).
+    #[test]
+    fn circle_changes_saturate_without_losing_the_need_to_rejudge() {
+        for capacity in [0, 1, 2] {
+            let mut changes = CircleChanges { tasks: Set::with_capacity(capacity), all: false };
+            for number in 0..capacity {
+                changes.insert(u64::from(number));
+                changes.insert(u64::from(number));
+            }
+            assert!(!changes.all, "at capacity {capacity}, including duplicates");
+            changes.insert(u64::from(capacity));
+            assert!(changes.all, "one beyond capacity {capacity}");
+            assert_eq!(changes.tasks.len(), capacity);
+            changes.insert(u64::MAX);
+            assert!(changes.all);
+            assert_eq!(changes.tasks.len(), capacity);
+        }
+    }
 }

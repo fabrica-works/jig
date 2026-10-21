@@ -365,7 +365,12 @@ fn memory_below_the_components_sum_is_refused() {
     // The tasks domain's wait index, its circle scratch and an amendment's staged
     // promise (tasks::worst_case at this profile's tasks limits) add 2,100,096:
     // 18,724,669,203 + 2,100,096 = 18,726,769,299.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_726_769_299 });
+    // The circle judge (waits::worst_case and compound::worst_case) adds 289,872:
+    // wait rows naming their delegates 352 plus 512 comparison bytes, a third
+    // set 400, two u32 maps for two u64 maps -160, knot waits 1,024, knot
+    // witnesses 8,192 and their 256 owned names 278,528, and a staged return's
+    // 256 circle slots and 768 projected bytes: 18,726,769,299 + 289,872 = 18,727,059,171.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_727_059_171 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

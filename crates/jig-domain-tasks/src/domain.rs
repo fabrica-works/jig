@@ -39,7 +39,7 @@ pub(crate) enum Startup {
 pub struct Domain {
     pub(crate) startup: Startup,
     pub(crate) waits: crate::waits::Index,
-    pub(crate) circle_changes: skein_lib::Set<u64>,
+    pub(crate) circle_changes: crate::waits::CircleChanges,
     pub(crate) tasks: Slab<Task>,
     pub(crate) names: Map<u64, Id<Task>>,
     pub(crate) stubs: Map<u64, crate::Stub>,
@@ -171,7 +171,7 @@ impl Domain {
         Domain {
             startup: Startup::Restoring,
             waits: crate::waits::Index::new(limits),
-            circle_changes: skein_lib::Set::with_capacity(limits.tasks),
+            circle_changes: crate::waits::CircleChanges::new(limits),
             tasks: Slab::with_capacity(limits.tasks),
             names: Map::with_capacity(limits.tasks),
             stubs: Map::with_capacity(crate::limits::stub_capacity(limits).expect("valid stub bound")),

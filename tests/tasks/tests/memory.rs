@@ -634,9 +634,12 @@ fn the_wait_index_and_walk_have_an_explicit_memory_delta() {
     // 16 optional (task, circle) slots * 32 bytes, plus a 32-byte source
     // and eight named u64 tasks per projected return.
     const STAGED_RETURN_BYTES: u64 = 2_048;
+    // Delegate comparison rows: 704 inline + 2,048 payload; a simultaneous
+    // changes set: 800; two u32 pending maps replace two u64 maps: -320.
+    const JUDGEMENT_BYTES: u64 = 3_232;
     assert_eq!(
         tasks::worst_case(&LIMITS),
-        Some(SEED_BYTES + WAIT_BYTES + PROMISE_BYTES + STAGED_EDGE_BYTES + STAGED_RETURN_BYTES)
+        Some(SEED_BYTES + WAIT_BYTES + PROMISE_BYTES + STAGED_EDGE_BYTES + STAGED_RETURN_BYTES + JUDGEMENT_BYTES)
     );
 }
 

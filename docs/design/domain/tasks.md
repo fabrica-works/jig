@@ -1135,12 +1135,11 @@ a restart restoring a circle an older rule allowed, its waiter held; a
 pool's two holders each given a dependency on a task that waits, through
 its delegate, for that pool: the first accepted, the second refused,
 naming the knot; a waiter joining a pool onto a circle through a holder's
-delegate, held, and lifted when that delegate ends; a
-prerequisite already done, met at once, one failed, refused, and one
-that fails later, its dependent held, and released, held again; one
-removed, its task woken; a
-grace given to a kept task with no live run, cancelled at once; a
-proposal from below a kept task waiting above it.
+delegate, held, and lifted when that delegate ends; a prerequisite
+already done, met at once, one failed, refused, and one that fails
+later, its dependent held, and released, held again; one removed, its
+task woken; a grace given to a kept task with no live run, cancelled at
+once; a proposal from below a kept task waiting above it.
 
 Its stories of what parties and agents ask alike: a party's batch of an
 agent's task and a person task, made as an agent's would be; a party's

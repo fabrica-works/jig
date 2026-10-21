@@ -284,44 +284,6 @@ fn control(world: &mut World, task: u64, control: Control) {
     }
 }
 
-// i3-0526.md: the backward pool walk misses a circle made by keeping its
-// second holder. Draw those amendments, but leave that known case unsent.
-fn keeps_second_pool_holder(world: &World, task: u64, dependencies: &[u64]) -> bool {
-    let row = world.record(task);
-    if !row.holds_taken || !matches!(row.phase, Phase::Active(_)) {
-        return false;
-    }
-    let mut pending = false;
-    for dependency in dependencies {
-        if world.records.contains_key(&Key::Live(*dependency)) {
-            pending = true;
-        }
-    }
-    if !pending {
-        return false;
-    }
-    for holding in &row.holdings {
-        let Holding::Slot { pool, .. } = holding else { continue };
-        for record in world.records.values() {
-            if let Stored::Live(other) = record
-                && other.number != task
-                && other.holds_taken
-                && matches!(other.phase, Phase::Active(_))
-                && !other.waiting_on.is_empty()
-            {
-                for holding in &other.holdings {
-                    if let Holding::Slot { pool: other_pool, .. } = holding
-                        && other_pool == pool
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    false
-}
-
 fn compound(world: &mut World, operations: Vec<jig_domain_tasks::Operation>, seen: &mut BTreeSet<Reached>) {
     let mut amended = false;
     let mut staged = skein_lib::List::with_capacity(u32::try_from(operations.len()).expect("small draw"));
@@ -372,9 +334,7 @@ fn compound(world: &mut World, operations: Vec<jig_domain_tasks::Operation>, see
 fn apply(world: &mut World, operation: Operation, seen: &mut BTreeSet<Reached>, attempt: &mut u64) {
     match operation {
         Operation::Amend { task, dependencies } => {
-            if !keeps_second_pool_holder(world, task, &dependencies) {
-                amend(world, task, &dependencies, seen);
-            }
+            amend(world, task, &dependencies, seen);
         }
         Operation::HoldRelease { task } => {
             world.send(Event::Hold { task, why: Hold::Budget });

@@ -1,6 +1,6 @@
 use jig_domain_tasks::{
-    Amendment, Circle, Control, Event, Hold, HoldKind, HoldSource, Holding, Kind, Limits, Name, Operation, Party,
-    Phase, Refusal, Stored, Taken, Was,
+    Active, Amendment, Circle, Control, Event, Hold, HoldKind, HoldSource, Holding, Kind, Limits, Name, Operation,
+    Party, Phase, Refusal, Stored, Taken, Was,
 };
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::{Duration, List};
@@ -13,6 +13,8 @@ const PREREQUISITE: u64 = 5;
 const WAITER: u64 = 6;
 const LATER: u64 = 7;
 const OTHER_HOLDER: u64 = 8;
+const DELEGATE_READY: u64 = 10;
+const HOLDER_READY: u64 = 11;
 const PERSON: u64 = 9;
 const CONNECTOR: u16 = 1;
 const KIND: u16 = 1;
@@ -66,9 +68,7 @@ fn delayed(pooled: bool, limits: &Limits) -> World {
 }
 
 fn finish_prerequisite(world: &mut World) {
-    world.claim(PREREQUISITE, PREREQUISITE);
-    world.finish(PREREQUISITE);
-    world.settle(PREREQUISITE);
+    finish_task(world, PREREQUISITE);
 }
 
 fn named_circle(world: &World, number: u64) -> &Circle {
@@ -409,4 +409,306 @@ fn a_compound_amendment_that_reholds_a_returning_waiter_adds_no_queue_edge() {
     assert_eq!(compound(&mut world, operations), Reply::Done);
     assert_eq!(world.record(HOLDER).waiting_on.as_ref(), [REQUESTER]);
     assert_eq!(named_circle(&world, WAITER).tasks.as_ref(), [WAITER, HOLDER, REQUESTER]);
+}
+
+fn pool_task(number: u64, dependencies: &[u64]) -> jig_domain_tasks::New {
+    let mut new = task(number, dependencies);
+    new.holdings = Box::new([holding(true)]);
+    new
+}
+
+fn amend_dependencies(world: &mut World, number: u64, dependencies: &[u64]) -> Reply {
+    let operation = amendment(world, number, dependencies);
+    compound(world, vec![operation])
+}
+
+fn cancel(world: &mut World, number: u64) {
+    let reply_to = world.to();
+    world.send(Event::Control {
+        reply_to,
+        by: Party::Person(PERSON),
+        task: number,
+        control: Control::Cancel { reason: Box::new([]), grace: None, message: None },
+    });
+}
+
+fn second_holder() -> World {
+    let mut world = configured(&LIMITS, true);
+    world.make(Party::Person(PERSON), vec![task(ROOT, &[]), pool_task(HOLDER, &[]), pool_task(DEPENDENT, &[])]);
+    world.make(Party::Task(ROOT), vec![task(PREREQUISITE, &[]), pool_task(WAITER, &[])]);
+    world
+}
+
+// i3-0526: both slots become stuck through the requester's pool waiter.
+#[test]
+fn keeping_the_second_pool_holder_is_refused_naming_the_knot() {
+    let mut world = second_holder();
+    assert_eq!(amend_dependencies(&mut world, HOLDER, &[ROOT]), Reply::Done);
+    assert!(matches!(amend_dependencies(&mut world, DEPENDENT, &[ROOT]), Reply::Refused(problem)
+        if problem.why == Refusal::Circle { cut: false }
+        && problem.blocked_by.as_deref() == Some(&[DEPENDENT, ROOT, WAITER, HOLDER])));
+}
+
+fn finish_task(world: &mut World, number: u64) {
+    world.claim(number, number);
+    world.finish(number);
+    world.settle(number);
+}
+
+// Make the delegate before its parent takes the pool, so no hold is handed
+// down. It joins only after its parent has taken the second slot (6.4; 6.7).
+fn pool_delegate() -> World {
+    // Two holders, three prerequisites and the later waiter reserve six results.
+    const FAMILY_DELEGATES: u32 = 6;
+    const FAMILY_INBOX_BYTES: u32 = FAMILY_DELEGATES * LIMITS.result_bytes;
+    let limits = Limits { inbox_bytes: FAMILY_INBOX_BYTES, ..LIMITS };
+    let mut world = configured(&limits, true);
+    world.make(Party::Person(PERSON), vec![task(ROOT, &[])]);
+    world.make(Party::Task(ROOT), vec![task(PREREQUISITE, &[]), task(DELEGATE_READY, &[]), task(HOLDER_READY, &[])]);
+    world.make(Party::Task(ROOT), vec![pool_task(HOLDER, &[]), pool_task(OTHER_HOLDER, &[HOLDER_READY])]);
+    introduce(&mut world, OTHER_HOLDER, DELEGATE_READY);
+    world.make(Party::Task(OTHER_HOLDER), vec![pool_task(DEPENDENT, &[DELEGATE_READY])]);
+    finish_task(&mut world, HOLDER_READY);
+    finish_task(&mut world, DELEGATE_READY);
+    world
+}
+
+fn pool_join() -> World {
+    let mut world = pool_delegate();
+    world.make(Party::Task(ROOT), vec![pool_task(WAITER, &[PREREQUISITE])]);
+    amend_dependencies(&mut world, HOLDER, &[WAITER]);
+    world
+}
+
+#[test]
+fn a_pool_join_names_both_holders_and_lifts_when_the_delegate_ends() {
+    let mut world = pool_join();
+    finish_prerequisite(&mut world);
+    assert_eq!(named_circle(&world, WAITER).tasks.as_ref(), [WAITER, HOLDER, OTHER_HOLDER, DEPENDENT]);
+    let place = world.record(WAITER).hold_wait_since;
+    world.elapse(Duration::from_secs(1));
+    world.make(Party::Person(PERSON), vec![pool_task(LATER, &[])]);
+    cancel(&mut world, DEPENDENT);
+    world.settle(DEPENDENT);
+    assert_eq!(world.record(WAITER).phase, Phase::Waiting);
+    assert_eq!(world.record(WAITER).hold_wait_since, place);
+    assert!(world.record(LATER).hold_wait_since > place);
+    assert_eq!(world.record(WAITER).hold_bound_since, Some(world.env.wall));
+}
+
+#[test]
+fn a_dependency_on_the_pool_waiter_is_refused_from_the_target_side() {
+    let mut world = pool_join();
+    world.make(Party::Person(PERSON), vec![pool_task(LATER, &[])]);
+    let reply = amend_dependencies(&mut world, WAITER, &[LATER]);
+    assert!(
+        matches!(&reply, Reply::Refused(problem)
+        if problem.why == Refusal::Circle { cut: false }
+        && problem.blocked_by.as_deref() == Some(&[WAITER, LATER, HOLDER, OTHER_HOLDER, DEPENDENT])),
+        "{reply:?}"
+    );
+}
+
+fn kept_pool_holders(limits: &Limits) -> World {
+    let mut world = configured(limits, true);
+    world.make(
+        Party::Person(PERSON),
+        vec![
+            pool_task(HOLDER, &[]),
+            pool_task(OTHER_HOLDER, &[]),
+            task(PREREQUISITE, &[]),
+            pool_task(WAITER, &[PREREQUISITE]),
+        ],
+    );
+    amend_dependencies(&mut world, HOLDER, &[WAITER]);
+    amend_dependencies(&mut world, OTHER_HOLDER, &[WAITER]);
+    world
+}
+
+#[test]
+fn removing_either_pool_holders_dependency_lifts_the_waiter() {
+    for holder in [HOLDER, OTHER_HOLDER] {
+        let mut world = kept_pool_holders(&LIMITS);
+        finish_prerequisite(&mut world);
+        assert_eq!(named_circle(&world, WAITER).tasks.as_ref(), [WAITER, HOLDER, OTHER_HOLDER]);
+        let place = world.record(WAITER).hold_wait_since;
+        assert_eq!(amend_dependencies(&mut world, holder, &[]), Reply::Done);
+        assert_eq!(world.record(WAITER).phase, Phase::Waiting);
+        assert_eq!(world.record(WAITER).hold_wait_since, place);
+    }
+}
+
+#[test]
+fn cancelling_either_pool_holder_lifts_the_waiter() {
+    for holder in [HOLDER, OTHER_HOLDER] {
+        let mut world = kept_pool_holders(&LIMITS);
+        finish_prerequisite(&mut world);
+        let place = world.record(WAITER).hold_wait_since;
+        cancel(&mut world, holder);
+        assert_eq!(world.record(WAITER).phase, Phase::Waiting);
+        assert_eq!(world.record(WAITER).hold_wait_since, place);
+        world.settle(holder);
+        assert!(world.record(WAITER).holds_taken);
+    }
+}
+
+#[test]
+fn a_batch_joining_a_pool_circle_is_refused_whole() {
+    let mut world = pool_delegate();
+    world.make(Party::Task(ROOT), vec![task(REQUESTER, &[])]);
+    amend_dependencies(&mut world, HOLDER, &[REQUESTER]);
+    let before = world.records.clone();
+    let reply = world.make(Party::Task(REQUESTER), vec![pool_task(WAITER, &[])]);
+    assert!(
+        matches!(&reply, Reply::Refused(problem)
+        if problem.why == Refusal::Circle { cut: false }
+        && problem.blocked_by.as_deref() == Some(&[REQUESTER, WAITER, HOLDER, OTHER_HOLDER, DEPENDENT])),
+        "{reply:?}"
+    );
+    assert_eq!(world.records, before);
+}
+
+#[test]
+fn shrinking_a_pool_holds_the_knot_without_the_free_holder() {
+    const THREE_HOLDERS: u32 = 3;
+    let mut world = kept_pool_holders(&LIMITS);
+    world.send(Event::Slots { pool: name(), slots: THREE_HOLDERS });
+    world.make(Party::Person(PERSON), vec![pool_task(LATER, &[])]);
+    finish_prerequisite(&mut world);
+    assert_eq!(world.record(WAITER).phase, Phase::Waiting);
+    world.send(Event::Slots { pool: name(), slots: 2 });
+    assert_eq!(named_circle(&world, WAITER).tasks.as_ref(), [WAITER, HOLDER, OTHER_HOLDER]);
+}
+
+#[test]
+fn a_restored_two_holder_pool_circle_holds_its_waiter() {
+    let world = kept_pool_holders(&LIMITS);
+    let mut rows: Vec<_> = world.records.values().filter(|row| row.key().live()).cloned().collect();
+    for row in &mut rows {
+        if let Stored::Live(waiter) = row
+            && waiter.number == WAITER
+        {
+            waiter.dependencies = Box::new([]);
+            waiter.waiting_on = Box::new([]);
+            waiter.hold_wait_since = Some(world.env.wall);
+        }
+    }
+    let mut domain = jig_tasks_world::domain(&LIMITS, SEED);
+    let mut out = skein_lib::Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
+    jig_domain_tasks::step(
+        &mut domain,
+        &world.env,
+        Event::Kinds {
+            connector: CONNECTOR,
+            kinds: Box::new([Kind {
+                connector: CONNECTOR,
+                kind: KIND,
+                hold: HoldKind::Pooled { taken: Taken::Waits },
+            }]),
+        },
+        &mut out,
+    );
+    for row in rows {
+        jig_domain_tasks::step(&mut domain, &world.env, Event::Restore { record: row }, &mut out);
+    }
+    jig_domain_tasks::step(&mut domain, &world.env, Event::Restored, &mut out);
+    assert!(!out.iter().any(|request| matches!(request, jig_domain_tasks::Request::RestoreRefused { .. })));
+    let waiter = domain.task(WAITER).expect("restored waiter");
+    let Phase::Held { why: Hold::Circle, source: Some(source), .. } = &waiter.phase else { panic!("circle hold") };
+    let HoldSource::Circle(circle) = source.as_ref() else { panic!("circle source") };
+    assert_eq!(circle.tasks.as_ref(), [WAITER, HOLDER, OTHER_HOLDER]);
+    assert!(waiter.hold_wait_since.is_some());
+}
+
+// A lift judges the kept rule as every release does (domain/tasks.md, 5.7).
+#[test]
+fn a_circle_held_agent_given_a_dependency_lifts_idle_and_is_not_due() {
+    const LATE: u64 = 10;
+    let mut world = delayed(false, &LIMITS);
+    finish_prerequisite(&mut world);
+    world.send(Event::Hold { task: HOLDER, why: Hold::Budget });
+    release(&mut world, HOLDER);
+    assert!(matches!(world.record(HOLDER).phase, Phase::Held { was: Was::Active(Active::Due), why: Hold::Circle, .. }));
+    world.make(Party::Task(ROOT), vec![task(LATE, &[])]);
+    let reply_to = world.to();
+    let message = world.record(HOLDER).last_message + 1;
+    world.send(Event::Amend {
+        reply_to,
+        by: Party::Task(ROOT),
+        task: HOLDER,
+        message,
+        stop_run: false,
+        funder: None,
+        amendment: Amendment {
+            tracked: None,
+            addressed: None,
+            instructions: None,
+            release: None,
+            spec: None,
+            wake: None,
+            dependencies: Some(Box::new([LATE])),
+            authority: None,
+            llm: None,
+            reason: Box::new([1]),
+        },
+    });
+    assert_eq!(world.record(HOLDER).waiting_on.as_ref(), [LATE]);
+    let reply_to = world.to();
+    world.send(Event::Control {
+        reply_to,
+        by: Party::Task(HOLDER),
+        task: DEPENDENT,
+        control: Control::Cancel { reason: Box::new([]), grace: None, message: None },
+    });
+    world.settle(DEPENDENT);
+    assert_eq!(world.record(HOLDER).phase, Phase::Active(Active::Idle));
+}
+
+#[test]
+fn an_internal_batch_circle_names_its_knot_without_the_creator() {
+    let mut world = configured(&LIMITS, false);
+    world.make(Party::Person(PERSON), vec![task(ROOT, &[])]);
+    let reply = world.make(Party::Task(ROOT), vec![task(REQUESTER, &[HOLDER]), task(HOLDER, &[REQUESTER])]);
+    assert!(
+        matches!(&reply, Reply::Refused(problem)
+        if problem.why == Refusal::Circle { cut: false }
+        && problem.blocked_by.as_deref() == Some(&[REQUESTER, HOLDER])),
+        "{reply:?}"
+    );
+}
+
+#[test]
+fn a_staged_second_pool_holder_is_refused_with_the_whole_compound() {
+    let mut world = second_holder();
+    let before = world.records.clone();
+    let operations = vec![amendment(&world, HOLDER, &[ROOT]), amendment(&world, DEPENDENT, &[ROOT])];
+    let reply = compound(&mut world, operations);
+    assert!(
+        matches!(&reply, Reply::Refused(problem)
+        if problem.why == Refusal::Circle { cut: false }
+        && problem.blocked_by.as_deref() == Some(&[DEPENDENT, ROOT, WAITER, HOLDER])),
+        "{reply:?}"
+    );
+    assert_eq!(world.records, before);
+}
+
+#[test]
+fn a_cut_pool_knot_rejudges_an_unnamed_holders_change() {
+    const NAMED: u32 = 2;
+    let mut world = kept_pool_holders(&Limits { circle: NAMED, ..LIMITS });
+    finish_prerequisite(&mut world);
+    assert_eq!(named_circle(&world, WAITER).tasks.as_ref(), [WAITER, HOLDER]);
+    assert!(named_circle(&world, WAITER).cut);
+    assert_eq!(amend_dependencies(&mut world, OTHER_HOLDER, &[]), Reply::Done);
+    assert_eq!(world.record(WAITER).phase, Phase::Waiting);
+}
+
+#[test]
+fn holding_a_named_pool_holder_lifts_the_waiter() {
+    let mut world = kept_pool_holders(&LIMITS);
+    finish_prerequisite(&mut world);
+    let place = world.record(WAITER).hold_wait_since;
+    world.send(Event::Hold { task: OTHER_HOLDER, why: Hold::Budget });
+    assert_eq!(world.record(WAITER).phase, Phase::Waiting);
+    assert_eq!(world.record(WAITER).hold_wait_since, place);
 }
