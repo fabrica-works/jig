@@ -136,6 +136,7 @@ pub struct Frozen {
     pub replies: BTreeMap<u64, Reply>,
     /// Pending executor preparations (domain/engine.md, 7).
     pub activations: BTreeSet<u64>,
+    activation_counts: BTreeMap<u64, u32>,
     /// Owned activation briefs (domain/engine.md, 9).
     pub contexts: BTreeMap<u64, RunContext>,
     /// Physical executor attempts (domain/engine.md, 7).
@@ -192,6 +193,7 @@ pub struct World {
     pub records: BTreeMap<Key, Stored>,
     pub replies: BTreeMap<u64, Reply>,
     pub activations: BTreeSet<u64>,
+    activation_counts: BTreeMap<u64, u32>,
     /// Owned activation brief supplied by the child (domain/engine.md, 9).
     pub contexts: BTreeMap<u64, RunContext>,
     pub runs: BTreeMap<u64, u64>,
@@ -230,6 +232,7 @@ impl World {
             records: BTreeMap::new(),
             replies: BTreeMap::new(),
             activations: BTreeSet::new(),
+            activation_counts: BTreeMap::new(),
             contexts: BTreeMap::new(),
             runs: BTreeMap::new(),
             stops: BTreeSet::new(),
@@ -264,6 +267,7 @@ impl World {
             records: self.records,
             replies: self.replies,
             activations: self.activations,
+            activation_counts: self.activation_counts,
             contexts: self.contexts,
             runs: self.runs,
             stops: self.stops,
@@ -839,8 +843,7 @@ impl World {
                 Request::Acknowledged { reply_to, accepted, .. } => self.reply(reply_to, Reply::Acknowledged(accepted)),
                 Request::TurnAcknowledged { reply_to, accepted, .. } => self.reply(reply_to, Reply::Turn(accepted)),
                 Request::Activate { context } => {
-                    self.activations.insert(context.task);
-                    self.contexts.insert(context.task, *context);
+                    self.activate(*context);
                 }
                 Request::Stop { task, attempt } => {
                     self.stops.insert((task, attempt));
@@ -1071,6 +1074,18 @@ impl World {
         assert!(self.closing.remove(&task));
         self.observe(Seen::Settled { task });
         self.send(Event::Settled { task });
+    }
+
+    fn activate(&mut self, context: RunContext) {
+        *self.activation_counts.entry(context.task).or_default() += 1;
+        self.activations.insert(context.task);
+        self.contexts.insert(context.task, context);
+    }
+
+    /// Count delivered preparations, including deliveries before a restart.
+    #[must_use]
+    pub fn activations(&self, task: u64) -> u32 {
+        self.activation_counts.get(&task).copied().unwrap_or(0)
     }
 
     pub fn advance(&mut self) {
