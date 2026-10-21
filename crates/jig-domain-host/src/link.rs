@@ -84,6 +84,25 @@ pub struct ModelBound {
     pub output: u32,
 }
 
+/// Maximum endpoint identities admitted in one host hello (hosts.md, 8.1).
+/// Independent of the number of model declarations.
+pub const PROGRAM_ENDPOINTS: u32 = 64;
+
+/// Reject an oversized or ambiguous endpoint declaration before retaining it.
+/// A prefix scan: at most 2,016 comparisons at the cap.
+#[must_use]
+pub fn valid_program_endpoints(endpoints: &[u32]) -> bool {
+    if endpoints.len() > usize::try_from(PROGRAM_ENDPOINTS).expect("u32 fits usize") {
+        return false;
+    }
+    for (at, endpoint) in endpoints.iter().enumerate() {
+        if endpoints.get(..at).expect("prefix").contains(endpoint) {
+            return false;
+        }
+    }
+    true
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Bounds {
     pub program_endpoints: Box<[u32]>,

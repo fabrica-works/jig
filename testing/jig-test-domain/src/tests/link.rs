@@ -2,6 +2,7 @@ use super::fixtures;
 use crate::{Delivery, Payload, Request, link};
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use skein_lib::{Duration, JournalRoom, Queue, Token};
 
@@ -513,4 +514,9 @@ fn direct_resume_observes_wall_expiry_without_firing_or_reordering_the_people_ti
     crate::step(&mut domain, &env, crate::Event::Timer(core::Timer::People));
     assert_eq!(domain.core.people.sign_in_person(1), None);
     assert_eq!(domain.core.counters.deployment().commits, commits.checked_add(1).expect("one timer commit"));
+}
+
+#[test]
+fn the_hosts_endpoint_cap_is_the_fleets() {
+    assert_eq!(host::PROGRAM_ENDPOINTS, fleet::PROGRAM_ENDPOINTS);
 }

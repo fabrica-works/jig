@@ -23,7 +23,7 @@ pub const LIMITS: v6::Limits = v6::Limits {
     credential_secret: 32,
     model_bound_name: 16,
     bounds_models: 2,
-    bounds_program_endpoints: jig_domain_workers::PROGRAM_ENDPOINTS,
+    bounds_program_endpoints: v4::CEILINGS.bounds_program_endpoints,
     hello_workstreams: 2,
     hello_hosting: 2,
     turn_refused: 2,
@@ -81,8 +81,8 @@ pub fn hello_fullest() -> Hello {
     let mut models = List::with_capacity(2);
     models.push(model()).expect("first model slot");
     models.push(model()).expect("second model slot");
-    let mut program_endpoints = List::with_capacity(jig_domain_workers::PROGRAM_ENDPOINTS);
-    for endpoint in 0..jig_domain_workers::PROGRAM_ENDPOINTS {
+    let mut program_endpoints = List::with_capacity(v4::CEILINGS.bounds_program_endpoints);
+    for endpoint in 0..v4::CEILINGS.bounds_program_endpoints {
         program_endpoints.push(endpoint).unwrap();
     }
     let bounds = Bounds::new(

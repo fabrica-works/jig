@@ -111,7 +111,7 @@ impl Membership {
 #[cfg(test)]
 mod tests;
 
-/// Maximum endpoint identities admitted in one host hello (protocol/channel.md, 5.1).
+/// Maximum endpoint identities admitted in one host hello (hosts.md, 8.1).
 /// Independent of the number of model declarations.
 pub const PROGRAM_ENDPOINTS: u32 = 64;
 

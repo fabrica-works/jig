@@ -68,7 +68,7 @@ pub fn limits(sizes: &Sizes) -> Option<v6::Limits> {
         credential_name: sizes.name,
         credential_secret: sizes.secret,
         model_bound_name: sizes.model_name,
-        bounds_program_endpoints: jig_domain_workers::PROGRAM_ENDPOINTS,
+        bounds_program_endpoints: v6::CEILINGS.bounds_program_endpoints,
         bounds_models: sizes.models,
         hello_workstreams: sizes.workstreams,
         hello_hosting: sizes.slots,

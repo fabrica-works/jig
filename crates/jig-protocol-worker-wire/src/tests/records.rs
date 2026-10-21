@@ -5,7 +5,7 @@ use skein_channel::{Direction, Role, Term};
 use skein_lib::{Duration, List, Reader};
 
 // Existing hello 178 + list count 4 + the independent 64 endpoint identities.
-const HELLO_MAX: u32 = 178 + 4 + jig_domain_workers::PROGRAM_ENDPOINTS * 4;
+const HELLO_MAX: u32 = 178 + 4 + crate::v4::CEILINGS.bounds_program_endpoints * 4;
 fn hello_schema() -> skein_channel::Schema {
     crate::schema(&fixtures::LIMITS).expect("small schema")
 }

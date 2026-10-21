@@ -364,3 +364,8 @@ fn a_refused_later_program_grant_leaves_no_value_queued() {
     assert!(refused.is_none());
     assert!(values.is_empty(), "a refused assignment queues no earlier credential");
 }
+
+#[test]
+fn the_hosts_endpoint_cap_is_the_worker_wires_ceiling() {
+    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v4::CEILINGS.bounds_program_endpoints);
+}

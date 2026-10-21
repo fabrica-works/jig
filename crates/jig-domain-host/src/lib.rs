@@ -18,7 +18,6 @@ extern crate alloc;
 mod activity;
 mod answers;
 mod assignment;
-pub use jig_domain_workers::{PROGRAM_ENDPOINTS, valid_program_endpoints};
 mod boundary;
 mod call;
 mod domain;
@@ -43,6 +42,6 @@ pub use domain::{Domain, max_out, resume, step};
 pub use facts::Fact;
 pub use limits::{Limits, worst_case};
 
-pub use link::{Bounds, Hello, LinkDown, LinkUp, ModelBound, Relayed};
+pub use link::{Bounds, Hello, LinkDown, LinkUp, ModelBound, PROGRAM_ENDPOINTS, Relayed, valid_program_endpoints};
 
 pub use link::{Login, LoginMethod, LoginState, SignOutResult, SourceFailure, SourceName};
