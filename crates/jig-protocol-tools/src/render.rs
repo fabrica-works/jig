@@ -278,9 +278,42 @@ fn task_problem(problem: &jig_domain_tasks::Problem) -> Rendered {
         jig_domain_tasks::Refusal::Reference => b"reference",
         jig_domain_tasks::Refusal::Subscription => b"subscription",
         jig_domain_tasks::Refusal::Dependencies => b"dependencies",
-        jig_domain_tasks::Refusal::Circle { .. } => b"circle",
-        jig_domain_tasks::Refusal::DependencyEnded { .. } => b"dependency",
-        jig_domain_tasks::Refusal::Kept => b"kept",
+        jig_domain_tasks::Refusal::Circle { cut } => {
+            return dependency_list(
+                problem,
+                b"these tasks would wait for one another",
+                b"these tasks would wait for one another: T",
+                b", T",
+                b"",
+                if cut { b"; some task lists are incomplete" } else { b"" },
+            );
+        }
+        jig_domain_tasks::Refusal::DependencyEnded { how } => {
+            let tasks = problem.blocked_by.as_deref().unwrap_or(&[]);
+            let Some(task) = tasks.first() else {
+                return text(&[b"Refused: a dependency has ended"], true);
+            };
+            let task = Decimal::of(*task);
+            return match how {
+                jig_domain_tasks::Status::Failed => {
+                    text(&[b"Refused: dependency T", task.as_bytes(), b" failed"], true)
+                }
+                jig_domain_tasks::Status::Cancelled => {
+                    text(&[b"Refused: dependency T", task.as_bytes(), b" was cancelled"], true)
+                }
+                jig_domain_tasks::Status::Done => text(&[b"Refused: T", task.as_bytes(), b" is done"], true),
+            };
+        }
+        jig_domain_tasks::Refusal::Kept => {
+            return dependency_list(
+                problem,
+                b"kept by its dependencies",
+                b"kept until T",
+                b", kept until T",
+                b" is done",
+                b"",
+            );
+        }
         jig_domain_tasks::Refusal::Executor => b"executor",
         jig_domain_tasks::Refusal::Spec => b"spec",
         jig_domain_tasks::Refusal::Contract => b"contract",
@@ -318,6 +351,42 @@ fn task_problem(problem: &jig_domain_tasks::Problem) -> Rendered {
         return text(&[b"Refused account ", account.as_bytes(), b": ", why], true);
     }
     text(&[b"Refused: ", why], true)
+}
+
+// The client's dependency phrases in one line (domain/tasks.md, sections 5.7 and 6.7).
+fn dependency_list(
+    problem: &jig_domain_tasks::Problem,
+    plain: &[u8],
+    first: &[u8],
+    next: &[u8],
+    each_tail: &[u8],
+    tail: &[u8],
+) -> Rendered {
+    let tasks = problem.blocked_by.as_deref().unwrap_or(&[]);
+    if tasks.is_empty() {
+        return text(&[b"Refused: ", plain], true);
+    }
+    let mut size = b"Refused: ".len();
+    size = size.checked_add(tail.len()).expect("dependency tail");
+    for (at, task) in tasks.iter().enumerate() {
+        let prefix = if at == 0 { first } else { next };
+        size = size
+            .checked_add(prefix.len())
+            .expect("dependency prefix")
+            .checked_add(Decimal::of(*task).as_bytes().len())
+            .expect("dependency number")
+            .checked_add(each_tail.len())
+            .expect("bounded dependency text");
+    }
+    let mut writer = Writer::new(size);
+    writer.put(b"Refused: ").expect("refusal heading");
+    for (at, task) in tasks.iter().enumerate() {
+        writer.put(if at == 0 { first } else { next }).expect("dependency prefix");
+        writer.put(Decimal::of(*task).as_bytes()).expect("dependency number");
+        writer.put(each_tail).expect("dependency status");
+    }
+    writer.put(tail).expect("dependency tail");
+    Rendered { error: true, text: writer.finish() }
 }
 
 fn notes(entries: &[jig_domain_notes::Entry], more: bool) -> Box<[u8]> {
@@ -460,4 +529,68 @@ fn proposed(proposal: u64, holder: jig_domain_tasks::ProposalHolder) -> Rendered
         }),
     };
     text(&[b"Proposed ", Decimal::of(proposal).as_bytes(), b", to ", &to], false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jig_domain_tasks::{Problem, Refusal, Status};
+
+    const CIRCLE: &[u64] = &[3, 5, 7];
+    const ENDED: &[u64] = &[4];
+    const KEPT: &[u64] = &[4, 6];
+
+    fn refusal(why: Refusal, tasks: &[u64], expected: &[u8]) {
+        let problem = Problem::naming(None, why, tasks);
+        assert_eq!(render(&CallPart::ControlRefused(problem)), Rendered { error: true, text: expected.into() },);
+    }
+
+    #[test]
+    fn a_circle_names_its_tasks_in_order() {
+        refusal(Refusal::Circle { cut: false }, CIRCLE, b"Refused: these tasks would wait for one another: T3, T5, T7");
+    }
+
+    #[test]
+    fn a_cut_circle_says_some_lists_are_incomplete() {
+        refusal(
+            Refusal::Circle { cut: true },
+            CIRCLE,
+            b"Refused: these tasks would wait for one another: T3, T5, T7; some task lists are incomplete",
+        );
+    }
+
+    #[test]
+    fn a_failed_dependency_is_named() {
+        refusal(Refusal::DependencyEnded { how: Status::Failed }, ENDED, b"Refused: dependency T4 failed");
+    }
+
+    #[test]
+    fn a_cancelled_dependency_is_named() {
+        refusal(Refusal::DependencyEnded { how: Status::Cancelled }, ENDED, b"Refused: dependency T4 was cancelled");
+    }
+
+    #[test]
+    fn a_done_dependency_is_named() {
+        refusal(Refusal::DependencyEnded { how: Status::Done }, ENDED, b"Refused: T4 is done");
+    }
+
+    #[test]
+    fn a_kept_task_names_each_pending_dependency() {
+        refusal(Refusal::Kept, KEPT, b"Refused: kept until T4 is done, kept until T6 is done");
+    }
+
+    #[test]
+    fn dependency_refusals_without_names_keep_their_plain_lines() {
+        for (why, expected) in [
+            (Refusal::Circle { cut: false }, b"Refused: these tasks would wait for one another".as_slice()),
+            (Refusal::Circle { cut: true }, b"Refused: these tasks would wait for one another"),
+            (Refusal::DependencyEnded { how: Status::Failed }, b"Refused: a dependency has ended"),
+            (Refusal::Kept, b"Refused: kept by its dependencies"),
+        ] {
+            for blocked_by in [None, Some(Box::from([]))] {
+                let problem = Problem { blocked_by, ..Problem::new(None, why) };
+                assert_eq!(render(&CallPart::ControlRefused(problem)), Rendered { error: true, text: expected.into() },);
+            }
+        }
+    }
 }

@@ -342,6 +342,15 @@ pub(crate) fn amendment_admit_in(
     if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
         return Err(people::Refusal::Role { held: Some(role) });
     }
+    if let Some(dependencies) = &amendment.dependencies {
+        for dependency in dependencies {
+            if !context.dependencies.contains(dependency)
+                && !core.reaches_in(crate::compound::PartyTask { task: *dependency, ..party }, depth, admission)
+            {
+                return Err(people::Refusal::Unknown);
+            }
+        }
+    }
     let row = &context;
     if let Err(why) = admission.address_admit(task, &amendment.addressed) {
         let people::Outcome::Refused(why) = crate::routing::refusals::person_task_refusal(core, Some(task), why) else {

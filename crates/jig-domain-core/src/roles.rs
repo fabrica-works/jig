@@ -195,8 +195,23 @@ impl Core {
     /// Whether a party may name this live task within its project.
     #[must_use]
     pub fn reaches(&self, person: u64, role: people::Role, project: u32, task: u64, depth: u32) -> bool {
-        let Some(context) = self.tasks.delegation(task) else { return false };
-        context.project == project && (self.reaches_project(role, project) || self.person_tree(person, task, depth))
+        self.reaches_in(
+            crate::compound::PartyTask { person, role: Some(role), project, task },
+            depth,
+            &tasks::CompoundAdmission::new(&self.tasks, 0),
+        )
+    }
+    pub(crate) fn reaches_in(
+        &self,
+        party: crate::compound::PartyTask,
+        depth: u32,
+        admission: &tasks::CompoundAdmission<'_>,
+    ) -> bool {
+        let crate::compound::PartyTask { person, role, project, task } = party;
+        let Some(role) = role else { return false };
+        let Some(context) = admission.task(task) else { return false };
+        context.project == project
+            && (self.reaches_project(role, project) || Self::person_tree_in(person, task, depth, admission))
     }
     pub(crate) fn reaches_project(&self, role: people::Role, project: u32) -> bool {
         match role {

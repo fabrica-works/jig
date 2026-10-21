@@ -16,7 +16,7 @@ fn ask(world: &mut World, request: u8, ask: people::Ask) {
     ask_as(world, world.sign_in.expect("signed-in person"), request, ask);
 }
 
-fn ask_as(world: &mut World, sign_in: u64, request: u8, ask: people::Ask) {
+pub(crate) fn ask_as(world: &mut World, sign_in: u64, request: u8, ask: people::Ask) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
         models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(6000 + u64::from(request))),
@@ -34,11 +34,11 @@ fn action(world: &mut World, completion: u32, action: core::NamedAction) {
     }));
 }
 
-fn running(world: &World, task: u64) -> (u64, u64) {
+pub(crate) fn running(world: &World, task: u64) -> (u64, u64) {
     *world.assignments.iter().rev().find(|(number, _)| *number == task).expect("task assigned")
 }
 
-fn finish(world: &mut World, run: (u64, u64), words: &[u8]) {
+pub(crate) fn finish(world: &mut World, run: (u64, u64), words: &[u8]) {
     world.send(root::Event::Answer {
         read: None,
         refused: Box::new([]),
@@ -53,7 +53,7 @@ fn finish(world: &mut World, run: (u64, u64), words: &[u8]) {
     });
 }
 
-fn plan_world(seed: u64) -> World {
+pub(crate) fn plan_world(seed: u64) -> World {
     let (configuration, limits) = jig_core_world::faults::plan_fixture(seed);
     World::configured(seed, false, configuration, limits)
 }
@@ -901,7 +901,7 @@ fn a_context_adoption_still_refuses_effects_after_a_cold_restart() {
     assert!(world.systems[0].observed().is_empty());
 }
 
-fn amendment(words: &[u8]) -> people::Amendment {
+pub(crate) fn amendment(words: &[u8]) -> people::Amendment {
     people::Amendment {
         spec: Some(people::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }),
         ..jig_core_world::fixtures::person_unchanged(b"new evidence")
@@ -1877,3 +1877,6 @@ mod procedure_goals;
 
 #[path = "stories/historical.rs"]
 mod historical;
+
+#[path = "stories/dependencies.rs"]
+mod dependencies;
