@@ -46,6 +46,38 @@ fn the_whole_worker_bound_prices_hello_and_retained_endpoint_copies_exactly() {
 }
 
 #[test]
+fn startup_refuses_a_worker_hello_with_65_program_endpoints() {
+    use jig_protocol_config::{Path, Problem, Segment, What};
+    let mut agent = fixtures::agent();
+    let past_cap = jig_domain_host::PROGRAM_ENDPOINTS + 1;
+    let mut endpoints = skein_lib::List::with_capacity(past_cap);
+    for endpoint in 0..past_cap {
+        endpoints.push(endpoint).expect("one slot per endpoint");
+    }
+    agent.bounds.program_endpoints = endpoints.into_boxed();
+    let problems = crate::startup(
+        fixtures::WORKER_DOCUMENT,
+        &fixtures::worker_files(),
+        Some(&agent),
+        &fixtures::seeds(),
+        None,
+        Some(fixtures::worker_runtime()),
+    )
+    .err()
+    .expect("no worker or service is constructed with this hello");
+    assert_eq!(problems.problems.len(), 1);
+    assert_eq!(problems.past, 0);
+    assert_eq!(
+        problems.problems.get(0),
+        Some(&Problem {
+            path: Path::root().member(b"application").member(b"workers").child(Segment::Index(0)).member(b"root"),
+            what: What::Bound,
+        }),
+    );
+    assert_eq!(agent.bounds.program_endpoints.len(), usize::try_from(past_cap).unwrap());
+}
+
+#[test]
 fn io_events_reach_only_the_layer_whose_tokens_they_carry() {
     let mut service = fixtures::two_workers();
     let owner = {
