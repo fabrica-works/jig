@@ -276,6 +276,7 @@ fn kept_effect(
         core::Event::EffectConnector(core::connector::Event::Described {
             owner,
             description: Box::new(core::connector::EffectDescription {
+                waits_for_dependencies: false,
                 connector: 1,
                 purpose: 19,
                 effect: authority::Effect {

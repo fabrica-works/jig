@@ -74,6 +74,8 @@ pub enum Recovery {
 /// The inspectable part of a connector-owned effect.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EffectDescription {
+    /// Whether this kind waits while its task has pending dependencies.
+    pub waits_for_dependencies: bool,
     /// Connector number assigned by the application root.
     pub connector: u16,
     /// Stable purpose within the asking task.

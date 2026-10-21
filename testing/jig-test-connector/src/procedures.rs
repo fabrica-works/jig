@@ -321,18 +321,18 @@ pub(crate) fn refused(
     let revisions: Box<[(u64, u64)]> = if let Some(state) = domain.procedures.get(&task) {
         let mut state = state.clone();
         state.awaiting = false;
-        let revisions: Box<[(u64, u64)]> = match (why, state.delegate) {
+        let revisions: Box<[(u64, u64)]> = match (&why, state.delegate) {
             (crate::StepRefusal::Moved { revision }, Some(child)) => {
-                state.revision = revision;
-                Box::new([(child, revision)])
+                state.revision = *revision;
+                Box::new([(child, *revision)])
             }
             _ => Box::new([]),
         };
         save(domain, state, out);
         revisions
     } else {
-        match (why, domain.delegate_outcomes.get(&task)) {
-            (crate::StepRefusal::Moved { revision }, Some((_, Some(child), _))) => Box::new([(*child, revision)]),
+        match (&why, domain.delegate_outcomes.get(&task)) {
+            (crate::StepRefusal::Moved { revision }, Some((_, Some(child), _))) => Box::new([(*child, *revision)]),
             _ => Box::new([]),
         }
     };

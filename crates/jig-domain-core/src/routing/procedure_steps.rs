@@ -153,7 +153,7 @@ pub(super) fn apply(core: &mut Core, env: &Env<Limits>, task: u64, step: u64, ev
     Requests::Out(out)
 }
 
-pub(super) fn append_problem(core: &Core, task: u64, step: u64, problem: tasks::Problem, out: &mut Queue<Request>) {
+pub(crate) fn append_problem(core: &Core, task: u64, step: u64, problem: tasks::Problem, out: &mut Queue<Request>) {
     let Requests::Out(mut requests) = refused(core, task, step, StepRefusal::Refused(problem));
     for _ in 0..requests.len() {
         if let Some(Request::Ask { connector, ask }) = requests.pop() {

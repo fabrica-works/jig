@@ -81,6 +81,10 @@ pub(super) fn encode_call_part(value: &domain::CallPart, limits: &Limits) -> Res
             wire::CallPartConnectorParts { connector: *connector },
         )?),
         domain::CallPart::EffectDenied { answer, findings } => encode_part_effect_denied(*answer, findings, limits)?,
+        domain::CallPart::EffectRefused(value) => wire::CallPart::EffectRefused(wire::CallPartEffectRefused::new(
+            &limits.core,
+            wire::CallPartEffectRefusedParts { value: encode_task_problem(value, limits)? },
+        )?),
         domain::CallPart::ToolDenied { answer, findings } => encode_part_tool_denied(*answer, findings, limits)?,
         domain::CallPart::EscalationDecided { task, revision, outcome } => {
             encode_part_escalation_decided(*task, *revision, *outcome, limits)?
@@ -169,6 +173,7 @@ pub(super) fn encode_call_part(value: &domain::CallPart, limits: &Limits) -> Res
         domain::CallPart::Unavailable => wire::CallPart::Unavailable,
     })
 }
+#[expect(clippy::too_many_lines, reason = "one exhaustive translation preserves the stored call vocabulary")]
 pub(super) fn decode_call_part(value: wire::CallPart, limits: &Limits) -> Result<domain::CallPart, wire::Problem> {
     Ok(match value {
         wire::CallPart::Effect(value) => decode_part_effect(value, limits),
@@ -182,6 +187,10 @@ pub(super) fn decode_call_part(value: wire::CallPart, limits: &Limits) -> Result
                 answer: decode_answer(answer, limits),
                 findings: decode_call_part_effect_denied_findings(findings, limits),
             }
+        }
+        wire::CallPart::EffectRefused(value) => {
+            let wire::CallPartEffectRefusedParts { value } = value.into_parts();
+            domain::CallPart::EffectRefused(decode_task_problem(value, limits)?)
         }
         wire::CallPart::ToolDenied(value) => {
             let wire::CallPartToolDeniedParts { answer, findings } = value.into_parts();

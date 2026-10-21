@@ -29,6 +29,7 @@ fn procedure_fixture() -> (Core, Limits, connector::EffectDescription) {
         },
     );
     let description = connector::EffectDescription {
+        waits_for_dependencies: false,
         connector: 1,
         purpose: 19,
         form: connector::EffectForm::Set,

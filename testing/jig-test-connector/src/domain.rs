@@ -203,7 +203,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Judge { token, requirement, resources, state } => {
             crate::requirements::judge(domain, env, token, requirement, &resources, state, out);
         }
-        Event::Procedure { project, task, number, resource, signal } => {
+        Event::Procedure { project, task, number, resource, signal, pending: _, added: _ } => {
             crate::procedures::step(domain, env, project, task, number, resource, signal, out);
         }
         Event::StepMade { task, step, first, revisions } => {

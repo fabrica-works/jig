@@ -47,6 +47,7 @@ fn effect_descriptions_name_their_recovery_and_price() {
     assert_eq!(
         out.pop(),
         Some(Request::Described {
+            waits_for_dependencies: true,
             token: Token::new(1),
             description: Description {
                 kind: 4,
@@ -71,6 +72,7 @@ fn effect_descriptions_name_their_recovery_and_price() {
     assert_eq!(
         restart.pop(),
         Some(Request::Described {
+            waits_for_dependencies: true,
             token: Token::new(2),
             description: Description {
                 kind: 1,
@@ -171,7 +173,11 @@ fn an_uncertain_restart_without_ids_is_held_and_not_resent() {
 fn a_procedure_waits_for_current_facts_and_never_asks_for_two_effects() {
     let mut domain = Domain::new(Backend::OperationIds, &limits());
     let procedure = Procedure::Remediate { service: service(), operation: 9, deadline: 100 };
-    event(&mut domain, 1, Event::StartProcedure { task: 7, project: 1, procedure });
+    event(
+        &mut domain,
+        1,
+        Event::StartProcedure { pending: Box::new([]), added: Box::new([]), task: 7, project: 1, procedure },
+    );
     let mut first = event(&mut domain, 1, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
     assert_eq!(first.pop(), Some(Request::System(SystemRequest::Service { service: service() })));
     let fact = ServiceFact { version: Box::from(*b"v1"), replicas: 2, healthy: false, revision: 1, observed: 1 };
@@ -190,6 +196,8 @@ fn pending_restart() -> Domain {
         &mut domain,
         1,
         Event::StartProcedure {
+            pending: Box::new([]),
+            added: Box::new([]),
             task: 7,
             project: 1,
             procedure: Procedure::Remediate { service: service(), operation: 9, deadline: 100 },
@@ -459,6 +467,8 @@ fn provision_wakes_at_supplied_readiness_and_keeps_deadline_and_holding_behavior
             &mut domain,
             0,
             Event::StartProcedure {
+                pending: Box::new([]),
+                added: Box::new([]),
                 task: 7,
                 project: 1,
                 procedure: Procedure::Provision { environment: environment(), until: 100, price: 50, deadline },

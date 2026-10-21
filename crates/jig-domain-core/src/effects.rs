@@ -578,6 +578,39 @@ fn complete(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, out: &m
     if checked == authority::Answer::Allow && !writers_ready(core, env, &origin, &description) {
         checked = authority::Answer::Wait;
     }
+    // A hard refusal outranks keeping, which only defers the effect.
+    if description.waits_for_dependencies && checked != authority::Answer::Refuse {
+        let task = match &origin {
+            EffectOrigin::Call { key, .. } => Some(key.task),
+            EffectOrigin::Procedure { task, .. } => Some(*task),
+            EffectOrigin::Accept { proposal, .. } => Some(proposal.proposer),
+            EffectOrigin::Projection { .. } => None,
+            EffectOrigin::Propose { .. } => unreachable!("explicit proposals completed above"),
+        };
+        if let Some(task) = task
+            && let Some(problem) = core.tasks.waiting_effect_problem(task)
+        {
+            drop_effect(out, flight.connector, owner, authority::Answer::Refuse);
+            match origin {
+                EffectOrigin::Call { to, key, .. } => answer(core, out, to, key, CallPart::EffectRefused(problem)),
+                EffectOrigin::Procedure { task, step, .. } => {
+                    crate::routing::procedure_steps::append_problem(core, task, step, problem, out);
+                }
+                EffectOrigin::Accept { to, key, .. } => match key {
+                    Some(key) => answer(core, out, to, key, CallPart::ProposalRefused(problem)),
+                    None => {
+                        let outcome = crate::routing::refusals::person_problem_refusal(core, problem);
+                        work.push(Event::People(jig_domain_people::Event::Decided {
+                            request: to.into_token(),
+                            outcome,
+                        }));
+                    }
+                },
+                EffectOrigin::Projection { .. } | EffectOrigin::Propose { .. } => unreachable!("task-owned effect"),
+            }
+            return;
+        }
+    }
     if checked == authority::Answer::Propose {
         match &origin {
             EffectOrigin::Procedure { task, step, entry: None } => {
@@ -1294,6 +1327,7 @@ fn settled(
             }
             CallPart::Effect { .. }
             | CallPart::Connector { .. }
+            | CallPart::EffectRefused(_)
             | CallPart::EffectDenied { .. }
             | CallPart::ToolDenied { .. }
             | CallPart::EscalationDecided { .. }

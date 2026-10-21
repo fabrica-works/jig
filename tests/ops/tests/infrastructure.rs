@@ -86,6 +86,8 @@ fn provision_waits_for_readiness_and_tears_down_on_release() {
     let mut world = InfrastructureWorld::new(0, infra::Backend::OperationIds);
     let environment = infra_environment();
     world.event(infra::Event::StartProcedure {
+        pending: Box::new([]),
+        added: Box::new([]),
         project: 1,
         task: 7,
         procedure: infra::Procedure::Provision {
@@ -181,6 +183,8 @@ fn scale_reads_replicas_afresh_and_finishes_at_the_requested_count() {
         replicas: 4,
     });
     world.event(infra::Event::StartProcedure {
+        pending: Box::new([]),
+        added: Box::new([]),
         project: 1,
         task: 7,
         procedure: infra::Procedure::Scale { service: service.clone(), replicas: 1, deadline: 100 },
@@ -217,6 +221,8 @@ fn scale_waiting_for_authority_rereads_before_asking_again() {
     let service = infra::Service::new(Box::from(*b"staging"), Box::from(*b"checkout"));
     world.production.add_service(production::ServiceName::new("staging", "checkout"), "v2", 3);
     world.event(infra::Event::StartProcedure {
+        pending: Box::new([]),
+        added: Box::new([]),
         project: 1,
         task: 7,
         procedure: infra::Procedure::Scale { service: service.clone(), replicas: 1, deadline: 100 },

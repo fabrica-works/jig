@@ -9,6 +9,19 @@ pub(crate) struct Kept {
     pub(crate) dependencies: bool,
 }
 
+impl Domain {
+    /// A waiting effect reads the task's current kept state (domain/tasks.md, 5.7).
+    #[must_use]
+    pub fn waiting_effect_problem(&self, task: u64) -> Option<crate::Problem> {
+        let row = record(self, task)?;
+        if for_record(row).dependencies {
+            Some(crate::Problem::naming(Some(task), crate::Refusal::Kept, &row.waiting_on))
+        } else {
+            None
+        }
+    }
+}
+
 pub(crate) fn kept(domain: &Domain, task: u64) -> Kept {
     match record(domain, task) {
         Some(row) => for_record(row),

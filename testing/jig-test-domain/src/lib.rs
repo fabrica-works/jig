@@ -974,6 +974,7 @@ pub mod link;
 mod messages;
 mod routes;
 mod steps;
+pub use steps::procedure_input;
 #[cfg(test)]
 mod tests;
 mod topics;

@@ -117,6 +117,8 @@ fn infrastructure_parts_retain_scope_prices_and_attributed_drift_without_making_
     });
     world.release(&named);
     world.event(infra::Event::StartProcedure {
+        pending: Box::new([]),
+        added: Box::new([]),
         task: 7,
         project: 1,
         procedure: infra::Procedure::Provision {

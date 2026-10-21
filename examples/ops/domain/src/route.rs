@@ -477,6 +477,8 @@ fn core_ask(
                             work.push(Work::Infrastructure(infrastructure::Event::StartProcedure {
                                 task,
                                 project: context.project,
+                                pending: context.pending,
+                                added: translate::infrastructure_added(context.added),
                                 procedure,
                             }));
                         }
@@ -879,12 +881,13 @@ pub(crate) fn infrastructure_out(
             }
             infrastructure::Request::Erase { key } => write(domain, decision, Write::Erase(Key::Infrastructure(key))),
             infrastructure::Request::System(request) => held(decision, Output::Infrastructure(request)),
-            infrastructure::Request::Described { token, description } => {
+            infrastructure::Request::Described { token, description, waits_for_dependencies } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Described {
                     owner: token,
                     description: Box::new(translate::infrastructure_description(
                         jig_ops_domain_connectors::number(Connector::Infrastructure),
                         description,
+                        waits_for_dependencies,
                     )),
                 })));
             }
@@ -1105,12 +1108,13 @@ pub(crate) fn observability_out(
                     state,
                 })));
             }
-            observability::Request::Described { token, effect } => {
+            observability::Request::Described { token, effect, waits_for_dependencies } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Described {
                     owner: token,
                     description: Box::new(translate::observability_description(
                         jig_ops_domain_connectors::number(Connector::Observability),
                         effect,
+                        waits_for_dependencies,
                     )),
                 })));
             }

@@ -423,7 +423,7 @@ pub enum Request {
     /// A conflicting or malformed owner association was refused.
     AssociationRefused { task: u64, step: u64, reason: crate::AssociationRefusal },
     /// A description for the core's authority check.
-    Described { token: Token, effect: Effect },
+    Described { token: Token, effect: Effect, waits_for_dependencies: bool },
     /// A refused staged effect or invalid read.
     Refused { token: Token },
     /// A committed outbox entry ready for journal release.

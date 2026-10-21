@@ -138,7 +138,10 @@ fn a_silence_is_saved_before_its_system_call_and_found_after_uncertainty() {
     let key = Key::procedure([1; 16], 7, 3);
     let effect = Effect { rule: Box::from(*b"checkout-errors"), until: 100 };
     let mut described = event(&mut domain, 1, Event::Describe { token, effect: effect.clone() });
-    assert_eq!(described.pop(), Some(Request::Described { token, effect: effect.clone() }));
+    assert_eq!(
+        described.pop(),
+        Some(Request::Described { token, effect: effect.clone(), waits_for_dependencies: false })
+    );
     let mut kept = event(&mut domain, 1, Event::Keep { project: Some(1), entry: 3, token, key });
     assert_eq!(
         kept.pop(),

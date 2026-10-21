@@ -115,6 +115,7 @@ fn task_dependencies_show_added_provenance_pending_and_stub_status() {
     assert_eq!(task.dependency_facts.get(1).unwrap().added, Some(added));
     assert_eq!(task.dependency_facts.get(1).unwrap().status, Some(tasks::Status::Done));
     assert!(!task.dependency_facts.get(1).unwrap().pending);
+    assert!(!task.dependency_facts.get(1).unwrap().keeps);
     row.waiting_on = Box::new([]);
     let task = task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
     assert!(!task.dependency_facts.get(0).unwrap().keeps);

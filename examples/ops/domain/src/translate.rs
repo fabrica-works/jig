@@ -38,6 +38,7 @@ pub(crate) fn state(value: u64) -> [u8; 32] {
 pub(crate) fn infrastructure_description(
     number: u16,
     value: infrastructure::Description,
+    waits_for_dependencies: bool,
 ) -> core::connector::EffectDescription {
     let mut names = List::with_capacity(u32::try_from(value.resources.len()).expect("bounded resources"));
     for resource in value.resources {
@@ -61,6 +62,7 @@ pub(crate) fn infrastructure_description(
         infrastructure::Recovery::Unrecoverable => core::connector::Recovery::Unrecoverable,
     };
     core::connector::EffectDescription {
+        waits_for_dependencies,
         connector: number,
         purpose: value.state,
         form,
@@ -80,8 +82,10 @@ pub(crate) fn infrastructure_description(
 pub(crate) fn observability_description(
     number: u16,
     value: observability::Effect,
+    waits_for_dependencies: bool,
 ) -> core::connector::EffectDescription {
     core::connector::EffectDescription {
+        waits_for_dependencies,
         connector: number,
         purpose: value.until,
         form: core::connector::EffectForm::Set,
@@ -434,4 +438,17 @@ fn triage_fields(
 
 const fn template_limits() -> jig_protocol_tools::Limits {
     jig_protocol_tools::Limits { input_bytes: 65536, words: 65536, batch: 2, depth: 16 }
+}
+
+pub(crate) fn infrastructure_added(values: Box<[tasks::Added]>) -> Box<[infrastructure::Added]> {
+    let mut added = List::with_capacity(u32::try_from(values.len()).expect("bounded dependencies"));
+    for value in values {
+        let by = match value.by {
+            tasks::Party::Person(person) => infrastructure::Party::Person(person),
+            tasks::Party::Task(task) => infrastructure::Party::Task(task),
+            tasks::Party::Deployment { project } => infrastructure::Party::Deployment { project },
+        };
+        added.push(infrastructure::Added { task: value.task, at: value.at, by }).expect("one row per dependency");
+    }
+    added.into_boxed()
 }

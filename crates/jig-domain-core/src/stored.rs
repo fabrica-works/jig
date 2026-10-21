@@ -32,6 +32,8 @@ pub enum CallPart {
     Connector { connector: u16 },
     /// The core denied a connector effect after checking its authority.
     EffectDenied { answer: jig_domain_authority::Answer, findings: Box<[jig_domain_authority::Finding]> },
+    /// A waiting effect was refused by its task's current dependencies.
+    EffectRefused(jig_domain_tasks::Problem),
     /// A named engine tool was refused before serving it, with the missing authority.
     ToolDenied { answer: jig_domain_authority::Answer, findings: Box<[jig_domain_authority::Finding]> },
     /// One held descendant decision reached its semantic terminal.
@@ -155,7 +157,8 @@ impl CallPart {
                         )
                         .expect("u32 fits usize")
             }
-            CallPart::MessageRefused(problem)
+            CallPart::EffectRefused(problem)
+            | CallPart::MessageRefused(problem)
             | CallPart::ProposalRefused(problem)
             | CallPart::EscalationRefused(problem)
             | CallPart::SubscriptionRefused(problem)

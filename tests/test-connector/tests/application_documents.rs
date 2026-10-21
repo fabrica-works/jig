@@ -322,6 +322,8 @@ fn a_resource_less_procedure_panel_keeps_its_actual_project_across_restart() {
     let mut world = World::new(88);
     let panel = prepare(&mut world, 90, ClientSubject::Panel { project: 7, task: 9 });
     let made = world.event(Event::Procedure {
+        pending: Box::new([]),
+        added: Box::new([]),
         project: 7,
         task: 9,
         number: kind(88, 1),
@@ -374,6 +376,8 @@ fn a_resource_less_procedure_panel_keeps_its_actual_project_across_restart() {
 fn a_resource_less_procedure_panel_refuses_an_inferred_or_changed_project() {
     let mut world = World::new(89);
     world.event(Event::Procedure {
+        pending: Box::new([]),
+        added: Box::new([]),
         project: 7,
         task: 9,
         number: kind(89, 1),
@@ -401,6 +405,8 @@ fn a_resource_less_procedure_panel_refuses_an_inferred_or_changed_project() {
         ));
     }
     let rejected = world.event(Event::Procedure {
+        pending: Box::new([]),
+        added: Box::new([]),
         project: 8,
         task: 9,
         number: kind(89, 1),

@@ -317,6 +317,7 @@ fn connector_config(
         pools: Box::default(),
         topics: Box::default(),
         kinds: Box::new([connector::KindSpec {
+            waits_for_dependencies: false,
             kind: 1,
             form: connector::Form::Set,
             recovery: connector::Recovery::Keyed,

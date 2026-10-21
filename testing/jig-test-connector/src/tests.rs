@@ -126,7 +126,15 @@ fn run_at(domain: &mut Domain, wall: u64, event: Event) -> Box<[Request]> {
 }
 
 fn procedure_event(signal: crate::ProcedureSignal) -> Event {
-    Event::Procedure { project: 1, task: 9, number: 3, resource: service(), signal }
+    Event::Procedure {
+        pending: Box::new([]),
+        added: Box::new([]),
+        project: 1,
+        task: 9,
+        number: 3,
+        resource: service(),
+        signal,
+    }
 }
 
 #[test]
@@ -669,6 +677,29 @@ fn a_moved_refusal_makes_the_next_step_name_the_new_revision() {
         Some(&Request::Step {
             task: PROCEDURE_TASK,
             decision: crate::StepDecision::Amend { task: DELEGATE_TASK, revision: 4, words: 12, priority: None },
+        })
+    );
+}
+
+#[test]
+fn a_kept_step_refusal_clears_the_awaited_action_without_advancing_it() {
+    let mut connector = amending_procedure();
+    drop(run(&mut connector, procedure_event(crate::ProcedureSignal::Activate)));
+    drop(run(
+        &mut connector,
+        Event::StepRefused {
+            task: PROCEDURE_TASK,
+            step: AMEND_STEP,
+            why: crate::StepRefusal::Kept { pending: Box::new([DELEGATE_TASK]) },
+        },
+    ));
+    assert!(!connector.procedures.get(&PROCEDURE_TASK).expect("live procedure").awaiting);
+    let requests = run(&mut connector, procedure_event(crate::ProcedureSignal::Activate));
+    assert_eq!(
+        requests.last(),
+        Some(&Request::Step {
+            task: PROCEDURE_TASK,
+            decision: crate::StepDecision::Amend { task: DELEGATE_TASK, revision: 3, words: 12, priority: None },
         })
     );
 }

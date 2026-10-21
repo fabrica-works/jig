@@ -61,7 +61,7 @@ mod party_controls;
 mod party_decisions;
 #[path = "people.rs"]
 mod people_routes;
-mod procedure_steps;
+pub(crate) mod procedure_steps;
 mod proposal_revisions;
 pub(crate) mod refusals;
 mod run_controls;

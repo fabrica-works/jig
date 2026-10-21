@@ -132,13 +132,7 @@ impl World {
                 self.procedure = Some(task);
                 self.events.push_back(root::Event::Connector {
                     number: connector,
-                    event: jig_test_connector::Event::Procedure {
-                        project: context.project,
-                        task,
-                        number: code,
-                        resource: jig_test_connector_world::path(1, 1),
-                        signal: jig_test_connector::ProcedureSignal::Activate,
-                    },
+                    event: root::procedure_input(&context, code, jig_test_connector_world::path(1, 1)),
                 });
             }
             root::Delivery::Core(core::Held::CallAnswer { part: core::CallPart::Delegated(tasks), .. }) => {

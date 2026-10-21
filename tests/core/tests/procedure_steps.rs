@@ -134,16 +134,19 @@ fn delegate_program(action: connector::ProcedureAction) -> Box<[connector::Proce
 }
 
 fn run_program(world: &mut World, task: u64) {
-    world.send(root::Event::Connector {
-        number: CONNECTOR,
-        event: connector::Event::Procedure {
-            project: 1,
-            task,
-            number: u16::try_from(PROCEDURE_CODE).expect("test procedure code"),
-            resource: jig_test_connector_world::path(1, 1),
-            signal: connector::ProcedureSignal::Activate,
-        },
-    });
+    let context = &world
+        .procedure_inputs
+        .iter()
+        .rev()
+        .find(|(_, _, _, context)| context.task == task)
+        .expect("procedure input")
+        .3;
+    let event = root::procedure_input(
+        context,
+        u16::try_from(PROCEDURE_CODE).expect("test procedure code"),
+        jig_test_connector_world::path(1, 1),
+    );
+    world.send(root::Event::Connector { number: CONNECTOR, event });
 }
 
 fn next_program_step(world: &mut World, task: u64) {
@@ -446,5 +449,79 @@ fn a_duplicate_cancel_leaves_the_whole_procedure_step_unmade() {
             core::StepCancel { task: child, reason: Box::new([]), grace: None },
             core::StepCancel { task: child, reason: Box::new([]), grace: None },
         ]),
+    );
+}
+
+const AMENDMENT_WALL: skein_lib::Wall = skein_lib::Wall::from_nanos(100_000_000);
+
+fn kept_procedure(seed: u64) -> (World, u64, u64) {
+    let (mut world, procedure) = procedure_world(seed);
+    decide(&mut world, procedure, core::ProcedureStep::new(core::StepEnd::Wait));
+    let parent = world.assignments[0];
+    let dependency = member(&world, tasks::Executor::Agent { charter: 1 }, b"prerequisite");
+    let dependency = jig_core_world::fixtures::delegate(&mut world, parent, 2, dependency);
+    let mut amendment = unchanged(b"wait for prerequisite");
+    amendment.dependencies = Some(Box::new([dependency]));
+    world.set_clock(skein_lib::Time::from_nanos(AMENDMENT_WALL.as_nanos()), AMENDMENT_WALL);
+    world.send(root::Event::Core(core::Event::NamedAction {
+        to: ReplyTo::new(Token::new(AMEND_CALL)),
+        key: core::CallKey { task: parent.0, attempt: parent.1, completion: 3, position: 0 },
+        action: core::NamedAction::Amend { target: procedure, revision: 0, amendment },
+    }));
+    (world, procedure, dependency)
+}
+
+#[test]
+fn a_kept_procedures_result_refuses_its_whole_step_including_its_message() {
+    let (mut world, procedure, dependency) = kept_procedure(885);
+    let before = live_row(&world, dependency).clone();
+    let procedure_before = live_row(&world, procedure).clone();
+    decide(
+        &mut world,
+        procedure,
+        core::ProcedureStep {
+            messages: Box::new([core::StepMessage {
+                target: dependency,
+                kind: tasks::MessageKind::Words,
+                words: b"must not arrive".as_slice().into(),
+            }]),
+            ..core::ProcedureStep::new(core::StepEnd::Result(tasks::TaskResult::Report {
+                words: b"done".as_slice().into(),
+            }))
+        },
+    );
+    assert_eq!(live_row(&world, dependency), &before);
+    assert_eq!(live_row(&world, procedure), &procedure_before);
+}
+
+#[test]
+fn a_procedure_receives_pending_dependencies_with_their_amendment_provenance() {
+    let (world, procedure, dependency) = kept_procedure(886);
+    let (_, _, _, context) = world
+        .procedure_inputs
+        .iter()
+        .rev()
+        .find(|(_, _, _, context)| context.task == procedure)
+        .expect("kept procedure input");
+    assert_eq!(context.pending.as_ref(), &[dependency]);
+    assert_eq!(
+        context.added.as_ref(),
+        &[tasks::Added { task: dependency, at: AMENDMENT_WALL, by: tasks::Party::Task(world.assignments[0].0) }]
+    );
+    let connector::Event::Procedure { pending, added, .. } = root::procedure_input(
+        context,
+        u16::try_from(PROCEDURE_CODE).expect("test code"),
+        jig_test_connector_world::path(1, 1),
+    ) else {
+        panic!("procedure event")
+    };
+    assert_eq!(pending.as_ref(), &[dependency]);
+    assert_eq!(
+        added.as_ref(),
+        &[connector::Added {
+            task: dependency,
+            at: AMENDMENT_WALL,
+            by: connector::application_core::Party::Task(world.assignments[0].0),
+        }]
     );
 }

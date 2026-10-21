@@ -77,7 +77,8 @@ pub fn render(part: &CallPart) -> Rendered {
         | CallPart::ToolDenied { answer, findings }
         | CallPart::DelegationDenied { answer, findings } => denied(*answer, findings),
         CallPart::ControlDenied { answer } => denied(*answer, &[]),
-        CallPart::EscalationRefused(problem)
+        CallPart::EffectRefused(problem)
+        | CallPart::EscalationRefused(problem)
         | CallPart::ProposalRefused(problem)
         | CallPart::ControlRefused(problem)
         | CallPart::MessageRefused(problem)

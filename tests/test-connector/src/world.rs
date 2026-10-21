@@ -78,10 +78,34 @@ pub fn config(seed: u8) -> Config {
         pools: Box::from([PoolSpec { path: path(seed, 2), slots: 2 }]),
         topics: Box::from([TopicSpec { topic: kind(seed, 1), offered: true, resources: Box::new([path(seed, 1)]) }]),
         kinds: Box::from([
-            KindSpec { kind: kind(seed, 1), form: Form::Creation, recovery: Recovery::Keyed, price: Some(3) },
-            KindSpec { kind: kind(seed, 2), form: Form::Transition, recovery: Recovery::Conditional, price: Some(4) },
-            KindSpec { kind: kind(seed, 3), form: Form::Set, recovery: Recovery::Idempotent, price: Some(2) },
-            KindSpec { kind: kind(seed, 4), form: Form::Transition, recovery: Recovery::Unrecoverable, price: Some(1) },
+            KindSpec {
+                waits_for_dependencies: false,
+                kind: kind(seed, 1),
+                form: Form::Creation,
+                recovery: Recovery::Keyed,
+                price: Some(3),
+            },
+            KindSpec {
+                waits_for_dependencies: false,
+                kind: kind(seed, 2),
+                form: Form::Transition,
+                recovery: Recovery::Conditional,
+                price: Some(4),
+            },
+            KindSpec {
+                waits_for_dependencies: false,
+                kind: kind(seed, 3),
+                form: Form::Set,
+                recovery: Recovery::Idempotent,
+                price: Some(2),
+            },
+            KindSpec {
+                waits_for_dependencies: false,
+                kind: kind(seed, 4),
+                form: Form::Transition,
+                recovery: Recovery::Unrecoverable,
+                price: Some(1),
+            },
         ]),
         requirements: Box::from([
             RequirementSpec { number: kind(seed, 1), guarded: true, freshness: Duration::from_nanos(4) },

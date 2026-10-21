@@ -996,7 +996,13 @@ pub(super) fn dependency_rows(limits: &Limits, row: &tasks::TaskRecord) -> List<
             }
         }
         facts
-            .push(Dependency { number: *number, pending: row.waiting_on.contains(number), added, keeps, status: None })
+            .push(Dependency {
+                number: *number,
+                pending: row.waiting_on.contains(number),
+                added,
+                keeps: keeps && row.waiting_on.contains(number),
+                status: None,
+            })
             .expect("bounded dependency facts");
     }
     facts

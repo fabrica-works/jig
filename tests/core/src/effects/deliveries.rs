@@ -105,20 +105,13 @@ impl World {
             }
             root::Delivery::Procedure { task, step, connector: number, code, context } => {
                 self.procedure = Some(task);
-                let project = context.project;
-                self.procedure_inputs.push((step, number, code, context));
+                self.procedure_inputs.push((step, number, code, context.clone()));
                 if self.hold_procedures {
                     return;
                 }
                 self.events.push_back(root::Event::Connector {
                     number,
-                    event: connector::Event::Procedure {
-                        project,
-                        task,
-                        number: code,
-                        resource: jig_test_connector_world::path(1, 1),
-                        signal: connector::ProcedureSignal::Activate,
-                    },
+                    event: root::procedure_input(&context, code, jig_test_connector_world::path(1, 1)),
                 });
             }
             root::Delivery::LostRead { connector, resource, call, .. } => {

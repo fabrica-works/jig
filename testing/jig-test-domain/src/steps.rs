@@ -116,6 +116,12 @@ pub(crate) fn refused(number: u16, task: u64, step: u64, why: core::StepRefusal,
         core::StepRefusal::Moved { now: jig_domain_people::Moved::Spec { revision }, .. } => {
             connector::StepRefusal::Moved { revision }
         }
+        core::StepRefusal::Refused(problem) if problem.why == tasks::Refusal::Kept => connector::StepRefusal::Kept {
+            pending: match problem.blocked_by {
+                Some(pending) => pending,
+                None => Box::new([]),
+            },
+        },
         core::StepRefusal::Moved { .. } | core::StepRefusal::Refused(_) | core::StepRefusal::Denied { .. } => {
             connector::StepRefusal::Refused
         }
@@ -171,5 +177,28 @@ fn amendment(task: u64, revision: u64, words: u64, priority: Option<u32>) -> cor
             },
         }]),
         ..core::ProcedureStep::new(core::StepEnd::Wait)
+    }
+}
+
+/// Translate a committed procedure delivery into its connector's input.
+#[must_use]
+pub fn procedure_input(context: &tasks::RunContext, code: u16, resource: connector::Path) -> connector::Event {
+    let mut added = List::with_capacity(u32::try_from(context.added.len()).expect("bounded dependencies"));
+    for value in &context.added {
+        let by = match value.by {
+            tasks::Party::Person(person) => connector::application_core::Party::Person(person),
+            tasks::Party::Task(task) => connector::application_core::Party::Task(task),
+            tasks::Party::Deployment { project } => connector::application_core::Party::Deployment { project },
+        };
+        added.push(connector::Added { task: value.task, at: value.at, by }).expect("one row per dependency");
+    }
+    connector::Event::Procedure {
+        project: context.project,
+        task: context.task,
+        number: code,
+        resource,
+        signal: connector::ProcedureSignal::Activate,
+        pending: context.pending.clone(),
+        added: added.into_boxed(),
     }
 }

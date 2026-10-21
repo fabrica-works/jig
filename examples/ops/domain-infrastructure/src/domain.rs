@@ -779,8 +779,15 @@ fn decide(
 fn stage(domain: &mut Domain, env: &Env<Limits>, token: Token, effect: Effect, out: &mut Queue<Request>) {
     if effect_valid(&effect, &env.limits) && domain.staged.len() < env.limits.staged {
         let description = describe(&effect, domain.backend);
+        let waits_for_dependencies = match &effect {
+            Effect::Restart { .. }
+            | Effect::Scale { .. }
+            | Effect::Rollback { .. }
+            | Effect::CreateEnvironment { .. }
+            | Effect::TearDown { .. } => true,
+        };
         domain.staged.insert(token, effect).expect("stage capacity checked");
-        out.push(Request::Described { token, description });
+        out.push(Request::Described { token, description, waits_for_dependencies });
     } else {
         out.push(Request::Refused { token });
     }
@@ -828,7 +835,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 out.push(Request::Erase { key: RecordKey::Rely(task) });
             }
         }
-        Event::StartProcedure { task, project, procedure } => {
+        Event::StartProcedure { task, project, procedure, pending: _, added: _ } => {
             start_procedure(domain, env, task, project, procedure, out);
         }
         Event::ProcedureDelegateOutcome { .. } => {}

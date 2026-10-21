@@ -655,10 +655,10 @@ pub(super) fn route_connector(
                 }));
             }
             connector::Request::System(call) => hold(decision, Delivery::System { connector: number, call }),
-            connector::Request::Described { token, description } => {
+            connector::Request::Described { token, description, waits_for_dependencies } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Described {
                     owner: token,
-                    description: Box::new(describe(number, description)),
+                    description: Box::new(describe(number, description, waits_for_dependencies)),
                 })));
             }
             connector::Request::EffectBusy { token } => work
@@ -853,7 +853,11 @@ fn name(path: connector::Path) -> authority::Name {
     authority::Name { segments: segments.into_boxed() }
 }
 
-fn describe(number: u16, description: connector::Description) -> core::connector::EffectDescription {
+fn describe(
+    number: u16,
+    description: connector::Description,
+    waits_for_dependencies: bool,
+) -> core::connector::EffectDescription {
     let form = match description.form {
         connector::Form::Creation => core::connector::EffectForm::Creation,
         connector::Form::Transition => core::connector::EffectForm::Transition,
@@ -878,6 +882,7 @@ fn describe(number: u16, description: connector::Description) -> core::connector
     }
     let state = state_pin(description.state);
     core::connector::EffectDescription {
+        waits_for_dependencies,
         connector: number,
         purpose: description.purpose,
         form,

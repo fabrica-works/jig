@@ -484,6 +484,7 @@ impl Core {
                 }
                 Some(
                     CallPart::Connector { .. }
+                    | CallPart::EffectRefused(_)
                     | CallPart::EffectDenied { .. }
                     | CallPart::ToolDenied { .. }
                     | CallPart::EscalationDecided { .. }

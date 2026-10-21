@@ -53,6 +53,7 @@ pub fn call_parts() -> Box<[core::CallPart]> {
         C::ToolDenied { answer: Answer::Wait, findings: findings.clone() },
         C::EscalationDecided { task: 1, revision: 2, outcome: tasks::EscalationOutcome::Passed { revision: 2 } },
         C::EscalationRefused(problem()),
+        C::EffectRefused(tasks::Problem::naming(Some(1), tasks::Refusal::Kept, &[2, 3])),
         C::Proposed { proposal: 2, holder: jig_domain_tasks::ProposalHolder::Person(1) },
         C::ProposalDecided { proposal: 2, outcome: tasks::ProposalOutcome::Accepted },
         C::ProposalRefused(problem()),

@@ -143,7 +143,15 @@ fn procedures_require_answers_and_current_facts_and_replay_the_same_decision() {
     let mut world = World::new(19);
     let task = 7;
     let step = |world: &mut World, signal| {
-        world.event(Event::Procedure { project: 1, task, number: kind(19, 1), resource: path(19, 1), signal })
+        world.event(Event::Procedure {
+            pending: Box::new([]),
+            added: Box::new([]),
+            project: 1,
+            task,
+            number: kind(19, 1),
+            resource: path(19, 1),
+            signal,
+        })
     };
     let first = step(&mut world, ProcedureSignal::Activate);
     assert!(matches!(first.last(), Some(Request::Step { decision: StepDecision::Effect(..), .. })));
@@ -369,4 +377,20 @@ fn procedure_delegate_outcomes_are_bounded_replayed_updated_and_erased() {
         world.event(Event::StepMade { task: 9, step: 30, first: None, revisions: Box::new([]) }).as_slice(),
         [Request::Save { .. }]
     ));
+}
+
+#[test]
+fn an_effect_description_carries_whether_its_kind_waits_for_dependencies() {
+    const SEED: u8 = 43;
+    for waits_for_dependencies in [false, true] {
+        let mut configuration = jig_test_connector_world::config(SEED);
+        configuration.kinds[0].waits_for_dependencies = waits_for_dependencies;
+        let mut world = World::new(SEED);
+        world.domain = jig_test_connector::Domain::new(configuration, &jig_test_connector_world::LIMITS);
+        let requests = world.event(Event::Describe { token: Token::new(1), effect: effect(SEED, 1, 10, 7, None) });
+        let [Request::Described { waits_for_dependencies: waits, .. }] = requests.as_slice() else {
+            panic!("described effect")
+        };
+        assert_eq!(*waits, waits_for_dependencies);
+    }
 }

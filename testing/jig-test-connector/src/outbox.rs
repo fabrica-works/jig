@@ -110,7 +110,7 @@ pub(crate) fn describe(domain: &mut Domain, env: &Env<Limits>, token: Token, eff
         state: effect.state,
     };
     domain.outbox.staged.insert(token, effect).expect("stage capacity checked");
-    out.push(Request::Described { token, description });
+    out.push(Request::Described { token, description, waits_for_dependencies: spec.waits_for_dependencies });
 }
 
 pub(crate) fn describe_proposal(

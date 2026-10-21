@@ -483,7 +483,7 @@ pub enum Event {
     /// A task no longer relies on its named resources.
     Unnamed { task: u64 },
     /// Start a procedure with parameters.
-    StartProcedure { task: u64, project: u32, procedure: Procedure },
+    StartProcedure { task: u64, project: u32, procedure: Procedure, pending: Box<[u64]>, added: Box<[Added]> },
     /// Step a procedure on current facts.
     Procedure { task: u64, signal: ProcedureSignal },
     /// Stage an effect for the core's authority check.
@@ -578,7 +578,7 @@ pub enum Request {
     /// A fact changed and procedures should step again.
     Changed { resource: Resource },
     /// Description for the core's authority check.
-    Described { token: Token, description: Description },
+    Described { token: Token, description: Description, waits_for_dependencies: bool },
     /// An invalid effect was refused before authority.
     Refused { token: Token },
     /// A committed outbox entry ready to make after release.
@@ -602,4 +602,20 @@ pub enum RestartStage {
     ReadAfresh,
     /// Every outbox entry is settled or explicitly held.
     Outbox,
+}
+
+/// The maker of a dependency amendment (domain/tasks.md, section 7).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Party {
+    Person(u64),
+    Task(u64),
+    Deployment { project: u32 },
+}
+
+/// A dependency added to a live procedure's task (domain/connectors.md, 6.1).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Added {
+    pub task: u64,
+    pub at: skein_lib::Wall,
+    pub by: Party,
 }

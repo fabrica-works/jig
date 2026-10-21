@@ -47,8 +47,8 @@ mod requirements;
 mod values;
 
 pub use boundary::{
-    Adoption, ApplyResult, Attempt, Class, Classed, Config, Description, Effect, EffectPhase, Event, Fact, Form, Hold,
-    HoldMode, Item, Key, KindSpec, Looked, Named, Origin, OutboxEntry, Outcome, Path, PoolSpec, ProcedureAction,
+    Added, Adoption, ApplyResult, Attempt, Class, Classed, Config, Description, Effect, EffectPhase, Event, Fact, Form,
+    Hold, HoldMode, Item, Key, KindSpec, Looked, Named, Origin, OutboxEntry, Outcome, Path, PoolSpec, ProcedureAction,
     ProcedureResult, ProcedureSignal, ProcedureSpec, ProcedureState, Read, Record, RecordKey, Recovery, Request,
     RequirementSpec, ResourceRole, ResourceSpec, RestartStep, StepDecision, StepRefusal, SystemEvent, SystemRequest,
     TopicSpec, Verdict,

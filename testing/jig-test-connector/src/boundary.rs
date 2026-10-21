@@ -25,9 +25,19 @@ pub enum Recovery {
     Unrecoverable,
 }
 
+/// A dependency added by an amendment (domain/tasks.md, 5.7).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Added {
+    pub task: u64,
+    pub at: Wall,
+    pub by: crate::application_core::Party,
+}
+
 /// One numbered effect kind offered by this connector.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct KindSpec {
+    /// Whether this kind waits while its task has pending dependencies.
+    pub waits_for_dependencies: bool,
     /// The connector-local kind number.
     pub kind: u16,
     /// What the write does.
@@ -577,6 +587,8 @@ pub enum Event {
     },
     /// Create, wake or answer a connector-owned procedure task.
     Procedure {
+        pending: Box<[u64]>,
+        added: Box<[Added]>,
         project: u32,
         task: u64,
         number: u16,
@@ -853,7 +865,7 @@ pub enum Request {
     /// Ordered restart phases have reached their final step.
     RestartDone,
     /// Description for the core's authority check.
-    Described { token: Token, description: Description },
+    Described { token: Token, description: Description, waits_for_dependencies: bool },
     /// A staged effect was refused by this connector.
     EffectRefused { token: Token },
     /// No stage or outbox room was reserved; the caller may retry its name.
@@ -884,9 +896,10 @@ pub enum Request {
     Erase { key: RecordKey },
 }
 
-/// The connector retries a spec amendment with the current revision.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// Why the core refused a procedure step.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum StepRefusal {
+    Kept { pending: Box<[u64]> },
     Moved { revision: u64 },
     Refused,
 }
