@@ -109,28 +109,3 @@ fn hold_origin_shape_is_checked_on_admission_and_cold_restore() {
     h.restart();
     assert_eq!(origin(&h.domain.task(1).unwrap().phase), Some(&HoldSource::Effect { connector: 7, entry: 3 }));
 }
-
-#[test]
-fn requester_ending_survives_restore_only_with_its_existing_person_authority() {
-    let mut h = Harness::new();
-    let mut open = task(1, &[]);
-    open.flags.conversation = true;
-    open.flags.ended_by = crate::EndedBy::Requester;
-    h.make([open].into());
-    h.restart();
-    let original = h.domain.task(1).expect("restored open task").clone();
-    assert_eq!(original.flags.ended_by, crate::EndedBy::Requester);
-    for requester in [Party::Person(0), Party::Task(1), Party::Deployment { project: 1 }] {
-        let mut broken = original.clone();
-        broken.requester = requester;
-        let mut cold = Harness::new();
-        cold.domain = Domain::new(&LIMITS, 91, crate::tests::charters(), Box::new([0]));
-        let out = cold.send(Event::Restore { record: Stored::Live(Box::new(broken)) });
-        let mut refused = false;
-        for request in out {
-            let Request::RestoreRefused { .. } = request else { continue };
-            refused = true;
-        }
-        assert!(refused);
-    }
-}

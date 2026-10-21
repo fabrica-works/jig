@@ -28,7 +28,9 @@ pub enum Retention {
 /// The immutable authority that may end a task (domain/tasks.md, 5.8).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum EndedBy {
+    /// Its run's judged result ends it.
     Result,
+    /// Only its requester ends it; a run's raw finish parks it (5.8).
     Requester,
 }
 

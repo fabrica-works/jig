@@ -24,6 +24,7 @@ pub(crate) fn charters() -> Box<[crate::CharterModels]> {
 }
 
 mod hold_origin;
+mod kept;
 mod keys;
 mod refusals;
 mod revisions;
@@ -47,33 +48,3 @@ mod payer;
 mod account;
 
 mod waits;
-
-#[test]
-fn shared_kept_rule_separates_claims_from_finish_authority() {
-    use crate::{End, EndedBy, Executor, TaskResult};
-    let done = End::Finished { result: TaskResult::Report { words: Box::new([]) }, cancel_delegates: false };
-    let failed = End::Finished { result: TaskResult::Failure { reason: Box::new([]) }, cancel_delegates: false };
-    let malformed = End::Finished {
-        result: TaskResult::Verdict { fields: Box::new([]), code: 0, words: Box::new([]) },
-        cancel_delegates: false,
-    };
-    let non_finish = End::Failed(crate::Class::Invalid);
-    for (dependencies, ended_by, blocks, discards, parks_done, parks_failure, parks_invalid) in [
-        (&[][..], EndedBy::Result, false, false, false, false, false),
-        (&[2][..], EndedBy::Result, true, false, true, false, true),
-        (&[][..], EndedBy::Requester, false, true, false, false, false),
-        (&[2][..], EndedBy::Requester, true, true, true, false, true),
-    ] {
-        let kept = crate::run::ends::pending(dependencies, ended_by);
-        assert_eq!(kept.blocks_claims(), blocks);
-        assert_eq!(kept.may_be_due(Executor::Agent { charter: 1 }), !blocks);
-        assert_eq!(kept.discards(&done), discards);
-        assert_eq!(kept.discards(&failed), discards);
-        assert_eq!(kept.discards(&malformed), discards);
-        assert!(!kept.discards(&non_finish));
-        assert_eq!(kept.parks(&done), parks_done);
-        assert_eq!(kept.parks(&failed), parks_failure);
-        assert_eq!(kept.parks(&malformed), parks_invalid);
-        assert!(!kept.parks(&non_finish));
-    }
-}

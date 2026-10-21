@@ -7,6 +7,7 @@ use crate::{Active, End, Executor, Phase, TaskResult, Was};
 pub(crate) struct Kept {
     /// A dependency an amendment added is pending.
     pub(crate) dependencies: bool,
+    /// Its requester ends it: no run's result may (5.8).
     pub(crate) open: bool,
 }
 
@@ -55,7 +56,7 @@ impl Kept {
 
     /// A done end waits until every dependency is met: a person's answer is refused, a run's parks.
     pub(crate) fn refuses_done(self) -> bool {
-        self.dependencies || self.open
+        self.dependencies
     }
 
     /// No run of it may end it, so a finish grace without a live run cancels it at once.
