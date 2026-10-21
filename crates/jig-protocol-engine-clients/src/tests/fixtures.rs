@@ -45,7 +45,8 @@ pub fn settings() -> Settings {
         models: models(),
     }
 }
-/// Two configured models: one with efforts and its provider, one with neither.
+/// Two configured models: one with efforts, provider, cache-write price and description,
+/// one with none of those optional values.
 pub fn models() -> Box<[crate::Model]> {
     Box::new([
         crate::Model {
@@ -54,6 +55,8 @@ pub fn models() -> Box<[crate::Model]> {
             window: 200_000,
             output: 32_000,
             efforts: Box::new([Box::from(b"low".as_slice()), Box::from(b"high".as_slice())]),
+            prices: crate::Prices { input: 3, cached: 1, cache_write: Some(5), output: 15, unit: 1_000_000 },
+            description: Some(Box::from(b"For careful work".as_slice())),
         },
         crate::Model {
             name: Box::from(b"quick".as_slice()),
@@ -61,6 +64,8 @@ pub fn models() -> Box<[crate::Model]> {
             window: 8192,
             output: 1024,
             efforts: Box::new([]),
+            prices: crate::Prices { input: 1, cached: 1, cache_write: None, output: 2, unit: 1000 },
+            description: None,
         },
     ])
 }

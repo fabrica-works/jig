@@ -341,6 +341,10 @@ fn memory_below_the_components_sum_is_refused() {
     // The one-pass collector uses the already priced 9 failures * 8 = 72 bytes.
     // No changed routed/document maximum and no change to the sum below.
     // 18,677,464,347 + 25,870,392 = 18,703,334,739; the sum is one byte greater.
+    // JP10d adds 64 * (512 description bytes + 64 inline bytes) = 36,864 to
+    // the clients' component, outside this core + hub + provider-terms sum.
+    // The clients' Model grows from 48 to 112 bytes: Prices is 48 bytes and the
+    // optional description's slice header is 16. List::worst_case prices that growth.
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_334_739 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

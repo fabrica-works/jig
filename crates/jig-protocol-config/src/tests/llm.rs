@@ -81,15 +81,28 @@ fn a_cache_write_price_is_kept_when_named() {
     let bytes = fixtures::with(&bytes, br#""spend": 20"#, br#""spend": 60"#);
     assert_eq!(model(&bytes).cache_write_price, Some(3));
 }
-fn with_description(description: &str) -> Box<[u8]> {
-    let member = format!(r#""output": 1024, "description": {description},"#);
-    fixtures::with(fixtures::ENGINE_SMALL, br#""output": 1024,"#, member.as_bytes())
+fn with_description(description: &[u8]) -> Box<[u8]> {
+    let head = br#""output": 1024, "description": "#;
+    let mut member = skein_lib::Writer::new(head.len().checked_add(description.len()).unwrap().checked_add(1).unwrap());
+    member.put(head).unwrap();
+    member.put(description).unwrap();
+    member.put(b",").unwrap();
+    fixtures::with(fixtures::ENGINE_SMALL, br#""output": 1024,"#, &member.finish())
 }
+fn quoted_description(description: &[u8]) -> Box<[u8]> {
+    let mut quoted = skein_lib::Writer::new(description.len().checked_add(2).unwrap());
+    quoted.put(b"\"").unwrap();
+    quoted.put(description).unwrap();
+    quoted.put(b"\"").unwrap();
+    quoted.finish()
+}
+// MODEL_DESCRIPTION_BYTES (configuration.md, 6); each é takes two bytes.
+const DESCRIPTION_BYTES: usize = 512;
+const DESCRIPTION_CHARACTERS: usize = DESCRIPTION_BYTES / 2;
 #[test]
 fn a_model_description_holds_512_bytes_of_text() {
-    // 256 two-byte characters reach MODEL_DESCRIPTION_BYTES without counting characters.
-    let description = "é".repeat(256);
-    let bytes = with_description(&format!("\"{description}\""));
+    let description = "é".repeat(DESCRIPTION_CHARACTERS);
+    let bytes = with_description(&quoted_description(description.as_bytes()));
     let engine = fixtures::engine(&bytes).unwrap();
     assert_eq!(engine.llm.descriptions.as_ref(), [Some(description.into_bytes().into_boxed_slice())]);
 }
@@ -99,10 +112,34 @@ fn a_model_without_a_description_keeps_none() {
     assert_eq!(engine.llm.descriptions.as_ref(), [None]);
 }
 #[test]
+fn the_clients_models_carry_configured_prices_and_descriptions() {
+    use jig_protocol_engine_clients::Prices;
+    let described = with_description(br#""For careful work""#);
+    let described = fixtures::with(
+        &described,
+        br#""prices": {"input": 1, "cached": 1, "output": 1, "unit": 1000}"#,
+        br#""prices": {"input": 2, "cached": 1, "cache_write": 3, "output": 4, "unit": 1000}"#,
+    );
+    let described = fixtures::with(&described, br#""spend": 20"#, br#""spend": 60"#);
+    for (bytes, prices, description) in [
+        (fixtures::ENGINE_SMALL, Prices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1000 }, None),
+        (
+            described.as_ref(),
+            Prices { input: 2, cached: 1, cache_write: Some(3), output: 4, unit: 1000 },
+            Some(b"For careful work".as_slice()),
+        ),
+    ] {
+        let engine = fixtures::engine(bytes).unwrap();
+        let models = crate::clients::models(&engine.llm);
+        let model = models.first().unwrap();
+        assert_eq!(model.prices, prices);
+        assert_eq!(model.description.as_deref(), description);
+    }
+}
+#[test]
 fn invalid_model_descriptions_are_refused_at_their_path() {
-    // One byte beyond MODEL_DESCRIPTION_BYTES.
-    let long = format!("\"{}\"", "d".repeat(513));
-    for (description, what) in [(long.as_str(), What::Bound), (r#""""#, What::Form), ("7", What::Kind)] {
+    let long = quoted_description(&[b'd'; DESCRIPTION_BYTES + 1]);
+    for (description, what) in [(long.as_ref(), What::Bound), (br#""""#, What::Form), (b"7", What::Kind)] {
         let problems = fixtures::engine(&with_description(description)).unwrap_err();
         assert_eq!(problems.problems.get(0), Some(&crate::Problem { path: model_path(b"description"), what }));
     }
@@ -119,9 +156,12 @@ fn a_later_model_keeps_its_description_in_order() {
     );
     let bytes = fixtures::with(&bytes, br#""models":["small"]"#, br#""models":["small","later"]"#);
     let engine = fixtures::engine(&bytes).unwrap();
-    let names: Vec<_> = engine.llm.models.iter().map(|model| model.name.as_ref()).collect();
-    assert_eq!(names, [b"small".as_slice(), b"later".as_slice()]);
+    assert_eq!(engine.llm.models.first().unwrap().name.as_ref(), b"small");
+    assert_eq!(engine.llm.models.get(1).unwrap().name.as_ref(), b"later");
     assert_eq!(engine.llm.descriptions.as_ref(), [None, Some(Box::from(b"For later work".as_slice()))]);
+    let shown = crate::clients::models(&engine.llm);
+    assert_eq!(shown.first().unwrap().description, None);
+    assert_eq!(shown.get(1).unwrap().description.as_deref(), Some(b"For later work".as_slice()));
 }
 #[test]
 fn a_model_takes_the_efforts_it_names_in_order() {

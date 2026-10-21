@@ -7,6 +7,12 @@ use jig_domain_people as p;
 use jig_domain_tasks as t;
 use skein_lib::{Queue, Reader, Writer};
 
+// MODEL_DESCRIPTION_BYTES (configuration.md, 6); each é takes two bytes.
+const DESCRIPTION_BYTES: usize = 512;
+const DESCRIPTION_CHARACTERS: usize = DESCRIPTION_BYTES / 2;
+// Repeated name and long effort, three invalid descriptions, and five zero price fields.
+const INVALID_MODEL_CASES: u32 = 2 + 3 + 5;
+
 fn choice() -> t::LlmChoice {
     t::LlmChoice {
         account: None,
@@ -83,12 +89,53 @@ fn configured_models_past_the_wire_or_named_twice_cannot_start_the_component() {
     let mut careful = fixtures::models().first().unwrap().clone();
     careful.efforts = Box::new([Box::from([b'e'; 33].as_slice())]);
     long.models = Box::new([careful]);
-    for settings in [twice, long] {
-        let mut out = Queue::with_capacity(8);
-        assert_eq!(Component::new(settings, &env, &mut out).err(), Some(Unusable::Limits));
+    let mut cases = skein_lib::List::with_capacity(INVALID_MODEL_CASES);
+    cases.push(("repeated name", twice)).unwrap();
+    cases.push(("long effort", long)).unwrap();
+    for (name, description) in [
+        ("long description", Box::from([b'd'; DESCRIPTION_BYTES + 1].as_slice())),
+        ("empty description", Box::from(b"".as_slice())),
+        ("invalid description text", Box::from([0xff].as_slice())),
+    ] {
+        let mut model = fixtures::models().first().unwrap().clone();
+        model.description = Some(description);
+        cases.push((name, settings_with(model))).unwrap();
     }
-    let mut out = Queue::with_capacity(8);
-    assert_eq!(Component::new(fixtures::settings(), &env, &mut out).err(), None);
+    let prices = fixtures::models().first().unwrap().prices;
+    for (name, prices) in [
+        ("zero input price", crate::Prices { input: 0, ..prices }),
+        ("zero cached price", crate::Prices { cached: 0, ..prices }),
+        ("zero cache-write price", crate::Prices { cache_write: Some(0), ..prices }),
+        ("zero output price", crate::Prices { output: 0, ..prices }),
+        ("zero price unit", crate::Prices { unit: 0, ..prices }),
+    ] {
+        let mut model = fixtures::models().first().unwrap().clone();
+        model.prices = prices;
+        cases.push((name, settings_with(model))).unwrap();
+    }
+    for (name, settings) in cases.into_boxed() {
+        let mut out = Queue::with_capacity(8);
+        assert_eq!(Component::new(settings, &env, &mut out).err(), Some(Unusable::Limits), "{name}");
+    }
+}
+
+fn settings_with(model: crate::Model) -> crate::Settings {
+    crate::Settings { models: Box::new([model]), ..fixtures::settings() }
+}
+
+#[test]
+fn configured_prices_and_bounded_descriptions_can_start_the_component() {
+    let env = fixtures::env();
+    let full = "é".repeat(DESCRIPTION_CHARACTERS).into_bytes().into_boxed_slice();
+    for description in [None, Some(full)] {
+        for cache_write in [None, Some(1), Some(u64::MAX)] {
+            let mut model = fixtures::models().first().unwrap().clone();
+            model.description = description.clone();
+            model.prices = crate::Prices { input: u64::MAX, cached: 1, cache_write, output: u64::MAX, unit: u32::MAX };
+            let mut out = Queue::with_capacity(8);
+            assert_eq!(Component::new(settings_with(model), &env, &mut out).err(), None);
+        }
+    }
 }
 
 /// The create fixture's first task, choosing `choice`.

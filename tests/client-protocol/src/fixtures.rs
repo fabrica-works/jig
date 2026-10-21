@@ -76,6 +76,14 @@ pub fn models() -> Box<[jig_protocol_engine_clients::Model]> {
         window: model.window,
         output: model.output,
         efforts: model.efforts,
+        prices: jig_protocol_engine_clients::Prices {
+            input: model.input_price,
+            cached: model.cached_price,
+            cache_write: model.cache_write_price,
+            output: model.output_price,
+            unit: model.price_unit,
+        },
+        description: None,
     }])
 }
 // Match this world's HTTP intake and the small profile's component bound.

@@ -26,7 +26,7 @@ pub(crate) fn parse(document: &Document, at: u32, path: &Path, problems: &mut Pr
 #[must_use]
 pub fn models(llm: &crate::Llm) -> Box<[jig_protocol_engine_clients::Model]> {
     let mut models = List::with_capacity(u32::try_from(llm.models.len()).expect("checked models"));
-    for model in &llm.models {
+    for (at, model) in llm.models.iter().enumerate() {
         let mut provider = None;
         for item in &llm.providers {
             for name in &item.models {
@@ -42,6 +42,14 @@ pub fn models(llm: &crate::Llm) -> Box<[jig_protocol_engine_clients::Model]> {
                 window: model.window,
                 output: model.output,
                 efforts: model.efforts.clone(),
+                prices: jig_protocol_engine_clients::Prices {
+                    input: model.input_price,
+                    cached: model.cached_price,
+                    cache_write: model.cache_write_price,
+                    output: model.output_price,
+                    unit: model.price_unit,
+                },
+                description: llm.descriptions.get(at).expect("one description per configured model").clone(),
             })
             .expect("one row per model");
     }

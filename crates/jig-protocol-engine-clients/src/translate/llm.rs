@@ -90,6 +90,19 @@ pub(crate) fn fits(models: &[Model], limits: &w::Limits) -> bool {
             || name > usize::try_from(limits.refusal_llm_model).expect("u32 fits usize")
             || model.efforts.len() > usize::try_from(jig_domain_core::EFFORTS).expect("u32 fits usize")
             || model.efforts.len() > usize::try_from(limits.me_model_efforts).expect("u32 fits usize")
+            || model.prices.unit == 0
+            || model.prices.input == 0
+            || model.prices.cached == 0
+            || model.prices.cache_write == Some(0)
+            || model.prices.output == 0
+        {
+            return false;
+        }
+        if let Some(description) = &model.description
+            && (description.is_empty()
+                || !skein_codec::text_is_valid(description)
+                || description.len()
+                    > usize::try_from(jig_domain_core::MODEL_DESCRIPTION_BYTES).expect("u32 fits usize"))
         {
             return false;
         }

@@ -177,6 +177,18 @@ pub struct Model {
     pub output: u32,
     /// The efforts it declares, by name in its order.
     pub efforts: Box<[Box<[u8]>]>,
+    pub prices: Prices,
+    pub description: Option<Box<[u8]>>,
+}
+/// Configured amounts per `unit` tokens in the deployment's spend unit; absent cache writes
+/// are priced at input (configuration.md, 3; domain/authority.md, 1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Prices {
+    pub input: u64,
+    pub cached: u64,
+    pub cache_write: Option<u64>,
+    pub output: u64,
+    pub unit: u32,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Served {

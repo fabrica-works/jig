@@ -65,6 +65,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(
             u64::from(jig_domain_tasks::MODELS).checked_mul(
                 u64::from(jig_domain_core::MODEL_NAME_BYTES)
+                    .checked_add(u64::from(jig_domain_core::MODEL_DESCRIPTION_BYTES))?
                     .checked_add(skein_lib::List::<Box<[u8]>>::worst_case(jig_domain_core::EFFORTS)?)?
                     .checked_add(
                         u64::from(jig_domain_core::EFFORTS).checked_mul(u64::from(jig_domain_core::EFFORT_BYTES))?,
