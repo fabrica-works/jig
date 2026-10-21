@@ -277,9 +277,13 @@ application's on skein's UI kit:
 - **The link is told,** where the tree shows the link's state, by jig's
   link part (`jig-link`) or the application's own presentation of it,
   whose region its world names to the referee: while the engine was
-  unreachable past a heartbeat, the person was shown offline. An
-  application that shows neither is not held to it, and the person is
-  not told (pages.md, section 2).
+  unreachable past a heartbeat, the person was shown offline. A tab's
+  page that starts, on a reload too, is judged afresh from then, whatever
+  an earlier page owed: its stream has only its own heartbeat until a
+  hello (client.md, section 8), so it tells the link, live or offline,
+  within the bound of a link coming back. An application that shows
+  neither is not held to it, and the person is not told (pages.md,
+  section 2).
 - **A sign-out told:** a sign-out the engine did not receive is never
   shown done (view.md, 18.6). After a person asks to sign out, the
   sign-in page is a fault while the engine still holds the sign-in they

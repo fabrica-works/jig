@@ -173,6 +173,18 @@ impl Rules {
             }
         }
     }
+    /// A tab's page starts, first or on a reload: its stream has only its own
+    /// heartbeat until a hello (client.md, section 8), so it tells the link
+    /// within the bound of a link coming back, whatever an earlier page owed.
+    fn started(&mut self, client: ClientId, judge: &mut JudgeOf) {
+        judge.withdraw(&Deadline::Online(client));
+        judge.withdraw(&Deadline::Offline(client));
+        match self.reachable {
+            Some(true) if !self.parked.contains(&client) => judge.expect(Deadline::Online(client), self.link_within),
+            Some(false) => judge.expect(Deadline::Offline(client), self.link_within),
+            _ => {}
+        }
+    }
     fn request(&mut self, client: ClientId, party: u64, sent: Sent, judge: &mut JudgeOf) {
         self.offers.requested(client, sent.attempt, judge);
         let key = (party, sent.key);
@@ -378,12 +390,7 @@ impl Expectations for Rules {
             }
             Observation::Client { client } => {
                 self.clients.insert(client);
-                if let Some(live) = self.reachable {
-                    judge.expect(
-                        if live { Deadline::Online(client) } else { Deadline::Offline(client) },
-                        if live { self.link_within } else { self.heartbeat },
-                    );
-                }
+                self.started(client, judge);
             }
             Observation::Truth(observed) => self.truth(observed, judge),
             Observation::Request { client, party, sent } => self.request(client, party, sent, judge),
@@ -392,6 +399,12 @@ impl Expectations for Rules {
             Observation::LeftPage { client } | Observation::WindowChanged { client } => {
                 self.visible.retain(|(c, _), _| *c != client);
                 self.reasoned.retain(|(c, _)| *c != client);
+            }
+            Observation::Reloaded { client } => {
+                self.visible.retain(|(c, _), _| *c != client);
+                self.reasoned.retain(|(c, _)| *c != client);
+                self.links.remove(&client);
+                self.started(client, judge);
             }
             Observation::Bounded { heap, bound } => {
                 judge.check(heap <= bound, "bounded: client and view exceeded the heap envelope");

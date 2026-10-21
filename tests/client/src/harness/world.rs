@@ -312,7 +312,7 @@ impl<A: App, F: Front<A>> World<A, F> {
     }
     /// Restarts this tab from its kept records and advances its delivery epoch.
     pub fn reload(&mut self, id: ClientId) {
-        self.observe(Observation::LeftPage { client: id });
+        self.observe(Observation::Reloaded { client: id });
         self.clients[id.0].acted_card = None;
         self.front.reload(id, self.now);
         let c = &mut self.clients[id.0];

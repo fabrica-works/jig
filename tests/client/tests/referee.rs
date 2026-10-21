@@ -453,6 +453,49 @@ fn me_cannot_unpark_a_client_running_outdated_code() {
     assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed);
 }
 
+/// A referee of 10 ms heartbeats whose link comes back within 40 ms, with one
+/// tab admitted at zero while the engine is `live` or not.
+fn reloading(live: bool) -> (skein_world::domain::Referee<referee::Rules>, ClientId) {
+    let span = Duration::from_millis(10);
+    let mut referee = skein_world::domain::Referee::new(referee::Rules::new(span, span, Duration::from_millis(40)));
+    let client = ClientId(0);
+    let mut out = Vec::new();
+    referee.observe(Time::ZERO, Observation::Client { client }, &mut out);
+    referee.observe(Time::ZERO, Observation::Truth(Observed::Reachable { live }), &mut out);
+    referee.observe(Time::ZERO, Observation::Shown { client, seen: vec![Seen::Link { live }] }, &mut out);
+    (referee, client)
+}
+
+#[test]
+fn a_reloaded_tab_owes_its_link_afresh() {
+    let (mut referee, client) = reloading(false);
+    let mut out = Vec::new();
+    referee.observe(Time::from_nanos(5_000_000), Observation::Reloaded { client }, &mut out);
+    assert_eq!(referee.next_deadline(), Some(Time::from_nanos(45_000_000)));
+    referee.fire(Time::from_nanos(20_000_000), &mut out);
+    referee.observe(
+        Time::from_nanos(30_000_000),
+        Observation::Shown { client, seen: vec![Seen::Link { live: false }] },
+        &mut out,
+    );
+    referee.fire(Time::from_nanos(50_000_000), &mut out);
+    assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed);
+}
+
+#[test]
+fn a_reloaded_tab_never_told_its_link_is_caught() {
+    for live in [false, true] {
+        let (mut referee, client) = reloading(live);
+        let mut out = Vec::new();
+        referee.observe(Time::from_nanos(5_000_000), Observation::Reloaded { client }, &mut out);
+        referee.fire(Time::from_nanos(50_000_000), &mut out);
+        assert!(
+            matches!(referee.verdict(), skein_world::domain::Verdict::Failed(_)),
+            "the earlier page's link stood for the reloaded one, live: {live}"
+        );
+    }
+}
+
 #[test]
 fn a_tree_breaking_the_outline_fails_the_referee() {
     let mut referee = skein_world::domain::Referee::new(referee::Rules::new(

@@ -117,6 +117,9 @@ pub enum Observation {
     Shown { client: ClientId, seen: Vec<Seen> },
     /// Navigation legitimately removes a page's cards.
     LeftPage { client: ClientId },
+    /// A tab started again from its kept records: its page left, and its
+    /// link is judged afresh from now.
+    Reloaded { client: ClientId },
     /// The person's decoded display act changes which still-waiting cards are visible.
     WindowChanged { client: ClientId },
     /// A durable engine fact or reachability change.
