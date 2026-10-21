@@ -25,7 +25,7 @@ pub enum Retention {
     ForgottenOnceRead,
 }
 
-/// The immutable authority that may end a task (domain/tasks.md, 5.7).
+/// The immutable authority that may end a task (domain/tasks.md, 5.8).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum EndedBy {
     Result,

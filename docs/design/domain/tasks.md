@@ -491,23 +491,8 @@ them (5.7).
 
 ### 5.7 Kept by a dependency
 
-A task's immutable `ended_by` is `Result` or `Requester`. `Result` is the
-default. `Requester` requires an agent conversation requested by a person;
-creation and restored records enforce that shape. It changes no cancel
-rights. The authority travels with the task through client creation,
-storage, preparation and its run charter, independent of the configured
-charter shared by other tasks.
-
-The shared kept rule has independent dependency and open facts. Only
-pending dependencies block claims and Due. Open tasks start and resume
-normally, but every raw finished result, including a failure result and a
-finish with follow-ups, parks before result validation. Result and
-follow-ups are discarded; charged spend, saved work, committed turns,
-read fences, delegates and history remain. Saved-work, charge and message
-fences are checked first. Closing keeps cancellation's partial result,
-narrowing goes Due, and held tasks stay held. Dependency-only tasks retain
-the existing valid-done rule; runtime failures retain their retry policy.
-
+A task its requester ends is not kept: it may start and run as ever,
+and only its ending differs (5.8).
 
 An active task with a pending dependency is kept: it stays active, with
 its holds, its delegates and what its executor has done, and goes no
@@ -554,6 +539,35 @@ What it keeps:
   pending dependency is one. A further reason to keep a live task from
   going on, its state and holds kept, is one more reason there, not
   another rule.
+
+### 5.8 Ended by its requester
+
+A task is ended by its result or by its requester: its `ended_by`, fixed
+at its making. A result ends it by default. Its requester may end it
+only if it is an agent's conversation with a person, its requester;
+making it and restoring it refuse any other shape. It changes no right
+to cancel. It travels with the task from the client's making, through
+storage and preparation, to its run's charter (hosts.md, 8.1),
+whatever the charter the task's agent shares with others.
+
+A task its requester ends:
+
+- **starts and resumes as ever.** Only a pending dependency keeps it
+  from a run (5.7).
+- **takes no run's finish.** A run that finishes, with any result,
+  a failure among them, or with follow-ups, parks before its result is
+  judged. The result and its follow-ups are discarded, and no try is
+  spent. What the run spent, saved and committed stays, with its turns,
+  its read fences, its delegates and its history. The fences of saved
+  work, of charge and of messages are checked first, as for any finish.
+- **ends as its requester says,** or by cancel. While it closes, a
+  cancel keeps its partial result. A narrowing run goes Due, as ever,
+  and a held task stays held.
+
+The kept rule of 5.7 holds both facts, the dependency and this one,
+apart: a task that is held from active keeps its requester's ending,
+and one that is held from closing does not. A failure that is not a
+finish, the run's own, keeps its retry policy whoever ends the task.
 
 ## 6. Holds
 

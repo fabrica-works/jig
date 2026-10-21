@@ -1,6 +1,6 @@
 # Agents and their hosts
 
-Provisional, 2026-10-07, revised 2026-10-19. Where an application's
+Provisional, 2026-10-07, revised 2026-10-21. Where an application's
 agents run, and what hosts them: the contract between the core and a
 host, the three shapes an application may take, the agent as a
 capability of two kinds, both smith's, jig's one host for runs wherever
@@ -783,28 +783,39 @@ host tools' calls (6.8).
 
 ### 8.1 Open compatibility
 
-The task's ending authority translates to Smith's `Finite` or `Open`
-mode. Open grants wait and never delivery. This release refuses an
-ordinary chosen program path for an Open task before preparation. It
-does not select another source or account because of that refusal, nor
-change ending authority. Account and source waits retain precedence.
-Alternative models and grants use the same compatibility view at
-selection and claim recheck.
+A task's ending (tasks.md, 5.8) is smith's mode for its run: a task its
+result ends runs `Finite`, and one its requester ends runs `Open`. An
+Open run is granted the wait and never delivery.
 
-Each admitted hello declares the actual program endpoint numbers, fixed
-for that channel, including the engine host. Unknown evidence fails
-closed. The independent entrance cap is 64 distinct endpoint numbers;
-wire and domain entrances reject malformed metadata before retention.
-It is not derived from the model count. A malformed list refuses the
-channel without inventing an agent shortfall.
+An Open task's ordinary program path is refused before preparation, at
+selection and again at the claim's recheck, alternative models and
+grants judged by the same view. The refusal chooses no other source or
+account and changes no task's ending. A wait for an account or a source
+comes before it.
 
-An agent start refusal carries `StartCause::{Other,Grants}` separately
-from operator bytes. Only an uncommitted, valid-fenced Open terminal
-with a proven offered program source, no accepted turn and zero
-cumulative expense converts typed Grants to Recheck. It releases the
-attempt without an Invalid try; the same selection policy then refuses
-another unsupported start. Structural host invalids, unproven endpoint
-cases and committed terminals keep their ordinary handling.
+Each admitted hello declares the program endpoint numbers its channel
+serves, the engine host's among them, fixed for that channel. Unknown
+evidence fails closed: an Open start is refused on it. At most 64 distinct
+numbers are admitted, whatever the number of models: the cap is kept
+with the hello's other bounds, and the worker wire's ceiling is the
+same. The wire and the domain each refuse a longer list, or one naming
+a number twice, before keeping it, and a malformed list refuses the
+channel without counting an agent short.
+
+A refused agent start carries its typed cause, `StartCause::{Other,
+Grants}`, apart from the operator's bytes. A run's end is rechecked,
+its attempt released and no try spent, if and only if all of these
+hold:
+
+- its start was refused with the Grants cause;
+- its saved work and its result passed their fences;
+- it spent nothing and committed no turn;
+- its task's ordinary program source was offered.
+
+Whatever class the host's refusal was given, the recheck is the same;
+the selection then refuses an unsupported start again. A structural
+invalid from the host, a program endpoint not proven, and a run that
+committed keep their ordinary handling.
 
 ## 9. Messages and delivery
 

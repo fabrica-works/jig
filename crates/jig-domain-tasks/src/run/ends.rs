@@ -1,4 +1,4 @@
-//! One rule for dependencies and ending authority (domain/tasks.md, 5.7 and section 7).
+//! One rule for dependencies and ending authority (domain/tasks.md, 5.7, 5.8 and section 7).
 use crate::domain::{Domain, record};
 use crate::{Active, End, Executor, Phase, TaskResult, Was};
 

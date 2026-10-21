@@ -1145,11 +1145,15 @@ with a person in front of a tree, are view.md's, 18.10.
 
 ### 19.1 Refused starts
 
-`chat_status` also reads the task document's optional `run_wait`.
-For Due or Preparing, a derived `Refused` produces `HostRefused`, after
-waiting-for-party precedence. Held, placed, idle and terminal statuses
-keep their precedence. Summary rows that have no run wait pass None.
-HostRefused is not a reply. The reference view shows Hello's observed
+`chat_status` also reads the task document's optional `run_wait`: a
+chat due or preparing whose run wait is `Refused` is refused by its
+host (`HostRefused`), with why. Its place in the order: held, closing
+and ended first, as ever; then, in an active stage, a party it waits
+on, and then a dependency it waits on, which is parked; then a refused
+start; and only then its stage, so a chat backing off is retrying and
+one claimed or running reads its host's report. A summary row, which
+holds no run wait, passes none and is never refused. A refusal is not a
+reply. The reference view shows Hello's observed
 kind, time and cause, or the task-specific program compatibility cause;
 it promises no automatic source switch.
 
