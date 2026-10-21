@@ -3,7 +3,7 @@ use crate::{What, tests::fixtures};
 fn engine() -> crate::Engine {
     fixtures::engine(fixtures::ENGINE_SMALL).expect("whole engine fixture")
 }
-fn core_config(document: &[u8]) -> jig_domain_core::Config {
+pub(super) fn core_config(document: &[u8]) -> jig_domain_core::Config {
     let mut engine = fixtures::engine(document).expect("checked engine");
     engine.charters[0].policy.instructions = Box::from(&b"Answer the question."[..]);
     crate::core(&engine, [3; 16], 11)
@@ -13,7 +13,7 @@ fn refuses(from: &[u8], to: &[u8], what: What) {
     let problems = fixtures::engine(&document).expect_err("refused domain configuration");
     assert_eq!(problems.problems.get(0).expect("one problem").what, what);
 }
-fn two_projects(number: u8) -> Box<[u8]> {
+pub(super) fn two_projects(number: u8) -> Box<[u8]> {
     let prefix = br#""projects": ["#;
     let start = skein_lib::bytes::find(fixtures::ENGINE_SMALL, prefix).unwrap().checked_add(prefix.len()).unwrap();
     let end = fixtures::ENGINE_SMALL.len().checked_sub(3).unwrap();

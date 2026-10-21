@@ -204,7 +204,8 @@ pub fn two_projects(seed: u64) -> (root::Config, root::Limits) {
     let mut limits = crate::world::limits();
     limits.core.authority.projects = 2;
     limits.core.tasks.funders = 8;
-    limits.core.people.projects = 2;
+    // Both configured projects and the deployment's roles.
+    limits.core.people.projects = 3;
     limits.core.people.initial_owners = 2;
     crate::peers::journal(&mut limits);
     let policy = config.core.authority.policy(1).expect("first policy").clone();
