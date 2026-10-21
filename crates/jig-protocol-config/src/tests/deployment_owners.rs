@@ -15,6 +15,7 @@ use skein_lib::{Env, ReplyTo, Time, Token, Wall};
 
 const DEPLOYMENT: u32 = 0;
 const PROJECT: u32 = 1;
+const SECOND_PROJECT: u32 = 2;
 const OWNER: u64 = 1;
 const SECOND_PERSON: u64 = 2;
 const ONE_SAVE: usize = 1;
@@ -41,7 +42,7 @@ struct Row {
     deployment_owners: &'static [u64],
 }
 
-fn rows() -> [Row; 5] {
+fn rows() -> [Row; 6] {
     let second_owner = with(
         ENGINE_SMALL,
         br#""subject": "owner-a"}"#,
@@ -54,6 +55,20 @@ fn rows() -> [Row; 5] {
             restart: false,
             sign_in: false,
             roles: &[(OWNER, DEPLOYMENT, Some(people::Role::Owner)), (OWNER, PROJECT, Some(people::Role::Owner))],
+            deployment_saves: ONE_SAVE,
+            deployment_policy: 0,
+            deployment_owners: &[OWNER],
+        },
+        Row {
+            shows: "Small holds two configured projects and the deployment's roles",
+            document: two_projects(b'2'),
+            restart: false,
+            sign_in: false,
+            roles: &[
+                (OWNER, DEPLOYMENT, Some(people::Role::Owner)),
+                (OWNER, PROJECT, Some(people::Role::Owner)),
+                (OWNER, SECOND_PROJECT, Some(people::Role::Owner)),
+            ],
             deployment_saves: ONE_SAVE,
             deployment_policy: 0,
             deployment_owners: &[OWNER],
