@@ -1,30 +1,48 @@
 //! Open and finite runs after the same committed turn (domain/tasks.md, 5.8).
 use jig_domain_tasks::{
-    Accepted, Active, End, EndedBy, Event, Executor, Flags, InvalidResult, Line, MessageKind, Party, PersonAddress,
-    Phase, Problem, Refusal, Stored, TaskResult, Tries, Word,
+    Accepted, Active, Amendment, Closing, Control, End, EndKind, EndedBy, Ending, Event, Executor, Flags, Hold,
+    InvalidResult, Key, Line, MessageKind, Models, New, Party, PersonAddress, Phase, Problem, Refusal, Stage, Stored,
+    TaskResult, Tries, Was, Word,
 };
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::Duration;
 
-fn replied(flags: Flags) -> World {
-    let mut w = World::new(327, LIMITS);
+fn claimed(flags: Flags) -> World {
     let mut chat = task(1, &[]);
     chat.flags = flags;
+    claimed_task(chat)
+}
+
+fn claimed_task(chat: New) -> World {
+    let mut w = World::new(327, LIMITS);
     assert_eq!(w.make(Party::Person(1), vec![chat]), Reply::Made(vec![1]));
     w.claim(1, 1);
+    w
+}
+
+fn commit_turn(w: &mut World, attempt: u64, read: Option<u64>) {
     let reply_to = w.to();
     let call = reply_to.into_token();
     w.send(Event::Turn {
         reply_to: skein_lib::ReplyTo::new(call),
         task: 1,
-        attempt: 1,
+        attempt,
         turn: 1,
-        read: None,
+        read,
         refused: Box::new([]),
-        offered: None,
+        offered: read,
         cumulative: 0,
     });
     assert_eq!(w.replies[&call.raw()], Reply::Turn(Accepted::New));
+}
+
+fn raw_finish() -> End {
+    End::Finished { result: TaskResult::Report { words: b"done".as_slice().into() }, cancel_delegates: false }
+}
+
+fn replied(flags: Flags) -> World {
+    let mut w = claimed(flags);
+    commit_turn(&mut w, 1, None);
     w.terminal(
         1,
         End::Finished {
@@ -148,4 +166,166 @@ fn a_batchs_requester_authority_takes_one_shape() {
             }
         }
     }
+}
+
+#[test]
+fn an_open_task_held_from_active_keeps_open_and_rewraps_the_hold() {
+    const CHAT: u64 = 1;
+    const FIRST_ATTEMPT: u64 = 1;
+    const NEXT_ATTEMPT: u64 = 2;
+    let mut w = claimed(Flags { conversation: true, ended_by: EndedBy::Requester, ..Flags::PLAIN });
+    commit_turn(&mut w, FIRST_ATTEMPT, None);
+    let replies = w.record(CHAT).replies.clone();
+    w.send(Event::Hold { task: CHAT, why: Hold::Stopped });
+    assert_eq!(
+        w.record(CHAT).phase,
+        Phase::Held { was: Was::Active(Active::Running { attempt: FIRST_ATTEMPT }), why: Hold::Stopped, source: None }
+    );
+    assert_eq!(w.terminal(CHAT, raw_finish()), Reply::Acknowledged(Accepted::New));
+    assert_eq!(w.record(CHAT).phase, Phase::Held { was: Was::Active(Active::Idle), why: Hold::Stopped, source: None });
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert_eq!(w.record(CHAT).last_answer, Some(FIRST_ATTEMPT));
+    assert_eq!(w.record(CHAT).flags.ended_by, EndedBy::Requester);
+    assert!(w.results.is_empty());
+    assert_eq!(w.activations(CHAT), 1);
+    assert_eq!(control(&mut w, Control::Release { again: None, message: None }), Reply::Done);
+    assert_eq!(w.record(CHAT).phase, Phase::Active(Active::Due));
+    assert_eq!(w.activations(CHAT), 2);
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert!(w.results.is_empty());
+    committed_turn(&w);
+    assert_eq!(w.record(CHAT).replies, replies);
+    w.claim(CHAT, NEXT_ATTEMPT);
+    assert_eq!(w.terminal(CHAT, raw_finish()), Reply::Acknowledged(Accepted::New));
+    assert_eq!(w.record(CHAT).phase, Phase::Active(Active::Idle));
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert_eq!(w.record(CHAT).last_answer, Some(NEXT_ATTEMPT));
+    assert_eq!(w.activations(CHAT), 2);
+    assert_eq!(w.record(CHAT).last_reply, 1);
+    assert_eq!(w.record(CHAT).replies, replies);
+    assert!(w.results.is_empty());
+}
+
+fn control(w: &mut World, control: Control) -> Reply {
+    let reply_to = w.to();
+    let call = reply_to.into_token().raw();
+    w.send(Event::Control {
+        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
+        by: Party::Person(1),
+        task: 1,
+        control,
+    });
+    w.replies[&call].clone()
+}
+
+fn run_ended(w: &World, attempt: u64, end: EndKind) {
+    assert!(w.records.values().any(|row| matches!(row,
+        Stored::Activity(row) if row.task == 1 && row.line == Line::RunEnded { attempt, end, spent: 0 }
+    )));
+}
+
+fn cancelled(w: &World, ending: &Ending, at: skein_lib::Wall, partial: Option<TaskResult>) {
+    assert_eq!(
+        ending,
+        &Ending::Cancelled { by: Party::Person(1), at, reason: b"stop".as_slice().into(), result: partial }
+    );
+    assert_eq!(w.results.len(), 1);
+    let Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!("ended task record") };
+    assert_eq!(row.phase, Phase::Ended(ending.clone()));
+    assert_eq!(row.tries, Tries::NONE);
+    assert_eq!(w.live(), 0);
+}
+
+#[test]
+fn an_open_raw_finish_while_narrowing_goes_due() {
+    const CHAT: u64 = 1;
+    const ATTEMPT: u64 = 1;
+    let mut chat = task(CHAT, &[]);
+    chat.flags = Flags { conversation: true, ended_by: EndedBy::Requester, ..Flags::PLAIN };
+    chat.authority.models = Models::Named(0b11);
+    let mut w = claimed_task(chat);
+    commit_turn(&mut w, ATTEMPT, None);
+    let replies = w.record(CHAT).replies.clone();
+    let mut authority = w.record(CHAT).authority.clone();
+    authority.models = Models::Named(0b01);
+    let reply_to = w.to();
+    let call = reply_to.into_token().raw();
+    w.send(Event::Amend {
+        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
+        funder: None,
+        by: Party::Person(1),
+        task: CHAT,
+        message: 1,
+        stop_run: true,
+        amendment: Amendment {
+            tracked: None,
+            addressed: None,
+            instructions: None,
+            release: None,
+            spec: None,
+            wake: None,
+            dependencies: None,
+            authority: Some(authority),
+            llm: None,
+            reason: b"narrow".as_slice().into(),
+        },
+    });
+    assert_eq!(w.replies[&call], Reply::Done);
+    assert!(w.record(CHAT).narrowing);
+    assert!(w.stops.contains(&(CHAT, ATTEMPT)));
+    assert_eq!(w.terminal(CHAT, raw_finish()), Reply::Acknowledged(Accepted::New));
+    assert_eq!(w.record(CHAT).phase, Phase::Active(Active::Due));
+    assert_eq!(w.record(CHAT).authority.models, Models::Named(0b01));
+    assert!(!w.record(CHAT).narrowing);
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert_eq!(w.record(CHAT).last_answer, Some(ATTEMPT));
+    assert_eq!(w.record(CHAT).replies, replies);
+    committed_turn(&w);
+    assert!(w.results.is_empty());
+    assert!(!w.records.contains_key(&Key::Ended(CHAT)));
+    assert_eq!(w.activations(CHAT), 2);
+    run_ended(&w, ATTEMPT, EndKind::Cancelled);
+}
+
+#[test]
+fn an_open_task_held_from_closing_drops_open() {
+    const CHAT: u64 = 1;
+    const ATTEMPT: u64 = 1;
+    let mut w = claimed(Flags { conversation: true, ended_by: EndedBy::Requester, ..Flags::PLAIN });
+    commit_turn(&mut w, ATTEMPT, None);
+    let at = w.env.wall;
+    assert_eq!(
+        control(&mut w, Control::Cancel { reason: b"stop".as_slice().into(), grace: None, message: None }),
+        Reply::Done
+    );
+    assert!(matches!(w.record(CHAT).phase, Phase::Closing(Closing { stage: Stage::Run { attempt: ATTEMPT }, .. })));
+    w.send(Event::Hold { task: CHAT, why: Hold::Stopped });
+    assert!(matches!(w.record(CHAT).phase, Phase::Held { was: Was::Closing(_), .. }));
+    assert_eq!(w.terminal(CHAT, raw_finish()), Reply::Acknowledged(Accepted::New));
+    let partial = TaskResult::Report { words: b"done".as_slice().into() };
+    let ending = Ending::Cancelled {
+        by: Party::Person(1),
+        at,
+        reason: b"stop".as_slice().into(),
+        result: Some(partial.clone()),
+    };
+    assert_eq!(
+        w.record(CHAT).phase,
+        Phase::Held {
+            was: Was::Closing(Closing { stage: Stage::Delegates, ending: ending.clone() }),
+            why: Hold::Stopped,
+            source: None,
+        }
+    );
+    assert_eq!(w.record(CHAT).tries, Tries::NONE);
+    assert_eq!(w.record(CHAT).last_answer, Some(ATTEMPT));
+    committed_turn(&w);
+    assert!(w.results.is_empty());
+    assert_eq!(w.activations(CHAT), 1);
+    assert_eq!(control(&mut w, Control::Release { again: None, message: None }), Reply::Done);
+    w.settle(CHAT);
+    cancelled(&w, &w.results[&CHAT], at, Some(partial));
+    let Stored::Ended(row) = &w.records[&Key::Ended(CHAT)] else { panic!("ended task record") };
+    assert_eq!(row.last_reply, 1);
+    run_ended(&w, ATTEMPT, EndKind::Cancelled);
 }
