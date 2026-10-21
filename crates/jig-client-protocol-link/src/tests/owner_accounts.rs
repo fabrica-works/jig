@@ -220,7 +220,7 @@ fn account_uses_keep_their_constant_bound_with_fewer_receiving_rows() {
 }
 #[test]
 fn account_lists_longer_than_the_receiving_rows_are_kept() {
-    // Receiving rows are two; each list here holds more, and the document's bytes bound them.
+    // Receiving rows are two; the account counts and document room admit these whole lists.
     let limits = fixtures::limits();
     let mut line = jig_client_test_records::account_line_record().into_parts();
     line.sources = repeated(&line.sources, 2);
@@ -240,17 +240,6 @@ fn account_lists_longer_than_the_receiving_rows_are_kept() {
         holder: c::OwnerAccountHolder::Party(23),
     }));
     assert_eq!(watches::delivery(&delivery(record), &limits), Ok(c::Delivery::OwnerAccounts(Box::new(expected))));
-}
-#[test]
-fn a_deployment_keeps_more_accounts_than_the_receiving_rows() {
-    let limits = fixtures::limits();
-    let mut record = fixtures::owner_with_account(Some(5)).into_parts();
-    record.accounts = repeated(&record.accounts, 3);
-    let record = w::OwnerDeployment::new(&limits.wire, record).unwrap();
-    let mut expected = fixtures::owner_account_expected(Some(5));
-    let account = expected.accounts.get(0).unwrap().clone();
-    expected.accounts = list([account.clone(), account.clone(), account]);
-    assert_eq!(crate::translate::documents::owner_deployment(record, &limits), Ok(expected));
 }
 
 fn configured_line() -> c::OwnerAccountLine {
@@ -394,4 +383,118 @@ fn zero_account_receiving_counts_make_limits_unusable() {
         let client = jig_client_domain::Limits { accounts, ..bounds.client };
         assert_eq!(crate::Limits::new(client, bounds.exchanges), Err(crate::Unusable::Limits), "{accounts:?}");
     }
+}
+
+// The fixture has two accounts and two sources in its first account; repeat its sign-in to two too.
+const ACCOUNT_COUNT: u32 = 2;
+fn counted_accounts() -> Box<[u8]> {
+    let limits = fixtures::limits();
+    let mut record = jig_client_test_records::accounts_record(None).into_parts();
+    record.signing = repeated(&record.signing, usize::try_from(ACCOUNT_COUNT).unwrap());
+    delivery(w::OwnerAccounts::new(&limits.wire, record).unwrap())
+}
+fn count_limits() -> crate::Limits {
+    let bounds = fixtures::limits();
+    let client = jig_client_domain::Limits {
+        accounts: jig_client_domain::AccountCounts {
+            accounts: ACCOUNT_COUNT,
+            sources: ACCOUNT_COUNT,
+            sign_ins: ACCOUNT_COUNT,
+        },
+        ..bounds.client
+    };
+    crate::Limits::new(client, bounds.exchanges).unwrap()
+}
+#[test]
+fn account_lists_filling_their_receiving_counts_are_admitted() {
+    let mut expected = document(None);
+    let signing = expected.signing.get(0).unwrap().clone();
+    expected.signing = list([signing.clone(), signing]);
+    assert_eq!(
+        watches::delivery(&counted_accounts(), &count_limits()),
+        Ok(c::Delivery::OwnerAccounts(Box::new(expected)))
+    );
+}
+#[test]
+fn account_lists_one_past_their_receiving_counts_are_refused() {
+    let bounds = count_limits();
+    let bytes = counted_accounts();
+    for accounts in [
+        jig_client_domain::AccountCounts { accounts: ACCOUNT_COUNT - 1, ..bounds.client.accounts },
+        jig_client_domain::AccountCounts { sources: ACCOUNT_COUNT - 1, ..bounds.client.accounts },
+        jig_client_domain::AccountCounts { sign_ins: ACCOUNT_COUNT - 1, ..bounds.client.accounts },
+    ] {
+        let client = jig_client_domain::Limits { accounts, ..bounds.client };
+        let limits = crate::Limits::new(client, bounds.exchanges).unwrap();
+        assert_eq!(watches::delivery(&bytes, &limits), Err(Undecodable::TooLarge), "{accounts:?}");
+    }
+}
+// One more account than receiving rows, within the configured account count.
+const DEPLOYMENT_ACCOUNTS: u32 = 3;
+fn counted_deployment(count: u32) -> w::OwnerDeployment {
+    let limits = fixtures::limits();
+    let mut record = fixtures::owner_with_account(Some(5)).into_parts();
+    record.accounts = repeated(&record.accounts, usize::try_from(count).unwrap());
+    w::OwnerDeployment::new(&limits.wire, record).unwrap()
+}
+fn expected_deployment(count: u32) -> c::OwnerDeployment {
+    let mut expected = fixtures::owner_account_expected(Some(5));
+    let account = expected.accounts.get(0).unwrap().clone();
+    expected.accounts = List::with_capacity(count);
+    for _ in 0..count {
+        expected.accounts.push(account.clone()).unwrap();
+    }
+    expected
+}
+fn deployment_count_limits() -> crate::Limits {
+    let bounds = fixtures::limits();
+    let mut client = bounds.client;
+    client.accounts.accounts = DEPLOYMENT_ACCOUNTS;
+    crate::Limits::new(client, bounds.exchanges).unwrap()
+}
+#[test]
+fn deployment_accounts_filling_the_receiving_count_are_admitted() {
+    let limits = deployment_count_limits();
+    assert_eq!(
+        crate::translate::documents::owner_deployment(counted_deployment(DEPLOYMENT_ACCOUNTS), &limits),
+        Ok(expected_deployment(DEPLOYMENT_ACCOUNTS))
+    );
+}
+#[test]
+fn deployment_accounts_one_past_the_receiving_count_are_refused() {
+    let limits = deployment_count_limits();
+    assert_eq!(
+        crate::translate::documents::owner_deployment(counted_deployment(DEPLOYMENT_ACCOUNTS + 1), &limits),
+        Err(Undecodable::TooLarge)
+    );
+}
+// The deployment reserves its rows-bounded host list; these accounts have no sources, uses or
+// display, and each reserves two rows-bounded chip lists.
+fn deployment_held() -> u64 {
+    let chips = List::<c::Chip>::worst_case(fixtures::limits().client.rows).unwrap();
+    u64::try_from(size_of::<c::OwnerDeployment>())
+        .unwrap()
+        .checked_add(List::<c::OwnerHost>::worst_case(fixtures::limits().client.rows).unwrap())
+        .unwrap()
+        .checked_add(List::<c::OwnerAccount>::worst_case(DEPLOYMENT_ACCOUNTS).unwrap())
+        .unwrap()
+        .checked_add(u64::from(DEPLOYMENT_ACCOUNTS).checked_mul(2).unwrap().checked_mul(chips).unwrap())
+        .unwrap()
+}
+#[test]
+fn a_deployment_filling_its_decoded_room_is_admitted() {
+    assert_eq!(deployment_held() % 2, 0, "the fixture's decoded bytes halve evenly");
+    let limits = fixtures::limits_for_document(deployment_held() / 2);
+    assert_eq!(
+        crate::translate::documents::owner_deployment(counted_deployment(DEPLOYMENT_ACCOUNTS), &limits),
+        Ok(expected_deployment(DEPLOYMENT_ACCOUNTS))
+    );
+}
+#[test]
+fn a_deployment_past_its_decoded_room_is_refused() {
+    let limits = fixtures::limits_for_document((deployment_held() / 2).checked_sub(1).unwrap());
+    assert_eq!(
+        crate::translate::documents::owner_deployment(counted_deployment(DEPLOYMENT_ACCOUNTS), &limits),
+        Err(Undecodable::TooLarge)
+    );
 }

@@ -54,6 +54,9 @@ pub(crate) fn owner_account_piece(
     room: &mut u64,
 ) -> Result<List<c::OwnerAccount>, w::Problem> {
     let count = piece_count(bytes)?;
+    if count > limits.client.accounts.accounts {
+        return Err(too_large());
+    }
     charge(room, List::<c::OwnerAccount>::worst_case(count))?;
     let mut reader = Reader::new(bytes);
     let mut rows = List::with_capacity(count);
@@ -343,7 +346,6 @@ pub(crate) fn owner_deployment_fields(
     for item in value.connectors() {
         list4.push(*item).expect("reserved supplied list");
     }
-    let mut room = super::document_room(limits);
     Ok(c::OwnerDeployment {
         providers: super::catalogue::offers(value.providers(), limits, &mut room)?,
         providers_cut: value.providers_cut(),

@@ -193,8 +193,8 @@ pub(crate) fn owner_accounts(value: w::OwnerAccounts, limits: &Limits) -> Result
     })
 }
 /// The bytes a decoded account list may hold, with the record that holds it. The client bounds a
-/// document by its bytes in all, not each list by its count (protocol/client.md, 3), and its domain
-/// prices each document it holds at twice its byte limit (`jig_client_domain::limits`).
+/// document by its bytes and account counts (client/domain/client.md, 14), and its domain prices
+/// each document it holds at twice its byte limit (`jig_client_domain::limits`).
 pub(crate) fn document_room(limits: &Limits) -> u64 {
     limits.client.document_bytes.saturating_mul(2)
 }
@@ -235,6 +235,9 @@ pub(crate) fn owner_account_source_piece(
     room: &mut u64,
 ) -> Result<List<c::OwnerAccountSource>, w::Problem> {
     let count = piece_count(bytes)?;
+    if count > limits.client.accounts.sources {
+        return Err(too_large());
+    }
     charge(room, List::<c::OwnerAccountSource>::worst_case(count))?;
     let mut reader = Reader::new(bytes);
     let mut rows = List::with_capacity(count);
@@ -251,6 +254,9 @@ pub(crate) fn owner_account_line_piece(
     room: &mut u64,
 ) -> Result<List<c::OwnerAccountLine>, w::Problem> {
     let count = piece_count(bytes)?;
+    if count > limits.client.accounts.accounts {
+        return Err(too_large());
+    }
     charge(room, List::<c::OwnerAccountLine>::worst_case(count))?;
     let mut reader = Reader::new(bytes);
     let mut rows = List::with_capacity(count);
@@ -267,6 +273,9 @@ pub(crate) fn owner_account_sign_in_piece(
     room: &mut u64,
 ) -> Result<List<c::OwnerAccountSignIn>, w::Problem> {
     let count = piece_count(bytes)?;
+    if count > limits.client.accounts.sign_ins {
+        return Err(too_large());
+    }
     charge(room, List::<c::OwnerAccountSignIn>::worst_case(count))?;
     let mut reader = Reader::new(bytes);
     let mut rows = List::with_capacity(count);
