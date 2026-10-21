@@ -152,7 +152,10 @@ inbox are the views child's (engine.md, section 11).
 - **The first owners** of a deployment are named in its configuration;
   everyone else gets a role from a project's owner, or by adoption's seed
   (section 4). The first owners decide the deployment's LLM accounts
-  (accounts.md, 3.2).
+  (accounts.md, 3.2). The first start also makes them owners of the
+  deployment's roles, project 0, which is a party's role in the deployment
+  (`../client/domain/contract.md`, 7.5) and counts against people's
+  `projects`.
 
 ## 4. Roles
 

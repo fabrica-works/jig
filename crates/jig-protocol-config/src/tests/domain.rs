@@ -443,7 +443,9 @@ fn memory_below_the_components_sum_is_refused() {
     let ending_saving = u64::from(limits.views.watchers) * ENDING_SAVING_PER_WATCHER;
     let over = BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving
         + SOURCE_DEADLINE_GROWTH
-        + SIGN_IN_CANCEL_GROWTH;
+        + SIGN_IN_CANCEL_GROWTH
+        // Deployment role storage and project-role scratch: people.projects 2 -> 3.
+        + 7_288;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
