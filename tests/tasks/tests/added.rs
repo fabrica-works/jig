@@ -387,6 +387,21 @@ fn a_waiter_given_a_dependency_leaves_the_queue_and_returns_ahead_of_a_later_wai
 }
 
 #[test]
+fn a_holder_after_a_task_whose_delegate_queues_behind_it_is_a_circle() {
+    let mut world = World::new(860, LIMITS);
+    world.configure_holds(1, vec![Kind { connector: 1, kind: 1, hold: HoldKind::Exclusive { taken: Taken::Waits } }]);
+    let mut holder = task(1, &[]);
+    holder.holdings = Box::new([resource()]);
+    world.make(Party::Person(9), vec![holder, task(2, &[])]);
+    let mut child = task(3, &[]);
+    child.funder = Funder::Task(2);
+    child.holdings = Box::new([resource()]);
+    assert_eq!(world.make(Party::Task(2), vec![child]), Reply::Made(vec![3]));
+    assert_eq!(world.record(3).phase, Phase::Waiting);
+    refused(amend(&mut world, Party::Person(9), 1, &[2]), 1, Refusal::Circle { cut: false }, &[1, 2, 3]);
+}
+
+#[test]
 fn an_already_done_dependency_is_recorded_as_met_without_keeping_the_task() {
     let mut world = pair();
     world.make(Party::Person(9), vec![task(3, &[2])]);
