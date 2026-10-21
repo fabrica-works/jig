@@ -24,6 +24,7 @@ pub struct Endpoint {
     pub number: u32,
     pub dialect: u32,
     pub provider: Box<[u8]>,
+    pub program: Option<Box<[u8]>>,
     pub address: Address,
     pub transport: Transport,
     pub headers: Box<[Header]>,
@@ -84,6 +85,7 @@ pub(crate) fn parse(
         }
     }
     let providers = providers::parse(&mut object, document, path, models.as_slice(), directories, problems);
+    program_bindings(endpoints.as_slice(), models.as_slice(), providers.as_slice(), path, problems);
     object.finish(document, path, problems);
     Some(Llm {
         endpoints: endpoints.into_boxed(),
@@ -92,6 +94,39 @@ pub(crate) fn parse(
         providers: providers.into_boxed(),
     })
 }
+/// A shared endpoint must name a program offered by every provider whose models use it.
+fn program_bindings(
+    endpoints: &[Endpoint],
+    models: &[Model],
+    providers: &[Provider],
+    path: &Path,
+    problems: &mut Problems,
+) {
+    for (index, endpoint) in endpoints.iter().enumerate() {
+        let Some(program) = &endpoint.program else { continue };
+        let at = check::index(&path.member(b"endpoints"), index).member(b"program");
+        let mut valid = false;
+        let mut refused =
+            program.is_empty() || program.len() > usize::try_from(jig_domain_accounts::NAME).expect("program bound");
+        for model in models {
+            if model.endpoint != endpoint.number {
+                continue;
+            }
+            for provider in providers {
+                if provider.models.contains(&model.name) {
+                    valid = true;
+                    if !provider.programs.contains(program) {
+                        refused = true;
+                    }
+                }
+            }
+        }
+        if !valid || refused {
+            problems.push(at, What::Refers);
+        }
+    }
+}
+
 fn endpoint(
     document: &Document,
     at: u32,
@@ -104,6 +139,7 @@ fn endpoint(
     let number = check::count(&mut object, document, b"number", path, problems);
     let dialect = check::count(&mut object, document, b"dialect", path, problems);
     let provider = check::text(&mut object, document, b"provider", path, problems);
+    let program = optional_text(&mut object, document, b"program", path, problems);
     let address = check::address(&mut object, document, b"address", path, problems);
     if let Some(address) = &address {
         network_address(address, &path.member(b"address"), problems);
@@ -118,6 +154,7 @@ fn endpoint(
         number: number?,
         dialect: dialect?,
         provider: provider?,
+        program,
         address: address?,
         transport: transport?,
         headers: headers.into_boxed(),
@@ -245,6 +282,7 @@ fn model(
     model.name = name?;
     model.dialect = endpoint.dialect;
     model.endpoint = endpoint.number;
+    model.program.clone_from(&endpoint.program);
     model.window = window?;
     model.output = output?;
     model.efforts = efforts?;
@@ -313,6 +351,7 @@ fn price(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         name: Box::default(),
         dialect: 0,
         endpoint: 0,
+        program: None,
         window: 0,
         output: 0,
         input_price: input_price?,

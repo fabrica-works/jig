@@ -48,7 +48,7 @@ fn choose(
     proofs: &[Coverage],
     host: &[HostSource],
 ) -> Selection {
-    world.domain.select(Use::Party(ALICE), PROVIDER, preferred, excluded, proofs, host, world.now)
+    world.domain.select(Use::Party(ALICE), PROVIDER, None, preferred, excluded, proofs, host, world.now)
 }
 fn ranked(own_holder: Holder, own_place: u32) -> World {
     ranked_with_other(own_holder, own_place, Holder::Party(ALICE))
@@ -113,7 +113,7 @@ fn a_preferred_account_waits_while_fresh_selection_can_continue() {
         Selection::Chosen { account: OTHER, source: OTHER_SOURCE }
     );
     assert_eq!(
-        world.domain.select(Use::Party(ALICE), 99, Some(OWN), None, &PROOFS, &[], world.now),
+        world.domain.select(Use::Party(ALICE), 99, None, Some(OWN), None, &PROOFS, &[], world.now),
         Selection::NoAccount
     );
 }
@@ -145,7 +145,7 @@ fn global_source_holds_and_refreshes_block_later_llm_keys() {
     for (held, state) in
         [(Some(Held::Limited { reset: None }), State::Limited { until: None }), (Some(Held::Refused), State::Refused)]
     {
-        let world = two_sources(Kind::Program, held);
+        let world = two_sources(Kind::SignIn, held);
         assert_eq!(
             choose(&world, Some(OWN), None, &PROOFS, &[]),
             Selection::Wait { account: OWN, source: Some(FIRST), why: WaitWhy::Source(state) }
@@ -174,12 +174,32 @@ fn global_source_holds_and_refreshes_block_later_llm_keys() {
 }
 
 #[test]
-fn only_host_local_program_unavailability_passes_to_the_next_source() {
+fn a_program_endpoint_chooses_only_program_sources() {
     let world = two_sources(Kind::Program, None);
-    assert_eq!(choose(&world, Some(OWN), None, &PROOFS, &[]), Selection::Chosen { account: OWN, source: SECOND });
+    let choose = |host: &[HostSource]| {
+        world.domain.select(
+            Use::Party(ALICE),
+            PROVIDER,
+            Some(b"claude_code"),
+            Some(OWN),
+            None,
+            &PROOFS,
+            host,
+            world.now,
+        )
+    };
+    assert_eq!(choose(&[]), Selection::Wait { account: OWN, source: Some(FIRST), why: WaitWhy::Host });
+    assert_eq!(
+        choose(&[HostSource { source: FIRST, usable: true }]),
+        Selection::Chosen { account: OWN, source: FIRST }
+    );
+}
+#[test]
+fn a_credential_endpoint_skips_program_sources() {
+    let world = two_sources(Kind::Program, Some(Held::Refused));
     assert_eq!(
         choose(&world, Some(OWN), None, &PROOFS, &[HostSource { source: FIRST, usable: true }]),
-        Selection::Chosen { account: OWN, source: FIRST }
+        Selection::Chosen { account: OWN, source: SECOND }
     );
 }
 
@@ -295,7 +315,7 @@ fn a_changed_main_provider_allows_fresh_account_choice() {
     grant(&mut world, FIRST);
     grant(&mut world, DEPLOYMENT_SOURCE);
     assert_eq!(
-        world.domain.select(Use::Party(ALICE), NEW_PROVIDER, Some(OWN), None, &PROOFS, &[], world.now),
+        world.domain.select(Use::Party(ALICE), NEW_PROVIDER, None, Some(OWN), None, &PROOFS, &[], world.now),
         Selection::Chosen { account: DEPLOYMENT, source: DEPLOYMENT_SOURCE }
     );
 }
@@ -318,5 +338,34 @@ fn host_rules_filter_direct_accounts_before_fresh_ranking() {
     assert_eq!(
         choose(&world, Some(OWN), None, &PROOFS, &host),
         Selection::Wait { account: OWN, source: Some(FIRST), why: WaitWhy::Host }
+    );
+}
+
+#[test]
+fn only_host_local_program_unavailability_passes_to_the_next_program_source() {
+    let mut rows = vec![account(OWN, PROVIDER, Holder::Party(ALICE), b"")];
+    for (number, place, name) in [(FIRST, 0, b"first".as_slice()), (SECOND, 1, b"second".as_slice())] {
+        rows.push(Stored::Source { account: OWN, number, place, kind: Kind::Program, name: name.into(), held: None });
+        rows.push(Stored::Issued { number, holder: Holder::Party(ALICE), name: name.into(), signed_out: false });
+    }
+    let mut world = fixture(rows);
+    let host = [HostSource { source: FIRST, usable: false }, HostSource { source: SECOND, usable: true }];
+    let choose = |world: &World| {
+        world.domain.select(
+            Use::Party(ALICE),
+            PROVIDER,
+            Some(b"claude_code"),
+            Some(OWN),
+            None,
+            &PROOFS,
+            &host,
+            world.now,
+        )
+    };
+    assert_eq!(choose(&world), Selection::Chosen { account: OWN, source: SECOND });
+    world.step(Event::Limited { account: FIRST, reset: None });
+    assert_eq!(
+        choose(&world),
+        Selection::Wait { account: OWN, source: Some(FIRST), why: WaitWhy::Source(State::Limited { until: None }) }
     );
 }

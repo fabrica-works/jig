@@ -273,3 +273,40 @@ fn table<const N: usize>(cases: [Case; N]) {
     }
     assert!(passed, "{failures:?}");
 }
+
+fn program_endpoint(offered: bool, name: &str) -> Box<[u8]> {
+    let prefix = br#""dialect": 0, "program": ""#;
+    let mut member = skein_lib::Writer::new(prefix.len().checked_add(name.len()).unwrap().checked_add(2).unwrap());
+    member.put(prefix).unwrap();
+    member.put(name.as_bytes()).unwrap();
+    member.put(b"\",").unwrap();
+    let document = fixtures::with(fixtures::ENGINE_SMALL, br#""dialect": 0,"#, &member.finish());
+    if offered {
+        fixtures::with(
+            &document,
+            br#""sources":{}"#,
+            br#""manage_usage":"https://usage.example/","sources":{"programs":["claude_code"]}"#,
+        )
+    } else {
+        document
+    }
+}
+#[test]
+fn an_endpoint_naming_a_program_its_provider_lacks_is_refused() {
+    let problems = fixtures::engine(&program_endpoint(false, "claude_code")).expect_err("program not offered");
+    assert_eq!(problems.problems.get(0).expect("program problem").path, endpoint_path(b"program"));
+    assert_eq!(problems.problems.get(0).expect("program problem").what, What::Refers);
+}
+#[test]
+fn an_unknown_program_is_refused_at_its_path() {
+    let problems = fixtures::engine(&program_endpoint(true, "unknown_program")).expect_err("unknown program");
+    assert_eq!(problems.problems.get(0).expect("program problem").path, endpoint_path(b"program"));
+    assert_eq!(problems.problems.get(0).expect("program problem").what, What::Refers);
+}
+#[test]
+fn a_models_program_comes_from_its_endpoint() {
+    let engine = fixtures::engine(&program_endpoint(true, "claude_code")).expect("program offered");
+    assert_eq!(engine.llm.endpoints[0].program.as_deref(), Some(b"claude_code".as_slice()));
+    assert_eq!(engine.llm.models[0].program, engine.llm.endpoints[0].program);
+    assert!(engine.llm.models[0].window <= 272_000);
+}

@@ -393,7 +393,7 @@ fn inventory(core: &mut Core, limits: &Limits, channel: Token, logins: Box<[flee
         &mut out,
     );
 }
-fn placement_fleet(core: &Core, limits: &Limits) -> fleet::Domain {
+pub(super) fn placement_fleet(core: &Core, limits: &Limits) -> fleet::Domain {
     let mut config = config(41);
     config.settings.charters[0].hosts = core.settings.charters[0].hosts;
     config.settings.charters[0].policy = core.settings.charters[0].policy.clone();
@@ -420,6 +420,10 @@ fn placement_with_accounts(
 ) -> (Core, Limits) {
     let (mut core, limits) = ready(false);
     core.settings.charters[0].policy.alternatives = Box::new([]);
+    if personal_first {
+        core.settings.models[0].program = Some(b"claude_code".as_slice().into());
+        core.settings.charters[0].policy.model.program = Some(b"claude_code".as_slice().into());
+    }
     core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
     let program_account = if main_holder == login_holder { 0 } else { 2 };
     let mut records = vec![
@@ -557,11 +561,10 @@ fn a_program_source_is_chosen_only_where_its_login_is_usable() {
     assert_eq!((choice.placement.channel, choice.accounts[0].source), (FIRST, PERSONAL_SOURCE));
 }
 #[test]
-fn an_unusable_login_lets_the_next_source_serve_there() {
+fn an_unusable_program_login_does_not_fall_back_to_a_key() {
     let (mut core, limits) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
     inventory(&mut core, &limits, FIRST, Box::new([login(b"personal", fleet::LoginState::NotSignedIn)]));
-    let choice = core.run_choice(TASK).unwrap();
-    assert_eq!((choice.placement.channel, choice.accounts[0].source), (FIRST, 1));
+    assert_eq!(core.run_choice(TASK), Err(RunWait::Host));
 }
 #[test]
 fn a_deployment_held_login_restricts_no_run() {
@@ -637,8 +640,7 @@ fn the_engine_never_takes_a_program_source() {
     limits.fleet.engine_slots = 1;
     core.fleet = placement_fleet(&core, &limits);
     host(&mut core, &limits, Token::new(0), &[b"scripted"]);
-    let choice = core.run_choice(TASK).unwrap();
-    assert_eq!((choice.placement.kind, choice.accounts[0].source), (fleet::HostKind::Engine, 1));
+    assert_eq!(core.run_choice(TASK), Err(RunWait::Host));
 }
 
 #[test]
@@ -690,4 +692,90 @@ fn a_login_kept_after_the_check_fails_the_assignment_recheck() {
     core.proofs.insert(TASK, proof).unwrap();
     inventory(&mut core, &limits, FIRST, Box::new([login(b"personal", fleet::LoginState::Usable)]));
     assert!(!core.claim_bindings_usable(TASK, 7));
+}
+
+#[test]
+fn a_declared_model_s_account_takes_no_program_source() {
+    let (mut core, limits) = placement_with_accounts(
+        accounts::Holder::Party(OWNER),
+        accounts::Holder::Party(OWNER),
+        false,
+        vec![
+            accounts::Stored::Account {
+                number: 5,
+                provider: 2,
+                holder: accounts::Holder::Party(OWNER),
+                place: 1,
+                uses: None,
+                subject: Box::new([]),
+                display: Box::new([]),
+            },
+            accounts::Stored::Source {
+                account: 5,
+                number: 6,
+                place: 0,
+                kind: accounts::Kind::Program,
+                name: b"other-program".as_slice().into(),
+                held: None,
+            },
+            accounts::Stored::Issued {
+                number: 6,
+                holder: accounts::Holder::Party(OWNER),
+                name: b"other-program".as_slice().into(),
+                signed_out: false,
+            },
+        ],
+    );
+    core.settings.models[2].program = Some(b"claude_code".as_slice().into());
+    core.settings.charters[0].policy.alternatives = Box::new([core.settings.models[2].clone()]);
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
+        fleet::Event::Sources {
+            sources: Box::new([
+                fleet::SourceName::new(b"personal").unwrap(),
+                fleet::SourceName::new(b"other-program").unwrap(),
+            ]),
+        },
+        &mut out,
+    );
+    inventory(
+        &mut core,
+        &limits,
+        FIRST,
+        Box::new([login(b"personal", fleet::LoginState::Usable), login(b"other-program", fleet::LoginState::Usable)]),
+    );
+    let choice = core.run_choice(TASK).expect("credential main runs");
+    assert_eq!(choice.accounts.as_ref(), &[authority::AccountBinding { provider: 1, account: 0, source: 1 }]);
+    assert!(choice.policy.alternatives.is_empty());
+}
+
+#[test]
+fn a_declared_model_with_mains_program_shares_mains_account() {
+    let (mut core, limits) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
+    core.settings.models[1].program = core.settings.models[0].program.clone();
+    core.settings.charters[0].policy.alternatives = Box::new([core.settings.models[1].clone()]);
+    core.fleet = placement_fleet(&core, &limits);
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
+        fleet::Event::Sources { sources: Box::new([fleet::SourceName::new(b"personal").unwrap()]) },
+        &mut out,
+    );
+    host_with_logins(
+        &mut core,
+        &limits,
+        FIRST,
+        &[b"scripted", b"same"],
+        Box::new([login(b"personal", fleet::LoginState::Usable)]),
+    );
+    let choice = core.run_choice(TASK).expect("program models run together");
+    assert_eq!(choice.placement.channel, FIRST);
+    assert_eq!(
+        choice.accounts.as_ref(),
+        &[authority::AccountBinding { provider: 1, account: 0, source: PERSONAL_SOURCE }]
+    );
+    assert_eq!(choice.policy.alternatives.as_ref(), core::slice::from_ref(&core.settings.models[1]));
 }

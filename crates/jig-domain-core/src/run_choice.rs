@@ -54,8 +54,14 @@ impl Core {
         {
             excluded = Some(accounts::Excluded { holder: account.holder(), provider: account.provider() });
         }
-        let candidates =
-            self.accounts.candidates(crate::coverage::payer(payer), provider, preferred, excluded, coverage.as_slice());
+        let candidates = self.accounts.candidates(
+            crate::coverage::payer(payer),
+            provider,
+            policy.model.program.as_deref(),
+            preferred,
+            excluded,
+            coverage.as_slice(),
+        );
         let mut waiting = None;
         let mut host_wait = false;
         let kinds = self.charter_of(task).hosts;
@@ -73,6 +79,7 @@ impl Core {
                 let selection = self.accounts.select(
                     crate::coverage::payer(payer),
                     provider,
+                    policy.model.program.as_deref(),
                     Some(*account),
                     None,
                     coverage.as_slice(),
@@ -100,6 +107,11 @@ impl Core {
                 let mut retained = List::with_capacity(jig_domain_tasks::MODELS);
                 for model in &policy.alternatives {
                     let Some(other) = self.provider(model) else { continue };
+                    if (other == provider && model.program != policy.model.program)
+                        || (other != provider && model.program.is_some())
+                    {
+                        continue;
+                    }
                     let mut bound = false;
                     for binding in &bindings {
                         if binding.provider == other {
@@ -110,6 +122,7 @@ impl Core {
                         && let accounts::Selection::Chosen { account, source } = self.accounts.select(
                             crate::coverage::payer(payer),
                             other,
+                            model.program.as_deref(),
                             None,
                             None,
                             coverage.as_slice(),
@@ -173,10 +186,14 @@ impl Core {
         }
         let mut facts = List::with_capacity(self.host_fact_capacity());
         self.host_facts(placement, self.host_rule(placement), &mut facts);
+        let main = self.chosen_main(task);
+        let main_provider = self.provider(main);
         for binding in &proof.accounts {
+            let program = if main_provider == Some(binding.provider) { main.program.as_deref() } else { None };
             let selected = self.accounts.select(
                 crate::coverage::payer(payer),
                 binding.provider,
+                program,
                 Some(binding.account),
                 None,
                 coverage.as_slice(),

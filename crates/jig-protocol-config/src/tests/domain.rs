@@ -356,7 +356,10 @@ fn memory_below_the_components_sum_is_refused() {
     // HostRule adds 4 host lines * 16 aligned bytes = 64 to the deployment envelope.
     // It remains below the Project envelope (56 overview carriers), so the components sum does not move
     // for that field. The two scratch lists above add 192 bytes over 18,703,343,827.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_344_019 });
+    // JP12 commit 3: 64 configured models * (16-byte optional program carrier +
+    // 32-byte backend name) + 4 charter envelopes * 16 bytes = 3,136 bytes.
+    // Run-policy payloads stay within their existing run_bytes envelopes.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_347_155 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

@@ -176,6 +176,7 @@ pub fn run() -> Box<core::RunCharter> {
             model: core::Model {
                 dialect: 1,
                 endpoint: 1,
+                program: None,
                 name: b"small".as_slice().into(),
                 window: 1024,
                 output: 128,

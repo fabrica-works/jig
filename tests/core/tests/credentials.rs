@@ -717,6 +717,8 @@ fn claim_keeps_pin_and_bindings(world: &World, task: u64, attempt: u64, account:
 
 fn program_configuration(seed: u64) -> (root::Config, root::Limits) {
     let (mut config, limits) = jig_core_world::effects::fixture(seed, false);
+    config.core.settings.models[0].program = Some(b"claude_code".as_slice().into());
+    config.core.settings.charters[0].policy.model.program = Some(b"claude_code".as_slice().into());
     config.core.settings.llm_providers.providers[0].offers.programs = Box::new([b"claude_code".as_slice().into()]);
     (config, limits)
 }

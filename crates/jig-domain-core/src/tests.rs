@@ -225,6 +225,7 @@ fn scripted_model() -> Model {
     Model {
         dialect: 1,
         endpoint: 1,
+        program: None,
         name: b"scripted".as_slice().into(),
         window: 8192,
         output: 1024,

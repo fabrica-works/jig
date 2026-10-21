@@ -54,6 +54,9 @@ fn model_owned_bytes(model: &crate::Model) -> Option<u64> {
     if let Some(effort) = &model.effort {
         longest = longest.max(u64::try_from(effort.len()).ok()?);
     }
+    if let Some(program) = &model.program {
+        bytes = bytes.checked_add(u64::try_from(program.len()).ok()?)?;
+    }
     bytes.checked_add(longest)
 }
 
@@ -108,6 +111,7 @@ fn models_worst_case() -> Option<u64> {
         tasks::MODELS,
         sizeof(size_of::<crate::Model>())?
             .checked_add(u64::from(crate::MODEL_NAME_BYTES))?
+            .checked_add(u64::from(accounts::NAME))?
             .checked_add(efforts)?
             .checked_add(u64::from(crate::EFFORT_BYTES))?,
     )

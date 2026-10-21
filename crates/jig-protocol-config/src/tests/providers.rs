@@ -228,6 +228,17 @@ fn an_account_sign_in_registration_names_its_endpoints_and_its_must_grant_scopes
     }
 }
 #[test]
+fn a_long_revocation_and_resource_are_kept() {
+    const URL: &[u8] = b"https://oauth2.googleapis.com/revoke";
+    assert_eq!(URL.len(), 36);
+    let bytes = one(b"https://issuer.example/revoke", URL);
+    let bytes = fixtures::with(&bytes, b"https://resource.example", URL);
+    let engine = fixtures::engine(&bytes).expect("long sign-in URLs parse");
+    let registration = engine.llm.providers[0].sign_in.as_ref().expect("sign-in registration");
+    assert_eq!(registration.revocation.as_deref(), Some(URL));
+    assert_eq!(registration.resource.as_deref(), Some(URL));
+}
+#[test]
 fn an_account_sign_in_must_grant_scope_outside_the_scopes_is_refused_at_its_name() {
     first_problem(
         &one(br#""must_grant": ["chat"]"#, br#""must_grant": ["other"]"#),

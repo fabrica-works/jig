@@ -76,6 +76,7 @@ impl Core {
                 if let jig_domain_accounts::Selection::Chosen { .. } = self.accounts.select(
                     crate::coverage::payer(payer),
                     provider,
+                    model.program.as_deref(),
                     None,
                     None,
                     coverage.as_slice(),
@@ -106,6 +107,18 @@ impl Core {
             }
         }
         Ok(())
+    }
+
+    /// The chosen main model, without cloning the policy during an assignment recheck.
+    pub(crate) fn chosen_main(&self, task: u64) -> &Model {
+        let policy = &self.charter_of(task).policy;
+        if let Some(choice) = &self.tasks.task(task).expect("live agent task").llm
+            && takes(&self.settings.models, policy, choice)
+        {
+            let configured = self.settings.models.get(usize::from(choice.main.model)).expect("validated model index");
+            return charter_model(policy, &configured.name).expect("validated charter model");
+        }
+        &policy.model
     }
 
     /// The policy a run of `task` uses: its charter's, running its LLM choice's models, each the

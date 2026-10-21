@@ -24,6 +24,13 @@ pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
             assert!(earlier.name != model.name, "unique configured model names");
         }
         assert!(model.name.len() <= usize::try_from(crate::MODEL_NAME_BYTES).expect("name bound"), "model name bound");
+        if let Some(program) = &model.program {
+            assert!(
+                !program.is_empty()
+                    && program.len() <= usize::try_from(jig_domain_accounts::NAME).expect("program bound"),
+                "program name bound"
+            );
+        }
         assert!(model.efforts.len() <= usize::try_from(crate::EFFORTS).expect("effort count"), "effort count");
         for (at, effort) in model.efforts.iter().enumerate() {
             assert!(

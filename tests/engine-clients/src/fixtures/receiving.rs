@@ -9,6 +9,7 @@ fn model() -> core::Model {
     core::Model {
         dialect: 1,
         endpoint: 1,
+        program: None,
         name: Box::from(b"scripted".as_slice()),
         window: 8192,
         output: 1024,

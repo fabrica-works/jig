@@ -314,6 +314,8 @@ pub struct RestoringProof {
 pub struct Model {
     pub dialect: u32,
     pub endpoint: u32,
+    /// The endpoint's backend, when it takes program sources (configuration.md, 3).
+    pub program: Option<Box<[u8]>>,
     pub name: Box<[u8]>,
     /// The input tokens a conversation's window may hold on this model.
     pub window: u32,

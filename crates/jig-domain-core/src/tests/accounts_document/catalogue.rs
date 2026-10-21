@@ -187,10 +187,11 @@ fn a_limited_candidate_does_not_hide_a_program_host_wait() {
         },
     ]);
     let (mut core, env) = serving_records(records);
+    core.settings.models[0].program = Some(b"claude_code".as_slice().into());
     drop(step(&mut core, &env, Event::Account(accounts::Event::Limited { account: FIRST_SOURCE, reset: None })));
     let coverage = core.account_coverage(tasks::Payer::Party(ALICE));
     assert_eq!(
-        core.accounts.candidates(Use::Party(ALICE), PROVIDER, None, None, coverage.as_slice()).get(0),
+        core.accounts.candidates(Use::Party(ALICE), PROVIDER, None, None, None, coverage.as_slice()).get(0),
         Some(&OWN)
     );
     assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unknown);
@@ -233,4 +234,26 @@ fn readiness_reads_a_usable_program_login() {
     let (mut core, env) = catalogue_host(accounts::Holder::Party(ALICE), true);
     drop(step(&mut core, &env, Event::Account(accounts::Event::Limited { account: 1, reset: None })));
     assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Usable);
+}
+
+#[test]
+fn readiness_requires_one_models_source_and_host_together() {
+    let (mut core, env) = serving();
+    let mut direct = core.settings.models[0].clone();
+    direct.name = b"direct".as_slice().into();
+    core.settings.models[0].program = Some(b"claude_code".as_slice().into());
+    core.settings.models = Box::new([core.settings.models[0].clone(), direct]);
+    core.settings.llm_providers.providers[0].models =
+        Box::new([b"scripted".as_slice().into(), b"direct".as_slice().into()]);
+    core.settings.llm_providers.providers[0].offers.programs = Box::new([b"claude_code".as_slice().into()]);
+    core.fleet = run_choice::placement_fleet(&core, &env.limits);
+    run_choice::host(&mut core, &env.limits, Token::new(7), &[b"scripted"]);
+    // The program model has a host but no source; the direct model has a source but no host.
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unavailable);
+    drop(step(&mut core, &env, Event::Fleet(fleet::Event::Lost { channel: Token::new(7) })));
+    core.fleet.reclaim();
+    run_choice::host(&mut core, &env.limits, Token::new(11), &[b"scripted", b"direct"]);
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Usable);
+    drop(step(&mut core, &env, Event::Account(accounts::Event::Limited { account: FIRST_SOURCE, reset: None })));
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unavailable);
 }

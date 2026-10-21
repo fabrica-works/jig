@@ -136,47 +136,57 @@ fn append(
 /// Full-state selection precedes any document truncation. No task pin is chosen here.
 fn readiness(core: &Core, payer: tasks::Payer, provider: u32) -> (Readiness, bool) {
     let coverage = core.account_coverage(payer);
-    let candidates = core.accounts.candidates(crate::coverage::payer(payer), provider, None, None, coverage.as_slice());
-    if candidates.is_empty() {
-        return (Readiness::Unavailable, false);
-    }
-    let hosts = core.fleet.host_views();
-    let mut facts = List::with_capacity(core.host_fact_capacity());
     let mut unknown = false;
     let mut refreshing = false;
-    for host in &hosts {
-        if !host.connected || host.draining || host.slots == 0 {
+    let hosts = core.fleet.host_views();
+    for model in &core.settings.models {
+        if core.provider(model) != Some(provider) {
             continue;
         }
-        if host.kind == fleet::HostKind::Worker && core.fleet.awaiting_logins(host.channel) {
-            unknown = true;
+        let candidates = core.accounts.candidates(
+            crate::coverage::payer(payer),
+            provider,
+            model.program.as_deref(),
+            None,
+            None,
+            coverage.as_slice(),
+        );
+        if candidates.is_empty() {
             continue;
         }
-        let placement = fleet::PlacementConstraint { channel: host.channel, kind: host.kind };
-        core.host_facts(placement, core.host_rule(placement), &mut facts);
-        for account in &candidates {
-            match core.accounts.select(
-                crate::coverage::payer(payer),
-                provider,
-                Some(*account),
-                None,
-                coverage.as_slice(),
-                facts.as_slice(),
-                core.run_now,
-            ) {
-                accounts::Selection::Chosen { .. } => {
-                    for model in &core.settings.models {
-                        if core.provider(model) == Some(provider)
-                            && core.fleet.supports(placement, &[crate::fleet_needs::model(model)])
-                        {
-                            return (Readiness::Usable, false);
-                        }
+        let mut facts = List::with_capacity(core.host_fact_capacity());
+        for host in &hosts {
+            if !host.connected || host.draining || host.slots == 0 {
+                continue;
+            }
+            if host.kind == fleet::HostKind::Worker && core.fleet.awaiting_logins(host.channel) {
+                unknown = true;
+                continue;
+            }
+            let placement = fleet::PlacementConstraint { channel: host.channel, kind: host.kind };
+            if !core.fleet.supports(placement, &[crate::fleet_needs::model(model)]) {
+                continue;
+            }
+            core.host_facts(placement, core.host_rule(placement), &mut facts);
+            for account in &candidates {
+                match core.accounts.select(
+                    crate::coverage::payer(payer),
+                    provider,
+                    model.program.as_deref(),
+                    Some(*account),
+                    None,
+                    coverage.as_slice(),
+                    facts.as_slice(),
+                    core.run_now,
+                ) {
+                    accounts::Selection::Chosen { .. } => return (Readiness::Usable, false),
+                    accounts::Selection::Wait { why: accounts::WaitWhy::Host, .. } => unknown = true,
+                    accounts::Selection::Wait { why: accounts::WaitWhy::Refreshing, .. } => refreshing = true,
+                    accounts::Selection::Wait {
+                        why: accounts::WaitWhy::Source(_) | accounts::WaitWhy::Empty, ..
                     }
+                    | accounts::Selection::NoAccount => {}
                 }
-                accounts::Selection::Wait { why: accounts::WaitWhy::Host, .. } => unknown = true,
-                accounts::Selection::Wait { why: accounts::WaitWhy::Refreshing, .. } => refreshing = true,
-                accounts::Selection::Wait { why: accounts::WaitWhy::Source(_) | accounts::WaitWhy::Empty, .. }
-                | accounts::Selection::NoAccount => {}
             }
         }
     }

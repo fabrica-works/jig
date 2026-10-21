@@ -324,7 +324,9 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 ### 5.5 Program sources and *none*
 
 - **The engine holds no value** for a program source; its grant carries
-  the source's name in its form. Its login is the program's own, in a
+  the source's name in its form. A model whose endpoint names a program
+  takes only a program source; one without it skips program sources. Its
+  login is the program's own, in a
   configuration directory on each host, named by the source's name under
   the programs directory the worker's configuration
   names (`configuration.md`, section 4); jig never reads it
