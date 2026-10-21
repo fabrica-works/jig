@@ -146,7 +146,7 @@ pub(crate) fn refresh(domain: &mut Domain, number: u64) {
 
 fn has(holdings: &[Holding], holding: &Holding) -> bool {
     for known in holdings {
-        if crate::holds::name(known) == crate::holds::name(holding) {
+        if crate::holds::same(known, holding) {
             return true;
         }
     }

@@ -196,7 +196,7 @@ fn shape(limits: &Limits, name: &Name) -> bool {
     bytes <= limits.hold_bytes
 }
 
-fn same(a: &Holding, b: &Holding) -> bool {
+pub(crate) fn same(a: &Holding, b: &Holding) -> bool {
     name(a) == name(b)
 }
 

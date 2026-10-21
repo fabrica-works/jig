@@ -712,3 +712,22 @@ fn holding_a_named_pool_holder_lifts_the_waiter() {
     assert_eq!(world.record(WAITER).phase, Phase::Waiting);
     assert_eq!(world.record(WAITER).hold_wait_since, place);
 }
+
+#[test]
+fn a_hand_down_uses_the_resource_name_despite_a_different_declared_kind() {
+    const OTHER_KIND: u16 = 2;
+    let mut world = configured(&LIMITS, false);
+    world.configure_holds(CONNECTOR, vec![Kind { connector: CONNECTOR, kind: OTHER_KIND, hold: HoldKind::Shared }]);
+    world.send(Event::Resource { name: name(), hold: HoldKind::Exclusive { taken: Taken::Waits } });
+    let mut creator = task(ROOT, &[]);
+    creator.holdings = Box::new([holding(false)]);
+    assert_eq!(world.make(Party::Person(PERSON), vec![creator]), Reply::Made(vec![ROOT]));
+    let mut member = task(WAITER, &[]);
+    member.holdings = Box::new([Holding::Write { resource: name(), kind: OTHER_KIND }]);
+    assert_eq!(world.make(Party::Task(ROOT), vec![member]), Reply::Made(vec![WAITER]));
+    assert!(world.record(ROOT).holdings.is_empty());
+    assert!(world.record(WAITER).holds_taken);
+    assert_eq!(world.record(WAITER).phase, Phase::Active(Active::Due));
+    finish_task(&mut world, WAITER);
+    finish_task(&mut world, ROOT);
+}

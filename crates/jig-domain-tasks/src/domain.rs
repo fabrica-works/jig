@@ -1120,7 +1120,7 @@ pub(crate) fn make_admitted(
                     break;
                 }
                 for wanted in &new.holdings {
-                    if wanted == holding {
+                    if crate::holds::same(wanted, holding) {
                         to = Some(new.number);
                         break;
                     }
