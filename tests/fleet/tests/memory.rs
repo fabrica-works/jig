@@ -113,10 +113,14 @@ impl Measured {
     /// A hello on `channel`, holding as many keys as a worker may, of the
     /// most bytes, and hosting `hosting`.
     fn hello(&mut self, channel: Token, hosting: Vec<Hosted>) -> Vec<Request> {
+        self.hello_with_endpoints(channel, hosting, jig_domain_fleet::PROGRAM_ENDPOINTS)
+    }
+
+    fn hello_with_endpoints(&mut self, channel: Token, hosting: Vec<Hosted>, endpoints: u32) -> Vec<Request> {
         let limits = self.env.limits;
         let workstreams = (0..limits.workstreams).map(|nth| channel.raw() * 100 + u64::from(nth)).collect();
         let mut bounds = jig_fleet_world::fixtures::bounds();
-        bounds.program_endpoints = (0..jig_domain_fleet::PROGRAM_ENDPOINTS).collect();
+        bounds.program_endpoints = (0..endpoints).collect();
         self.step(Event::Hello {
             worker: u32::try_from(channel.raw()).expect("fixture channel") % LIMITS.configured_workers,
             channel,
@@ -148,6 +152,26 @@ impl Measured {
         assert!(asked.is_empty(), "a start waits for placement: {asked:?}");
         (run, attempt)
     }
+}
+
+#[test]
+fn program_endpoints_retain_exactly_the_formulas_bytes() {
+    let limits = Limits { engine_slots: 1, ..LIMITS };
+    let channels = limits.workers + u32::from(limits.engine_slots > 0);
+    let retained = |endpoints| {
+        let mut fleet = Measured::new(limits);
+        assert!(fleet.hello_with_endpoints(Token::new(0), Vec::new(), endpoints).is_empty());
+        for nth in 0..limits.workers {
+            assert!(fleet.hello_with_endpoints(channel(nth), Vec::new(), endpoints).is_empty());
+        }
+        assert_eq!(fleet.domain.workers(), limits.workers);
+        assert_eq!(fleet.domain.attempts(), 0);
+        fleet.meter.held()
+    };
+    let with_0 = retained(0);
+    let with_64 = retained(jig_domain_fleet::PROGRAM_ENDPOINTS);
+    let endpoints = u64::from(channels) * u64::from(jig_domain_fleet::PROGRAM_ENDPOINTS) * 4;
+    assert_eq!(with_64 - with_0, endpoints);
 }
 
 #[test]

@@ -21,6 +21,31 @@ fn spawn(service: &mut Service) -> (Token, io::kernel::Spawn) {
 }
 
 #[test]
+fn the_whole_worker_bound_prices_hello_and_retained_endpoint_copies_exactly() {
+    use jig_protocol_config::{self as config, read};
+    let document =
+        config::document(fixtures::WORKER_DOCUMENT, &config::DocumentLimits { bytes: 8192, tokens: 4096, depth: 32 })
+            .expect("worker document");
+    let mut whole = read::Object::new(&document, 0).expect("service object");
+    let workers = read::list(&document, whole.member(&document, b"workers").expect("workers"), 1).expect("one worker");
+    let worker = config::worker(&document, *workers.get(0).expect("worker"), &config::Directories::working())
+        .expect("worker configuration");
+    let mut agent = fixtures::agent();
+    let without = crate::worker::worst_case(&worker, &agent, 0).expect("empty endpoint bound");
+    for count in [1, jig_domain_host::PROGRAM_ENDPOINTS] {
+        let mut endpoints = skein_lib::List::with_capacity(count);
+        for endpoint in 0..count {
+            endpoints.push(endpoint).expect("one slot per endpoint");
+        }
+        agent.bounds.program_endpoints = endpoints.into_boxed();
+        let with = crate::worker::worst_case(&worker, &agent, 0).expect("bounded endpoints");
+        let hello_endpoints = u64::from(count) * 4;
+        let endpoint_copies = u64::from(count) * 4 * 2;
+        assert_eq!(with - without, hello_endpoints + endpoint_copies, "{count} endpoints");
+    }
+}
+
+#[test]
 fn io_events_reach_only_the_layer_whose_tokens_they_carry() {
     let mut service = fixtures::two_workers();
     let owner = {
