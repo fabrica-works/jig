@@ -401,6 +401,7 @@ pub(crate) fn decide(
                 task.record.phase = match was {
                     Was::Waiting => {
                         task.record.hold_wait_since = None;
+                        task.record.hold_bound_since = None;
                         Phase::Waiting
                     }
                     Was::Active(active) => Phase::Active(active),

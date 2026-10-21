@@ -517,6 +517,7 @@ pub(crate) fn take(domain: &mut Domain, _env: &Env<Limits>, number: u64, out: &m
     let row = task_mut(domain, number).expect("waiting task live");
     row.record.holds_taken = true;
     row.record.hold_wait_since = None;
+    row.record.hold_bound_since = None;
     domain.hold_alarms.cancel(number);
     let mut taken = List::with_capacity(u32::try_from(holdings.len()).expect("bounded task holdings"));
     for holding in holdings {
@@ -667,6 +668,10 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>) {
         if row.phase == Phase::Waiting
             && let Some(since) = row.hold_wait_since
         {
+            let since = match row.hold_bound_since {
+                Some(bound) => bound,
+                None => since,
+            };
             let until = since.as_nanos().saturating_add(env.limits.hold_wait.as_nanos());
             let remaining = until.saturating_sub(env.wall.as_nanos());
             let due = env.now.saturating_add(skein_lib::Duration::from_nanos(remaining));

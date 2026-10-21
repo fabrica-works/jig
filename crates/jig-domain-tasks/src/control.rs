@@ -737,6 +737,7 @@ pub(crate) fn apply_release(
     task.record.due_reason = crate::Why::Released;
     if task.record.phase == Phase::Waiting {
         task.record.hold_wait_since = None;
+        task.record.hold_bound_since = None;
     }
     task.record.tries = Tries::NONE;
     task.record.refusals = 0;

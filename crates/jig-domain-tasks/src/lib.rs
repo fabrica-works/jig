@@ -112,6 +112,7 @@ mod tests;
 mod value;
 mod verdict;
 mod waiting;
+mod waits;
 mod wake;
 mod writers;
 pub use activity::{ActivityLine, EndKind, Line, Why, line_bytes_limit, lines_per_decision};

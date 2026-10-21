@@ -416,6 +416,7 @@ pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
             None => 0,
         })?
         .checked_add(bytes(size_of_val(&*task.dependencies))?)?
+        .checked_add(bytes(size_of_val(&*task.added))?)?
         .checked_add(holdings_bytes(&task.holdings)?)?
         .checked_add(bytes(size_of_val(&*task.delegates))?)?
         .checked_add(bytes(size_of_val(&*task.result_followups))?)?

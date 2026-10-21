@@ -1256,6 +1256,7 @@ pub(crate) fn make_admitted(
                 holdings: new.holdings,
                 holds_taken: false,
                 hold_wait_since: None,
+                hold_bound_since: None,
                 dependencies: new.dependencies,
                 added: Box::new([]),
                 delegates: Box::new([]),

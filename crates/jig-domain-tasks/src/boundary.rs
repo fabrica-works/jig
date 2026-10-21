@@ -1031,8 +1031,13 @@ pub struct TaskRecord {
     pub holdings: Box<[Holding]>,
     /// True only after the whole requested set has been taken.
     pub holds_taken: bool,
-    /// First wall time at which dependencies cleared but a hold was unavailable.
+    /// First wall time at which dependencies cleared but a hold was unavailable: the task's
+    /// place in its queues.
     pub hold_wait_since: Option<Wall>,
+    /// When the wait bound counts from, if not from `hold_wait_since`: a task that left its
+    /// queues for a dependency added or a circle comes back at its place, its bound counted
+    /// afresh (domain/tasks.md, 6.2 and 6.7).
+    pub hold_bound_since: Option<Wall>,
     /// Current live direct delegates, bounded by `Limits::delegates`; requester ending waits until
     /// they are gone.
     pub delegates: Box<[u64]>,
