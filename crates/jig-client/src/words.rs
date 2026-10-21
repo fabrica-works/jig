@@ -12,7 +12,7 @@ pub use decision::DecisionWord;
 use skein_lib::List;
 use skein_ui::phrases::{HoleKind, HoleShape, Language, PhraseId, PhraseShape};
 /// Phrase count, for a caller composing a bounded phrasebook.
-pub const PHRASES: u32 = 90;
+pub const PHRASES: u32 = 95;
 /// Owner of jig's public enum vocabulary.
 pub const OWNER: skein_ui::Owner = skein_ui::Owner { number: 65_537 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,6 +26,7 @@ pub enum Word {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HoldWord {
+    Circle,
     Failures,
     Stalled,
     Dependency,
@@ -45,6 +46,9 @@ pub enum HoldWord {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RefusalWord {
+    Circle,
+    Dependency,
+    Kept,
     NoEscalationHolder,
     Malformed,
     Role,
@@ -67,6 +71,7 @@ pub enum RefusalWord {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WaitingWord {
+    Dependencies,
     Party,
     Delegates,
     News,
@@ -110,11 +115,15 @@ impl Word {
             HoldCategory::ResourceAccess => HoldWord::ResourceAccess,
             HoldCategory::PoolLost { .. } => HoldWord::PoolLost,
             HoldCategory::Procedure => HoldWord::Procedure,
+            HoldCategory::Circle => HoldWord::Circle,
         })
     }
     #[must_use]
     pub fn refusal(value: &Refusal) -> Self {
         Self::Refusal(match value {
+            Refusal::Circle { .. } => RefusalWord::Circle,
+            Refusal::Dependency { .. } => RefusalWord::Dependency,
+            Refusal::Kept { .. } => RefusalWord::Kept,
             Refusal::NoEscalationHolder => RefusalWord::NoEscalationHolder,
             Refusal::Malformed { .. } => RefusalWord::Malformed,
             Refusal::Role { .. } => RefusalWord::Role,
@@ -141,6 +150,7 @@ impl Word {
     #[must_use]
     pub fn waiting(value: &WaitsOn) -> Self {
         Self::Waiting(match value {
+            WaitsOn::Dependencies { .. } => WaitingWord::Dependencies,
             WaitsOn::Party { .. } => WaitingWord::Party,
             WaitsOn::Delegates => WaitingWord::Delegates,
             WaitsOn::News => WaitingWord::News,
@@ -175,7 +185,12 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 90] = [
+pub const ALL: [Word; 95] = [
+    Word::Hold(HoldWord::Circle),
+    Word::Refusal(RefusalWord::Circle),
+    Word::Refusal(RefusalWord::Dependency),
+    Word::Refusal(RefusalWord::Kept),
+    Word::Waiting(WaitingWord::Dependencies),
     Word::Phase(Phase::Waiting),
     Word::Phase(Phase::Idle),
     Word::Phase(Phase::Due),

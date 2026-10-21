@@ -102,7 +102,7 @@ pub fn creating(
         )?),
         acts::Beyond::Refused(why) => w::Beyond::Refused(w::BeyondRefused::new(
             limits,
-            w::BeyondRefusedParts { value: super::refusals::refusal(*why, limits)? },
+            w::BeyondRefusedParts { value: super::refusals::refusal(why.clone(), limits)? },
         )?),
     };
     w::CreatingBounds::new(limits, w::CreatingBoundsParts { within, beyond })

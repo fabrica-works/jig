@@ -70,7 +70,7 @@ pub(crate) fn line<'a>(
         last_activity: task.last_activity,
         ended_at: (!jig_client_view::page::conversations::live(task.chip.phase)).then_some(task.changed),
         budget: task.budget.clone(),
-        waits_on: task.waits_on,
+        waits_on: task.waits_on.clone(),
         held_below: phases.held - u32::from(task.chip.phase == Phase::Held),
         phases,
         conversation,

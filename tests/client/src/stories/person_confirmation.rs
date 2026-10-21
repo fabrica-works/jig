@@ -62,6 +62,7 @@ fn chip(form: Form) -> Chip {
                 since: Some(Wall::EPOCH),
             },
             details: Box::new(OwnerChipDetails {
+                dependencies: skein_lib::List::with_capacity(0),
                 project: 1,
                 executor: OwnerExecutor::Person(PersonAddress::Party(7)),
                 phase_since: Wall::EPOCH,

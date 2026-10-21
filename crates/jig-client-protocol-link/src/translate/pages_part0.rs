@@ -74,6 +74,9 @@ pub(crate) fn owner_message_kind_fields(
         w::OwnerMessageKind::ProposalDecision(row) => {
             c::OwnerMessageKind::ProposalDecision { proposal: row.proposal(), accepted: row.accepted() }
         }
+        w::OwnerMessageKind::Met(row) => {
+            c::OwnerMessageKind::Met { dependency: row.dependency(), removed: row.removed() }
+        }
         w::OwnerMessageKind::Words => c::OwnerMessageKind::Words,
         w::OwnerMessageKind::EffectNotMade(row) => c::OwnerMessageKind::EffectNotMade { entry: row.entry() },
         w::OwnerMessageKind::Amendment(row) => c::OwnerMessageKind::Amendment { revision: row.revision() },
@@ -163,6 +166,9 @@ pub(crate) fn owner_activity_fields(value: &w::OwnerActivity, limits: &Limits) -
             c::OwnerActivity::Turn { reply: row.reply(), attempt: row.attempt(), turn: row.turn(), read: opt0 }
         }
         w::OwnerActivity::Decided(row) => c::OwnerActivity::Decided { revision: row.revision() },
+        w::OwnerActivity::Kept(row) => {
+            c::OwnerActivity::Kept { attempt: row.attempt(), pending: row.pending().clone() }
+        }
         w::OwnerActivity::Milestone(row) => c::OwnerActivity::Milestone { position: row.position() },
     })
 }

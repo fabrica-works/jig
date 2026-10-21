@@ -59,6 +59,7 @@ fn message_fits(kind: &OwnerMessageKind, words: &Text, limits: &Limits) -> Optio
         | OwnerMessageKind::ProposalDecision { .. }
         | OwnerMessageKind::Words
         | OwnerMessageKind::EffectNotMade { .. }
+        | OwnerMessageKind::Met { .. }
         | OwnerMessageKind::Amendment { .. }
         | OwnerMessageKind::Question
         | OwnerMessageKind::Answer { .. }
@@ -81,6 +82,11 @@ pub fn required(value: &OwnerActivityLine, limits: &Limits, words: &Words) -> Op
         OwnerActivity::Words { kind, words, .. } => message_fits(kind, words, limits)?,
         OwnerActivity::Heard(word) | OwnerActivity::Notified { word, .. } => {
             message_fits(&word.kind, &word.words, limits)?;
+        }
+        OwnerActivity::Kept { pending, .. } => {
+            if pending.capacity() > limits.rows {
+                return None;
+            }
         }
         OwnerActivity::RunBegan { .. }
         | OwnerActivity::RunEnded { .. }
@@ -215,6 +221,15 @@ fn kind(b: &mut Builder, value: &OwnerMessageKind, words: &Words) {
             caption(b, words, P::Amendment);
             number(b, words, P::Revision, *revision);
         }
+        OwnerMessageKind::Met { dependency, removed } => words.text(
+            b,
+            if *removed {
+                crate::phrases::jig::JigPhrase::DependencyRemoved
+            } else {
+                crate::phrases::jig::JigPhrase::DependencyMet
+            },
+            &[Hole::Number(*dependency)],
+        ),
         OwnerMessageKind::Question => caption(b, words, P::Question),
         OwnerMessageKind::Answer { question } => {
             caption(b, words, P::Answer);
@@ -349,6 +364,13 @@ fn line(b: &mut Builder, value: &OwnerActivity, words: &Words) {
         OwnerActivity::Decided { revision } => {
             caption(b, words, P::Decided);
             number(b, words, P::Revision, *revision);
+        }
+        OwnerActivity::Kept { attempt, pending } => {
+            words.text(b, crate::phrases::jig::JigPhrase::DependencyParked, &[]);
+            number(b, words, P::Attempt, *attempt);
+            for dependency in pending {
+                words.text(b, crate::phrases::jig::JigPhrase::KeptUntil, &[Hole::Number(*dependency)]);
+            }
         }
         OwnerActivity::Milestone { position } => {
             caption(b, words, P::Milestone);

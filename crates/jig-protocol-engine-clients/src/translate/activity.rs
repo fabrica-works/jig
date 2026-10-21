@@ -27,6 +27,17 @@ pub fn line(value: &t::ActivityLine, limits: &w::Limits) -> Result<w::OwnerActiv
             limits,
             w::OwnerActivityDecidedParts { revision: *revision },
         )?),
+        t::Line::Kept { attempt, pending } => {
+            let mut rows =
+                skein_lib::List::with_capacity(u32::try_from(pending.len()).expect("bounded pending dependencies"));
+            for number in pending {
+                rows.push(*number).expect("same pending dependencies");
+            }
+            w::OwnerActivity::Kept(w::OwnerActivityKept::new(
+                limits,
+                w::OwnerActivityKeptParts { attempt: *attempt, pending: rows },
+            )?)
+        }
         t::Line::Milestone { position } => w::OwnerActivity::Milestone(w::OwnerActivityMilestone::new(
             limits,
             w::OwnerActivityMilestoneParts { position: *position },
@@ -109,6 +120,7 @@ pub fn page_turn(
         | t::Line::RunBegan { .. }
         | t::Line::RunEnded { .. }
         | t::Line::Decided { .. }
+        | t::Line::Kept { .. }
         | t::Line::Milestone { .. } => {
             if supplied.is_some() {
                 return Err(invalid);

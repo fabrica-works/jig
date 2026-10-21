@@ -6,6 +6,7 @@ use skein_ui::phrases::{Form, Hole, Language, PhraseLimits, Phrasebook, PluralCl
 const TEXT: u32 = 32;
 const TASK: u64 = 7;
 const HOLDS: &[(H, &[u8])] = &[
+    (H::Circle, b"Held for a circle of waits"),
     (H::Failures { class: HoldFailure::Lost }, b"Held: out of tries"),
     (H::Stalled, b"The executor stopped progressing"),
     (H::Dependency { task: TASK }, b"Dependency task 7"),
@@ -44,7 +45,8 @@ fn each_hold_category_says_its_own_phrase() {
     for (hold, expected) in HOLDS {
         let holes: &[Hole] = match hold {
             H::Dependency { .. } | H::Uncertain { .. } | H::PoolLost { .. } => &[Hole::Number(TASK)],
-            H::Failures { .. }
+            H::Circle
+            | H::Failures { .. }
             | H::Stalled
             | H::Stopped
             | H::StoppedBy { .. }

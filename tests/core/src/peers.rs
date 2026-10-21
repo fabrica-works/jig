@@ -347,7 +347,7 @@ fn party_reply(reply: &people::Reply) -> parties::Reply {
             })
         }
         people::Reply::Refused(why) | people::Reply::Outcome(people::Outcome::Refused(why)) => {
-            parties::Reply::Refused(party_refusal(*why))
+            parties::Reply::Refused(party_refusal(why.clone()))
         }
         people::Reply::SignedOut | people::Reply::Outcome(people::Outcome::SignedOut) => parties::Reply::SignedOut,
         people::Reply::Outcome(people::Outcome::ProposalDecided { proposer, proposal, by, at, choice }) => {
@@ -526,6 +526,16 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
 
 fn party_refusal(why: people::Refusal) -> parties::Refusal {
     match why {
+        people::Refusal::Circle { tasks, cut } => parties::Refusal::Circle { tasks, cut },
+        people::Refusal::Kept { pending } => parties::Refusal::Kept { pending },
+        people::Refusal::Dependency { dependency, how } => parties::Refusal::Dependency {
+            dependency,
+            how: match how {
+                people::DependencyStatus::Done => parties::DependencyStatus::Done,
+                people::DependencyStatus::Failed => parties::DependencyStatus::Failed,
+                people::DependencyStatus::Cancelled => parties::DependencyStatus::Cancelled,
+            },
+        },
         people::Refusal::Role { held } => parties::Refusal::Role { held: held.map(people::Role::number) },
         people::Refusal::Authority { proposable, lacking } => parties::Refusal::Authority {
             proposable: match proposable {
@@ -661,6 +671,7 @@ fn party_hold(value: people::HoldReason) -> parties::HoldReason {
         people::HoldReason::ResourceAccess => parties::HoldReason::ResourceAccess,
         people::HoldReason::PoolLost { pool } => parties::HoldReason::PoolLost { pool },
         people::HoldReason::Procedure => parties::HoldReason::Procedure,
+        people::HoldReason::Circle => parties::HoldReason::Circle,
     }
 }
 

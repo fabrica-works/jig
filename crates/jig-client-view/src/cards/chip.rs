@@ -116,8 +116,26 @@ pub fn details(
     seen: &mut skein_lib::Set<u64>,
 ) {
     match phase {
-        ChipPhase::Owner { phase, details: _ } => {
+        ChipPhase::Owner { phase, details } => {
             crate::chip_phase::brief(b, phase, words);
+            let mut kept = skein_lib::List::with_capacity(details.dependencies.len());
+            for dependency in &details.dependencies {
+                if dependency.keeps && dependency.pending {
+                    dependency_words(b, dependency, words);
+                    kept.push(dependency.number).expect("bounded kept dependencies");
+                }
+            }
+            dependencies_list(b, client, &kept, words, bindings, pending, seen);
+            if let Some(hold) = &details.hold
+                && let Some(circle) = &hold.circle
+            {
+                words.text(b, JigPhrase::CircleHold, &[]);
+                dependencies_list(b, client, &circle.tasks, words, bindings, pending, seen);
+                words.text(b, JigPhrase::CircleLifts, &[]);
+                if circle.cut {
+                    words.text(b, JigPhrase::TaskListsCut, &[]);
+                }
+            }
             if let jig_client::contract::OwnerChipPhase::Waiting { dependencies, .. } = phase {
                 dependencies_list(b, client, dependencies, words, bindings, pending, seen);
             }
@@ -238,5 +256,54 @@ fn dependencies_list(
         } else {
             words.status(b, JigPhrase::LoadingDependency, &[Hole::Number(*dependency)]);
         }
+    }
+}
+
+/// Dependency provenance uses the same words on a chip and its task page.
+pub(crate) fn dependency_words(b: &mut Builder, dependency: &jig_client::contract::Dependency, words: &Words) {
+    let phrase = match dependency.status {
+        Some(jig_client::contract::OwnerTaskStatus::Failed) => JigPhrase::DependencyFailed,
+        Some(jig_client::contract::OwnerTaskStatus::Cancelled) => JigPhrase::DependencyCancelled,
+        None | Some(jig_client::contract::OwnerTaskStatus::Done) => {
+            if dependency.keeps && dependency.pending {
+                JigPhrase::KeptUntil
+            } else if dependency.pending {
+                JigPhrase::DependencyPending
+            } else {
+                JigPhrase::DependencyDone
+            }
+        }
+    };
+    words.text(b, phrase, &[Hole::Number(dependency.number)]);
+    if let Some(added) = dependency.added {
+        let (phrase, number) = match added.by {
+            jig_client::contract::OwnerRequester::Task(task) => (JigPhrase::DependencyByTask, task),
+            jig_client::contract::OwnerRequester::Person(party) => (JigPhrase::DependencyByParty, party),
+            jig_client::contract::OwnerRequester::Deployment { project } => {
+                (JigPhrase::DependencyByDeployment, u64::from(project))
+            }
+        };
+        words.text(b, phrase, &[Hole::Number(number), Hole::Wall(words.adjusted_wall(added.at))]);
+    }
+}
+
+/// Show a numbered task in a refusal without inventing a phase when its chip is absent.
+pub(crate) fn named(b: &mut Builder, client: &Borrowed<'_>, number: u64, words: &Words, bindings: &mut JigBindings) {
+    match kept(client, number) {
+        Some(chip) => {
+            head(b, &chip, words, bindings);
+            if let ChipPhase::Owner { phase, .. } = chip.details.as_ref() {
+                crate::chip_phase::brief(b, phase, words);
+            }
+        }
+        None => crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Link,
+            JigPhrase::TaskPage,
+            &[Hole::Number(number)],
+            Act::Go { address: Address::task(number) },
+        ),
     }
 }

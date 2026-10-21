@@ -45,6 +45,14 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.provider_offer_programs = client.rows;
     wire.model_set_names_names_item = client.text.min(w::CEILINGS.model_set_names_names_item);
     wire.owner_chip_phase_waiting_dependencies = client.rows;
+    wire.owner_chip_details_fields_dependencies = client.rows.min(w::CEILINGS.owner_chip_details_fields_dependencies);
+    wire.task_dependency_facts = client.rows.min(w::CEILINGS.task_dependency_facts);
+    wire.circle_tasks = client.rows.min(w::CEILINGS.circle_tasks);
+    wire.refusal_circle_tasks = client.rows.min(w::CEILINGS.refusal_circle_tasks);
+    wire.refusal_kept_pending = client.rows.min(w::CEILINGS.refusal_kept_pending);
+    wire.owner_activity_kept_pending = client.rows.min(w::CEILINGS.owner_activity_kept_pending);
+    wire.waits_on_dependencies_pending = client.rows.min(w::CEILINGS.waits_on_dependencies_pending);
+
     wire.call_identity_id = client.text;
     wire.run_work_tool_tool = client.text;
     wire.part_resource_path = client.segments;

@@ -236,6 +236,17 @@ fn controls(
     words: &Words,
     bindings: &mut JigBindings,
 ) {
+    if let Some(fact) = client.objects().get(object)
+        && let Some(value) = crate::objects::person_task::owner_facts(&fact)
+        && let ChipPhase::Owner { details, .. } = value.task.details.as_ref()
+    {
+        for dependency in &details.dependencies {
+            if dependency.keeps && dependency.pending {
+                words.text(b, JigPhrase::KeptAnswer, &[]);
+                return;
+            }
+        }
+    }
     let answering = crate::cards::common::answering(client, object);
     match contract {
         TaskContractDocument::Verdict { choices, .. } => {
@@ -310,7 +321,35 @@ pub fn card(
     render(b, client, value, words, bindings);
     // The card keeps the whole contract; editable drafts live only in its confirmation.
     crate::cards::common::answer(b, &fact, words, text_limit);
-    crate::cards::common::acts(b, &fact.card, &value.acts, object, words, bindings);
+    let mut acts = skein_lib::List::with_capacity(value.acts.capacity());
+    let kept = match value.task.details.as_ref() {
+        ChipPhase::Owner { details, .. } => {
+            let mut kept = false;
+            for dependency in &details.dependencies {
+                kept |= dependency.keeps && dependency.pending;
+            }
+            kept
+        }
+        ChipPhase::Active(_)
+        | ChipPhase::Waiting { .. }
+        | ChipPhase::Idle { .. }
+        | ChipPhase::Starting
+        | ChipPhase::Running { .. }
+        | ChipPhase::WaitingForWords { .. }
+        | ChipPhase::BackingOff { .. }
+        | ChipPhase::Procedure { .. }
+        | ChipPhase::Person { .. }
+        | ChipPhase::Closing(_)
+        | ChipPhase::Held { .. }
+        | ChipPhase::Ended { .. } => false,
+    };
+    for act in &value.acts {
+        if kept && act.act == jig_client::contract::ActKind::Answer {
+            continue;
+        }
+        acts.push(act.clone()).expect("same bounded offers");
+    }
+    crate::cards::common::acts(b, &fact.card, &acts, object, words, bindings);
     crate::cards::close(b);
     true
 }

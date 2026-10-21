@@ -47,6 +47,7 @@ pub fn hold(value: tasks::Hold) -> client::HoldCategory {
         tasks::Hold::ResourceAccess => client::HoldCategory::ResourceAccess,
         tasks::Hold::PoolLost { pool } => client::HoldCategory::PoolLost { pool },
         tasks::Hold::Procedure => client::HoldCategory::Procedure,
+        tasks::Hold::Circle => client::HoldCategory::Circle,
     }
 }
 
@@ -106,6 +107,7 @@ pub fn phase(value: &documents::PhaseLine, limits: &Limits) -> Result<client::Ow
 /// Refuses inconsistent executor facts or any whole nested chip allocation above the receiving bounds.
 pub fn held(value: &documents::HoldLine, limits: &Limits) -> Result<client::OwnerChipHold, owner::Invalid> {
     Ok(client::OwnerChipHold {
+        circle: value.circle.as_ref().map(|circle| client::Circle { tasks: numbers(&circle.tasks), cut: circle.cut }),
         account: value.account.as_ref().map(|value| owner::part(value, limits)).transpose()?,
         source: value.source.as_ref().map(|value| owner::part(value, limits)).transpose()?,
         reason: hold(value.reason),
@@ -171,6 +173,7 @@ pub fn resource(value: &documents::ResourceLine, limits: &Limits) -> Result<clie
 /// Refuses inconsistent executor facts or any whole nested chip allocation above the receiving bounds.
 pub fn details(value: &documents::ChipDetails, limits: &Limits) -> Result<client::OwnerChipDetails, owner::Invalid> {
     Ok(client::OwnerChipDetails {
+        dependencies: dependencies(&value.dependencies, limits)?,
         project: value.project,
         executor: owner::executor(value.executor),
         phase_since: value.phase_since,
@@ -266,6 +269,38 @@ pub fn chip(value: &documents::Chip, limits: &Limits) -> Result<client::Chip, ow
     })
 }
 
+/// # Errors
+/// Rejects dependency allocations above the receiver's existing row bound.
+pub fn dependencies(
+    values: &skein_lib::List<documents::Dependency>,
+    limits: &Limits,
+) -> Result<skein_lib::List<client::Dependency>, owner::Invalid> {
+    owner::list(values, limits, |value| {
+        Ok(client::Dependency {
+            number: value.number,
+            pending: value.pending,
+            keeps: value.keeps,
+            added: value
+                .added
+                .as_ref()
+                .map(|added| client::DependencyAdded { at: added.at, by: results::requester(added.by) }),
+            status: value.status.map(|status| match status {
+                tasks::Status::Done => client::OwnerTaskStatus::Done,
+                tasks::Status::Failed => client::OwnerTaskStatus::Failed,
+                tasks::Status::Cancelled => client::OwnerTaskStatus::Cancelled,
+            }),
+        })
+    })
+}
+
+fn numbers(values: &[u64]) -> skein_lib::List<u64> {
+    let mut rows = skein_lib::List::with_capacity(u32::try_from(values.len()).expect("bounded numbers"));
+    for number in values {
+        rows.push(*number).expect("same number count");
+    }
+    rows
+}
+
 #[cfg(test)]
 pub(super) mod tests {
     const UTF8_TEXTS: [&[u8]; 1] = [b"~/"];
@@ -280,6 +315,7 @@ pub(super) mod tests {
             executor: documents::ExecutorKind::Person,
             phase: documents::PhaseLine::Ended,
             details: Box::new(documents::ChipDetails {
+                dependencies: List::with_capacity(0),
                 project: u32::MAX,
                 executor: tasks::Executor::Person(tasks::PersonAddress::Role(u32::MAX)),
                 phase_since: Wall::from_nanos(3),
@@ -351,6 +387,7 @@ pub(super) mod tests {
         ] {
             for supplied in [None, Some(account.clone())] {
                 let source = documents::HoldLine {
+                    circle: None,
                     account: supplied.clone(),
                     source: origin.clone(),
                     reason: tasks::Hold::Drift,
@@ -506,6 +543,7 @@ pub(super) mod tests {
             Ok(client::OwnerChipPhase::Closing(client::ClosingStage::Run { attempt: u64::MAX }))
         );
         let source = documents::HoldLine {
+            circle: None,
             account: None,
             source: None,
             reason: tasks::Hold::PoolLost { pool: u64::MAX },

@@ -103,21 +103,33 @@ pub enum CurrentHold {
 /// Sparse engine hold facts; absent words, clocks and parts stay absent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum HoldCategory {
-    Failures { class: HoldFailure },
+    Failures {
+        class: HoldFailure,
+    },
     Stalled,
-    Dependency { task: u64 },
+    Dependency {
+        task: u64,
+    },
     Stopped,
-    StoppedBy { party: u64 },
+    StoppedBy {
+        party: u64,
+    },
     Drift,
     Effects,
     EffectFailed,
-    Uncertain { entry: u64 },
+    Uncertain {
+        entry: u64,
+    },
     Budget,
     Deadline,
     HoldsWaited,
+    /// Joining a queue would close a circle of waits (domain/tasks.md, 6.7).
+    Circle,
     ResourceUnavailable,
     ResourceAccess,
-    PoolLost { pool: u64 },
+    PoolLost {
+        pool: u64,
+    },
     Procedure,
 }
 /// Exact admission failure categories, independent of detailed attempt failures.
@@ -149,30 +161,61 @@ pub enum Moved {
 /// A durable request refusal and all facts needed to show it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Refusal {
+    Circle {
+        tasks: skein_lib::List<u64>,
+        cut: bool,
+    },
+    Dependency {
+        dependency: u64,
+        how: super::OwnerTaskStatus,
+    },
+    Kept {
+        pending: skein_lib::List<u64>,
+    },
     /// An explicit account preference cannot fund the prospective task.
-    Account { account: u32, why: super::AccountWhy },
+    Account {
+        account: u32,
+        why: super::AccountWhy,
+    },
     /// A root task has no escalation holder.
     NoEscalationHolder,
     /// The provider's account use rule refuses this change.
     Provider,
     /// A malformed operation, at its place in the compound.
-    Malformed { at: u32, why: super::Malformed },
+    Malformed {
+        at: u32,
+        why: super::Malformed,
+    },
     /// The project role does not allow the act.
-    Role { held: Option<HeldRole> },
+    Role {
+        held: Option<HeldRole>,
+    },
     /// Another person holds this role-addressed task.
-    Taken { by: u64 },
+    Taken {
+        by: u64,
+    },
     /// The object waits for someone else.
     NotWaiting,
     /// This holder cannot pass further.
     NoFurther,
     /// Authority lacked a named permission or amount; proposal eligibility is supplied when known.
-    Authority { lacking: Lacking, proposable: Option<bool> },
+    Authority {
+        lacking: Lacking,
+        proposable: Option<bool>,
+    },
     /// An admission limit was reached.
-    Limit { which: Limit },
+    Limit {
+        which: Limit,
+    },
     /// The decided thing changed.
-    Moved { now: Revision, what: Moved },
+    Moved {
+        now: Revision,
+        what: Moved,
+    },
     /// The object ended.
-    Ended { how: Ending },
+    Ended {
+        how: Ending,
+    },
     /// No visible object with that name.
     Unknown,
     /// The deployment does not offer this act.
@@ -180,7 +223,10 @@ pub enum Refusal {
     /// The key names another ask.
     KeyConflict,
     /// An LLM choice names a model, by its configured name, that cannot be chosen, and why.
-    Llm { model: super::Text, why: super::LlmWhy },
+    Llm {
+        model: super::Text,
+        why: super::LlmWhy,
+    },
 }
 
 /// The role the engine actually found held, when known.

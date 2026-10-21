@@ -5,6 +5,7 @@ pub fn task(limits: &Limits) -> Task {
     Task::new(
         limits,
         TaskParts {
+            dependency_facts: List::with_capacity(0),
             kept_account: None,
             run_wait: None,
             llm: None,

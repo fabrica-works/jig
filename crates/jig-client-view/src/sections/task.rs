@@ -36,7 +36,21 @@ pub fn header(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &
     if doc.flags.conversation
         && let Some(me) = client.frame().document
     {
-        words.chat_status(b, &jig_client::facts::chat_status(&doc.chip, &doc.waits_on, doc.project, me), client.wall());
+        match &doc.waits_on {
+            jig_client::contract::WaitsOn::Dependencies { .. } => {
+                words.text(b, JigPhrase::Word(jig_client::words::Word::waiting(&doc.waits_on)), &[]);
+            }
+            jig_client::contract::WaitsOn::Party { .. }
+            | jig_client::contract::WaitsOn::Delegates
+            | jig_client::contract::WaitsOn::News
+            | jig_client::contract::WaitsOn::Nothing => {
+                words.chat_status(
+                    b,
+                    &jig_client::facts::chat_status(&doc.chip, &doc.waits_on, doc.project, me),
+                    client.wall(),
+                );
+            }
+        }
     }
     words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(doc.project))]);
     if let Some(goal) = doc.goal {
@@ -245,6 +259,9 @@ pub(crate) fn overview(b: &mut Builder, client: &Borrowed<'_>, doc: &Task, words
     }
     crate::owner_wake::policy(b, &doc.wake, words.book(), words.language());
     crate::owner_wake::subscriptions(b, &doc.subscriptions, words.book(), words.language());
+    for dependency in &doc.dependency_facts {
+        cards::chip::dependency_words(b, dependency, words);
+    }
     for link in &doc.dependencies {
         task_link(b, client, link, words, bindings);
     }

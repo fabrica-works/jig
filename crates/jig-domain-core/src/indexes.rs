@@ -39,6 +39,7 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, at: skein_lib::Wall, out
                 | tasks::Line::RunBegan { .. }
                 | tasks::Line::RunEnded { .. }
                 | tasks::Line::Decided { .. }
+                | tasks::Line::Kept { .. }
                 | tasks::Line::Milestone { .. } => None,
             };
             let Some((party, message)) = addressed else { return };

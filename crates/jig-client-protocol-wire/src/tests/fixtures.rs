@@ -479,6 +479,7 @@ pub fn owner_chip_details_fields(limits: &Limits) -> OwnerChipDetailsFields {
     OwnerChipDetailsFields::new(
         limits,
         OwnerChipDetailsFieldsParts {
+            dependencies: List::with_capacity(0),
             project: u32::MAX,
             executor: OwnerExecutor::Agent(owner_executor_agent(limits)),
             phase_since: u64::MAX,

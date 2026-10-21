@@ -409,6 +409,7 @@ pub(super) fn encode_hold_reason(value: &d::application_core::HoldReason) -> w::
                 .expect("admitted fields fit schema"),
         ),
         d::application_core::HoldReason::Procedure => w::HoldReason::Procedure,
+        d::application_core::HoldReason::Circle => w::HoldReason::Circle,
     }
 }
 pub(super) fn decode_hold_reason(value: w::HoldReason, limits: &d::Limits) -> d::application_core::HoldReason {
@@ -444,6 +445,7 @@ pub(super) fn decode_hold_reason(value: w::HoldReason, limits: &d::Limits) -> d:
             d::application_core::HoldReason::PoolLost { pool }
         }
         w::HoldReason::Procedure => d::application_core::HoldReason::Procedure,
+        w::HoldReason::Circle => d::application_core::HoldReason::Circle,
     }
 }
 pub(super) fn encode_failure_class(value: d::application_core::FailureClass) -> w::FailureClass {

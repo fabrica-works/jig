@@ -117,6 +117,7 @@ pub(crate) fn hold_category(value: &w::HoldCategory, limits: &Limits) -> c::Hold
         w::HoldCategory::ResourceAccess => c::HoldCategory::ResourceAccess,
         w::HoldCategory::PoolLost(row) => c::HoldCategory::PoolLost { pool: row.pool() },
         w::HoldCategory::Procedure => c::HoldCategory::Procedure,
+        w::HoldCategory::Circle => c::HoldCategory::Circle,
     }
 }
 

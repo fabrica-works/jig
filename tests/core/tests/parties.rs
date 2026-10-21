@@ -62,7 +62,7 @@ fn a_partys_batch_of_two_agents_tasks_is_made_as_their_roots() {
     assert_eq!(second.funder, tasks::Funder::Pool { project: PROJECT, person: PARTY, period: 1 });
 }
 #[test]
-fn a_partys_batch_with_a_dependency_cycle_is_refused_naming_its_people_member() {
+fn a_partys_batch_with_a_dependency_circle_is_refused_naming_its_tasks_in_order() {
     let mut world = batch_world(302);
     let mut first = people_member(b"first", 20);
     first.dependencies = Box::new([people::Dependency::Batch(1)]);
@@ -71,9 +71,9 @@ fn a_partys_batch_with_a_dependency_cycle_is_refused_naming_its_people_member() 
     create(&mut world, Box::new([first, second]));
     assert_eq!(
         world.people_answers.last(),
-        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::NotWellFormed {
-            at: 0,
-            why: people::Malformed::Cycle
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Circle {
+            tasks: Box::new([FIRST, LAST]),
+            cut: false
         })))
     );
     assert_eq!(

@@ -2,8 +2,19 @@
 use skein_lib::Wall;
 
 /// A final reason a keyed request was refused.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    Circle {
+        tasks: Box<[u64]>,
+        cut: bool,
+    },
+    Dependency {
+        dependency: u64,
+        how: DependencyStatus,
+    },
+    Kept {
+        pending: Box<[u64]>,
+    },
     /// The held role does not permit this request here.
     Role {
         held: Option<u32>,
@@ -223,16 +234,23 @@ pub enum Moved {
 /// The reason a task is held, in the party's vocabulary.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum HoldReason {
+    Circle,
     /// Its retry allowance was exhausted.
-    Failures { class: FailureClass },
+    Failures {
+        class: FailureClass,
+    },
     /// Its executor stopped progressing.
     Stalled,
     /// An input failed or was cancelled.
-    Dependency { task: u64 },
+    Dependency {
+        task: u64,
+    },
     /// An authorized stop has no named party.
     Stopped,
     /// A named party stopped the task.
-    StoppedBy { party: u64 },
+    StoppedBy {
+        party: u64,
+    },
     /// A resource drifted away from what the task needs.
     Drift,
     /// Its effects need a decision.
@@ -240,7 +258,9 @@ pub enum HoldReason {
     /// An effect failed permanently.
     EffectFailed,
     /// An effect's result is uncertain.
-    Uncertain { entry: u64 },
+    Uncertain {
+        entry: u64,
+    },
     /// It lacks budget for its next activation.
     Budget,
     /// Its deadline has passed.
@@ -252,7 +272,9 @@ pub enum HoldReason {
     /// Adoption no longer permits its workspace writes.
     ResourceAccess,
     /// Its allocation in a pool disappeared.
-    PoolLost { pool: u64 },
+    PoolLost {
+        pool: u64,
+    },
     /// Its procedure asked for a decision.
     Procedure,
 }
@@ -272,4 +294,11 @@ pub enum FailureClass {
     Lost,
     /// The result broke its contract.
     Invalid,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum DependencyStatus {
+    Done,
+    Failed,
+    Cancelled,
 }

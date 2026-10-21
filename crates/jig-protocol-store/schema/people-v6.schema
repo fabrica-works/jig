@@ -176,7 +176,7 @@ record HoldReasonDependency { task: u64 }
 record HoldReasonStoppedBy { party: u64 }
 record HoldReasonUncertain { entry: u64 }
 record HoldReasonPoolLost { pool: u64 }
-enum HoldReason { failures: HoldReasonFailures, stalled, dependency: HoldReasonDependency, stopped, stopped_by: HoldReasonStoppedBy, drift, effects, effect_failed, uncertain: HoldReasonUncertain, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: HoldReasonPoolLost, procedure }
+enum HoldReason { failures: HoldReasonFailures, stalled, dependency: HoldReasonDependency, stopped, stopped_by: HoldReasonStoppedBy, drift, effects, effect_failed, uncertain: HoldReasonUncertain, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: HoldReasonPoolLost, procedure, circle }
 record MovedHold { revision: u64 reason: HoldReason }
 record MovedSpec { revision: u64 }
 record MovedPerson { revision: u64 }
@@ -214,7 +214,11 @@ enum LlmWhy { unconfigured, effort, charter, authority, procedure, repeated }
 record RefusalLlm { model: u8 why: LlmWhy }
 enum AccountWhy { unknown, provider, uses, limited }
 record RefusalAccount { account: u32 why: AccountWhy }
-enum Refusal { not_well_formed: RefusalNotWellFormed, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider, account: RefusalAccount }
+enum DependencyStatus { done, failed, cancelled }
+record RefusalCircle { tasks: list 32 u64 cut: bool }
+record RefusalDependency { dependency: u64 how: DependencyStatus }
+record RefusalKept { pending: list 64 u64 }
+enum Refusal { not_well_formed: RefusalNotWellFormed, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider, account: RefusalAccount, circle: RefusalCircle, dependency: RefusalDependency, kept: RefusalKept }
 enum ProposalChoice { accepted, rejected, passed, withdrawn, stale }
 enum EscalationChoice { released, rejected, passed }
 record OutcomeCompound { project: u32 operations: u32 first_message: u64 }

@@ -31,13 +31,14 @@ fn copy(
     models: &[jig_domain_core::Model],
 ) -> Result<client::Task, owner::Invalid> {
     Ok(client::Task {
+        dependency_facts: chips::dependencies(&source.dependency_facts, limits)?,
         kept_account: source.kept_account,
         run_wait: source.run_wait.map(wait),
         llm: super::llm::choice(source.llm.as_ref(), models, limits)?,
         label: source.label,
         flags: super::queries::flags(source.flags),
         last_activity: source.last_activity,
-        waits_on: super::queries::waits(source.waits_on),
+        waits_on: super::queries::waits(source.waits_on.clone()),
         chip: chips::chip(&source.chip, limits)?,
         goal: source.goal,
         priority: source.priority,
@@ -185,6 +186,7 @@ pub(crate) mod tests {
         let mut delegates = List::with_capacity(4);
         delegates.push(documents::LiveDelegate { chip: chip.clone(), takeover_budget: u64::MAX }).expect("source room");
         documents::Task {
+            dependency_facts: List::with_capacity(0),
             kept_account: None,
             run_wait: None,
             waits_on: documents::WaitsOn::Nothing,
@@ -219,6 +221,7 @@ pub(crate) mod tests {
             budget: chip.details.budget,
             authority: state.authority,
             hold: Some(documents::HoldLine {
+                circle: None,
                 account: None,
                 source: None,
                 reason: tasks::Hold::Uncertain { entry: u64::MAX },

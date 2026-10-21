@@ -69,6 +69,7 @@ pub(super) fn encode_hold_reason(
             wire::HoldReasonPoolLostParts { pool: *pool },
         )?),
         domain::HoldReason::Procedure => wire::HoldReason::Procedure,
+        domain::HoldReason::Circle => wire::HoldReason::Circle,
     })
 }
 pub(super) fn decode_hold_reason(value: wire::HoldReason) -> domain::HoldReason {
@@ -104,6 +105,7 @@ pub(super) fn decode_hold_reason(value: wire::HoldReason) -> domain::HoldReason 
             domain::HoldReason::PoolLost { pool }
         }
         wire::HoldReason::Procedure => domain::HoldReason::Procedure,
+        wire::HoldReason::Circle => domain::HoldReason::Circle,
     }
 }
 pub(super) fn encode_moved(value: &domain::Moved, limits: &wire::Limits) -> Result<wire::Moved, wire::Problem> {
@@ -454,6 +456,30 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         domain::Refusal::Taken { by } => {
             wire::Refusal::Taken(wire::RefusalTaken::new(limits, wire::RefusalTakenParts { by: *by })?)
         }
+        domain::Refusal::Circle { tasks, cut } => wire::Refusal::Circle(wire::RefusalCircle::new(
+            limits,
+            wire::RefusalCircleParts {
+                tasks: names(tasks, limits.refusal_circle_tasks, wire::Path::RefusalCircleTasks)?,
+                cut: *cut,
+            },
+        )?),
+        domain::Refusal::Kept { pending } => wire::Refusal::Kept(wire::RefusalKept::new(
+            limits,
+            wire::RefusalKeptParts {
+                pending: names(pending, limits.refusal_kept_pending, wire::Path::RefusalKeptPending)?,
+            },
+        )?),
+        domain::Refusal::Dependency { dependency, how } => wire::Refusal::Dependency(wire::RefusalDependency::new(
+            limits,
+            wire::RefusalDependencyParts {
+                dependency: *dependency,
+                how: match how {
+                    domain::DependencyStatus::Done => wire::DependencyStatus::Done,
+                    domain::DependencyStatus::Failed => wire::DependencyStatus::Failed,
+                    domain::DependencyStatus::Cancelled => wire::DependencyStatus::Cancelled,
+                },
+            },
+        )?),
         domain::Refusal::NotWaiting => wire::Refusal::NotWaiting,
         domain::Refusal::NoFurther => wire::Refusal::NoFurther,
         domain::Refusal::Unknown => wire::Refusal::Unknown,
@@ -524,6 +550,22 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
             let wire::RefusalTakenParts { by } = value.into_parts();
             domain::Refusal::Taken { by }
         }
+        wire::Refusal::Circle(value) => {
+            let wire::RefusalCircleParts { tasks, cut } = value.into_parts();
+            domain::Refusal::Circle { tasks: tasks.into_boxed(), cut }
+        }
+        wire::Refusal::Kept(value) => domain::Refusal::Kept { pending: value.into_parts().pending.into_boxed() },
+        wire::Refusal::Dependency(value) => {
+            let wire::RefusalDependencyParts { dependency, how } = value.into_parts();
+            domain::Refusal::Dependency {
+                dependency,
+                how: match how {
+                    wire::DependencyStatus::Done => domain::DependencyStatus::Done,
+                    wire::DependencyStatus::Failed => domain::DependencyStatus::Failed,
+                    wire::DependencyStatus::Cancelled => domain::DependencyStatus::Cancelled,
+                },
+            }
+        }
         wire::Refusal::NotWaiting => domain::Refusal::NotWaiting,
         wire::Refusal::NoFurther => domain::Refusal::NoFurther,
         wire::Refusal::Unknown => domain::Refusal::Unknown,
@@ -593,4 +635,14 @@ fn decode_account_why(value: wire::AccountWhy) -> domain::AccountWhy {
         wire::AccountWhy::Uses => domain::AccountWhy::Uses,
         wire::AccountWhy::Limited => domain::AccountWhy::Limited,
     }
+}
+
+fn names(values: &[u64], bound: u32, path: wire::Path) -> Result<skein_lib::List<u64>, wire::Problem> {
+    let mut rows = skein_lib::List::with_capacity(bound);
+    for number in values {
+        if rows.push(*number).is_err() {
+            return Err(wire::Problem { path, reason: skein_codec::Reason::Bound });
+        }
+    }
+    Ok(rows)
 }

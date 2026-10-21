@@ -23,6 +23,7 @@ fn value() -> OwnerChipDetails {
         })
         .unwrap();
     OwnerChipDetails {
+        dependencies: List::with_capacity(0),
         project: u32::MAX,
         executor: OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
         phase_since: Wall::EPOCH,
@@ -45,6 +46,7 @@ fn value() -> OwnerChipDetails {
             notice: Some(OwnerPersonStallNotice { message: u64::MAX, at: Wall::from_nanos(4), activity: u64::MAX }),
         }),
         hold: Some(OwnerChipHold {
+            circle: None,
             account: None,
             source: Some(part()),
             reason: HoldCategory::Failures { class: HoldFailure::Invalid },

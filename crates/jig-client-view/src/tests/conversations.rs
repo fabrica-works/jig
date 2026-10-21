@@ -101,3 +101,23 @@ fn a_project_tasks_section_keeps_queries_filtered_by_requester_and_label() {
     let section = crate::page::Section::Project { project: PROJECT, section: crate::address::ProjectSection::Tasks };
     assert!(crate::page::shown::uses(section, &subject));
 }
+
+#[test]
+fn a_kept_conversation_names_its_dependencies_without_promising_that_words_resume_it() {
+    let (mut domain, out) = entered(Address::Conversations { project: None });
+    let mut watched = None;
+    for request in out {
+        if let Request::Client {
+            asked: jig_client::Event::Watch { handle, subject: jig_client::Watchable::Jig(Subject::Tasks { .. }) },
+        } = request
+        {
+            watched = Some(handle);
+        }
+    }
+    let mut kept = line(FIRST, Wall::EPOCH);
+    kept.waits_on = WaitsOn::Dependencies { pending: list([7]), count: 1 };
+    deliver(&mut domain, watched.unwrap(), Delivery::Tasks(Box::new(Tasks { rows: list([kept]), more: false })));
+    let (tree, _) = super::pages::build(&domain, 1, super::cards::words());
+    assert!(super::cards::contains(&tree, b"kept until T7 is done"));
+    assert!(!super::cards::contains(&tree, b"Parked; your words resume it"));
+}

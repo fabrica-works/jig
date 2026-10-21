@@ -123,6 +123,7 @@ pub fn task_record() -> w::Task {
     w::Task::new(
         &lim,
         w::TaskParts {
+            dependency_facts: List::with_capacity(0),
             kept_account: None,
             run_wait: None,
             llm: None,
@@ -309,6 +310,7 @@ pub fn wire_owner_chip_details_row() -> w::OwnerChipDetailsRow {
             value: w::OwnerChipDetailsFields::new(
                 &lim,
                 w::OwnerChipDetailsFieldsParts {
+                    dependencies: List::with_capacity(0),
                     project: 7,
                     executor: w::OwnerExecutor::Agent(
                         w::OwnerExecutorAgent::new(&lim, w::OwnerExecutorAgentParts { charter: 7 })

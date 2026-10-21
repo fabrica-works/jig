@@ -531,6 +531,7 @@ fn core_ask(
                                 | tasks::MessageKind::ProposalDecision { .. }
                                 | tasks::MessageKind::EffectNotMade { .. }
                                 | tasks::MessageKind::Words
+                                | tasks::MessageKind::Met { .. }
                                 | tasks::MessageKind::Amendment { .. }
                                 | tasks::MessageKind::Question
                                 | tasks::MessageKind::Answer { .. }

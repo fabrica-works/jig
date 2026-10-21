@@ -542,7 +542,10 @@ pub(super) fn named_action(
                                 capacity: None,
                             })
                         }
-                        jig_domain_people::Refusal::Role { .. }
+                        jig_domain_people::Refusal::Circle { .. }
+                        | jig_domain_people::Refusal::Dependency { .. }
+                        | jig_domain_people::Refusal::Kept { .. }
+                        | jig_domain_people::Refusal::Role { .. }
                         | jig_domain_people::Refusal::Authority { .. }
                         | jig_domain_people::Refusal::Ended { .. }
                         | jig_domain_people::Refusal::Taken { .. }

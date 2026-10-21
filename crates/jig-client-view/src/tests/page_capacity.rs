@@ -782,17 +782,10 @@ fn full_cursor() -> Cursor {
 
 #[test]
 fn each_page_bound_keeps_its_value_at_the_client_limits() {
-    // With chip_nodes 168 and runs/waiting still at two rows, the accounts term grows
-    // from (2 * 2 * 168 + 2 * 13 + 68) * 2 = 1_532 to
-    // (2 * 2 * 168 + 8 * 13 + 68) * 8 = 6_752 at eight accounts and eight sources.
-    // The 5_220-node increase raises the deployment bound from 2_979 to 8_199.
-    // Two catalogue offers (two programs each), two readiness rows and six
-    // list/heading/cut nodes add 2 * (2 * 2 + 12) + 2 * 5 + 6 = 48.
-    // Program facts add 11 * 2 * 2 + 3 * 2 = 50 nodes at this profile.
-    // Each card frame's two committed outcomes grow by 2 * (260 - 34) = 452.
-    // The page formulas count these frames independently of their offered controls.
-    // One placement-rule phrase per host adds two nodes at this profile.
-    const DEPLOYMENT_NODES: u32 = 8_201;
+    // Added-dependency words and provenance, circle chips and their fallbacks
+    // enlarge the shared chip envelope and the standalone owner metadata.
+    // Pin the resulting page totals so that later bound changes stay visible.
+    const DEPLOYMENT_NODES: u32 = 10_937;
     assert_eq!(
         [
             crate::inbox_nodes(&CLIENT, 0),
@@ -805,14 +798,14 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
             crate::page_nodes(&CLIENT, 0)
         ],
         [
-            Some(386_267),
-            Some(97_386),
-            Some(1_157_064),
-            Some(1_335_715),
-            Some(579_525),
+            Some(414_443),
+            Some(104_718),
+            Some(1_239_864),
+            Some(1_431_991),
+            Some(621_789),
             Some(DEPLOYMENT_NODES),
             Some(25),
-            Some(1_335_715)
+            Some(1_431_991)
         ]
     );
 }
@@ -830,20 +823,20 @@ fn an_arranged_task_page_counts_the_sum_of_its_sections() {
     let counts = sections.map(|s| crate::task_section_nodes(&CLIENT, s).unwrap());
     assert_eq!(
         (crate::task_header_nodes(&CLIENT).unwrap(), counts),
-        (48_448, [209_003, 1_287_267, 356_106, 15_640, 71, 94])
+        (52_042, [224_829, 1_379_949, 384_148, 17_224, 71, 94])
     );
     let arrangement = crate::page::Arrangement { task: list(sections), project: list([]) };
     assert_eq!(
         crate::arranged_nodes(&CLIENT, 0, &arrangement),
-        Some(48_448 + 209_003 + 1_287_267 + 356_106 + 15_640 + 71 + 94)
+        Some(52_042 + 224_829 + 1_379_949 + 384_148 + 17_224 + 71 + 94)
     );
 }
 #[test]
 fn no_arrangement_keeps_each_page_bound() {
     each_page_bound_keeps_its_value_at_the_client_limits();
     let arrangement = crate::page::Arrangement::none();
-    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_335_715));
-    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_335_724));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_431_991));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_432_000));
 }
 
 fn most_owed_cards() -> Fixture {

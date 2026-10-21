@@ -487,7 +487,7 @@ fn a_tasks_row_of_another_version_does_not_decode() {
     let mut bytes =
         crate::codec::tasks::encode(&row, &limits, &fixtures::model_names(&[b"first", b"second", b"third"]))
             .expect("within bounds");
-    bytes[1] = 3;
+    *bytes.get_mut(1).expect("version prefix") = 5;
     assert_eq!(
         crate::codec::tasks::decode(&bytes, &limits, &fixtures::model_names(&[b"first", b"second", b"third"])),
         Err(crate::tasks_v6::Problem { path: crate::tasks_v6::Path::RowVersion, reason: skein_codec::Reason::Version })
@@ -1280,4 +1280,17 @@ fn program_checks_retain_the_source_number() {
         holder: jig_domain_people::AccountHolder::Own,
         change: jig_domain_people::AccountChange::CheckProgram { source: 0 },
     });
+}
+
+#[test]
+fn retained_people_answers_keep_dependency_refusal_facts() {
+    use jig_domain_people as p;
+    for why in [
+        p::Refusal::Circle { tasks: Box::new([7, 5, 9]), cut: true },
+        p::Refusal::Kept { pending: Box::new([7, 9]) },
+        p::Refusal::Dependency { dependency: 7, how: p::DependencyStatus::Failed },
+        p::Refusal::Dependency { dependency: 9, how: p::DependencyStatus::Cancelled },
+    ] {
+        people_round_trip(fixtures::people_outcomes::answered(p::Outcome::Refused(why)));
+    }
 }

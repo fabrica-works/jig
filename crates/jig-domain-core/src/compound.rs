@@ -65,7 +65,7 @@ pub(crate) fn route(
             if let Some(capacity) = problem.capacity {
                 core.tasks.remember_capacity(env.wall, capacity);
             }
-            let outcome = crate::routing::refusals::person_task_refusal(core, problem.task, problem.why);
+            let outcome = crate::routing::refusals::person_problem_refusal(core, *problem);
             return refused(work, route.request, at, outcome);
         }
         operations.push(operation).expect("same operation count");

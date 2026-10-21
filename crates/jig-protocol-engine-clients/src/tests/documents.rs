@@ -274,3 +274,70 @@ fn creating_and_compound_capacity_refusals_keep_the_operations_kind() {
         assert_eq!(row.key().key(), &refusal.key.key);
     }
 }
+
+#[test]
+fn added_dependencies_and_kept_waits_cross_both_client_translations() {
+    use jig_client_domain::contract as c;
+    use jig_domain_core::documents as d;
+    use jig_domain_tasks as t;
+    use skein_lib::{List, Reader, Wall, Writer};
+    let limits = fixtures::wire_limits();
+    let mut task = fixtures::task_with_hold();
+    let mut facts = List::with_capacity(2);
+    facts
+        .push(d::Dependency {
+            number: 7,
+            pending: true,
+            added: Some(t::Added { task: 7, at: Wall::from_nanos(11), by: t::Party::Person(13) }),
+            keeps: true,
+            status: None,
+        })
+        .unwrap();
+    facts
+        .push(d::Dependency {
+            number: 9,
+            pending: false,
+            added: Some(t::Added { task: 9, at: Wall::from_nanos(17), by: t::Party::Task(19) }),
+            keeps: true,
+            status: Some(t::Status::Done),
+        })
+        .unwrap();
+    task.dependency_facts = facts.clone();
+    task.chip.details.dependencies = facts;
+    let mut pending = List::with_capacity(1);
+    pending.push(7).unwrap();
+    task.waits_on = d::WaitsOn::Dependencies { pending, count: 1 };
+    let record = translate::task::document(&task, &[], &limits).unwrap();
+    let mut out = Writer::new(usize::try_from(record.measure()).unwrap());
+    record.encode(&mut out).unwrap();
+    let bytes = out.finish();
+    let record = w::Task::decode(&limits, &mut Reader::new(&bytes)).unwrap();
+    let actual = jig_client_protocol_link::translate::documents::task(record, &fixtures::client_limits()).unwrap();
+    let first = actual.dependency_facts.get(0).unwrap();
+    assert_eq!((first.number, first.pending, first.keeps), (7, true, true));
+    assert_eq!(first.added, Some(c::DependencyAdded { at: Wall::from_nanos(11), by: c::OwnerRequester::Person(13) }));
+    let second = actual.dependency_facts.get(1).unwrap();
+    assert_eq!(second.status, Some(c::OwnerTaskStatus::Done));
+    assert_eq!(second.added.unwrap().by, c::OwnerRequester::Task(19));
+    let c::WaitsOn::Dependencies { pending, count } = actual.waits_on else { panic!("kept wait") };
+    assert_eq!((pending.as_slice(), count), ([7].as_slice(), 1));
+    let c::ChipPhase::Owner { details, .. } = actual.chip.details.as_ref() else { panic!("owner chip") };
+    assert_eq!(details.dependencies, actual.dependency_facts);
+}
+
+#[test]
+fn a_circle_hold_keeps_its_order_and_cut_through_the_client() {
+    use jig_client_domain::contract as c;
+    use jig_domain_tasks as t;
+    let mut task = fixtures::task_with_hold();
+    let hold = task.hold.as_mut().unwrap();
+    hold.reason = t::Hold::Circle;
+    hold.circle = Some(t::Circle { tasks: Box::new([9, 7]), cut: true });
+    let record = translate::task::document(&task, &[], &fixtures::wire_limits()).unwrap();
+    let actual = jig_client_protocol_link::translate::documents::task(record, &fixtures::client_limits()).unwrap();
+    let Some(c::TaskHold::Owner(hold)) = actual.hold else { panic!("owner hold") };
+    assert_eq!(hold.reason, c::HoldCategory::Circle);
+    let circle = hold.circle.unwrap();
+    assert_eq!(circle.tasks.as_slice(), &[9, 7]);
+    assert!(circle.cut);
+}

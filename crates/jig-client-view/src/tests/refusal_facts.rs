@@ -143,6 +143,7 @@ fn engine_refusals_keep_categories_supplied_hold_reasons_and_absent_ending_detai
 #[test]
 fn sparse_current_hold_facts_keep_only_supplied_categories_and_numeric_identities() {
     let mut reasons = Vec::from([
+        HoldCategory::Circle,
         HoldCategory::Stalled,
         HoldCategory::Dependency { task: 123 },
         HoldCategory::Stopped,
@@ -180,6 +181,7 @@ fn sparse_current_hold_facts_keep_only_supplied_categories_and_numeric_identitie
         assert!(!contains(&tree, b"Attempt "));
         assert!(!contains(&tree, b"Reason: "));
         match reason {
+            HoldCategory::Circle => assert!(contains(&tree, b"Held for a circle of waits")),
             HoldCategory::Dependency { .. }
             | HoldCategory::StoppedBy { .. }
             | HoldCategory::Uncertain { .. }

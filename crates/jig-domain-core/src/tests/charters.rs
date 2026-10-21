@@ -10,6 +10,8 @@ fn a_charter_whose_default_spend_misses_its_floor_is_refused() {
 
 pub(super) fn context(task: u64, charter: u32) -> Box<tasks::RunContext> {
     Box::new(tasks::RunContext {
+        added: Box::new([]),
+        pending: Box::new([]),
         llm: None,
         payer: tasks::Payer::Party(1),
         task,

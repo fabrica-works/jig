@@ -141,6 +141,7 @@ fn text() -> contract::Text {
 }
 fn document(number: u64) -> contract::Task {
     contract::Task {
+        dependency_facts: List::with_capacity(0),
         kept_account: None,
         run_wait: None,
         label: 0,

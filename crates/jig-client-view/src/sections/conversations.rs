@@ -48,21 +48,7 @@ pub(crate) fn section(
         );
         crate::document_text::loss(b, &row.chip.title, words);
         words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(row.project))]);
-        if let Some(me) = client.frame().document {
-            words.chat_status(
-                b,
-                &jig_client::facts::chat_status(&row.chip, &row.waits_on, row.project, me),
-                client.wall(),
-            );
-        }
-        match row.waits_on {
-            jig_client::contract::WaitsOn::Party { .. } => {}
-            jig_client::contract::WaitsOn::Delegates
-            | jig_client::contract::WaitsOn::News
-            | jig_client::contract::WaitsOn::Nothing => {
-                words.text(b, JigPhrase::Word(Word::waiting(&row.waits_on)), &[]);
-            }
-        }
+        waiting(b, client, row, words);
         if let Some(read) = &row.conversation {
             words.text(
                 b,
@@ -112,6 +98,32 @@ pub(crate) fn section(
     b.close();
     true
 }
+fn waiting(b: &mut Builder, client: &Borrowed<'_>, row: &jig_client::contract::TaskLine, words: &Words) {
+    let kept = match &row.waits_on {
+        jig_client::contract::WaitsOn::Dependencies { .. } => true,
+        jig_client::contract::WaitsOn::Party { .. }
+        | jig_client::contract::WaitsOn::Delegates
+        | jig_client::contract::WaitsOn::News
+        | jig_client::contract::WaitsOn::Nothing => false,
+    };
+    if !kept && let Some(me) = client.frame().document {
+        words.chat_status(b, &jig_client::facts::chat_status(&row.chip, &row.waits_on, row.project, me), client.wall());
+    }
+    match &row.waits_on {
+        jig_client::contract::WaitsOn::Party { .. } => {}
+        jig_client::contract::WaitsOn::Dependencies { pending, .. } => {
+            for task in pending {
+                words.text(b, JigPhrase::KeptUntil, &[Hole::Number(*task)]);
+            }
+        }
+        jig_client::contract::WaitsOn::Delegates
+        | jig_client::contract::WaitsOn::News
+        | jig_client::contract::WaitsOn::Nothing => {
+            words.text(b, JigPhrase::Word(Word::waiting(&row.waits_on)), &[]);
+        }
+    }
+}
+
 fn forms(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let mut field_built = false;
     if let Some(frame) = &client.frame().document {

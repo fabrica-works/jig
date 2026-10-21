@@ -51,6 +51,7 @@ impl TaskHold {
                 | HoldCategory::ResourceUnavailable
                 | HoldCategory::ResourceAccess
                 | HoldCategory::PoolLost { .. }
+                | HoldCategory::Circle
                 | HoldCategory::Procedure => false,
             },
         }

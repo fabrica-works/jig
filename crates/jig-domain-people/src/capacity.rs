@@ -129,7 +129,7 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
 
 pub(crate) fn permanent(outcome: &Outcome) -> Option<CapacityCause> {
     match outcome {
-        Outcome::Refused(refusal) | Outcome::CompoundRefused { why: refusal, .. } => room(*refusal),
+        Outcome::Refused(refusal) | Outcome::CompoundRefused { why: refusal, .. } => room(refusal),
         Outcome::Compound { .. }
         | Outcome::Applied { .. }
         | Outcome::Again(_)
@@ -165,7 +165,7 @@ pub(crate) fn permanent(outcome: &Outcome) -> Option<CapacityCause> {
     }
 }
 
-fn room(refusal: Refusal) -> Option<CapacityCause> {
+fn room(refusal: &Refusal) -> Option<CapacityCause> {
     match refusal {
         Refusal::Limit { which } => match which {
             LimitKind::Goals
@@ -180,7 +180,7 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
             | LimitKind::HolderAccounts
             | LimitKind::Sources
             | LimitKind::SignIns
-            | LimitKind::Notes => Some(CapacityCause::Limit { which }),
+            | LimitKind::Notes => Some(CapacityCause::Limit { which: *which }),
             LimitKind::Operations
             | LimitKind::Words
             | LimitKind::Identity
@@ -211,7 +211,10 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
             | LimitKind::Resource
             | LimitKind::Service => None,
         },
-        Refusal::NotWellFormed { .. }
+        Refusal::Circle { .. }
+        | Refusal::Dependency { .. }
+        | Refusal::Kept { .. }
+        | Refusal::NotWellFormed { .. }
         | Refusal::Role { .. }
         | Refusal::Authority { .. }
         | Refusal::Moved { .. }

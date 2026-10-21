@@ -450,6 +450,10 @@ pub(crate) fn owner_chip_hold(value: &w::OwnerChipHold, limits: &Limits) -> Resu
         None => None,
     };
     Ok(c::OwnerChipHold {
+        circle: match value.circle() {
+            Some(circle) => Some(c::Circle { tasks: circle.tasks().clone(), cut: circle.cut() }),
+            None => None,
+        },
         account: opt0,
         source: opt1,
         reason: hold_category(value.reason(), limits),

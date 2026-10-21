@@ -2,7 +2,7 @@
 //! (`domain/engine.md`, section 4.4).
 
 use super::children::append_people;
-use super::refusals::{person_message_refusal, person_move_refusal, person_task_refusal};
+use super::refusals::{person_message_refusal, person_move_refusal, person_problem_refusal};
 use super::runs::call_decision;
 use super::view_routes::touch_task;
 use crate::{
@@ -537,7 +537,7 @@ pub(super) fn tag_tasks(
                 let Some(PersonTaskRoute::Compound { .. }) = core.person_tasks.remove(&request) else {
                     unreachable!("compound continuation");
                 };
-                let outcome = person_task_refusal(core, problem.task, problem.why);
+                let outcome = person_problem_refusal(core, problem);
                 let outcome = if let people::Outcome::Refused(why) = outcome {
                     people::Outcome::CompoundRefused { at, why }
                 } else {
@@ -1165,18 +1165,16 @@ pub(super) fn tag_tasks(
                         ask: Ask::Effect(crate::connector::Ask::Drop { owner, answer: authority::Answer::Refuse }),
                     });
                 }
-                if let Some(event) = core.goal_refused(token, problem.why) {
-                    append_people(core, env, event, &mut out);
+                if core.goal_routes.remove(&token).is_some() {
+                    let outcome = person_problem_refusal(core, problem);
+                    append_people(core, env, people::Event::Decided { request: token, outcome }, &mut out);
                     continue;
                 }
                 if core.person_tasks.remove(&token).is_some() {
                     append_people(
                         core,
                         env,
-                        people::Event::Decided {
-                            request: token,
-                            outcome: person_task_refusal(core, problem.task, problem.why),
-                        },
+                        people::Event::Decided { request: token, outcome: person_problem_refusal(core, problem) },
                         &mut out,
                     );
                     continue;
@@ -1185,10 +1183,7 @@ pub(super) fn tag_tasks(
                     append_people(
                         core,
                         env,
-                        people::Event::Decided {
-                            request: token,
-                            outcome: person_move_refusal(core, problem.task, problem.why),
-                        },
+                        people::Event::Decided { request: token, outcome: person_move_refusal(core, problem) },
                         &mut out,
                     );
                     continue;
@@ -1215,10 +1210,7 @@ pub(super) fn tag_tasks(
                     append_people(
                         core,
                         env,
-                        people::Event::Decided {
-                            request,
-                            outcome: person_move_refusal(core, problem.task, problem.why),
-                        },
+                        people::Event::Decided { request, outcome: person_move_refusal(core, problem) },
                         &mut out,
                     );
                     continue;
@@ -1263,10 +1255,7 @@ pub(super) fn tag_tasks(
                     append_people(
                         core,
                         env,
-                        people::Event::Decided {
-                            request: token,
-                            outcome: person_task_refusal(core, problem.task, problem.why),
-                        },
+                        people::Event::Decided { request: token, outcome: person_problem_refusal(core, problem) },
                         &mut out,
                     );
                     continue;
@@ -1275,10 +1264,7 @@ pub(super) fn tag_tasks(
                     append_people(
                         core,
                         env,
-                        people::Event::Decided {
-                            request: token,
-                            outcome: person_message_refusal(core, problem.task, problem.why),
-                        },
+                        people::Event::Decided { request: token, outcome: person_message_refusal(core, problem) },
                         &mut out,
                     );
                     continue;

@@ -179,14 +179,14 @@ pub fn check(expected: &Admission, actual: &people::Reply) -> Result<(), &'stati
     let answer = match actual {
         people::Reply::Outcome(value) => value,
         people::Reply::Refused(why) => {
-            return if *expected == Admission::Refused(*why) { Ok(()) } else { Err("offered act was refused") };
+            return if *expected == Admission::Refused(why.clone()) { Ok(()) } else { Err("offered act was refused") };
         }
         people::Reply::Again(_) | people::Reply::SignedOut | people::Reply::SignedIn { .. } => {
             return Err("offer received no semantic admission");
         }
     };
     let matches = match expected {
-        Admission::Refused(why) => *answer == people::Outcome::Refused(*why),
+        Admission::Refused(why) => *answer == people::Outcome::Refused(why.clone()),
         Admission::Proposed { .. } => {
             matches!(answer, people::Outcome::Proposed { .. })
         }

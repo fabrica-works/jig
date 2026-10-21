@@ -171,8 +171,10 @@ pub fn lines(core: &Core, limits: &Limits, party: u64, query: &TaskQuery, window
     Ok(Lines { query: *query, lines, next })
 }
 pub(super) fn worst_case(limits: &DocumentLimits) -> Option<u64> {
-    List::<TaskLine>::worst_case(limits.rows)?
-        .checked_add(u64::from(limits.rows).checked_mul(super::chip_heap_worst_case(limits)?)?)
+    List::<TaskLine>::worst_case(limits.rows)?.checked_add(
+        u64::from(limits.rows)
+            .checked_mul(super::chip_heap_worst_case(limits)?.checked_add(List::<u64>::worst_case(limits.lines)?)?)?,
+    )
 }
 pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
     Map::<SortKey, u64>::worst_case(limits.tasks.tasks)

@@ -34,6 +34,7 @@ fn restored_application_tokens_cannot_exceed_the_deployments_allocations() {
 pub(super) fn limits() -> Limits {
     let retry = tasks::Retry { retries: 1, base: Duration::from_millis(10), max: Duration::from_secs(1) };
     let tasks = tasks::Limits {
+        circle: 8,
         tasks: 2,
         funders: 4,
         project_tasks: 2,

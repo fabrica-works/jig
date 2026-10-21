@@ -21,6 +21,7 @@ pub enum OwnerActivity {
     Turn { reply: u64, attempt: u64, turn: u32, read: Option<u64> },
     Decided { revision: u64 },
     Milestone { position: u64 },
+    Kept { attempt: u64, pending: List<u64> },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerRunWhy {
@@ -94,6 +95,10 @@ pub enum OwnerMessageKind {
         class: OwnerNewsClass,
     },
     Result(OwnerWordResult),
+    Met {
+        dependency: u64,
+        removed: bool,
+    },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerMessageProposalKind {

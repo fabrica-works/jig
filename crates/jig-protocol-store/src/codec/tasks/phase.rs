@@ -155,6 +155,7 @@ pub fn hold(source: &domain::Hold, limits: &wire::Limits) -> Result<wire::Hold, 
             wire::Hold::PoolLost(wire::Number::new(limits, wire::NumberParts { value: *pool })?)
         }
         domain::Hold::Procedure => wire::Hold::Procedure,
+        domain::Hold::Circle => wire::Hold::Circle,
     })
 }
 /// Read `Hold` from its store value.
@@ -191,6 +192,7 @@ pub fn read_hold(source: wire::Hold, _limits: &wire::Limits) -> Result<domain::H
             domain::Hold::PoolLost { pool: value }
         }
         wire::Hold::Procedure => domain::Hold::Procedure,
+        wire::Hold::Circle => domain::Hold::Circle,
     })
 }
 
@@ -340,6 +342,13 @@ pub fn read_was(source: wire::Was, limits: &wire::Limits) -> Result<domain::Was,
 /// Translate `HoldSource` to its store value.
 pub fn hold_source(source: &domain::HoldSource, limits: &wire::Limits) -> Result<wire::HoldSource, wire::Problem> {
     Ok(match source {
+        domain::HoldSource::Circle(circle) => wire::HoldSource::Circle(wire::Circle::new(
+            limits,
+            wire::CircleParts {
+                tasks: references(&circle.tasks, limits.circle_tasks, wire::Path::CircleTasks, limits)?,
+                cut: circle.cut,
+            },
+        )?),
         domain::HoldSource::Resource(value) => wire::HoldSource::Resource(value::name(value, limits)?),
         domain::HoldSource::Effect { connector, entry } => wire::HoldSource::Effect(wire::HoldEffect::new(
             limits,
@@ -350,6 +359,10 @@ pub fn hold_source(source: &domain::HoldSource, limits: &wire::Limits) -> Result
 /// Read `HoldSource` from its store value.
 pub fn read_hold_source(source: wire::HoldSource, limits: &wire::Limits) -> Result<domain::HoldSource, wire::Problem> {
     Ok(match source {
+        wire::HoldSource::Circle(value) => {
+            let wire::CircleParts { tasks, cut } = value.into_parts();
+            domain::HoldSource::Circle(domain::Circle { tasks: read_references(tasks), cut })
+        }
         wire::HoldSource::Resource(value) => domain::HoldSource::Resource(value::read_name(value, limits)?),
         wire::HoldSource::Effect(value) => {
             let wire::HoldEffectParts { connector, entry } = value.into_parts();

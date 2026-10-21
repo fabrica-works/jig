@@ -410,3 +410,78 @@ fn a_saved_named_deadline_keeps_its_optional_wall_in_both_batch_asks() {
         }
     }
 }
+
+#[test]
+fn added_dependencies_circle_and_restarted_wait_bound_read_back() {
+    let mut record = current_record();
+    record.dependencies = Box::new([7, 9]);
+    record.waiting_on = Box::new([9]);
+    record.added = Box::new([
+        domain::Added { task: 7, at: Wall::from_nanos(11), by: domain::Party::Person(13) },
+        domain::Added { task: 9, at: Wall::from_nanos(17), by: domain::Party::Task(19) },
+    ]);
+    record.hold_wait_since = Some(Wall::from_nanos(23));
+    record.hold_bound_since = Some(Wall::from_nanos(29));
+    record.phase = domain::Phase::Held {
+        was: domain::Was::Waiting,
+        why: domain::Hold::Circle,
+        source: Some(Box::new(domain::HoldSource::Circle(domain::Circle { tasks: Box::new([9, 7]), cut: true }))),
+    };
+    let row = live_record(record);
+    assert_eq!(saved_tasks(&row), Ok(row));
+}
+
+#[test]
+fn kept_lines_and_met_notices_read_back_and_pending_is_bounded() {
+    let limits = tasks_limits();
+    let pending = task_numbers(limits.kept_line_pending);
+    let row = activity(domain::Line::Kept { attempt: 3, pending });
+    assert_eq!(saved_tasks(&row), Ok(row));
+    for removed in [false, true] {
+        let row = message_row(domain::MessageKind::Met { dependency: 7, removed });
+        assert_eq!(saved_tasks(&row), Ok(row));
+    }
+    let pending = task_numbers(limits.kept_line_pending + 1);
+    let row = activity(domain::Line::Kept { attempt: 3, pending });
+    assert_eq!(tasks::encode(&row, &limits, &[]), Err(bound_problem(wire::Path::KeptLinePending)));
+    let mut wider = limits;
+    wider.kept_line_pending += 1;
+    let bytes = tasks::encode(&row, &wider, &[]).unwrap();
+    assert_eq!(tasks::decode(&bytes, &limits, &[]), Err(bound_problem(wire::Path::KeptLinePending)));
+}
+
+#[test]
+fn circle_and_added_records_refuse_one_past_their_bounds() {
+    let limits = tasks_limits();
+    let mut record = current_record();
+    let mut added = skein_lib::List::with_capacity(limits.task_definition_added + 1);
+    for _ in 0..=limits.task_definition_added {
+        added.push(domain::Added { task: 7, at: Wall::EPOCH, by: domain::Party::Task(9) }).unwrap();
+    }
+    record.added = added.into_boxed();
+    let row = live_record(record);
+    assert_eq!(tasks::encode(&row, &limits, &[]), Err(bound_problem(wire::Path::TaskDefinitionAdded)));
+    let mut record = current_record();
+    record.phase = domain::Phase::Held {
+        was: domain::Was::Waiting,
+        why: domain::Hold::Circle,
+        source: Some(Box::new(domain::HoldSource::Circle(domain::Circle {
+            tasks: task_numbers(limits.circle_tasks + 1),
+            cut: true,
+        }))),
+    };
+    let row = live_record(record);
+    assert_eq!(tasks::encode(&row, &limits, &[]), Err(bound_problem(wire::Path::CircleTasks)));
+    let mut wider = limits;
+    wider.circle_tasks += 1;
+    let bytes = tasks::encode(&row, &wider, &[]).unwrap();
+    assert_eq!(tasks::decode(&bytes, &limits, &[]), Err(bound_problem(wire::Path::CircleTasks)));
+}
+
+fn task_numbers(count: u32) -> Box<[u64]> {
+    let mut numbers = skein_lib::List::with_capacity(count);
+    for _ in 0..count {
+        numbers.push(7).unwrap();
+    }
+    numbers.into_boxed()
+}

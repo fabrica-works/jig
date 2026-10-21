@@ -130,6 +130,7 @@ fn hold_reason(why: tasks::Hold) -> people::HoldReason {
         tasks::Hold::ResourceAccess => people::HoldReason::ResourceAccess,
         tasks::Hold::PoolLost { pool } => people::HoldReason::PoolLost { pool },
         tasks::Hold::Procedure => people::HoldReason::Procedure,
+        tasks::Hold::Circle => people::HoldReason::Circle,
     }
 }
 

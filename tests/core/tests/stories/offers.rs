@@ -108,7 +108,7 @@ fn an_observer_is_offered_nothing_and_told_why() {
     };
     let refused = people::Refusal::Role { held: Some(people::Role::Observer) };
     assert_eq!(project.acts.len(), 6);
-    assert!(project.acts.iter().all(|value| value.admission == Admission::Refused(refused)));
+    assert!(project.acts.iter().all(|value| value.admission == Admission::Refused(refused.clone())));
     assert!(project.acts.iter().any(|value| value.act == Act::Reorder));
     let task_rows = world
         .store
@@ -191,7 +191,7 @@ fn a_policy_narrowed_withdraws_an_offer_in_the_next_delivery() {
         panic!("task");
     };
     let Admission::Refused(refused) =
-        value.acts.iter().find(|value| value.act == Act::Move).expect("withdrawn takeover").admission
+        value.acts.iter().find(|value| value.act == Act::Move).expect("withdrawn takeover").admission.clone()
     else {
         panic!("withdrawn offer");
     };

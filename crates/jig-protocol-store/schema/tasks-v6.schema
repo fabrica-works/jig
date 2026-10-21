@@ -107,14 +107,15 @@ record Done { result: TaskResult }
 record Cancelled { by: Party at: u64 reason: bytes 65536 result: option TaskResult }
 enum Ending { done: Done, failed: FailureResult, cancelled: Cancelled }
 record FailedClass { class: Class }
-enum Hold { failures: FailedClass, stalled, dependency: Number, stopped, stopped_by: Person, drift, effects, effect_failed, uncertain: Effect, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: Number, procedure }
+enum Hold { failures: FailedClass, stalled, dependency: Number, stopped, stopped_by: Person, drift, effects, effect_failed, uncertain: Effect, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: Number, procedure, circle }
 enum Active { idle, due, preparing, claimed: Number, running: Number, backing_off: Number }
 enum Stage { run: Number, delegates, effects, releases, settled }
 record Closing { stage: Stage ending: Ending }
 record Activation { value: Active }
 enum Was { waiting, active: Activation, closing: Closing }
 record HoldEffect { connector: u16 entry: u64 }
-enum HoldSource { resource: Name, effect: HoldEffect }
+record Circle { tasks: list 32 Number cut: bool }
+enum HoldSource { resource: Name, effect: HoldEffect, circle: Circle }
 record Held { was: Was why: Hold source: option HoldSource }
 record Final { ending: Ending }
 enum Phase { waiting, active: Activation, closing: Closing, held: Held, ended: Final }
@@ -178,7 +179,8 @@ record NoticeMessage { subscription: u64 target: u64 state: NoticeState }
 record TimerMessage { subscription: u64 }
 record NewsMessage { subscription: u64 class: NewsClass }
 record ResultMessage { kind: ResultKind }
-enum MessageKind { escalation: EscalationMessage, proposal: ProposalMessage, person_stalled: StalledMessage, proposal_decision: DecisionMessage, words, effect_not_made: EffectMessage, amendment: AmendmentMessage, question, answer: AnswerMessage, notice: NoticeMessage, timer: TimerMessage, news: NewsMessage, result: ResultMessage }
+record MetMessage { dependency: u64 removed: bool }
+enum MessageKind { escalation: EscalationMessage, proposal: ProposalMessage, person_stalled: StalledMessage, proposal_decision: DecisionMessage, words, effect_not_made: EffectMessage, amendment: AmendmentMessage, question, answer: AnswerMessage, notice: NoticeMessage, timer: TimerMessage, news: NewsMessage, result: ResultMessage, met: MetMessage }
 record Word { number: u64 from: Party kind: MessageKind words: bytes 65536 at: u64 hits: u32 eligible: bool }
 record FailedEnd { class: Class }
 enum EndKind { parked, finished, cancelled, failed: FailedEnd, refused }
@@ -190,7 +192,8 @@ record EndedLine { attempt: u64 end: EndKind spent: u64 }
 record TurnLine { reply: u64 attempt: u64 turn: u32 read: option u64 }
 record DecidedLine { revision: u64 }
 record MilestoneLine { position: u64 }
-enum Line { words: ActivityWords, heard: HeardMessage, notified: NotifiedMessage, run_began: BeganLine, run_ended: EndedLine, turn: TurnLine, decided: DecidedLine, milestone: MilestoneLine }
+record KeptLine { attempt: u64 pending: list 64 Number }
+enum Line { words: ActivityWords, heard: HeardMessage, notified: NotifiedMessage, run_began: BeganLine, run_ended: EndedLine, turn: TurnLine, decided: DecidedLine, milestone: MilestoneLine, kept: KeptLine }
 record ActivityLine { task: u64 position: u64 at: u64 line: Line }
 enum Status { done, failed, cancelled }
 enum InvalidResult { form, verdict, words, change, followups }
@@ -262,6 +265,7 @@ record TaskRun {
     run_spent: u64
     run_reserved: u64
 }
+record Added { task: u64 at: u64 by: Party }
 record TaskDefinition {
     label: u32 flags: Flags
     root: u64
@@ -281,11 +285,13 @@ record TaskDefinition {
     funder: Funder
     dependencies: list 64 Number
     waiting_on: list 64 Number
+    added: list 64 Added
 }
 record TaskInterests {
     holdings: list 64 Holding
     holds_taken: bool
     hold_wait_since: option u64
+    hold_bound_since: option u64
     delegates: list 64 Number
     result_followups: list 4 Number
     references: list 64 Number
@@ -344,7 +350,9 @@ enum LlmFault { unconfigured, effort, charter, authority, procedure, repeated }
 record RefusalLlm { model: u8 why: LlmFault }
 enum AccountWhy { unknown, provider, uses, limited }
 record RefusalAccount { account: u32 why: AccountWhy }
-enum Refusal { goals, grace, unproposable, person_revision: RefusalPersonRevision, resource_unavailable, not_ready, unknown, busy, duplicate, empty, batch, live, project, tree, depth, delegates, reference, subscription, dependencies, cycle, executor, spec, contract, authority_shape, inputs, state, attempt, live_delegates, restore, read, turn, funding, hold_kind, hold_taken, holds, llm: RefusalLlm, account: RefusalAccount }
+record RefusalCircle { cut: bool }
+record RefusalDependencyEnded { how: Status }
+enum Refusal { goals, grace, unproposable, person_revision: RefusalPersonRevision, resource_unavailable, not_ready, unknown, busy, duplicate, empty, batch, live, project, tree, depth, delegates, reference, subscription, dependencies, circle: RefusalCircle, executor, spec, contract, authority_shape, inputs, state, attempt, live_delegates, restore, read, turn, funding, hold_kind, hold_taken, holds, llm: RefusalLlm, account: RefusalAccount, dependency_ended: RefusalDependencyEnded, kept }
 versioned record TaskProblem { task: option u64 why: Refusal blocked_by: option list 8192 Number capacity: option Capacity }
 record ResultFollowupsDelegates { value: list 4 Creation }
 record ResultFollowupsProposal { value: Proposal }

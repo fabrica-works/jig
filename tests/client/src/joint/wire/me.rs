@@ -78,7 +78,7 @@ pub(super) fn creating(
     let c::Bounds::Create(within) = offers::bounds(&value.within, limits, models)? else { panic!("creating bound") };
     let beyond = match &value.beyond {
         acts::Beyond::Proposed { to } => c::Beyond::Proposed { to: offers::recipient(to, limits)? },
-        acts::Beyond::Refused(why) => c::Beyond::Refused(refusals::refusal(*why)?),
+        acts::Beyond::Refused(why) => c::Beyond::Refused(refusals::refusal(why.clone())?),
     };
     Ok(c::Creating { within, beyond })
 }

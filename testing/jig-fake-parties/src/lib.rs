@@ -8,7 +8,9 @@
 mod tests;
 
 mod facts;
-pub use facts::{Again, Ending, EndingParty, FailureClass, HoldReason, Lack, LimitKind, Moved, Refusal};
+pub use facts::{
+    Again, DependencyStatus, Ending, EndingParty, FailureClass, HoldReason, Lack, LimitKind, Moved, Refusal,
+};
 
 use skein_lib::{Duration, Rng, Time, Wall};
 use std::collections::VecDeque;

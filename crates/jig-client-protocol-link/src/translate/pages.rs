@@ -62,6 +62,7 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
     checked.wire.note_page_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.object_page_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.owner_activity_words_words = limits.client.text;
+    checked.wire.owner_activity_kept_pending = limits.client.rows.min(w::CEILINGS.owner_activity_kept_pending);
     checked.wire.owner_amendment_state_dependencies = limits.client.rows;
     checked.wire.owner_authority_grants =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");

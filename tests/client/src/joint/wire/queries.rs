@@ -70,6 +70,7 @@ pub(super) fn waits(value: d::WaitsOn) -> c::WaitsOn {
                 }
             },
         },
+        d::WaitsOn::Dependencies { pending, count } => c::WaitsOn::Dependencies { pending, count },
         d::WaitsOn::Delegates => c::WaitsOn::Delegates,
         d::WaitsOn::News => c::WaitsOn::News,
         d::WaitsOn::Nothing => c::WaitsOn::Nothing,
@@ -87,7 +88,7 @@ pub(super) fn line(value: &d::TaskLine, limits: &Limits) -> Result<c::TaskLine, 
         last_activity: value.last_activity,
         ended_at: value.ended_at,
         budget: owner::budget(&value.budget),
-        waits_on: waits(value.waits_on),
+        waits_on: waits(value.waits_on.clone()),
         phases: rows::phases(value.phases),
         held_below: value.held_below,
         conversation: value.conversation.map(|v| c::ConversationRead {

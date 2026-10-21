@@ -121,6 +121,7 @@ fn context_carrier(limits: &Limits) -> Option<u64> {
     let task = &limits.tasks;
     task_carrier(limits)?
         .checked_add(sizeof(size_of::<tasks::RunContext>())?)?
+        .checked_add(bytes(task.dependencies, sizeof(size_of::<tasks::Added>())?.checked_add(8)?)?)?
         .checked_add(bytes(task.inbox_messages, sizeof(size_of::<tasks::Word>())?)?)?
         .checked_add(u64::from(task.inbox_bytes))?
         .checked_add(u64::from(task.inbox_bytes).checked_mul(sizeof(size_of::<tasks::ResultField>())?)?)?
@@ -191,6 +192,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(crate::documents::document_with_context_worst_case(limits)?)?
         .checked_add(crate::documents::document_scratch_worst_case(limits)?)?
         .checked_add(crate::acts::scratch_worst_case(limits)?)?
+        // The early party-batch circle projection retains parents, a walk and its ordered names.
+        .checked_add(List::<Option<u32>>::worst_case(limits.people.batch)?)?
+        .checked_add(List::<u32>::worst_case(limits.people.batch)?.checked_mul(2)?)?
+        .checked_add(List::<u64>::worst_case(limits.tasks.circle)?)?
         .checked_add(List::<people::ProjectRole>::worst_case(limits.people.projects)?)?
         .checked_add(List::<tasks::ViewTask>::worst_case(limits.tasks.tasks.checked_mul(2)?)?)?
         .checked_add(Map::<(u32, u64), u64>::worst_case(limits.tasks.tasks)?)?

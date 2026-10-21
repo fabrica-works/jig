@@ -57,6 +57,7 @@ pub(super) fn encode_hold_reason(
             wire::HoldReasonPoolLostParts { pool: *pool },
         )?),
         domain::HoldReason::Procedure => wire::HoldReason::Procedure,
+        domain::HoldReason::Circle => wire::HoldReason::Circle,
     })
 }
 pub(super) fn decode_hold_reason(value: wire::HoldReason) -> domain::HoldReason {
@@ -92,6 +93,7 @@ pub(super) fn decode_hold_reason(value: wire::HoldReason) -> domain::HoldReason 
             domain::HoldReason::PoolLost { pool }
         }
         wire::HoldReason::Procedure => domain::HoldReason::Procedure,
+        wire::HoldReason::Circle => domain::HoldReason::Circle,
     }
 }
 pub(super) fn encode_moved(value: &domain::Moved, limits: &wire::Limits) -> Result<wire::Moved, wire::Problem> {

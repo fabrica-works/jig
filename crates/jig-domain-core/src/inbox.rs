@@ -48,6 +48,7 @@ fn question_answered(row: &tasks::TaskRecord, question: u64) -> bool {
             | tasks::MessageKind::Question
             | tasks::MessageKind::EffectNotMade { .. }
             | tasks::MessageKind::Words
+            | tasks::MessageKind::Met { .. }
             | tasks::MessageKind::Amendment { .. }
             | tasks::MessageKind::Proposal { .. }
             | tasks::MessageKind::ProposalDecision { .. }
@@ -201,6 +202,7 @@ impl Core {
                         | tasks::MessageKind::Proposal { .. }
                         | tasks::MessageKind::EffectNotMade { .. }
                         | tasks::MessageKind::Words
+                        | tasks::MessageKind::Met { .. }
                         | tasks::MessageKind::Amendment { .. }
                         | tasks::MessageKind::Notice { .. }
                         | tasks::MessageKind::Timer { .. }

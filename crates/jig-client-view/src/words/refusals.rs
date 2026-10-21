@@ -9,6 +9,31 @@ impl Words {
     /// Say the supplied refusal, never deriving permission or numerical limits.
     pub fn refusal(&self, b: &mut Builder, refusal: &Refusal, text_limit: u32) {
         match refusal {
+            Refusal::Circle { tasks, cut } => {
+                self.text(b, JigPhrase::CircleRefused, &[]);
+                for task in tasks {
+                    self.text(b, JigPhrase::CircleWaitsFor, &[Hole::Number(*task)]);
+                }
+                if *cut {
+                    self.text(b, JigPhrase::TaskListsCut, &[]);
+                }
+            }
+            Refusal::Dependency { dependency, how } => self.text(
+                b,
+                match how {
+                    jig_client::contract::OwnerTaskStatus::Done => JigPhrase::DependencyDone,
+                    jig_client::contract::OwnerTaskStatus::Failed => JigPhrase::DependencyFailed,
+                    jig_client::contract::OwnerTaskStatus::Cancelled => JigPhrase::DependencyCancelled,
+                },
+                &[Hole::Number(*dependency)],
+            ),
+            Refusal::Kept { pending } => {
+                self.text(b, JigPhrase::KeptAnswer, &[]);
+                for task in pending {
+                    self.text(b, JigPhrase::KeptUntil, &[Hole::Number(*task)]);
+                }
+            }
+
             Refusal::Malformed { at, why } => self.text(
                 b,
                 match why {

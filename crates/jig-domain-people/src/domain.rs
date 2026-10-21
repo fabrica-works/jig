@@ -1980,6 +1980,15 @@ pub fn application_part_done(domain: &mut Domain, request: Token) {
 }
 
 fn valid_program_outcome(limits: &Limits, outcome: &Outcome) -> bool {
+    if let Outcome::Refused(why) | Outcome::CompoundRefused { why, .. } = outcome {
+        if let Refusal::Circle { tasks, .. } = why {
+            return tasks.len() <= 32;
+        }
+        if let Refusal::Kept { pending } = why {
+            return pending.len() <= 64;
+        }
+    }
+
     let (confirmed, rows) = match outcome {
         Outcome::AccountSignedOut { confirmed, failed_hosts } | Outcome::AccountRemoved { confirmed, failed_hosts } => {
             (*confirmed, failed_hosts)

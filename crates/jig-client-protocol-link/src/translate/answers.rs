@@ -407,6 +407,7 @@ pub(crate) fn hold_category(value: &w::HoldCategory, limits: &Limits) -> c::Hold
         w::HoldCategory::ResourceAccess => c::HoldCategory::ResourceAccess,
         w::HoldCategory::PoolLost(row) => c::HoldCategory::PoolLost { pool: row.pool() },
         w::HoldCategory::Procedure => c::HoldCategory::Procedure,
+        w::HoldCategory::Circle => c::HoldCategory::Circle,
     }
 }
 
@@ -448,6 +449,16 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
             c::Refusal::Role { held: opt0 }
         }
         w::Refusal::Taken(row) => c::Refusal::Taken { by: row.by() },
+        w::Refusal::Circle(value) => c::Refusal::Circle { tasks: value.tasks().clone(), cut: value.cut() },
+        w::Refusal::Kept(value) => c::Refusal::Kept { pending: value.pending().clone() },
+        w::Refusal::Dependency(value) => c::Refusal::Dependency {
+            dependency: value.dependency(),
+            how: match value.how() {
+                w::OwnerTaskStatus::Done => c::OwnerTaskStatus::Done,
+                w::OwnerTaskStatus::Failed => c::OwnerTaskStatus::Failed,
+                w::OwnerTaskStatus::Cancelled => c::OwnerTaskStatus::Cancelled,
+            },
+        },
         w::Refusal::NotWaiting => c::Refusal::NotWaiting,
         w::Refusal::NoFurther => c::Refusal::NoFurther,
         w::Refusal::Authority(row) => {

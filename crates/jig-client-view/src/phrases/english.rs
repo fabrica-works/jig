@@ -13,6 +13,73 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::KeptUntil => Box::new([
+                Segment::Text(copy_of(b"kept until T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" is done")),
+            ]),
+            JigPhrase::DependencyRemoved => Box::new([
+                Segment::Text(copy_of(b"T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" was removed from its dependencies")),
+            ]),
+            JigPhrase::DependencyMet => Box::new([
+                Segment::Text(copy_of(b"T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" is done; the task can go on")),
+            ]),
+            JigPhrase::DependencyFailed => Box::new([
+                Segment::Text(copy_of(b"dependency T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" failed")),
+            ]),
+            JigPhrase::DependencyCancelled => Box::new([
+                Segment::Text(copy_of(b"dependency T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" was cancelled")),
+            ]),
+            JigPhrase::DependencyPending => Box::new([
+                Segment::Text(copy_of(b"waiting for T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b"")),
+            ]),
+            JigPhrase::DependencyDone => Box::new([
+                Segment::Text(copy_of(b"T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" is done")),
+            ]),
+            JigPhrase::CircleWaitsFor => Box::new([
+                Segment::Text(copy_of(b"waits for T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b"")),
+            ]),
+            JigPhrase::DependencyParked => Box::new([Segment::Text(copy_of(b"parked"))]),
+            JigPhrase::CircleHold => Box::new([Segment::Text(copy_of(b"Held for a circle of waits"))]),
+            JigPhrase::CircleLifts => {
+                Box::new([Segment::Text(copy_of(b"This hold lifts on its own once the circle breaks"))])
+            }
+            JigPhrase::CircleRefused => Box::new([Segment::Text(copy_of(b"These tasks would wait for one another"))]),
+            JigPhrase::KeptAnswer => {
+                Box::new([Segment::Text(copy_of(b"This task is kept by its dependencies; answer once they are done"))])
+            }
+            JigPhrase::DependencyByTask => Box::new([
+                Segment::Text(copy_of(b"added by T")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" at ")),
+                Segment::Hole { index: 1, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::DependencyByParty => Box::new([
+                Segment::Text(copy_of(b"added by P")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" at ")),
+                Segment::Hole { index: 1, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::DependencyByDeployment => Box::new([
+                Segment::Text(copy_of(b"added by deployment ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" at ")),
+                Segment::Hole { index: 1, kind: HoleKind::Wall },
+            ]),
             JigPhrase::Word(_) => unreachable!("public words compose their own language"),
             JigPhrase::OwnerHoldRelease => {
                 Box::new([Segment::Text(copy_of(b"Release continues from the shown lifecycle; failure counts reset"))])

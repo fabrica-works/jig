@@ -139,6 +139,7 @@ fn historical_funding_all_four_source_kinds_keep_period_parent_counters_and_rese
 fn historical_ended_whole_chip_metadata_prices_reserved_resources_connectors_and_nested_independent_ending() {
     let bounds = Bounds { rows: 3, text: 8, ..Bounds::default() };
     let metadata = OwnerChipDetails {
+        dependencies: List::with_capacity(0),
         project: u32::MAX,
         executor: OwnerExecutor::Person(PersonAddress::Role(u32::MAX)),
         phase_since: Wall::EPOCH,

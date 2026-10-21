@@ -901,6 +901,13 @@ fn a_standing_refusal_does_not_replace_account_or_credential_waits_or_placed_wor
         assert_eq!(task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap().run_wait, None);
     }
     row.phase = tasks::Phase::Active(tasks::Active::Due);
+    // A due person task always carries its wait; its document reads the row itself.
+    row.person_wait = Some(tasks::PersonWait {
+        since: Wall::EPOCH,
+        stall: Duration::from_secs(1),
+        deadline: Wall::from_nanos(1_000_000_000),
+        notice: None,
+    });
     for executor in
         [tasks::Executor::Procedure { connector: 1, code: 1 }, tasks::Executor::Person(tasks::PersonAddress::Person(1))]
     {

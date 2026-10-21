@@ -26,6 +26,7 @@ pub struct Amendment {
     pub addressed: Option<AddressChange>,
     pub spec: Option<super::Specification>,
     pub wake: Option<super::OwnerWakePolicy>,
+    /// Replaces the whole list: new names add dependencies, omitted names remove them (tasks.md, 7).
     pub dependencies: Option<List<u64>>,
     pub authority: Option<super::OwnerAuthority>,
     pub instructions: Option<Text>,

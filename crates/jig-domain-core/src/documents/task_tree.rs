@@ -103,6 +103,17 @@ pub enum TaskLink {
     Stored { number: u64, status: Option<tasks::Status> },
 }
 
+/// Dependency facts from its owning task and the prerequisite's live row or stub
+/// (client/domain/contract.md, 5.1; domain/tasks.md, 5.7 and 7).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Dependency {
+    pub number: u64,
+    pub pending: bool,
+    pub added: Option<tasks::Added>,
+    pub keeps: bool,
+    pub status: Option<tasks::Status>,
+}
+
 /// A pending proposal's immutable identity.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ProposalRef {
@@ -124,6 +135,7 @@ pub enum EscalationState {
 /// A hold's reason, revision and prior lifecycle, with its escalation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct HoldLine {
+    pub circle: Option<tasks::Circle>,
     /// The connector's account, independently of the resource or outbox origin.
     pub account: Option<Part>,
     pub source: Option<Part>,
@@ -216,6 +228,7 @@ pub struct Task {
     pub resources: List<ResourceLine>,
     pub inputs: List<TaskLink>,
     pub dependencies: List<TaskLink>,
+    pub dependency_facts: List<Dependency>,
     pub references: List<TaskLink>,
     pub subscriptions: List<tasks::Subscription>,
     pub wake: tasks::WakePolicy,
@@ -492,7 +505,7 @@ pub(super) fn ending(limits: &Limits, value: &tasks::Ending) -> Result<Ending, M
 
 pub(super) fn hold_source(limits: &Limits, source: Option<&tasks::HoldSource>) -> Result<Option<Part>, Missing> {
     match source {
-        None => Ok(None),
+        None | Some(tasks::HoldSource::Circle(_)) => Ok(None),
         Some(tasks::HoldSource::Resource(name)) => {
             Ok(Some(part_path(limits, name.connector, PartKind::Resource, &name.path)?))
         }
@@ -509,7 +522,7 @@ fn hold_account(task: u64, reason: tasks::Hold, source: Option<&tasks::HoldSourc
             let connector = match source {
                 Some(tasks::HoldSource::Resource(name)) => name.connector,
                 Some(tasks::HoldSource::Effect { connector, .. }) => *connector,
-                None => return None,
+                None | Some(tasks::HoldSource::Circle(_)) => return None,
             };
             Some(Part { connector, kind: PartKind::Hold, key: PartKey::Number(task) })
         }
@@ -525,12 +538,26 @@ fn hold_account(task: u64, reason: tasks::Hold, source: Option<&tasks::HoldSourc
         | tasks::Hold::ResourceUnavailable
         | tasks::Hold::ResourceAccess
         | tasks::Hold::PoolLost { .. }
+        | tasks::Hold::Circle
         | tasks::Hold::Procedure => None,
     }
 }
 pub(super) fn hold(limits: &Limits, row: &tasks::TaskRecord) -> Result<Option<HoldLine>, Missing> {
     match &row.phase {
         tasks::Phase::Held { was, why, source } => Ok(Some(HoldLine {
+            circle: match source.as_deref() {
+                Some(tasks::HoldSource::Circle(circle)) => {
+                    let mut tasks = List::with_capacity(limits.documents.lines);
+                    for number in circle.tasks.iter().take(bound(limits)) {
+                        tasks.push(*number).expect("bounded circle chips");
+                    }
+                    Some(tasks::Circle {
+                        cut: circle.cut || circle.tasks.len() > bound(limits),
+                        tasks: tasks.into_boxed(),
+                    })
+                }
+                None | Some(tasks::HoldSource::Resource(_) | tasks::HoldSource::Effect { .. }) => None,
+            },
             account: hold_account(row.number, *why, source.as_deref()),
             source: hold_source(limits, source.as_deref())?,
             reason: *why,
@@ -745,7 +772,7 @@ pub fn task_from_row(
     let acts = super::offers::task(core, limits, party, row, decision)?;
     let authority = authority(limits, &row.authority)?;
     Ok(Task {
-        waits_on: core.waits_on(limits, row.number),
+        waits_on: crate::waits::from_row(core, limits, row),
         label: row.label,
         flags: row.flags,
         last_activity: row.last_activity,
@@ -785,6 +812,7 @@ pub fn task_from_row(
         resources,
         inputs: links(core, limits, party, &row.spec.inputs)?,
         dependencies: links(core, limits, party, &row.dependencies)?,
+        dependency_facts: dependency_facts(core, limits, row),
         references: links(core, limits, party, &row.references)?,
         subscriptions,
         wake: row.wake,
@@ -899,6 +927,9 @@ pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64>
             )?,
         )?
         .checked_add(lines.checked_mul(u64::try_from(size_of::<tasks::ResultField>()).ok()?)?.checked_add(text)?)?
+        .checked_add(List::<Dependency>::worst_case(limits.lines)?)?
+        .checked_add(List::<u64>::worst_case(limits.lines)?)?
+        .checked_add(32 * 8)?
         .checked_add(List::<ProposalRef>::worst_case(limits.lines)?)?
         .checked_add(u64::from(tasks::MODELS).checked_mul(u64::try_from(size_of::<tasks::ModelEffort>()).ok()?)?)?
         .checked_add(authority)?;
@@ -924,4 +955,49 @@ pub(super) fn authority_worst_case(limits: &super::DocumentLimits) -> Option<u64
 
 pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     overview_worst_case(limits)?.checked_add(super::offers::heap_worst_case(limits)?)
+}
+
+pub(super) fn dependency_facts(core: &Core, limits: &Limits, row: &tasks::TaskRecord) -> List<Dependency> {
+    let mut facts = dependency_rows(limits, row);
+    for index in 0..facts.len() {
+        let fact = facts.get_mut(index).expect("bounded dependency index");
+        fact.status = match core.tasks.task(fact.number) {
+            Some(task) => match &task.phase {
+                tasks::Phase::Ended(ending) => Some(match ending {
+                    tasks::Ending::Done(_) => tasks::Status::Done,
+                    tasks::Ending::Failed { .. } => tasks::Status::Failed,
+                    tasks::Ending::Cancelled { .. } => tasks::Status::Cancelled,
+                }),
+                tasks::Phase::Waiting
+                | tasks::Phase::Active(_)
+                | tasks::Phase::Held { .. }
+                | tasks::Phase::Closing(_) => None,
+            },
+            None => match core.tasks.stub(fact.number) {
+                Some(stub) => Some(stub.phase),
+                None => None,
+            },
+        };
+    }
+    facts
+}
+pub(super) fn dependency_rows(limits: &Limits, row: &tasks::TaskRecord) -> List<Dependency> {
+    let mut facts = List::with_capacity(limits.documents.lines);
+    let keeps = match row.phase {
+        tasks::Phase::Active(_) => true,
+        tasks::Phase::Waiting | tasks::Phase::Held { .. } | tasks::Phase::Closing(_) | tasks::Phase::Ended(_) => false,
+    } && !row.waiting_on.is_empty();
+    for number in row.dependencies.iter().take(bound(limits)) {
+        let mut added = None;
+        for value in &row.added {
+            if value.task == *number {
+                added = Some(value.clone());
+                break;
+            }
+        }
+        facts
+            .push(Dependency { number: *number, pending: row.waiting_on.contains(number), added, keeps, status: None })
+            .expect("bounded dependency facts");
+    }
+    facts
 }

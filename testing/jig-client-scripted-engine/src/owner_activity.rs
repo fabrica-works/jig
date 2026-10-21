@@ -34,6 +34,7 @@ impl Payload for OwnerMessageKind {
             | Self::ProposalDecision { .. }
             | Self::Words
             | Self::EffectNotMade { .. }
+            | Self::Met { .. }
             | Self::Amendment { .. }
             | Self::Question
             | Self::Answer { .. }
@@ -53,6 +54,7 @@ impl Payload for OwnerActivity {
         match self {
             Self::Words { kind, words, .. } => message_words_heap(kind, words, bounds),
             Self::Heard(word) | Self::Notified { word, .. } => word.heap(bounds),
+            Self::Kept { pending, .. } => pending.heap(bounds),
             Self::RunBegan { .. }
             | Self::RunEnded { .. }
             | Self::Turn { .. }
@@ -83,7 +85,7 @@ pub fn word_bytes(value: &OwnerWord, bounds: &Bounds) -> Option<u64> {
 pub fn word_fits(value: &OwnerWord, bounds: &Bounds) -> bool {
     crate::payload::fits(value, bounds)
 }
-fn max_heap(bounds: &Bounds) -> Option<u64> {
+fn word_heap(bounds: &Bounds) -> Option<u64> {
     let text = u64::from(bounds.text);
     let fields = List::<ResultField>::worst_case(bounds.rows)?
         .checked_add(u64::from(bounds.rows).checked_mul(text)?.checked_mul(2)?)?;
@@ -92,11 +94,13 @@ fn max_heap(bounds: &Bounds) -> Option<u64> {
 /// Configured whole activity envelope; exactly one message may occur in a line.
 #[must_use]
 pub fn worst_case(bounds: &Bounds) -> Option<u64> {
-    u64::try_from(size_of::<OwnerActivityLine>()).ok()?.checked_add(max_heap(bounds)?)
+    u64::try_from(size_of::<OwnerActivityLine>())
+        .ok()?
+        .checked_add(word_heap(bounds)?.max(List::<u64>::worst_case(bounds.rows)?))
 }
 #[must_use]
 pub fn word_worst_case(bounds: &Bounds) -> Option<u64> {
-    u64::try_from(size_of::<OwnerWord>()).ok()?.checked_add(max_heap(bounds)?)
+    u64::try_from(size_of::<OwnerWord>()).ok()?.checked_add(word_heap(bounds)?)
 }
 #[cfg(test)]
 mod tests;

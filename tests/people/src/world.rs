@@ -1032,8 +1032,10 @@ impl World {
         while self.held.front().is_some_and(|reply| reply.commit <= self.durable) {
             let held = self.held.pop_front().expect("front present");
             assert!(self.calls.remove(&held.call), "one reply per live call");
-            match held.reply {
-                Reply::Refused(why) | Reply::Outcome(Outcome::Refused(why)) => self.observe(Seen::Refused { why }),
+            match &held.reply {
+                Reply::Refused(why) | Reply::Outcome(Outcome::Refused(why)) => {
+                    self.observe(Seen::Refused { why: why.clone() });
+                }
                 Reply::SignedIn { .. } | Reply::SignedOut | Reply::Outcome(_) | Reply::Again(_) => {}
             }
             assert!(self.replies.insert(held.call, held.reply).is_none());

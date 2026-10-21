@@ -60,6 +60,7 @@ pub fn phase_owner() -> (w::Chip, c::Chip) {
     expected.details = Box::new(c::ChipPhase::Owner {
         phase: c::OwnerChipPhase::Waiting { dependencies: List::with_capacity(0), more: false, holds: false },
         details: Box::new(c::OwnerChipDetails {
+            dependencies: List::with_capacity(0),
             project: 7,
             executor: c::OwnerExecutor::Agent { charter: 7 },
             phase_since: Wall::from_nanos(7),

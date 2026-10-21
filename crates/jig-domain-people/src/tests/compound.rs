@@ -77,10 +77,10 @@ const INVALID: &[(u64, &[u8], Refusal)] = &[
 fn a_compounds_invalid_operation_keeps_its_standalone_refusal() {
     let mut test = Test::new(LIMITS);
     test.signin(1, 10, identity(0, 1));
-    for &(task, words, refusal) in INVALID {
+    for &(task, words, ref refusal) in INVALID {
         let mut operations = List::with_capacity(1);
         operations.push(Operation::Message { task, words: words.into() }).expect("one operation");
         let rows = test.request(10, 1, Ask::Compound { project: 1, operations });
-        assert_eq!(reply(&rows), Reply::Refused(refusal), "task {task}, words {words:?}");
+        assert_eq!(reply(&rows), Reply::Refused(refusal.clone()), "task {task}, words {words:?}");
     }
 }

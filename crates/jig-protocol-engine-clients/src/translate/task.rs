@@ -186,7 +186,7 @@ fn admission(models: &[crate::Model], value: &acts::Admission, limits: &w::Limit
         )?),
         acts::Admission::Refused(value) => w::Admission::Refused(w::AdmissionRefused::new(
             limits,
-            w::AdmissionRefusedParts { value: refusals::refusal(*value, limits)? },
+            w::AdmissionRefusedParts { value: refusals::refusal(value.clone(), limits)? },
         )?),
         acts::Admission::Bounded { within, beyond } => {
             let beyond = match beyond {
@@ -196,7 +196,7 @@ fn admission(models: &[crate::Model], value: &acts::Admission, limits: &w::Limit
                 )?),
                 acts::Beyond::Refused(value) => w::Beyond::Refused(w::BeyondRefused::new(
                     limits,
-                    w::BeyondRefusedParts { value: refusals::refusal(*value, limits)? },
+                    w::BeyondRefusedParts { value: refusals::refusal(value.clone(), limits)? },
                 )?),
             };
             w::Admission::Bounded(Box::new(w::AdmissionBounded::new(
@@ -338,13 +338,14 @@ pub fn document(value: &d::Task, models: &[crate::Model], limits: &w::Limits) ->
     w::Task::new(
         limits,
         w::TaskParts {
+            dependency_facts: chips::dependencies(&value.dependency_facts, limits)?,
             llm: super::llm::choice(value.llm.as_ref(), models, limits)?,
             kept_account: value.kept_account,
             run_wait: super::task_wait::waiting(value.run_wait, limits)?,
             label: value.label,
             flags: super::me::flags(value.flags, limits)?,
             last_activity: value.last_activity.as_nanos(),
-            waits_on: super::queries::waits(value.waits_on, limits)?,
+            waits_on: super::queries::waits(value.waits_on.clone(), limits)?,
             chip: chips::chip(&value.chip, limits)?,
             goal: value.goal,
             priority: value.priority,

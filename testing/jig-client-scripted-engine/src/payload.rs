@@ -468,6 +468,7 @@ impl Payload for ChipPhase {
     }
 }
 fields!(Task {
+    dependency_facts,
     label, flags, last_activity, waits_on, llm, kept_account, run_wait,
     chip,
     goal,
@@ -905,11 +906,7 @@ impl Payload for Runtime {
 fields!(Impact { tasks, live_runs, proposals });
 fields!(WriterSlot { resource, task, attempt });
 fields!(LiveDelegate { chip, takeover_budget });
-plain!(
-    jig_client_domain::contract::TaskQuery,
-    jig_client_domain::contract::WaitsOn,
-    jig_client_domain::contract::ConversationRead
-);
+plain!(jig_client_domain::contract::TaskQuery, jig_client_domain::contract::ConversationRead);
 fields!(TaskLine {
     chip,
     project,
@@ -1066,6 +1063,9 @@ impl Payload for Moved {
 impl Payload for Refusal {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Circle { tasks, .. } => tasks.heap(bounds),
+            Self::Kept { pending } => pending.heap(bounds),
+
             Self::Role { held } => held.heap(bounds),
             Self::Taken { by } => by.heap(bounds),
             Self::Authority { lacking, proposable } => sum(&[lacking.heap(bounds), proposable.heap(bounds)]),
@@ -1080,6 +1080,7 @@ impl Payload for Refusal {
             | Self::NoEscalationHolder
             | Self::NotOffered
             | Self::KeyConflict
+            | Self::Dependency { .. }
             | Self::Account { .. } => Some(0),
             Self::Llm { model, why: _ } => model.heap(bounds),
         }
@@ -1277,6 +1278,7 @@ impl Payload for HoldCategory {
             | Self::ResourceUnavailable
             | Self::ResourceAccess
             | Self::PoolLost { .. }
+            | Self::Circle
             | Self::Procedure => Some(0),
         }
     }
@@ -1394,5 +1396,14 @@ impl Payload for EndedGroup {
 impl Payload for jig_client_domain::contract::TaskRunWait {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         Some(0)
+    }
+}
+
+impl Payload for jig_client_domain::contract::WaitsOn {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Dependencies { pending, .. } => pending.heap(bounds),
+            Self::Party { .. } | Self::Delegates | Self::News | Self::Nothing => Some(0),
+        }
     }
 }

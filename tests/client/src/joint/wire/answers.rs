@@ -59,7 +59,10 @@ fn refusal(
 ) -> Result<client::Refusal, super::owner::Invalid> {
     match value {
         people::Refusal::Llm { model, why } => super::llm::refusal(model, why, models, limits),
-        people::Refusal::Role { .. }
+        people::Refusal::Circle { .. }
+        | people::Refusal::Dependency { .. }
+        | people::Refusal::Kept { .. }
+        | people::Refusal::Role { .. }
         | people::Refusal::Authority { .. }
         | people::Refusal::Limit { .. }
         | people::Refusal::Moved { .. }
@@ -97,7 +100,7 @@ mod tests {
     #[test]
     fn final_sparse_entrance_refusal_and_retained_refusal_keep_the_same_exact_original_child_terminal() {
         let why = people::Refusal::Moved { now: people::Moved::Person { revision: u64::MAX } };
-        let entrance = reply(people::Reply::Refused(why), &[], &crate::test::limits().client.domain)
+        let entrance = reply(people::Reply::Refused(why.clone()), &[], &crate::test::limits().client.domain)
             .expect("representable owner value");
         let retained =
             reply(people::Reply::Outcome(people::Outcome::Refused(why)), &[], &crate::test::limits().client.domain)

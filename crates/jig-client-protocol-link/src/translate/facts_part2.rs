@@ -165,6 +165,7 @@ pub(crate) fn owner_chip_details_fields(
         None => None,
     };
     Ok(c::OwnerChipDetails {
+        dependencies: dependencies(value.dependencies(), limits),
         project: value.project(),
         executor: owner_executor(value.executor(), limits),
         phase_since: Wall::from_nanos(value.phase_since()),
@@ -290,4 +291,33 @@ pub(crate) fn result_value_fields(
         w::ResultValueFields::Failure(row) => c::ResultValue::Failure(document_text(row.value(), limits)?),
         w::ResultValueFields::Words(row) => c::ResultValue::Words(document_text(row.value(), limits)?),
     })
+}
+
+#[expect(clippy::manual_map, reason = "step code preserves optional owner facts explicitly")]
+pub(crate) fn dependencies(values: &List<w::Dependency>, limits: &Limits) -> List<c::Dependency> {
+    let mut rows = List::with_capacity(values.len());
+    for value in values {
+        let added = match value.added() {
+            Some(added) => {
+                Some(c::DependencyAdded { at: Wall::from_nanos(added.at()), by: owner_requester(added.by(), limits) })
+            }
+            None => None,
+        };
+        rows.push(c::Dependency {
+            number: value.number(),
+            pending: value.pending(),
+            added,
+            keeps: value.keeps(),
+            status: match value.status() {
+                Some(value) => Some(match value {
+                    w::OwnerTaskStatus::Done => c::OwnerTaskStatus::Done,
+                    w::OwnerTaskStatus::Failed => c::OwnerTaskStatus::Failed,
+                    w::OwnerTaskStatus::Cancelled => c::OwnerTaskStatus::Cancelled,
+                }),
+                None => None,
+            },
+        })
+        .expect("same dependency count");
+    }
+    rows
 }

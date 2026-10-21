@@ -270,7 +270,13 @@ secrets' store (section 9).
   added one its wall and its maker, a party or a task
   (`../domain/tasks.md`, section 7); a hold for a circle of waits, with
   the circle's tasks, cut at their limit, and when the held task began
-  to wait for holds (`../domain/tasks.md`, 6.7). The index of holders,
+  to wait for holds (`../domain/tasks.md`, 6.7); and, for a task that left
+  its queues and came back, when its wait bound counts from
+  (`../domain/tasks.md`, 6.2). The tasks family's activity also keeps a
+  parked run's `Kept` line, its attempt and pending dependencies
+  (`../domain/tasks.md`, 5.7; `../domain/engine.md`, section 7), and the
+  `Met` notice, the dependency and whether it was removed
+  (`../domain/tasks.md`, 8.1). The index of holders,
   waiters and dependents is not stored: the restart rebuilds it from
   the live tasks, and judges their waits whole (`../domain/engine.md`,
   section 6). People's retained answers keep the refusals for added

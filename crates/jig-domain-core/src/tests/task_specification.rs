@@ -84,3 +84,90 @@ fn task_specification_preserves_parameter_identity_and_local_text_loss() {
     );
     assert_eq!(task.spec.parameters, task.parameters);
 }
+
+#[test]
+fn task_dependencies_show_added_provenance_pending_and_stub_status() {
+    const DEPENDENCY: u64 = 7;
+    let (mut core, limits) = make_tree();
+    let mut row = core.tasks.task(2).unwrap().clone();
+    let parent = core.tasks.task(1).unwrap().clone();
+    fixtures::restore(&mut core, &limits, Box::new([parent, row.clone()]));
+    row.phase = tasks::Phase::Active(tasks::Active::Idle);
+    row.dependencies = Box::new([1, DEPENDENCY]);
+    row.waiting_on = Box::new([1]);
+    let added = tasks::Added { task: DEPENDENCY, at: Wall::from_nanos(11), by: tasks::Party::Person(1) };
+    row.added = Box::new([added.clone()]);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Restore {
+            record: tasks::Stored::Stub(tasks::Stub {
+                task: DEPENDENCY,
+                phase: tasks::Status::Done,
+                result: Token::new(DEPENDENCY),
+            }),
+        },
+    );
+    let task = task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
+    assert_eq!(task.dependency_facts.get(0).unwrap().number, 1);
+    assert!(task.dependency_facts.get(0).unwrap().pending);
+    assert!(task.dependency_facts.get(0).unwrap().keeps);
+    assert_eq!(task.dependency_facts.get(1).unwrap().added, Some(added));
+    assert_eq!(task.dependency_facts.get(1).unwrap().status, Some(tasks::Status::Done));
+    assert!(!task.dependency_facts.get(1).unwrap().pending);
+    row.waiting_on = Box::new([]);
+    let task = task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
+    assert!(!task.dependency_facts.get(0).unwrap().keeps);
+}
+
+#[test]
+fn a_kept_person_card_offers_no_answer_and_keeps_its_take() {
+    let (core, limits) = make_tree();
+    let mut row = core.tasks.task(2).unwrap().clone();
+    row.executor = tasks::Executor::Person(tasks::PersonAddress::Role(people::Role::Owner.number()));
+    row.phase = tasks::Phase::Active(tasks::Active::Idle);
+    row.dependencies = Box::new([1]);
+    row.waiting_on = Box::new([1]);
+    let card = person_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
+    let mut take = false;
+    for offer in card.acts.as_slice() {
+        assert_ne!(offer.act, crate::acts::Act::Answer);
+        if offer.act == crate::acts::Act::Take {
+            take = true;
+        }
+    }
+    assert!(take);
+}
+
+#[test]
+fn dependency_refusals_keep_the_problem_names_at_the_people_boundary() {
+    let (core, _) = make_tree();
+    for (why, expected) in [
+        (tasks::Refusal::Circle { cut: true }, people::Refusal::Circle { tasks: Box::new([7, 5, 9]), cut: true }),
+        (tasks::Refusal::Kept, people::Refusal::Kept { pending: Box::new([7, 5, 9]) }),
+        (
+            tasks::Refusal::DependencyEnded { how: tasks::Status::Failed },
+            people::Refusal::Dependency { dependency: 7, how: people::DependencyStatus::Failed },
+        ),
+    ] {
+        let problem = tasks::Problem::naming(Some(2), why, &[7, 5, 9]);
+        assert_eq!(routing::refusals::person_problem_refusal(&core, problem), people::Outcome::Refused(expected));
+    }
+}
+
+#[test]
+fn a_circle_hold_projection_cuts_the_chips_without_losing_the_source_cut() {
+    let (core, mut limits) = make_tree();
+    limits.documents.lines = 2;
+    let mut row = core.tasks.task(2).unwrap().clone();
+    row.revisions.hold = 1;
+    row.phase = tasks::Phase::Held {
+        was: tasks::Was::Waiting,
+        why: tasks::Hold::Circle,
+        source: Some(Box::new(tasks::HoldSource::Circle(tasks::Circle { tasks: Box::new([9, 7, 5]), cut: false }))),
+    };
+    let task = task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
+    let circle = task.hold.unwrap().circle.unwrap();
+    assert_eq!(circle.tasks.as_ref(), &[9, 7]);
+    assert!(circle.cut);
+}

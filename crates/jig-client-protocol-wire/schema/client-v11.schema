@@ -40,7 +40,7 @@ record HoldCategoryDependency { task: u64 }
 record HoldCategoryStoppedBy { party: u64 }
 record HoldCategoryUncertain { entry: u64 }
 record HoldCategoryPoolLost { pool: u64 }
-enum HoldCategory { failures: HoldCategoryFailures, stalled, dependency: HoldCategoryDependency, stopped, stopped_by: HoldCategoryStoppedBy, drift, effects, effect_failed, uncertain: HoldCategoryUncertain, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: HoldCategoryPoolLost, procedure }
+enum HoldCategory { failures: HoldCategoryFailures, stalled, dependency: HoldCategoryDependency, stopped, stopped_by: HoldCategoryStoppedBy, drift, effects, effect_failed, uncertain: HoldCategoryUncertain, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: HoldCategoryPoolLost, procedure, circle }
 record OwnerChipPhaseWaiting { dependencies: list 32 u64 more: bool holds: bool }
 record OwnerChipPhaseActive { value: RunStage }
 record OwnerChipPhasePerson { address: PersonAddress taken_by: option u64 since: option u64 }
@@ -120,7 +120,15 @@ record OwnerHoldEscalationWaiting { holder: OwnerEscalationHolder entry: u64 sin
 record OwnerHoldEscalationRejected { by: u64 reason: DocumentText }
 enum OwnerHoldEscalation { routing, waiting: OwnerHoldEscalationWaiting, rejected: OwnerHoldEscalationRejected }
 record OwnerFailureTries { transient: u32 permanent: u32 run: u32 agent: u32 lost: u32 invalid: u32 }
-record OwnerChipHold { account: option OwnerPart source: option OwnerPart reason: HoldCategory revision: u64 before: OwnerPriorPhase escalation: option OwnerHoldEscalation tries: OwnerFailureTries hold_wait_since: option u64 }
+record OwnerRequesterTask { value: u64 }
+record OwnerRequesterPerson { value: u64 }
+record OwnerRequesterDeployment { project: u32 }
+enum OwnerRequester { task: OwnerRequesterTask, person: OwnerRequesterPerson, deployment: OwnerRequesterDeployment }
+enum OwnerTaskStatus { done, failed, cancelled }
+record DependencyAdded { at: u64 by: OwnerRequester }
+record Dependency { number: u64 pending: bool added: option DependencyAdded keeps: bool status: option OwnerTaskStatus }
+record Circle { tasks: list 32 u64 cut: bool }
+record OwnerChipHold { account: option OwnerPart source: option OwnerPart reason: HoldCategory revision: u64 before: OwnerPriorPhase escalation: option OwnerHoldEscalation tries: OwnerFailureTries hold_wait_since: option u64 circle: option Circle }
 record OwnerNumbers { budget: u64 spent: u64 spent_below: u64 reserved: u64 }
 record FunderTask { value: u64 }
 record FunderPool { project: u32 person: u64 period: u64 }
@@ -135,10 +143,6 @@ record OwnerResourceLine { part: OwnerPart kind: u16 taken: bool holder: option 
 record OwnerChipWorkTool { call: bytes 65536 tool: bytes 65536 }
 enum OwnerChipWork { preparing, starting, active, writing, tool: OwnerChipWorkTool, waiting, ending }
 record OwnerChipObservation { channel: u64 work: OwnerChipWork since: u64 reported_at: u64 started: option u64 }
-record OwnerRequesterTask { value: u64 }
-record OwnerRequesterPerson { value: u64 }
-record OwnerRequesterDeployment { project: u32 }
-enum OwnerRequester { task: OwnerRequesterTask, person: OwnerRequesterPerson, deployment: OwnerRequesterDeployment }
 record ResultField { name: bytes 65536 value: bytes 65536 }
 record ChipFields { task: u64 title: DocumentText executor: Executor phase: Phase details: u32 }
 record ChipRow { parent: option u32 value: ChipFields }
@@ -183,7 +187,7 @@ record HoldReasonPoolFields { part: Part }
 record HoldReasonProcedureFields { part: Part }
 enum HoldReasonFields { tries: HoldReasonTriesFields, stalled: HoldReasonStalledFields, dependency: HoldReasonDependencyFields, drift: HoldReasonDriftFields, effect_failed: HoldReasonEffectFailedFields, effect_uncertain: HoldReasonEffectUncertainFields, budget: HoldReasonBudgetFields, deadline: HoldReasonDeadlineFields, stopped: HoldReasonStoppedFields, resource: HoldReasonResourceFields, pool: HoldReasonPoolFields, procedure: HoldReasonProcedureFields }
 record HoldReasonRow { parent: option u32 value: HoldReasonFields }
-record OwnerChipDetailsFields { project: u32 executor: OwnerExecutor phase_since: u64 run_since: option u64 attempt: option u64 retry: option RetryNotice wake: OwnerWakePolicy person_wait: option OwnerPersonWait hold: option OwnerChipHold budget: OwnerBudget activity: u64 resources: bytes 16777216 resources_cut: bool resources_observed: bool procedure: option OwnerPart live_delegates: u32 closing_connectors: option list 32 u16 ending: option u32 ended_at: option u64 observation: option OwnerChipObservation }
+record OwnerChipDetailsFields { project: u32 executor: OwnerExecutor phase_since: u64 run_since: option u64 attempt: option u64 retry: option RetryNotice wake: OwnerWakePolicy person_wait: option OwnerPersonWait hold: option OwnerChipHold budget: OwnerBudget activity: u64 resources: bytes 16777216 resources_cut: bool resources_observed: bool procedure: option OwnerPart live_delegates: u32 closing_connectors: option list 32 u16 ending: option u32 ended_at: option u64 observation: option OwnerChipObservation dependencies: list 32 Dependency }
 record OwnerChipDetailsRow { parent: option u32 value: OwnerChipDetailsFields }
 record OwnerChipEndingDoneFields { value: u32 }
 record OwnerChipEndingFailedFields { value: DocumentText }
@@ -240,6 +244,7 @@ enum ModelSet { all, names: ModelSetNames }
 record OwnerAuthority { models: option ModelSet tools: u64 grants: bytes 16777216 delegation: OwnerDelegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 16777216 }
 record TrackingTracked { priority: u32 }
 enum Tracking { tracked: TrackingTracked, untracked }
+# Dependencies replace the whole list: newly named tasks are added, omitted tasks removed (tasks.md, 7).
 record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 tracked: option Tracking llm: option LlmChoice }
 record SeenResults { through: u64 }
 record SeenConversation { task: u64 through: u64 }
@@ -403,7 +408,10 @@ enum LlmWhy { unconfigured, effort, charter, authority, procedure, repeated }
 record RefusalLlm { model: text 4096 why: LlmWhy }
 enum AccountWhy { unknown, provider, uses, limited }
 record RefusalAccount { account: u32 why: AccountWhy }
-enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider, account: RefusalAccount }
+record RefusalCircle { tasks: list 32 u64 cut: bool }
+record RefusalDependency { dependency: u64 how: OwnerTaskStatus }
+record RefusalKept { pending: list 32 u64 }
+enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider, account: RefusalAccount, circle: RefusalCircle, dependency: RefusalDependency, kept: RefusalKept }
 record Done { outcome: Outcome }
 record Refused { refusal: Refusal at: option u32 }
 enum Final { done: Done, refused: Refused }
@@ -460,7 +468,8 @@ record OwnerMessageKindNotice { subscription: u64 target: u64 state: OwnerNotice
 record OwnerMessageKindTimer { subscription: u64 }
 record OwnerMessageKindNews { subscription: u64 class: OwnerNewsClass }
 record OwnerMessageKindResult { value: OwnerWordResult }
-enum OwnerMessageKind { escalation: OwnerMessageKindEscalation, proposal: OwnerMessageKindProposal, person_stalled: OwnerMessageKindPersonStalled, proposal_decision: OwnerMessageKindProposalDecision, words, effect_not_made: OwnerMessageKindEffectNotMade, amendment: OwnerMessageKindAmendment, question, answer: OwnerMessageKindAnswer, notice: OwnerMessageKindNotice, timer: OwnerMessageKindTimer, news: OwnerMessageKindNews, result: OwnerMessageKindResult }
+record OwnerMessageKindMet { dependency: u64 removed: bool }
+enum OwnerMessageKind { escalation: OwnerMessageKindEscalation, proposal: OwnerMessageKindProposal, person_stalled: OwnerMessageKindPersonStalled, proposal_decision: OwnerMessageKindProposalDecision, words, effect_not_made: OwnerMessageKindEffectNotMade, amendment: OwnerMessageKindAmendment, question, answer: OwnerMessageKindAnswer, notice: OwnerMessageKindNotice, timer: OwnerMessageKindTimer, news: OwnerMessageKindNews, result: OwnerMessageKindResult, met: OwnerMessageKindMet }
 record OwnerWord { number: u64 from: OwnerRequester kind: OwnerMessageKind words: text 65536 at: u64 hits: u32 eligible: bool }
 record OwnerRunWhyMessage { message: u64 }
 record OwnerRunWhyRetry { tries: OwnerFailureTries }
@@ -475,7 +484,8 @@ record OwnerActivityRunEnded { attempt: u64 end: OwnerRunEnd spent: u64 }
 record OwnerActivityTurn { reply: u64 attempt: u64 turn: u32 read: option u64 }
 record OwnerActivityDecided { revision: u64 }
 record OwnerActivityMilestone { position: u64 }
-enum OwnerActivity { words: OwnerActivityWords, heard: OwnerActivityHeard, notified: OwnerActivityNotified, run_began: OwnerActivityRunBegan, run_ended: OwnerActivityRunEnded, turn: OwnerActivityTurn, decided: OwnerActivityDecided, milestone: OwnerActivityMilestone }
+record OwnerActivityKept { attempt: u64 pending: list 32 u64 }
+enum OwnerActivity { words: OwnerActivityWords, heard: OwnerActivityHeard, notified: OwnerActivityNotified, run_began: OwnerActivityRunBegan, run_ended: OwnerActivityRunEnded, turn: OwnerActivityTurn, decided: OwnerActivityDecided, milestone: OwnerActivityMilestone, kept: OwnerActivityKept }
 record OwnerActivityLine { task: u64 position: u64 at: u64 line: OwnerActivity }
 record TurnName { attempt: u64 number: u32 }
 record TurnCarried { bytes: bytes 8388608 }
@@ -490,7 +500,6 @@ record TaskContractDocumentReport { words: u32 }
 record TaskContractDocumentVerdict { choices: bytes 16777216 cut: bool }
 record TaskContractDocumentChange { connector: u16 kind: u16 words: u32 }
 enum TaskContractDocument { approval: TaskContractDocumentApproval, report: TaskContractDocumentReport, verdict: TaskContractDocumentVerdict, change: TaskContractDocumentChange }
-enum OwnerTaskStatus { done, failed, cancelled }
 record OwnerTaskLinkLive { value: Chip }
 record OwnerTaskLinkRetained { chip: Chip at: option u64 }
 record OwnerTaskLinkStored { number: u64 status: option OwnerTaskStatus }
@@ -601,7 +610,8 @@ record WhomRole { project: u32 role: u32 }
 enum Whom { person: WhomPerson, role: WhomRole }
 enum WaitedFor { question, proposal, escalation, person_task }
 record WaitsOnParty { whom: Whom entries: u32 task: u64 kind: WaitedFor }
-enum WaitsOn { party: WaitsOnParty, delegates, news, nothing }
+record WaitsOnDependencies { pending: list 32 u64 count: u32 }
+enum WaitsOn { party: WaitsOnParty, delegates, news, nothing, dependencies: WaitsOnDependencies }
 record ConversationRead { seen: u64 unread: Count }
 record OwnerPhaseCounts { waiting: u32 idle: u32 starting: u32 running: u32 backing_off: u32 closing: u32 held: u32 done: u32 failed: u32 cancelled: u32 }
 record TaskLine { chip: Chip project: u32 requester: OwnerRequester tracked: option u32 label: u32 flags: TaskFlags changed: u64 last_activity: u64 ended_at: option u64 budget: OwnerBudget waits_on: WaitsOn phases: OwnerPhaseCounts held_below: u32 conversation: option ConversationRead }
@@ -693,7 +703,7 @@ record TaskWaitRefusedProgram { value: TaskWaitProgram }
 enum TaskWaitRefused { hello: TaskWaitHello, program: TaskWaitRefusedProgram }
 record TaskRunWaitRefused { value: TaskWaitRefused }
 enum TaskRunWait { account: TaskWaitAccount, credential, host, refused: TaskRunWaitRefused }
-record Task { label: u32 flags: TaskFlags last_activity: u64 waits_on: WaitsOn chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext llm: option LlmChoice kept_account: option u32 run_wait: option TaskRunWait }
+record Task { label: u32 flags: TaskFlags last_activity: u64 waits_on: WaitsOn chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext llm: option LlmChoice kept_account: option u32 run_wait: option TaskRunWait dependency_facts: list 32 Dependency }
 record TreeNode { chip: Chip parent: option u64 dependencies: list 32 u64 proposals: list 32 ProposalKey spend: u64 folded: PhaseCounts held_below: u32 }
 record Tree { task: u64 nodes: bytes 16777216 folded: PhaseCounts held_below: u32 }
 record ReadPosition { task: u64 through: u64 }

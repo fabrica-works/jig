@@ -125,6 +125,7 @@ pub struct Task {
     pub subscriptions: super::Subscriptions,
     pub result_contract: super::TaskContractDocument,
     pub dependencies: List<super::OwnerTaskLink>,
+    pub dependency_facts: List<super::Dependency>,
     pub references: List<super::OwnerTaskLink>,
     /// At least one task list was omitted; this does not identify which list.
     pub cut: bool,
@@ -864,6 +865,7 @@ impl Activity {
                 | super::OwnerActivity::RunBegan { .. }
                 | super::OwnerActivity::RunEnded { .. }
                 | super::OwnerActivity::Decided { .. }
+                | super::OwnerActivity::Kept { .. }
                 | super::OwnerActivity::Milestone { .. } => None,
             },
             Self::Words { .. }
@@ -902,6 +904,7 @@ impl Activity {
                 | super::OwnerActivity::RunEnded { .. }
                 | super::OwnerActivity::Turn { .. }
                 | super::OwnerActivity::Decided { .. }
+                | super::OwnerActivity::Kept { .. }
                 | super::OwnerActivity::Milestone { .. } => None,
             },
             Self::Turn { .. }
@@ -925,6 +928,7 @@ impl Activity {
                 | super::OwnerActivity::RunBegan { .. }
                 | super::OwnerActivity::RunEnded { .. }
                 | super::OwnerActivity::Decided { .. }
+                | super::OwnerActivity::Kept { .. }
                 | super::OwnerActivity::Milestone { .. } => None,
             },
             Self::Words { .. }

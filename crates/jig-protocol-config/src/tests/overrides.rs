@@ -140,6 +140,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"tasks.subscriptions", 4),
     (b"tasks.batch", 2),
     (b"tasks.dependencies", 8),
+    (b"tasks.circle", 8),
     (b"tasks.holdings", 4),
     (b"tasks.hold_kinds", 8),
     (b"tasks.resource_reports", 128),

@@ -260,7 +260,14 @@ pub(super) fn encode_refusal(value: &tasks::Refusal, limits: &Limits) -> Result<
         tasks::Refusal::Reference => wire::Refusal::Reference,
         tasks::Refusal::Subscription => wire::Refusal::Subscription,
         tasks::Refusal::Dependencies => wire::Refusal::Dependencies,
-        tasks::Refusal::Cycle => wire::Refusal::Cycle,
+        tasks::Refusal::Circle { cut } => {
+            wire::Refusal::Circle(wire::RefusalCircle::new(limits, wire::RefusalCircleParts { cut: *cut })?)
+        }
+        tasks::Refusal::DependencyEnded { how } => wire::Refusal::DependencyEnded(wire::RefusalDependencyEnded::new(
+            limits,
+            wire::RefusalDependencyEndedParts { how: super::state::status(*how) },
+        )?),
+        tasks::Refusal::Kept => wire::Refusal::Kept,
         tasks::Refusal::Executor => wire::Refusal::Executor,
         tasks::Refusal::Spec => wire::Refusal::Spec,
         tasks::Refusal::Contract => wire::Refusal::Contract,
@@ -310,7 +317,11 @@ pub(super) fn decode_refusal(value: wire::Refusal, _limits: &Limits) -> tasks::R
         wire::Refusal::Reference => tasks::Refusal::Reference,
         wire::Refusal::Subscription => tasks::Refusal::Subscription,
         wire::Refusal::Dependencies => tasks::Refusal::Dependencies,
-        wire::Refusal::Cycle => tasks::Refusal::Cycle,
+        wire::Refusal::Circle(value) => tasks::Refusal::Circle { cut: value.into_parts().cut },
+        wire::Refusal::DependencyEnded(value) => {
+            tasks::Refusal::DependencyEnded { how: super::state::read_status(value.into_parts().how) }
+        }
+        wire::Refusal::Kept => tasks::Refusal::Kept,
         wire::Refusal::Executor => tasks::Refusal::Executor,
         wire::Refusal::Spec => tasks::Refusal::Spec,
         wire::Refusal::Contract => tasks::Refusal::Contract,

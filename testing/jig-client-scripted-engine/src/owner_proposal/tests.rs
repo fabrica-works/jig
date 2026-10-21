@@ -56,6 +56,7 @@ fn part() -> OwnerPart {
 }
 fn hold() -> OwnerChipHold {
     OwnerChipHold {
+        circle: None,
         account: None,
         source: Some(part()),
         reason: HoldCategory::StoppedBy { party: u64::MAX },

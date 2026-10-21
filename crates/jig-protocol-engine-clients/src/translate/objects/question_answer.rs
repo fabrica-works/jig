@@ -4,6 +4,10 @@ use jig_domain_tasks as t;
 use skein_lib::{List, bytes};
 pub fn message_kind(value: &t::MessageKind, limits: &w::Limits) -> Result<w::OwnerMessageKind, w::Problem> {
     Ok(match value {
+        t::MessageKind::Met { dependency, removed } => w::OwnerMessageKind::Met(w::OwnerMessageKindMet::new(
+            limits,
+            w::OwnerMessageKindMetParts { dependency: *dependency, removed: *removed },
+        )?),
         t::MessageKind::Words => w::OwnerMessageKind::Words,
         t::MessageKind::Question => w::OwnerMessageKind::Question,
         t::MessageKind::Escalation { task, revision } => {
@@ -152,6 +156,7 @@ pub fn answer(value: &t::ActivityLine, limits: &w::Limits) -> Result<w::OwnerAct
         | t::Line::RunEnded { .. }
         | t::Line::Turn { .. }
         | t::Line::Decided { .. }
+        | t::Line::Kept { .. }
         | t::Line::Milestone { .. } => {
             return Err(w::Problem {
                 path: w::Path::OwnerHistoricalValueQuestionAnswer,

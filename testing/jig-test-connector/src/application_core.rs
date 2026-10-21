@@ -201,6 +201,8 @@ pub enum Moved {
 /// The reason a task is held, in the party's vocabulary.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum HoldReason {
+    /// A queue join would close a circle of waits.
+    Circle,
     /// Its retry allowance was exhausted.
     Failures { class: FailureClass },
     /// Its executor stopped progressing.

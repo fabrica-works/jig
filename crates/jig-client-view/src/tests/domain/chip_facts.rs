@@ -3,6 +3,7 @@ use skein_lib::{List, Wall};
 
 pub(super) fn details() -> OwnerChipDetails {
     OwnerChipDetails {
+        dependencies: List::with_capacity(0),
         project: u32::MAX,
         executor: OwnerExecutor::Person(PersonAddress::Role(u32::MAX)),
         phase_since: Wall::from_nanos(10),

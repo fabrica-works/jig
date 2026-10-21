@@ -43,7 +43,7 @@ record RefusalAuthority { lacking: Lack proposable: option bool }
 record RefusalLimit { which: LimitKind }
 record RefusalEnded { how: Ending }
 record HoldReasonFailures { class: FailureClass }
-enum HoldReason { failures: HoldReasonFailures, stalled, dependency: HoldReasonDependency, stopped, stopped_by: HoldReasonStoppedBy, drift, effects, effect_failed, uncertain: HoldReasonUncertain, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: HoldReasonPoolLost, procedure }
+enum HoldReason { failures: HoldReasonFailures, stalled, dependency: HoldReasonDependency, stopped, stopped_by: HoldReasonStoppedBy, drift, effects, effect_failed, uncertain: HoldReasonUncertain, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: HoldReasonPoolLost, procedure, circle }
 record MovedHold { revision: u64 reason: HoldReason }
 enum Moved { hold: MovedHold, spec: MovedSpec, person: MovedPerson, note: MovedNote }
 record RefusalMoved { now: Moved }

@@ -189,6 +189,7 @@ fn answers_question(answer: &OwnerActivityLine, message: u64) -> bool {
             | OwnerMessageKind::ProposalDecision { .. }
             | OwnerMessageKind::Words
             | OwnerMessageKind::EffectNotMade { .. }
+            | OwnerMessageKind::Met { .. }
             | OwnerMessageKind::Amendment { .. }
             | OwnerMessageKind::Question
             | OwnerMessageKind::Notice { .. }
@@ -202,6 +203,7 @@ fn answers_question(answer: &OwnerActivityLine, message: u64) -> bool {
         | OwnerActivity::RunEnded { .. }
         | OwnerActivity::Turn { .. }
         | OwnerActivity::Decided { .. }
+        | OwnerActivity::Kept { .. }
         | OwnerActivity::Milestone { .. } => false,
     }
 }

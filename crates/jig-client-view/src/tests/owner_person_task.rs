@@ -523,3 +523,40 @@ fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result
 }
 
 const UTF8_TEXTS: [&[u8]; 4] = [b"~\0/", &[b'~'; 128], &[b'q'; 128], &[b'w'; 128]];
+
+#[test]
+fn a_kept_person_chip_names_its_dependency_and_who_added_it() {
+    let mut value = value();
+    let ChipPhase::Owner { details, .. } = value.task.details.as_mut() else { panic!("owner") };
+    details.dependencies = rows([Dependency {
+        number: 7,
+        pending: true,
+        keeps: true,
+        added: Some(DependencyAdded { at: Wall::EPOCH, by: OwnerRequester::Person(5) }),
+        status: None,
+    }]);
+    let tree = build(&value, words(), limits(words()));
+    assert!(contains(&tree, b"kept until T7 is done"));
+    assert!(tree.nodes().iter().flat_map(|node| &node.text).any(|run| run.text.starts_with(b"added by P5 at ")));
+}
+
+#[test]
+fn a_kept_person_card_keeps_take_but_hides_an_answer_offer() {
+    let mut value = value();
+    let ChipPhase::Owner { details, .. } = value.task.details.as_mut() else { panic!("owner") };
+    details.dependencies = rows([Dependency { number: 7, pending: true, keeps: true, added: None, status: None }]);
+    let (d, object) =
+        super::cards_objects::loaded(ObjectKey::PersonTask(8), ReadValue::OwnerPersonTask(Box::new(value)));
+    let w = words();
+    let cap = limits(w);
+    let mut b = Builder::new(&cap);
+    let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
+    crate::cards::card(&mut b, &d.view(), object, &crate::cards::Place::Elsewhere, w, &mut bindings);
+    let tree = b.finish();
+    let answer = w.say(crate::phrases::jig::JigPhrase::ActAnswer, &[]);
+    let take = w.say(crate::phrases::jig::JigPhrase::ActTake, &[]);
+    assert!(
+        !tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(answer.as_ref()))
+    );
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(take.as_ref())));
+}

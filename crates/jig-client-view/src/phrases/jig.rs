@@ -6,6 +6,23 @@ use skein_ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    DependencyParked,
+    KeptUntil,
+    DependencyRemoved,
+    DependencyMet,
+    DependencyFailed,
+    DependencyCancelled,
+    DependencyPending,
+    DependencyDone,
+    CircleWaitsFor,
+    CircleHold,
+    CircleLifts,
+    CircleRefused,
+    KeptAnswer,
+    DependencyByTask,
+    DependencyByParty,
+    DependencyByDeployment,
+
     Word(jig_client::words::Word),
     RequestNotKept,
     RequestUnconfirmed,
@@ -1009,6 +1026,23 @@ impl JigPhrase {
     pub const fn id(self) -> PhraseId {
         let number = match self {
             Self::Word(word) => return word.id(),
+            Self::DependencyParked => 7815,
+            Self::KeptUntil => 7800,
+            Self::DependencyRemoved => 7801,
+            Self::DependencyMet => 7802,
+            Self::DependencyFailed => 7803,
+            Self::DependencyCancelled => 7804,
+            Self::DependencyPending => 7805,
+            Self::DependencyDone => 7806,
+            Self::CircleWaitsFor => 7807,
+            Self::CircleHold => 7808,
+            Self::CircleLifts => 7809,
+            Self::CircleRefused => 7810,
+            Self::KeptAnswer => 7811,
+            Self::DependencyByTask => 7812,
+            Self::DependencyByParty => 7813,
+            Self::DependencyByDeployment => 7814,
+
             Self::OwnerHoldRelease => 673,
             Self::NoticesPart => 680,
             Self::NothingKnown => 674,
@@ -1610,6 +1644,10 @@ impl JigPhrase {
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
             Self::Word(word) => return word.shape(text),
+            Self::DependencyByTask | Self::DependencyByParty | Self::DependencyByDeployment => {
+                Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }, HoleShape { kind: HoleKind::Wall, bytes: 0 }])
+            }
+
             Self::FrameNeedsKinds => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
@@ -1621,7 +1659,12 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::ActWithdraw
+            Self::DependencyParked
+            | Self::CircleHold
+            | Self::CircleLifts
+            | Self::CircleRefused
+            | Self::KeptAnswer
+            | Self::ActWithdraw
             | Self::OwnerHoldRelease
             | Self::PageCut
             | Self::NoteChangedNotSupplied
@@ -2131,6 +2174,14 @@ impl JigPhrase {
             | Self::Closing
             | Self::PartOwnerProposal
             | Self::RequestsDropped
+            | Self::KeptUntil
+            | Self::DependencyRemoved
+            | Self::DependencyMet
+            | Self::DependencyFailed
+            | Self::DependencyCancelled
+            | Self::DependencyPending
+            | Self::DependencyDone
+            | Self::CircleWaitsFor
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::PolicyEffect
             | Self::RunRetryFailed
@@ -2234,7 +2285,23 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 587] = [
+pub const ALL: [JigPhrase; 603] = [
+    JigPhrase::DependencyParked,
+    JigPhrase::KeptUntil,
+    JigPhrase::DependencyRemoved,
+    JigPhrase::DependencyMet,
+    JigPhrase::DependencyFailed,
+    JigPhrase::DependencyCancelled,
+    JigPhrase::DependencyPending,
+    JigPhrase::DependencyDone,
+    JigPhrase::CircleWaitsFor,
+    JigPhrase::CircleHold,
+    JigPhrase::CircleLifts,
+    JigPhrase::CircleRefused,
+    JigPhrase::KeptAnswer,
+    JigPhrase::DependencyByTask,
+    JigPhrase::DependencyByParty,
+    JigPhrase::DependencyByDeployment,
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,

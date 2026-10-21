@@ -3,24 +3,34 @@
 //! The core reads the current live record for an ending; no historical archive
 //! is retained here. Unknown names disclose no object. Retry answers are unsaved.
 use crate::{Core, Event};
+use alloc::boxed::Box;
 use jig_domain_notes as notes;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{Queue, Token};
 
+pub(crate) fn person_problem_refusal(core: &Core, problem: tasks::Problem) -> people::Outcome {
+    task_answer(core, problem)
+}
+
 pub(crate) fn person_task_refusal(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::Outcome {
-    task_answer(core, task, why)
+    task_answer(core, tasks::Problem::naming(task, why, &[]))
 }
 
-pub(super) fn person_move_refusal(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::Outcome {
-    task_answer(core, task, why)
+pub(super) fn person_move_refusal(core: &Core, problem: tasks::Problem) -> people::Outcome {
+    task_answer(core, problem)
 }
 
-pub(super) fn person_message_refusal(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::Outcome {
-    task_answer(core, task, why)
+pub(super) fn person_message_refusal(core: &Core, problem: tasks::Problem) -> people::Outcome {
+    task_answer(core, problem)
 }
 
-fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::Outcome {
+fn task_answer(core: &Core, problem: tasks::Problem) -> people::Outcome {
+    let tasks::Problem { task, why, blocked_by, .. } = problem;
+    let names = match blocked_by {
+        Some(names) => names,
+        None => Box::new([]),
+    };
     let refusal = match why {
         tasks::Refusal::Unproposable => {
             people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(people::Accepter::Nobody) }
@@ -71,7 +81,19 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
         tasks::Refusal::Delegates => people::Refusal::Limit { which: people::LimitKind::Delegates },
         tasks::Refusal::Subscription => people::Refusal::Limit { which: people::LimitKind::Subscription },
         tasks::Refusal::Dependencies => people::Refusal::Limit { which: people::LimitKind::Dependencies },
-        tasks::Refusal::Cycle => people::Refusal::Limit { which: people::LimitKind::Cycle },
+        tasks::Refusal::Circle { cut } => people::Refusal::Circle { tasks: names, cut },
+        tasks::Refusal::DependencyEnded { how } => people::Refusal::Dependency {
+            dependency: match names.first() {
+                Some(number) => *number,
+                None => return people::Outcome::Refused(people::Refusal::Unknown),
+            },
+            how: match how {
+                tasks::Status::Done => people::DependencyStatus::Done,
+                tasks::Status::Failed => people::DependencyStatus::Failed,
+                tasks::Status::Cancelled => people::DependencyStatus::Cancelled,
+            },
+        },
+        tasks::Refusal::Kept => people::Refusal::Kept { pending: names },
         tasks::Refusal::Grace => people::Refusal::Limit { which: people::LimitKind::Grace },
         tasks::Refusal::Goals => people::Refusal::Limit { which: people::LimitKind::Goals },
         tasks::Refusal::Spec => people::Refusal::Limit { which: people::LimitKind::Spec },

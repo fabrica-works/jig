@@ -20,8 +20,10 @@ fn refused_task_documents_reject_truncated_or_unknown_nested_tags() {
     let mut reader = Reader::new(&bytes);
     assert_eq!(w::Task::decode(&limits, &mut reader), Ok(record));
     assert_eq!(reader.remaining(), 0);
-    let offset = bytes.len() - wait_bytes.len();
-    assert_eq!(&bytes[offset..], wait_bytes);
+    // The task's dependency facts, an empty list's four-byte count, follow its wait.
+    let offset = bytes.len() - wait_bytes.len() - 4;
+    assert_eq!(&bytes[offset..offset + wait_bytes.len()], wait_bytes);
+    assert_eq!(&bytes[offset + wait_bytes.len()..], [0; 4]);
     for end in offset..bytes.len() {
         assert_eq!(
             w::Task::decode(&limits, &mut Reader::new(&bytes[..end])).expect_err("truncated refusal").reason,

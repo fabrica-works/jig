@@ -663,7 +663,7 @@ fn a_delivered_document_offering_what_admission_refuses_is_caught() {
     use jig_domain_core::acts::Admission;
     use jig_domain_people::{Outcome, Refusal, Reply, Role};
     let refusal = Refusal::Role { held: Some(Role::Observer) };
-    let actual = Reply::Outcome(Outcome::Refused(refusal));
+    let actual = Reply::Outcome(Outcome::Refused(refusal.clone()));
     assert!(jig_core_world::referee::offers::check(&Admission::Allowed, &actual).is_err());
     assert_eq!(jig_core_world::referee::offers::check(&Admission::Refused(refusal), &actual), Ok(()));
 }

@@ -29,6 +29,8 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let people = &domain.people;
     let authority = &domain.authority;
     let mut limits = wire::Limits {
+        refusal_circle_tasks: domain.tasks.circle,
+        refusal_kept_pending: domain.tasks.dependencies,
         account_change_declare_program_name: 32,
         account_host_failure_name: people.program_host_name_bytes,
         outcome_account_program_declared_name: 32,

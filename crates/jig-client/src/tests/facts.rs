@@ -211,7 +211,7 @@ fn a_task_line_and_its_task_document_give_one_status() {
     task.chip = facts_chip(RUNNING, Some(OwnerChipWork::Writing));
     task.waits_on = QUESTION;
     line.chip = task.chip.clone();
-    line.waits_on = task.waits_on;
+    line.waits_on = task.waits_on.clone();
     line.project = task.project;
     let me = me();
     assert_eq!(

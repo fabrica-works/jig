@@ -153,3 +153,22 @@ fn the_longest_accounts_rows_decode_within_the_rows_heap_worst_case() {
         assert_eq!(meter.held(), 0, "the decoded row's heap is released");
     }
 }
+
+#[test]
+fn added_dependencies_kept_lines_and_circle_payloads_fit_their_heap_bounds() {
+    let limits = tasks_v6::CEILINGS;
+    check(
+        "tasks",
+        "task_definition",
+        tasks_v6::TaskDefinition::worst_case_heap(&limits).expect("definition bound"),
+        |golden| {
+            tasks_v6::TaskDefinition::decode(&limits, &mut Reader::new(golden)).expect("full definition with additions")
+        },
+    );
+    check("tasks", "kept_line", tasks_v6::KeptLine::worst_case_heap(&limits).expect("kept bound"), |golden| {
+        tasks_v6::KeptLine::decode(&limits, &mut Reader::new(golden)).expect("full pending list")
+    });
+    check("tasks", "circle", tasks_v6::Circle::worst_case_heap(&limits).expect("circle bound"), |golden| {
+        tasks_v6::Circle::decode(&limits, &mut Reader::new(golden)).expect("full circle")
+    });
+}

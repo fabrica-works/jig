@@ -173,6 +173,7 @@ fn budget() -> Budget {
 #[must_use]
 pub fn task() -> Task {
     Task {
+        dependency_facts: skein_lib::List::with_capacity(0),
         kept_account: None,
         run_wait: None,
         llm: None,

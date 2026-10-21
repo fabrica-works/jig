@@ -60,16 +60,18 @@ pub(super) fn checked(
     let allowed = if proposing { None } else { budget(core, creation)? };
     let Creation { person, project, role, batch, .. } = &*creation;
     well_formed(batch)?;
-    if let Some(at) = cycle(batch) {
-        return Err(people::Refusal::NotWellFormed { at, why: people::Malformed::Cycle });
-    }
+    let first = core
+        .counters
+        .deployment()
+        .tasks
+        .checked_add(1)
+        .ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
+    check_circle(core, env, batch, first)?;
     if !proposing && !core.authority.escalations_held(*project, role.number()) {
         return Err(people::Refusal::NoEscalationHolder);
     }
     let mut delegates = List::with_capacity(env.limits.people.batch);
     let mut members = List::with_capacity(env.limits.people.batch);
-    let tasks = core.counters.deployment().tasks;
-    let first = tasks.checked_add(1).ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
     for member in batch {
         let new = new_task(core, env, creation, member, first, members.len())?;
         let executor = core.delegation_executor(*project, new.executor).ok_or(people::Refusal::Unknown)?;
@@ -256,31 +258,77 @@ fn contract(value: &people::Contract) -> tasks::Contract {
         }
     }
 }
-fn cycle(batch: &[people::Member]) -> Option<u32> {
-    for (at, _) in batch.iter().enumerate() {
-        let mut reached = List::with_capacity(u32::try_from(batch.len()).expect("bounded batch"));
+fn check_circle(
+    core: &mut Core,
+    env: &Env<Limits>,
+    batch: &[people::Member],
+    first: u64,
+) -> Result<(), people::Refusal> {
+    if let Some(circle) = cycle(batch, first, env.limits.tasks.circle)? {
+        // A refused batch's named tasks must never be reused by later work.
         for _ in batch {
-            reached.push(false).expect("one mark per member");
+            crate::fresh(&mut core.counters, crate::Family::Task)
+                .ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
         }
-        *reached.get_mut(u32::try_from(at).expect("bounded position")).expect("member mark") = true;
+        return Err(people::Refusal::Circle { tasks: circle.tasks, cut: circle.cut });
+    }
+    Ok(())
+}
+
+// The party batch still has local references here. Reserve the prospective
+// numbers only on refusal, and translate the exact circle in wait order
+// (client/domain/contract.md, 4; domain/tasks.md, 6.7).
+fn cycle(batch: &[people::Member], first: u64, bound: u32) -> Result<Option<tasks::Circle>, people::Refusal> {
+    let count = u32::try_from(batch.len()).expect("bounded batch");
+    for start in 0..count {
+        let mut pending = List::with_capacity(count);
+        let mut parents = List::with_capacity(count);
         for _ in batch {
-            for (position, member) in batch.iter().enumerate() {
-                if !*reached.get(u32::try_from(position).expect("bounded position")).expect("member mark") {
-                    continue;
+            parents.push(None).expect("one parent per member");
+        }
+        *parents.get_mut(start).expect("member") = Some(start);
+        pending.push(start).expect("first member");
+        for _ in batch {
+            let Some(last) = pending.len().checked_sub(1) else { break };
+            let current = *pending.get(last).expect("pending member");
+            pending.truncate(last);
+            let member = batch.get(usize::try_from(current).expect("member fits usize")).expect("batch member");
+            for dependency in &member.dependencies {
+                let people::Dependency::Batch(next) = *dependency else { continue };
+                if next == start {
+                    let mut reverse = List::with_capacity(count);
+                    let mut at = current;
+                    for _ in batch {
+                        reverse.push(at).expect("bounded simple circle");
+                        if at == start {
+                            break;
+                        }
+                        at = parents.get(at).expect("member").expect("visited parent");
+                    }
+                    let mut names = List::with_capacity(bound);
+                    for number in reverse.as_slice().iter().rev() {
+                        if names.len() == bound {
+                            break;
+                        }
+                        names
+                            .push(
+                                first
+                                    .checked_add(u64::from(*number))
+                                    .ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?,
+                            )
+                            .expect("bounded circle names");
+                    }
+                    return Ok(Some(tasks::Circle { tasks: names.into_boxed(), cut: reverse.len() > bound }));
                 }
-                for dependency in &member.dependencies {
-                    let people::Dependency::Batch(next) = *dependency else { continue };
-                    if usize::try_from(next).expect("u32 fits usize") == at {
-                        return Some(u32::try_from(at).expect("bounded position"));
-                    }
-                    if let Some(mark) = reached.get_mut(next) {
-                        *mark = true;
-                    }
+                let Some(parent) = parents.get_mut(next) else { continue };
+                if parent.is_none() {
+                    *parent = Some(current);
+                    pending.push(next).expect("each member once");
                 }
             }
         }
     }
-    None
+    Ok(None)
 }
 
 fn well_formed(batch: &[people::Member]) -> Result<(), people::Refusal> {

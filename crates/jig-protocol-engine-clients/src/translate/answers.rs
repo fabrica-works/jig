@@ -14,11 +14,11 @@ pub(crate) fn answer(
         p::Reply::Outcome(p::Outcome::SignedOut) | p::Reply::SignedOut => return Ok(w::KeyedAnswer::SignedOut),
         p::Reply::Outcome(p::Outcome::Refused(why)) | p::Reply::Refused(why) => w::Final::Refused(w::Refused::new(
             limits,
-            w::RefusedParts { at: None, refusal: refusal(*why, models, limits)? },
+            w::RefusedParts { at: None, refusal: refusal(why.clone(), models, limits)? },
         )?),
         p::Reply::Outcome(p::Outcome::CompoundRefused { at, why }) => w::Final::Refused(w::Refused::new(
             limits,
-            w::RefusedParts { refusal: refusal(*why, models, limits)?, at: Some(*at) },
+            w::RefusedParts { refusal: refusal(why.clone(), models, limits)?, at: Some(*at) },
         )?),
         p::Reply::Outcome(p::Outcome::ServiceMade { person }) => {
             let what = w::Made::Service(w::MadeService::new(

@@ -10,6 +10,7 @@ use skein_lib::{Duration, List, Token, Wall};
 /// All metadata supplied by the chip owner, independent of its coarse phase.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerChipDetails {
+    pub dependencies: List<Dependency>,
     pub project: u32,
     pub executor: OwnerExecutor,
     pub phase_since: Wall,
@@ -61,6 +62,7 @@ pub struct OwnerPersonStallNotice {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerChipHold {
+    pub circle: Option<Circle>,
     /// Separate account supplied by the core; never inferred from the origin.
     pub account: Option<OwnerPart>,
     pub source: Option<OwnerPart>,
@@ -124,4 +126,24 @@ pub enum OwnerChipWork {
     Tool { call: Box<[u8]>, tool: Box<[u8]> },
     Waiting,
     Ending,
+}
+
+/// Added-dependency facts carried beside task links (contract.md, 5.1).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Dependency {
+    pub number: u64,
+    pub pending: bool,
+    pub added: Option<DependencyAdded>,
+    pub keeps: bool,
+    pub status: Option<super::OwnerTaskStatus>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct DependencyAdded {
+    pub at: Wall,
+    pub by: OwnerRequester,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Circle {
+    pub tasks: List<u64>,
+    pub cut: bool,
 }

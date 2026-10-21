@@ -43,6 +43,7 @@ pub fn chat(number: u64, title: &[u8], activity: Wall) -> Task {
     task.chip.details = Box::new(ChipPhase::Owner {
         phase: OwnerChipPhase::Active(RunStage::Idle),
         details: Box::new(OwnerChipDetails {
+            dependencies: skein_lib::List::with_capacity(0),
             project: task.project,
             executor: OwnerExecutor::Agent { charter: 1 },
             phase_since: Wall::EPOCH,

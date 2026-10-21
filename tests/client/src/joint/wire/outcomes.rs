@@ -26,7 +26,9 @@ pub fn outcome(value: &people::Outcome, limits: &Limits) -> Result<Outcome, owne
         people::Outcome::Compound { project, operations, first_message } => {
             client::OwnerOutcome::Compound { project: *project, operations: *operations, first_message: *first_message }
         }
-        people::Outcome::CompoundRefused { at, why } => return Ok(Outcome::CompoundRefused { at: *at, why: *why }),
+        people::Outcome::CompoundRefused { at, why } => {
+            return Ok(Outcome::CompoundRefused { at: *at, why: why.clone() });
+        }
         people::Outcome::Proposed { proposal, .. } => client::OwnerOutcome::Proposed { proposal: *proposal },
         people::Outcome::Withdrawn { proposal } => client::OwnerOutcome::Withdrawn { proposal: *proposal },
         people::Outcome::Created { first, last, given } => client::OwnerOutcome::Created {
@@ -98,7 +100,7 @@ pub fn outcome(value: &people::Outcome, limits: &Limits) -> Result<Outcome, owne
         }
         people::Outcome::Again(why) => return Ok(Outcome::Again(*why)),
         people::Outcome::SignedOut => return Ok(Outcome::SignedOut),
-        people::Outcome::Refused(why) => return Ok(Outcome::Refused(*why)),
+        people::Outcome::Refused(why) => return Ok(Outcome::Refused(why.clone())),
         people::Outcome::AccountSignInStarted { source, address } => {
             client::OwnerOutcome::AccountSignInStarted { source: *source, address: address.clone() }
         }

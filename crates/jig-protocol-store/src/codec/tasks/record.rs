@@ -397,6 +397,7 @@ fn task_definition(
             funder: value::funder(source.funder, limits)?,
             dependencies: dependencies(&source.dependencies, limits)?,
             waiting_on: waiting_on(&source.waiting_on, limits)?,
+            added: added(&source.added, limits)?,
         },
     )
 }
@@ -408,6 +409,7 @@ fn task_interests(source: &domain::TaskRecord, limits: &wire::Limits) -> Result<
             holdings: holdings(&source.holdings, limits)?,
             holds_taken: source.holds_taken,
             hold_wait_since: value::wall(source.hold_wait_since),
+            hold_bound_since: value::wall(source.hold_bound_since),
             delegates: delegates(&source.delegates, limits)?,
             result_followups: result_followups(&source.result_followups, limits)?,
             references: references(&source.references, limits)?,
@@ -499,9 +501,11 @@ pub fn read_task_record(source: wire::TaskRecord, limits: &wire::Limits) -> Resu
         funder: value::read_funder(definition.funder),
         dependencies: phase::read_references(definition.dependencies),
         waiting_on: phase::read_references(definition.waiting_on),
+        added: read_added(definition.added),
         holdings: read_holdings(interests.holdings, limits)?,
         holds_taken: interests.holds_taken,
         hold_wait_since: value::read_wall(interests.hold_wait_since),
+        hold_bound_since: value::read_wall(interests.hold_bound_since),
         delegates: phase::read_references(interests.delegates),
         result_followups: phase::read_references(interests.result_followups),
         references: phase::read_references(interests.references),
@@ -548,4 +552,27 @@ fn result_followups(source: &[u64], limits: &wire::Limits) -> Result<List<wire::
 
 fn references(source: &[u64], limits: &wire::Limits) -> Result<List<wire::Number>, wire::Problem> {
     phase::references(source, limits.task_interests_references, wire::Path::TaskInterestsReferences, limits)
+}
+
+fn added(source: &[domain::Added], limits: &wire::Limits) -> Result<List<wire::Added>, wire::Problem> {
+    let mut rows = List::with_capacity(limits.task_definition_added);
+    for row in source {
+        let row = wire::Added::new(
+            limits,
+            wire::AddedParts { task: row.task, at: row.at.as_nanos(), by: value::party(&row.by, limits)? },
+        )?;
+        if rows.push(row).is_err() {
+            return Err(problem(wire::Path::TaskDefinitionAdded));
+        }
+    }
+    Ok(rows)
+}
+fn read_added(source: List<wire::Added>) -> Box<[domain::Added]> {
+    let mut rows = List::with_capacity(source.len());
+    for row in source.into_boxed() {
+        let wire::AddedParts { task, at, by } = row.into_parts();
+        rows.push(domain::Added { task, at: Wall::from_nanos(at), by: value::read_party(by) })
+            .expect("same number of additions");
+    }
+    rows.into_boxed()
 }

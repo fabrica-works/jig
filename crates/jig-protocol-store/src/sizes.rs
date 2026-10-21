@@ -77,6 +77,8 @@ fn largest(
     // most two per payload byte (escaped zero). Notes bounds both count and sum.
     // The largest fixed key is a tasks update: tags plus five widened numbers.
     let key = domain.notes.pattern_bytes.checked_mul(5)?.checked_add(32)?.max(44).max(application.key.checked_add(1)?);
+    // Tasks price additions and kept lines at dependencies, circle holds at circle;
+    // people prices the same refusal names through codec::limits (store.md, 5.1).
     // Transcript bodies are frames in files; this sizes map values only.
     let mut map_core = limits.core;
     map_core.turn_record_transcript = 0;

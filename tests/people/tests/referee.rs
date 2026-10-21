@@ -6,7 +6,7 @@ use skein_world::domain::{Referee, Verdict};
 fn fails(observations: &[Seen]) {
     let mut referee = Referee::new(People::default());
     for seen in observations {
-        referee.observe(Time::ZERO, *seen, &mut Vec::new());
+        referee.observe(Time::ZERO, seen.clone(), &mut Vec::new());
     }
     assert!(matches!(referee.verdict(), Verdict::Failed(_)));
 }

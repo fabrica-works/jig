@@ -33,7 +33,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
         .checked_add(crate::proposed_task::part_nodes(limits)?)?
         .checked_add(limits.segments.checked_add(20)?.checked_mul(limits.rows)?)?
         .checked_add(limits.segments.checked_add(6)?.checked_mul(2)?)?
-        .checked_add(limits.rows)?
+        .checked_add(limits.rows.checked_mul(6)?)?
         .checked_add(crate::result_nodes(limits)?)
 }
 pub(crate) fn part_fits(part: &OwnerPart, limits: &Limits) -> Option<()> {
@@ -133,7 +133,7 @@ pub(crate) fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> 
 /// Existing `ResultValue` cards retain their existing domain/row envelopes.
 #[must_use]
 pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Option<ChipFragment> {
-    if value.resources.capacity() > limits.rows {
+    if value.resources.capacity() > limits.rows || value.dependencies.capacity() > limits.rows {
         return None;
     }
     for resource in &value.resources {
@@ -143,6 +143,11 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
         part_fits(part, limits)?;
     }
     if let Some(hold) = &value.hold {
+        if let Some(circle) = &hold.circle
+            && circle.tasks.capacity() > limits.rows
+        {
+            return None;
+        }
         if let Some(part) = &hold.account {
             part_fits(part, limits)?;
         }
@@ -286,6 +291,7 @@ pub(crate) fn reason(b: &mut Builder, value: HoldCategory, words: &Words) {
         HoldCategory::ResourceUnavailable => text(b, words, P::ResourceUnavailable, &[]),
         HoldCategory::ResourceAccess => text(b, words, P::ResourceAccess, &[]),
         HoldCategory::PoolLost { pool } => number(b, words, P::PoolLost, pool),
+        HoldCategory::Circle => words.text(b, crate::phrases::jig::JigPhrase::CircleHold, &[]),
         HoldCategory::Procedure => text(b, words, P::HoldProcedure, &[]),
     }
 }
@@ -338,6 +344,15 @@ pub(crate) fn hold(b: &mut Builder, value: &OwnerChipHold, words: &Words, bindin
         crate::proposed_task::part(b, source, words, bindings);
     }
     reason(b, value.reason, words);
+    if let Some(circle) = &value.circle {
+        for task in &circle.tasks {
+            words.text(b, crate::phrases::jig::JigPhrase::CircleWaitsFor, &[Hole::Number(*task)]);
+        }
+        words.text(b, crate::phrases::jig::JigPhrase::CircleLifts, &[]);
+        if circle.cut {
+            words.text(b, crate::phrases::jig::JigPhrase::TaskListsCut, &[]);
+        }
+    }
     number(b, words, P::Revision, value.revision);
     prior(b, value.before, words);
     if let Some(value) = &value.escalation {

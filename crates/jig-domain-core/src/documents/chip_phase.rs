@@ -32,6 +32,7 @@ pub struct ChipObservation {
 /// Facts needed beside every chip, without nesting other chips or histories.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ChipDetails {
+    pub dependencies: List<super::task_tree::Dependency>,
     /// Owner context for a role address, including in a standalone retained chip.
     pub project: u32,
     /// Concrete owner identity; the chip's coarse executor kind remains separate.
@@ -94,6 +95,7 @@ pub(super) fn from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<ChipD
         tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
     };
     Ok(ChipDetails {
+        dependencies: super::task_tree::dependency_rows(limits, row),
         project: row.project,
         executor: row.executor,
         phase_since: row.phase_since,
@@ -129,6 +131,7 @@ pub(super) fn observe(
     row: &tasks::TaskRecord,
     details: &mut ChipDetails,
 ) -> Result<(), Missing> {
+    details.dependencies = super::task_tree::dependency_facts(core, limits, row);
     for index in 0..details.resources.len() {
         let holding =
             row.holdings.get(usize::try_from(index).expect("bounded holding index")).expect("one resource per holding");
@@ -217,6 +220,8 @@ pub(super) fn heap_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(text.checked_mul(7)?)?
         .checked_add(List::<u64>::worst_case(limits.lines)?)?
         .checked_add(List::<u16>::worst_case(limits.lines)?)?
+        .checked_add(List::<super::task_tree::Dependency>::worst_case(limits.lines)?)?
+        .checked_add(32 * 8)?
         .checked_add(List::<ResourceLine>::worst_case(limits.lines)?)?
         .checked_add(lines.checked_mul(path)?)?
         .checked_add(path)

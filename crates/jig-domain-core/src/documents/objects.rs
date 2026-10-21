@@ -591,6 +591,7 @@ pub(super) fn question(
             | tasks::MessageKind::EffectNotMade { .. }
             | tasks::MessageKind::Words
             | tasks::MessageKind::Question
+            | tasks::MessageKind::Met { .. }
             | tasks::MessageKind::Amendment { .. }
             | tasks::MessageKind::Proposal { .. }
             | tasks::MessageKind::ProposalDecision { .. }
@@ -629,6 +630,7 @@ pub(super) fn question(
             tasks::MessageKind::Answer { .. }
             | tasks::MessageKind::EffectNotMade { .. }
             | tasks::MessageKind::Words
+            | tasks::MessageKind::Met { .. }
             | tasks::MessageKind::Amendment { .. }
             | tasks::MessageKind::Proposal { .. }
             | tasks::MessageKind::ProposalDecision { .. }

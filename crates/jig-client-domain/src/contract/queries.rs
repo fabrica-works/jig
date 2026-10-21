@@ -54,8 +54,9 @@ pub enum WaitedFor {
     PersonTask,
 }
 /// The task's wait, supplied by its owner.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum WaitsOn {
+    Dependencies { pending: skein_lib::List<u64>, count: u32 },
     Party { whom: Whom, entries: u32, task: u64, kind: WaitedFor },
     Delegates,
     News,

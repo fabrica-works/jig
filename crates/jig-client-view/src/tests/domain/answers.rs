@@ -13,7 +13,7 @@ use crate::{
     objects::{Body, Card, Left, Object, Source, answer::recovery},
 };
 use jig_client::contract::*;
-use skein_lib::{Id, Queue, Time, Token, Wall};
+use skein_lib::{Id, List, Queue, Time, Token, Wall};
 mod person_refresh;
 fn install(domain: &mut Fixture, body: Body) -> Id<Object> {
     let key = body.key();
@@ -89,7 +89,13 @@ fn durable_outcomes_remain_on_open_cards_and_decided_first_leaves_with_all_facts
 }
 #[test]
 fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_losing_the_refusal() {
+    let mut names = List::with_capacity(2);
+    names.push(7).unwrap();
+    names.push(5).unwrap();
     let refusals = [
+        Refusal::Circle { tasks: names.clone(), cut: true },
+        Refusal::Kept { pending: names },
+        Refusal::Dependency { dependency: 7, how: OwnerTaskStatus::Failed },
         Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) },
         Refusal::Role { held: None },
         Refusal::Taken { by: 71 },
@@ -147,7 +153,13 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
                 assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Task(Box::new(current))));
                 assert_eq!(domain.objects().get(id).unwrap().card, Card::Refused { refusal });
             }
-            Refusal::Authority { .. } | Refusal::Limit { .. } | Refusal::Llm { .. } | Refusal::Account { .. } => {
+            Refusal::Circle { .. }
+            | Refusal::Dependency { .. }
+            | Refusal::Kept { .. }
+            | Refusal::Authority { .. }
+            | Refusal::Limit { .. }
+            | Refusal::Llm { .. }
+            | Refusal::Account { .. } => {
                 assert!(recovery(&object).change_ask);
                 assert!(rows.is_empty());
             }

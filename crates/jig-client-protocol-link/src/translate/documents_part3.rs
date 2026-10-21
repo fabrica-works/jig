@@ -370,6 +370,7 @@ pub(crate) fn task_fields(value: &w::Task, limits: &Limits) -> Result<c::Task, w
         None => None,
     };
     Ok(c::Task {
+        dependency_facts: crate::translate::facts::dependencies(value.dependency_facts(), limits),
         label: value.label(),
         flags: crate::translate::queries::flags(value.flags()),
         last_activity: Wall::from_nanos(value.last_activity()),

@@ -15,6 +15,7 @@ impl Payload for OwnerChipDetails {
             .checked_add(self.person_wait.heap(bounds)?)?
             .checked_add(self.hold.heap(bounds)?)?
             .checked_add(self.budget.heap(bounds)?)?
+            .checked_add(self.dependencies.heap(bounds)?)?
             .checked_add(self.resources.heap(bounds)?)?
             .checked_add(self.procedure.heap(bounds)?)?
             .checked_add(self.closing_connectors.heap(bounds)?)?
@@ -41,6 +42,7 @@ impl Payload for OwnerChipHold {
         };
         self.account
             .heap(bounds)?
+            .checked_add(self.circle.heap(bounds)?)?
             .checked_add(self.source.heap(bounds)?)?
             .checked_add(self.reason.heap(bounds)?)?
             .checked_add(escalation)
@@ -89,4 +91,15 @@ pub fn fits(value: &OwnerChipDetails, bounds: &Bounds) -> bool {
 #[must_use]
 pub fn boxed_fits(value: &Option<Box<OwnerChipDetails>>, bounds: &Bounds) -> bool {
     crate::payload::fits(value, bounds)
+}
+
+impl Payload for jig_client_domain::contract::Dependency {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        Some(0)
+    }
+}
+impl Payload for jig_client_domain::contract::Circle {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.tasks.heap(bounds)
+    }
 }

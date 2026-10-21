@@ -204,6 +204,11 @@ pub fn chip(record: w::Chip, limits: &Limits) -> Result<c::Chip, Undecodable> {
 
 pub(crate) fn receiving(limits: &Limits) -> Result<Limits, Undecodable> {
     let mut checked = *limits;
+    checked.wire.task_dependency_facts = limits.client.rows.min(w::CEILINGS.task_dependency_facts);
+    checked.wire.owner_chip_details_fields_dependencies =
+        limits.client.rows.min(w::CEILINGS.owner_chip_details_fields_dependencies);
+    checked.wire.circle_tasks = limits.client.rows.min(w::CEILINGS.circle_tasks);
+    checked.wire.waits_on_dependencies_pending = limits.client.rows.min(w::CEILINGS.waits_on_dependencies_pending);
     receiving_part0(&mut checked, limits);
     receiving_part1(&mut checked, limits);
     receiving_part2(&mut checked, limits);

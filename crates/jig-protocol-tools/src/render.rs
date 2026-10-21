@@ -278,7 +278,9 @@ fn task_problem(problem: &jig_domain_tasks::Problem) -> Rendered {
         jig_domain_tasks::Refusal::Reference => b"reference",
         jig_domain_tasks::Refusal::Subscription => b"subscription",
         jig_domain_tasks::Refusal::Dependencies => b"dependencies",
-        jig_domain_tasks::Refusal::Cycle => b"cycle",
+        jig_domain_tasks::Refusal::Circle { .. } => b"circle",
+        jig_domain_tasks::Refusal::DependencyEnded { .. } => b"dependency",
+        jig_domain_tasks::Refusal::Kept => b"kept",
         jig_domain_tasks::Refusal::Executor => b"executor",
         jig_domain_tasks::Refusal::Spec => b"spec",
         jig_domain_tasks::Refusal::Contract => b"contract",
@@ -440,6 +442,7 @@ fn hold_reason(reason: &jig_domain_people::HoldReason) -> &'static [u8] {
         HoldReason::ResourceAccess => b"for resource access",
         HoldReason::PoolLost { .. } => b"for a lost pool",
         HoldReason::Procedure => b"for its procedure",
+        HoldReason::Circle => b"for a circle of waits",
     }
 }
 

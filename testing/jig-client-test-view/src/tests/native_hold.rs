@@ -94,6 +94,7 @@ fn task(account: Option<OwnerPart>) -> Task {
     task.chip.details = Box::new(ChipPhase::Owner {
         phase: OwnerChipPhase::Held { reason: HoldCategory::Drift, revision: 3 },
         details: Box::new(OwnerChipDetails {
+            dependencies: List::with_capacity(0),
             project: task.project,
             executor: OwnerExecutor::Agent { charter: 1 },
             phase_since: Wall::from_nanos(10),
@@ -103,6 +104,7 @@ fn task(account: Option<OwnerPart>) -> Task {
             wake: task.wake,
             person_wait: None,
             hold: Some(OwnerChipHold {
+                circle: None,
                 account,
                 source: Some(origin()),
                 reason: HoldCategory::Drift,

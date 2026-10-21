@@ -20,6 +20,7 @@ fn part() -> OwnerPart {
 }
 pub(super) fn details() -> OwnerChipDetails {
     OwnerChipDetails {
+        dependencies: List::with_capacity(0),
         project: u32::MAX,
         executor: OwnerExecutor::Agent { charter: u32::MAX },
         phase_since: Wall::from_nanos(10),
@@ -57,6 +58,7 @@ pub(super) fn details() -> OwnerChipDetails {
 }
 fn hold() -> OwnerChipHold {
     OwnerChipHold {
+        circle: None,
         account: None,
         source: None,
         reason: HoldCategory::Budget,
@@ -787,4 +789,31 @@ fn a_long_resource_path_shows_its_tail_and_keeps_the_whole_slot() {
     assert!(!contains(&tree, b"\\xF0"));
     let slot = tree.nodes().iter().find_map(|node| node.slot).expect("whole resource slot");
     assert_eq!(bindings.owner_part(slot.token), Some(&reference));
+}
+
+#[test]
+fn a_circle_hold_names_the_waits_in_order_and_lifts_on_its_own() {
+    let mut value = details();
+    let mut held = hold();
+    held.reason = HoldCategory::Circle;
+    let mut tasks = List::with_capacity(3);
+    tasks.push(7).unwrap();
+    tasks.push(5).unwrap();
+    tasks.push(9).unwrap();
+    held.circle = Some(Circle { tasks, cut: true });
+    value.hold = Some(held);
+    let (tree, _, _) = build(&value, words());
+    assert!(has(&tree, b"Held for a circle of waits"));
+    assert!(has(&tree, b"This hold lifts on its own once the circle breaks"));
+    let expected = [b"waits for T7".as_slice(), b"waits for T5", b"waits for T9"];
+    let mut shown = 0;
+    for node in tree.nodes() {
+        for run in &node.text {
+            if run.text.starts_with(b"waits for T") {
+                assert_eq!(run.text.as_ref(), *expected.get(shown).unwrap());
+                shown += 1;
+            }
+        }
+    }
+    assert_eq!(shown, expected.len());
 }

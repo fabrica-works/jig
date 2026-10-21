@@ -87,6 +87,7 @@ fn waiting(waits_on: &WaitsOn, project: u32, me: &Me) -> Option<ChatStatus> {
                 Some(ChatStatus::WaitingFor(*whom))
             }
         }
+        WaitsOn::Dependencies { .. } => Some(ChatStatus::Parked),
         WaitsOn::Delegates | WaitsOn::News | WaitsOn::Nothing => None,
     }
 }

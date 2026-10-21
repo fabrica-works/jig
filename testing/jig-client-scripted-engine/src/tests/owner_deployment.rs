@@ -5,10 +5,10 @@ use core::mem::size_of;
 
 fn empty() -> OwnerDeployment {
     OwnerDeployment {
-        providers: skein_lib::List::with_capacity(0),
+        providers: List::with_capacity(0),
         providers_cut: false,
         key_bytes: 256,
-        readiness: skein_lib::List::with_capacity(0),
+        readiness: List::with_capacity(0),
         readiness_cut: false,
         store: StoreFill { bytes: 0, mark: 0 },
         hosts: List::with_capacity(2),
@@ -111,7 +111,7 @@ fn deployment_hosts_ten_attempt_states_three_placements_task_links_and_absent_cl
                 name: None,
                 awaiting_logins: false,
                 rule: HostRule::Open,
-                programs: skein_lib::List::with_capacity(0),
+                programs: List::with_capacity(0),
                 channel: u64::MAX,
                 kind: OwnerHostKind::Worker,
                 slots: u32::MAX,
@@ -408,7 +408,7 @@ fn deployment_heap_counts_every_reserved_list_box_chip_text_and_exact_carrier_th
             name: None,
             awaiting_logins: false,
             rule: HostRule::Open,
-            programs: skein_lib::List::with_capacity(0),
+            programs: List::with_capacity(0),
             channel: 1,
             kind: OwnerHostKind::Engine,
             slots: 0,
@@ -491,6 +491,7 @@ fn owner_chip_fixture(number: u64) -> Chip {
         writer_lost: true,
     };
     let owner = OwnerChipDetails {
+        dependencies: List::with_capacity(0),
         project: u32::MAX,
         executor: OwnerExecutor::Agent { charter: u32::MAX },
         phase_since: Wall::EPOCH,

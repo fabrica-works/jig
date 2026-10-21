@@ -2641,6 +2641,8 @@ pub enum HoldReason {
     PoolLost(HoldReasonPoolLost),
     /// `procedure` without a payload.
     Procedure,
+    /// `circle` without a payload.
+    Circle,
 }
 
 impl HoldReason {
@@ -5145,7 +5147,7 @@ impl HoldReason {
             Self::StoppedBy(record) => 1_u32.checked_add(HoldReasonStoppedBy::measure(record)).expect("schema ceilings fit u32"),
             Self::Uncertain(record) => 1_u32.checked_add(HoldReasonUncertain::measure(record)).expect("schema ceilings fit u32"),
             Self::PoolLost(record) => 1_u32.checked_add(HoldReasonPoolLost::measure(record)).expect("schema ceilings fit u32"),
-            Self::Stalled | Self::Stopped | Self::Drift | Self::Effects | Self::EffectFailed | Self::Budget | Self::Deadline | Self::HoldsWaited | Self::ResourceUnavailable | Self::ResourceAccess | Self::Procedure => 1,
+            Self::Stalled | Self::Stopped | Self::Drift | Self::Effects | Self::EffectFailed | Self::Budget | Self::Deadline | Self::HoldsWaited | Self::ResourceUnavailable | Self::ResourceAccess | Self::Procedure | Self::Circle => 1,
         }
     }
 
@@ -5168,6 +5170,7 @@ impl HoldReason {
             Self::ResourceAccess => writer.put(&[13_u8])?,
             Self::PoolLost(record) => { writer.put(&[14_u8])?; record.encode(writer)?; }
             Self::Procedure => writer.put(&[15_u8])?,
+            Self::Circle => writer.put(&[16_u8])?,
         }
         Ok(())
     }
@@ -5198,6 +5201,7 @@ impl HoldReason {
             13 => Self::ResourceAccess,
             14 => Self::PoolLost(HoldReasonPoolLost::decode_from(limits, reader)?),
             15 => Self::Procedure,
+            16 => Self::Circle,
             _ => return Err(Problem { path: Path::HoldReasonTag, reason: skein_codec::Reason::Tag }),
         };
         Ok(value)
@@ -7727,7 +7731,7 @@ mod golden_tests {
         };
         at && past
     }
-    static GOLDEN_0: [Case; 366] = [
+    static GOLDEN_0: [Case; 368] = [
         ("record_segment_smallest", || { let value = Segment::new(&CEILINGS, SegmentParts { bytes: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Segment::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_segment_full", || { let value = Segment::new(&CEILINGS, SegmentParts { bytes: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Segment::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_resource_path_smallest", || { let value = ResourcePath::new(&CEILINGS, ResourcePathParts { segments: skein_lib::List::with_capacity(0) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ResourcePath::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -8016,6 +8020,8 @@ mod golden_tests {
         ("enum_hold_reason_pool_lost_full", || { let value = HoldReason::PoolLost(HoldReasonPoolLost::new(&CEILINGS, HoldReasonPoolLostParts { pool: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[14, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HoldReason::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_hold_reason_procedure_smallest", || { let value = HoldReason::Procedure; let bytes: &[u8] = &[15]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HoldReason::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_hold_reason_procedure_full", || { let value = HoldReason::Procedure; let bytes: &[u8] = &[15]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HoldReason::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_hold_reason_circle_smallest", || { let value = HoldReason::Circle; let bytes: &[u8] = &[16]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HoldReason::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_hold_reason_circle_full", || { let value = HoldReason::Circle; let bytes: &[u8] = &[16]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HoldReason::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_record_outbox_smallest", || { let value = RecordOutbox::new(&CEILINGS, RecordOutboxParts { value: OutboxEntry::new(&CEILINGS, OutboxEntryParts { number: 0_u64, task: 0_u64, key: Key::new(&CEILINGS, KeyParts { attempt: 0_u64, completion: 0_u32, position: 0_u32, deployment: [0_u8; 16], task: 0_u64, purpose: 0_u64 }).expect("golden within ceilings"), effect: Effect::new(&CEILINGS, EffectParts { kind: 0_u16, resources: skein_lib::List::with_capacity(0), purpose: 0_u64, condition: None, target: 0_u64, state: 0_u64 }).expect("golden within ceilings"), attempt: None, phase: EffectPhase::Kept }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RecordOutbox::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_record_outbox_full", || { let value = RecordOutbox::new(&CEILINGS, RecordOutboxParts { value: OutboxEntry::new(&CEILINGS, OutboxEntryParts { number: u64::MAX, task: u64::MAX, key: Key::new(&CEILINGS, KeyParts { attempt: u64::MAX, completion: u32::MAX, position: u32::MAX, deployment: [165_u8; 16], task: u64::MAX, purpose: u64::MAX }).expect("golden within ceilings"), effect: Effect::new(&CEILINGS, EffectParts { kind: u16::MAX, resources: { let mut items = skein_lib::List::with_capacity(1); items.push(ResourcePath::new(&CEILINGS, ResourcePathParts { segments: { let mut items = skein_lib::List::with_capacity(1); items.push(Segment::new(&CEILINGS, SegmentParts { bytes: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")).expect("one slot"); items }, purpose: u64::MAX, condition: Some(u64::MAX), target: u64::MAX, state: u64::MAX }).expect("golden within ceilings"), attempt: Some(Attempt::new(&CEILINGS, AttemptParts { number: u32::MAX, sent: u64::MAX, deadline: u64::MAX }).expect("golden within ceilings")), phase: EffectPhase::Kept }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RecordOutbox::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_moved_hold_smallest", || { let value = MovedHold::new(&CEILINGS, MovedHoldParts { revision: 0_u64, reason: HoldReason::Failures(HoldReasonFailures::new(&CEILINGS, HoldReasonFailuresParts { class: FailureClass::Transient }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, MovedHold::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),

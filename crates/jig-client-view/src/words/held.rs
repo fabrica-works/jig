@@ -9,6 +9,10 @@ impl Words {
     /// Admission reason facts, without invented amounts, actors, clocks or parts.
     pub(crate) fn hold_category(&self, b: &mut Builder, reason: HoldCategory) {
         match reason {
+            HoldCategory::Circle => {
+                self.text(b, JigPhrase::CircleHold, &[]);
+                self.text(b, JigPhrase::CircleLifts, &[]);
+            }
             HoldCategory::Failures { class } => {
                 self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Failures)), &[]);
                 let phrase = match class {

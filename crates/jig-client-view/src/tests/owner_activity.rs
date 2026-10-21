@@ -142,6 +142,7 @@ fn kinds() -> Box<[(OwnerMessageKind, &'static [u8])]> {
         (OwnerMessageKind::PersonStalled { task: u64::MAX }, b"Kind: person stalled"),
         (OwnerMessageKind::ProposalDecision { proposal: u64::MAX, accepted: true }, b"Kind: proposal decision"),
         (OwnerMessageKind::Words, b"Kind: words"),
+        (OwnerMessageKind::Met { dependency: 7, removed: false }, b"T7 is done; the task can go on"),
         (OwnerMessageKind::EffectNotMade { entry: u64::MAX }, b"Kind: effect not made"),
         (OwnerMessageKind::Amendment { revision: u64::MAX }, b"Kind: amendment"),
         (OwnerMessageKind::Question, b"Kind: question"),
@@ -156,7 +157,7 @@ fn kinds() -> Box<[(OwnerMessageKind, &'static [u8])]> {
     ])
 }
 #[test]
-fn owner_activity_all_eight_lines_keep_task_commit_clock_and_exact_variant_facts() {
+fn owner_activity_all_nine_lines_keep_task_commit_clock_and_exact_variant_facts() {
     let lines: Box<[(OwnerActivity, &[u8])]> = Box::new([
         (
             OwnerActivity::Words {
@@ -183,8 +184,9 @@ fn owner_activity_all_eight_lines_keep_task_commit_clock_and_exact_variant_facts
         ),
         (OwnerActivity::Decided { revision: u64::MAX }, b"Decision recorded"),
         (OwnerActivity::Milestone { position: u64::MAX }, b"Milestone"),
+        (OwnerActivity::Kept { attempt: u64::MAX, pending: List::with_capacity(0) }, b"parked"),
     ]);
-    assert_eq!(lines.len(), 8);
+    assert_eq!(lines.len(), 9);
     for (line, label) in lines {
         let value = activity(line);
         let original = value.clone();
@@ -234,6 +236,7 @@ fn assert_line_fields(tree: &Tree, line: &OwnerActivity) {
             assert!(has(tree, b"Turn: 4294967295"));
             assert!(has(tree, b"Last read message: 18446744073709551615"));
         }
+        OwnerActivity::Kept { .. } => assert!(has(tree, b"Attempt: 18446744073709551615")),
         OwnerActivity::Decided { .. } => assert!(has(tree, b"Revision: 18446744073709551615")),
         OwnerActivity::Milestone { .. } => assert_eq!(
             tree.nodes()
@@ -246,8 +249,8 @@ fn assert_line_fields(tree: &Tree, line: &OwnerActivity) {
     }
 }
 #[test]
-fn owner_activity_all_thirteen_message_kinds_keep_whole_word_hits_clock_and_flags() {
-    assert_eq!(kinds().len(), 13);
+fn owner_activity_all_fourteen_message_kinds_keep_whole_word_hits_clock_and_flags() {
+    assert_eq!(kinds().len(), 14);
     for (kind, label) in kinds() {
         let word = fixture(kind);
         let original = word.clone();
@@ -295,6 +298,7 @@ fn assert_kind_numbers(tree: &Tree, kind: &OwnerMessageKind) {
         OwnerMessageKind::Timer { .. } | OwnerMessageKind::News { .. } => {
             assert!(has(tree, b"Subscription: 18446744073709551615"));
         }
+        OwnerMessageKind::Met { .. } => assert!(has(tree, b"T7 is done; the task can go on")),
         OwnerMessageKind::Words | OwnerMessageKind::Question | OwnerMessageKind::Result(_) => {}
     }
 }
@@ -668,3 +672,47 @@ fn owner_activity_checked_normal_book_rejects_missing_duplicate_wrong_number_and
 }
 
 const UTF8_TEXTS: [&[u8]; 3] = [b"~\0", b"!\0", &[b'~'; 8]];
+
+#[test]
+fn a_kept_run_is_parked_and_met_names_the_ended_or_removed_dependency() {
+    let mut pending = List::with_capacity(2);
+    pending.push(7).unwrap();
+    pending.push(8).unwrap();
+    let tree = build(&activity(OwnerActivity::Kept { attempt: 3, pending }), normal_words());
+    assert!(has(&tree, b"parked"));
+    assert!(has(&tree, b"Attempt: 3"));
+    assert!(has(&tree, b"kept until T7 is done"));
+    assert!(has(&tree, b"kept until T8 is done"));
+    for (removed, expected) in [
+        (false, b"T7 is done; the task can go on".as_slice()),
+        (true, b"T7 was removed from its dependencies".as_slice()),
+    ] {
+        let tree = build(
+            &activity(OwnerActivity::Heard(fixture(OwnerMessageKind::Met { dependency: 7, removed }))),
+            normal_words(),
+        );
+        assert!(has(&tree, b"Message heard"));
+        assert!(has(&tree, expected));
+    }
+}
+
+#[test]
+fn dependency_refusals_name_the_circle_the_ending_and_the_kept_answer() {
+    let mut pending = List::with_capacity(2);
+    pending.push(7).unwrap();
+    pending.push(5).unwrap();
+    for (refusal, expected) in [
+        (Refusal::Circle { tasks: pending.clone(), cut: true }, b"These tasks would wait for one another".as_slice()),
+        (Refusal::Kept { pending }, b"This task is kept by its dependencies; answer once they are done".as_slice()),
+        (Refusal::Dependency { dependency: 7, how: OwnerTaskStatus::Failed }, b"dependency T7 failed".as_slice()),
+        (
+            Refusal::Dependency { dependency: 5, how: OwnerTaskStatus::Cancelled },
+            b"dependency T5 was cancelled".as_slice(),
+        ),
+    ] {
+        let f = view::worst_case(&client_limits(), normal_words()).unwrap();
+        let mut b = Builder::new(&tree_limits(f));
+        normal_words().refusal(&mut b, &refusal, client_limits().text);
+        assert!(has(&b.finish(), expected));
+    }
+}

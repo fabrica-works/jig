@@ -74,6 +74,10 @@ pub(super) fn waits(value: WaitsOn, limits: &w::Limits) -> Result<w::WaitsOn, w:
                 },
             },
         )?),
+        WaitsOn::Dependencies { pending, count } => w::WaitsOn::Dependencies(w::WaitsOnDependencies::new(
+            limits,
+            w::WaitsOnDependenciesParts { pending, count },
+        )?),
         WaitsOn::Delegates => w::WaitsOn::Delegates,
         WaitsOn::News => w::WaitsOn::News,
         WaitsOn::Nothing => w::WaitsOn::Nothing,
@@ -96,7 +100,7 @@ pub(super) fn line(value: &d::TaskLine, limits: &w::Limits) -> Result<w::TaskLin
                 Some(at) => Some(at.as_nanos()),
             },
             budget: owner::budget(&value.budget, limits)?,
-            waits_on: waits(value.waits_on, limits)?,
+            waits_on: waits(value.waits_on.clone(), limits)?,
             phases: live::phases(value.phases, limits)?,
             held_below: value.held_below,
             conversation: match value.conversation {

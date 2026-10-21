@@ -38,8 +38,9 @@ pub fn offered_nodes(limits: &Limits) -> Option<u32> {
 pub fn chip_nodes(limits: &Limits) -> Option<u32> {
     // A held prior closing can combine full failure rows and connector waits.
     // Observed activation includes only supplied work, timing and retry facts;
-    // the bound also includes every optional pending-ending explanation.
-    limits.rows.checked_mul(8)?.checked_add(26)?.checked_mul(limits.objects.checked_add(1)?)
+    // the bound also includes every optional pending-ending explanation,
+    // added-dependency words and provenance, and circle links and fallbacks.
+    limits.rows.checked_mul(16)?.checked_add(28)?.checked_mul(limits.objects.checked_add(1)?)
 }
 fn frame_of_card(limits: &Limits) -> Option<u32> {
     // Item, named region, heading, project, state and answer; full inbox

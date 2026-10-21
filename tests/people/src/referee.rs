@@ -16,7 +16,7 @@ pub enum RouteKind {
     Account,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Seen {
     Called { call: u64 },
     Abandoned { call: u64 },
@@ -156,11 +156,19 @@ fn filled(why: Refusal) -> bool {
                 | HoldReason::HoldsWaited
                 | HoldReason::ResourceUnavailable
                 | HoldReason::ResourceAccess
-                | HoldReason::Procedure => true,
+                | HoldReason::Procedure
+                | HoldReason::Circle => true,
             },
             Moved::Spec { .. } | Moved::Person { .. } => true,
             Moved::Note { revision } => revision != 0,
         },
+        Refusal::Circle { tasks, cut } => {
+            (cut || !tasks.is_empty()) && tasks.len() <= 32 && tasks.iter().all(|task| *task != 0)
+        }
+        Refusal::Dependency { dependency, .. } => dependency != 0,
+        Refusal::Kept { pending } => {
+            !pending.is_empty() && pending.len() <= 64 && pending.iter().all(|task| *task != 0)
+        }
         Refusal::Taken { by } => by != 0,
         Refusal::Ended { how } => match how {
             Ending::Cancelled { by, .. } => match by {

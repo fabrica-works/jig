@@ -164,7 +164,7 @@ fn refusal_facts_keep_every_sparse_entrance_category() {
     let limits = f::wire();
     for cases in [f::refusals().as_slice(), f::extra_refusals().as_slice()] {
         for (source, expected) in cases {
-            assert_eq!(crate::translate::refusals::refusal(*source, &limits).expect("refusal fits"), *expected);
+            assert_eq!(crate::translate::refusals::refusal(source.clone(), &limits).expect("refusal fits"), *expected);
         }
     }
 }
@@ -334,4 +334,35 @@ fn an_account_sign_in_answer_over_the_address_bound_is_refused_at_its_address() 
         result.err(),
         Some(w::Problem { path: w::Path::OwnerOutcomeAccountSignInStartedAddress, reason: skein_codec::Reason::Bound })
     );
+}
+
+#[test]
+fn dependency_refusals_keep_all_names_and_outcomes_through_the_client() {
+    use jig_client_domain::contract as c;
+    use skein_lib::List;
+    let mut names = List::with_capacity(2);
+    names.push(7).unwrap();
+    names.push(5).unwrap();
+    for (why, expected) in [
+        (
+            p::Refusal::Circle { tasks: Box::new([7, 5]), cut: true },
+            c::Refusal::Circle { tasks: names.clone(), cut: true },
+        ),
+        (p::Refusal::Kept { pending: Box::new([7, 5]) }, c::Refusal::Kept { pending: names }),
+        (
+            p::Refusal::Dependency { dependency: 7, how: p::DependencyStatus::Failed },
+            c::Refusal::Dependency { dependency: 7, how: c::OwnerTaskStatus::Failed },
+        ),
+        (
+            p::Refusal::Dependency { dependency: 5, how: p::DependencyStatus::Cancelled },
+            c::Refusal::Dependency { dependency: 5, how: c::OwnerTaskStatus::Cancelled },
+        ),
+    ] {
+        let reply = p::Reply::Outcome(p::Outcome::Refused(why));
+        let record = crate::translate::answers::answer(&reply, &[], &f::wire()).unwrap();
+        assert_eq!(
+            jig_client_protocol_link::translate::answers::answer(record, &f::client_limits()),
+            Ok(c::Answer::Refused { at: None, refusal: expected })
+        );
+    }
 }

@@ -1,6 +1,7 @@
 //! Durable refusal facts and unsaved retry kinds (client/domain/contract.md,
 //! section 4). Facts contain only numbers and enums; their owner keeps any words.
 use crate::Role;
+use alloc::boxed::Box;
 use skein_lib::Wall;
 
 /// Who may accept a proposal of a refused request (client/domain/contract.md, 3.5).
@@ -13,8 +14,14 @@ pub enum Accepter {
 }
 
 /// A final reason a keyed request was refused.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// The bounded wait circle in traversal order (tasks.md, 6.7).
+    Circle { tasks: Box<[u64]>, cut: bool },
+    /// An added prerequisite already failed or was cancelled (tasks.md, 7).
+    Dependency { dependency: u64, how: DependencyStatus },
+    /// An answer is kept by its pending prerequisites (tasks.md, 5.7).
+    Kept { pending: Box<[u64]> },
     /// An explicit account preference was refused before the task changes.
     Account { account: u32, why: crate::AccountWhy },
     /// The named batch member is not well formed.
@@ -234,4 +241,12 @@ pub enum Again {
     Busy,
     /// Restoration or a required neighbour is not ready.
     NotReady,
+}
+
+/// The terminal phase of an added prerequisite (client/domain/contract.md, 4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum DependencyStatus {
+    Done,
+    Failed,
+    Cancelled,
 }

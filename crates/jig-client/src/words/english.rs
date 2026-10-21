@@ -36,6 +36,11 @@ impl Word {
     pub(super) const fn data(self) -> (u16, &'static [u8], &'static [HoleKind]) {
         match self {
             Self::Decision(value) => value.data(),
+            Self::Hold(HoldWord::Circle) => (91, b"Held for a circle of waits", &[]),
+            Self::Refusal(RefusalWord::Circle) => (92, b"These tasks would wait for one another", &[]),
+            Self::Refusal(RefusalWord::Dependency) => (93, b"The added dependency has ended", &[]),
+            Self::Refusal(RefusalWord::Kept) => (94, b"This answer waits for pending dependencies", &[]),
+            Self::Waiting(WaitingWord::Dependencies) => (95, b"Kept by its dependencies", &[]),
             Self::Phase(Phase::Waiting) => (0, b"Waiting", &[]),
             Self::Phase(Phase::Idle) => (1, b"Waiting for news", &[]),
             Self::Phase(Phase::Due) => (2, b"Due to run", &[]),

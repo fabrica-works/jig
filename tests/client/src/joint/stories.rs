@@ -108,7 +108,7 @@ fn same_task_admission(source: &jig_domain_core::acts::Admission, native: &clien
             same_recipient(a, b);
         }
         (jig_domain_core::acts::Admission::Refused(a), client::Admission::Refused(b)) => {
-            assert_eq!(super::wire::refusals::refusal(*a).expect("bounded refusal"), *b);
+            assert_eq!(super::wire::refusals::refusal(a.clone()).expect("bounded refusal"), *b);
         }
         (
             jig_domain_core::acts::Admission::Bounded {
@@ -146,7 +146,7 @@ fn same_task_admission(source: &jig_domain_core::acts::Admission, native: &clien
                     same_recipient(a, b);
                 }
                 (jig_domain_core::acts::Beyond::Refused(a), client::Beyond::Refused(b)) => {
-                    assert_eq!(super::wire::refusals::refusal(*a).expect("bounded refusal"), *b);
+                    assert_eq!(super::wire::refusals::refusal(a.clone()).expect("bounded refusal"), *b);
                 }
                 pair => panic!("different exact beyond-bound judgment: {pair:?}"),
             }

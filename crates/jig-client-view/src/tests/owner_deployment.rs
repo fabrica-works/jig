@@ -503,6 +503,7 @@ fn genuine_owner_chip_fixture(number: u64) -> Chip {
         writer_lost: true,
     };
     let owner = OwnerChipDetails {
+        dependencies: List::with_capacity(0),
         project: u32::MAX,
         executor: OwnerExecutor::Agent { charter: u32::MAX },
         phase_since: Wall::EPOCH,

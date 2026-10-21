@@ -112,12 +112,12 @@ pub fn admission(
     Ok(match value {
         acts::Admission::Allowed => client::Admission::Allowed,
         acts::Admission::Proposed { to } => client::Admission::Proposed { to: recipient(to, limits)? },
-        acts::Admission::Refused(value) => client::Admission::Refused(refusals::refusal(*value)?),
+        acts::Admission::Refused(value) => client::Admission::Refused(refusals::refusal(value.clone())?),
         acts::Admission::Bounded { within, beyond } => client::Admission::Bounded {
             within: bounds(within, limits, models)?,
             beyond: match beyond {
                 acts::Beyond::Proposed { to } => client::Beyond::Proposed { to: recipient(to, limits)? },
-                acts::Beyond::Refused(value) => client::Beyond::Refused(refusals::refusal(*value)?),
+                acts::Beyond::Refused(value) => client::Beyond::Refused(refusals::refusal(value.clone())?),
             },
         },
     })

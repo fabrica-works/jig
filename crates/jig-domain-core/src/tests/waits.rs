@@ -153,3 +153,24 @@ fn a_task_not_live_waits_on_nothing() {
     let (core, limits) = pair();
     assert_eq!(core.waits_on(&limits, 99), WaitsOn::Nothing);
 }
+
+#[test]
+fn a_kept_idle_row_waits_on_dependencies_before_delegates_and_cuts_oldest_first() {
+    let (mut core, mut limits) = tree_core();
+    let parent = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
+    make_batch(&mut core, &limits, tasks::Party::Person(1), Box::new([parent]));
+    let older = new_row(&core, 3, tasks::Funder::Period { project: 1, period: 1 }, None);
+    fixtures::make_batch_at(&mut core, &limits, tasks::Party::Person(1), Box::new([older]), Wall::from_nanos(10));
+    let newer = new_row(&core, 2, tasks::Funder::Task(1), None);
+    fixtures::make_batch_at(&mut core, &limits, tasks::Party::Task(1), Box::new([newer]), Wall::from_nanos(20));
+    limits.documents.lines = 1;
+    let mut row = core.tasks.task(1).unwrap().clone();
+    row.phase = tasks::Phase::Active(tasks::Active::Idle);
+    row.dependencies = Box::new([2, 3]);
+    row.waiting_on = Box::new([2, 3]);
+    let WaitsOn::Dependencies { pending, count } = crate::waits::from_row(&core, &limits, &row) else { panic!("kept") };
+    assert_eq!(pending.as_slice(), &[3]);
+    assert_eq!(count, 2);
+    row.phase = tasks::Phase::Active(tasks::Active::Running { attempt: 1 });
+    assert_eq!(crate::waits::from_row(&core, &limits, &row), WaitsOn::Nothing);
+}

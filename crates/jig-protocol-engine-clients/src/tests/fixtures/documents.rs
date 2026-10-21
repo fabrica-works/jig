@@ -68,6 +68,7 @@ pub fn chip() -> d::Chip {
         executor: d::ExecutorKind::Agent,
         phase: d::PhaseLine::Waiting { dependencies: List::with_capacity(0), more: false, holds: false },
         details: Box::new(d::ChipDetails {
+            dependencies: List::with_capacity(0),
             project: 7,
             executor: t::Executor::Agent { charter: 7 },
             phase_since: Wall::from_nanos(7),
@@ -123,6 +124,7 @@ pub fn authority() -> d::AuthorityLine {
 }
 pub fn hold() -> d::HoldLine {
     d::HoldLine {
+        circle: None,
         account: None,
         source: None,
         reason: t::Hold::Uncertain { entry: 29 },
@@ -135,6 +137,7 @@ pub fn hold() -> d::HoldLine {
 }
 pub fn task_with_hold() -> d::Task {
     d::Task {
+        dependency_facts: List::with_capacity(0),
         kept_account: None,
         run_wait: None,
         waits_on: d::WaitsOn::Nothing,

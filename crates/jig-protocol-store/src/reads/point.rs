@@ -153,6 +153,7 @@ pub(super) fn reply(
         | tasks::Line::RunBegan { .. }
         | tasks::Line::RunEnded { .. }
         | tasks::Line::Decided { .. }
+        | tasks::Line::Kept { .. }
         | tasks::Line::Milestone { .. } => {
             let Some(owner) = joins::owner(store, task, spent)? else { return Ok(Some(empty())) };
             super::ready(page(store, range, value, Some(&owner), None, spent))

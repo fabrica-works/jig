@@ -134,6 +134,10 @@ pub fn message_kind(source: &domain::MessageKind, limits: &wire::Limits) -> Resu
             limits,
             wire::AmendmentMessageParts { revision: *revision },
         )?),
+        domain::MessageKind::Met { dependency, removed } => wire::MessageKind::Met(wire::MetMessage::new(
+            limits,
+            wire::MetMessageParts { dependency: *dependency, removed: *removed },
+        )?),
         domain::MessageKind::Question => wire::MessageKind::Question,
         domain::MessageKind::Answer { question } => wire::MessageKind::Answer(wire::AnswerMessage::new(
             limits,
@@ -193,6 +197,10 @@ pub fn read_message_kind(
         wire::MessageKind::Amendment(source) => {
             let wire::AmendmentMessageParts { revision } = source.into_parts();
             domain::MessageKind::Amendment { revision }
+        }
+        wire::MessageKind::Met(source) => {
+            let wire::MetMessageParts { dependency, removed } = source.into_parts();
+            domain::MessageKind::Met { dependency, removed }
         }
         wire::MessageKind::Question => domain::MessageKind::Question,
         wire::MessageKind::Answer(source) => {
@@ -309,6 +317,18 @@ pub fn line(source: &domain::Line, limits: &wire::Limits) -> Result<wire::Line, 
         domain::Line::Decided { revision } => {
             wire::Line::Decided(wire::DecidedLine::new(limits, wire::DecidedLineParts { revision: *revision })?)
         }
+        domain::Line::Kept { attempt, pending } => wire::Line::Kept(wire::KeptLine::new(
+            limits,
+            wire::KeptLineParts {
+                attempt: *attempt,
+                pending: super::phase::references(
+                    pending,
+                    limits.kept_line_pending,
+                    wire::Path::KeptLinePending,
+                    limits,
+                )?,
+            },
+        )?),
         domain::Line::Milestone { position } => {
             wire::Line::Milestone(wire::MilestoneLine::new(limits, wire::MilestoneLineParts { position: *position })?)
         }
@@ -344,6 +364,10 @@ pub fn read_line(source: wire::Line, limits: &wire::Limits) -> Result<domain::Li
         wire::Line::Decided(source) => {
             let wire::DecidedLineParts { revision } = source.into_parts();
             domain::Line::Decided { revision }
+        }
+        wire::Line::Kept(source) => {
+            let wire::KeptLineParts { attempt, pending } = source.into_parts();
+            domain::Line::Kept { attempt, pending: super::phase::read_references(pending) }
         }
         wire::Line::Milestone(source) => {
             let wire::MilestoneLineParts { position } = source.into_parts();

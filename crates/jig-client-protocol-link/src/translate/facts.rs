@@ -21,6 +21,7 @@ pub(crate) use part1::{
 };
 #[path = "facts_part2.rs"]
 mod part2;
+pub(crate) use part2::dependencies;
 pub(crate) use part2::{funder, owner_budget, owner_requester, owner_resource_line};
 use part2::{owner_chip_details_fields, owner_chip_ending_fields, result_value_fields};
 

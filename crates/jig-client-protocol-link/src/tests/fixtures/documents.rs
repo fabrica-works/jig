@@ -52,6 +52,7 @@ pub fn task_record() -> w::Task {
 }
 pub fn task() -> c::Task {
     c::Task {
+        dependency_facts: List::with_capacity(0),
         kept_account: None,
         run_wait: None,
         llm: None,

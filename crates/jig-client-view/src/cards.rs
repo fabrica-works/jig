@@ -70,6 +70,21 @@ pub fn open(
         Place::Conversation | Place::TaskPage => {}
     }
     state(b, &facts.card, object, words, bindings);
+    if let Card::Refused { refusal } = &facts.card {
+        if let jig_client::contract::Refusal::Circle { tasks, .. } = refusal {
+            for task in tasks {
+                chip::named(b, client, *task, words, bindings);
+            }
+        }
+        if let jig_client::contract::Refusal::Kept { pending } = refusal {
+            for task in pending {
+                chip::named(b, client, *task, words, bindings);
+            }
+        }
+        if let jig_client::contract::Refusal::Dependency { dependency, .. } = refusal {
+            chip::named(b, client, *dependency, words, bindings);
+        }
+    }
     if client.ui.refused_amendments.get(&facts.key).is_some()
         && let Card::Refused { refusal: jig_client::contract::Refusal::Authority { proposable: Some(true), .. } } =
             facts.card

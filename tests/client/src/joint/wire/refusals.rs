@@ -31,6 +31,16 @@ pub fn refusal(value: people::Refusal) -> Result<client::Refusal, super::owner::
                 people::Malformed::ProposedAsAllowed => client::Malformed::ProposedAsAllowed,
             },
         },
+        people::Refusal::Circle { tasks, cut } => client::Refusal::Circle { tasks: names(&tasks), cut },
+        people::Refusal::Kept { pending } => client::Refusal::Kept { pending: names(&pending) },
+        people::Refusal::Dependency { dependency, how } => client::Refusal::Dependency {
+            dependency,
+            how: match how {
+                people::DependencyStatus::Done => client::OwnerTaskStatus::Done,
+                people::DependencyStatus::Failed => client::OwnerTaskStatus::Failed,
+                people::DependencyStatus::Cancelled => client::OwnerTaskStatus::Cancelled,
+            },
+        },
         people::Refusal::NotWaiting => client::Refusal::NotWaiting,
         people::Refusal::NoFurther => client::Refusal::NoFurther,
         people::Refusal::Unknown => client::Refusal::Unknown,
@@ -156,6 +166,7 @@ pub fn hold(value: people::HoldReason) -> client::HoldCategory {
         people::HoldReason::ResourceAccess => client::HoldCategory::ResourceAccess,
         people::HoldReason::PoolLost { pool } => client::HoldCategory::PoolLost { pool },
         people::HoldReason::Procedure => client::HoldCategory::Procedure,
+        people::HoldReason::Circle => client::HoldCategory::Circle,
     }
 }
 
@@ -187,6 +198,14 @@ pub fn ending(value: people::Ending) -> client::Ending {
         people::Ending::Decided { by, at } => client::Ending::Decided { by, party: None, how: None, at },
         people::Ending::Deleted => client::Ending::Deleted,
     }
+}
+
+fn names(values: &[u64]) -> skein_lib::List<u64> {
+    let mut rows = skein_lib::List::with_capacity(u32::try_from(values.len()).expect("bounded numbers"));
+    for number in values {
+        rows.push(*number).expect("same number count");
+    }
+    rows
 }
 
 #[cfg(test)]

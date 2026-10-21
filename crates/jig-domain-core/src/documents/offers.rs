@@ -182,6 +182,15 @@ pub(super) fn person(
 ) -> Result<List<Offered>, Missing> {
     match row.phase {
         tasks::Phase::Active(tasks::Active::Due | tasks::Active::Idle) => {
+            if !row.waiting_on.is_empty() {
+                let kinds = match row.executor {
+                    tasks::Executor::Person(tasks::PersonAddress::Role(_)) => &[Act::Take, Act::HandBack][..],
+                    tasks::Executor::Person(tasks::PersonAddress::Person(_))
+                    | tasks::Executor::Agent { .. }
+                    | tasks::Executor::Procedure { .. } => &[][..],
+                };
+                return list(core, limits, party, &Subject::PersonTask { task: row.number }, kinds, decision);
+            }
             let kinds = match row.executor {
                 tasks::Executor::Person(tasks::PersonAddress::Role(_)) => &[Act::Answer, Act::Take, Act::HandBack][..],
                 tasks::Executor::Person(tasks::PersonAddress::Person(_))
@@ -349,6 +358,7 @@ fn effect(core: &Core, limits: &Limits, act: Act, subject: &Subject) -> Option<a
                 | tasks::Hold::ResourceUnavailable
                 | tasks::Hold::ResourceAccess
                 | tasks::Hold::PoolLost { .. }
+                | tasks::Hold::Circle
                 | tasks::Hold::Procedure => acts::ReleaseEffect::Judged,
             };
             Some(acts::Effect::Release(what))

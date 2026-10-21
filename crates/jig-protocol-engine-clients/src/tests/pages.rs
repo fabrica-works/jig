@@ -80,3 +80,52 @@ fn a_notes_page_becomes_its_record() {
         Ok(w::ReadValue::Notes(jig_client_test_records::scoped_notes_page()))
     );
 }
+
+#[test]
+fn kept_lines_and_met_notices_cross_both_client_translations() {
+    use jig_client_domain::contract as c;
+    use jig_domain_tasks as t;
+    use skein_lib::{List, Reader, Wall, Writer};
+    let limits = fixtures::wire_limits();
+    for removed in [false, true] {
+        let mut rows = List::with_capacity(2);
+        for (position, line) in [
+            (13, t::Line::Kept { attempt: 3, pending: Box::new([19, 23]) }),
+            (
+                11,
+                t::Line::Heard(t::Word {
+                    number: 17,
+                    from: t::Party::Task(29),
+                    kind: t::MessageKind::Met { dependency: 19, removed },
+                    words: Box::new([]),
+                    at: Wall::from_nanos(31),
+                    hits: 1,
+                    eligible: true,
+                }),
+            ),
+        ] {
+            rows.push(reads::PageRow::Activity {
+                line: t::ActivityLine { task: 7, position, at: Wall::from_nanos(37), line },
+                turn: None,
+            })
+            .unwrap();
+        }
+        let w::ReadValue::Activity(record) = activity(&fixtures::page(rows), &limits).unwrap() else {
+            panic!("activity page");
+        };
+        let mut out = Writer::new(usize::try_from(record.measure()).unwrap());
+        record.encode(&mut out).unwrap();
+        let bytes = out.finish();
+        let record = w::ActivityPage::decode(&limits, &mut Reader::new(&bytes)).unwrap();
+        let actual =
+            jig_client_protocol_link::translate::pages::activity_page(record, &fixtures::client_limits()).unwrap();
+        let c::Activity::Owner { source, decoded } = &actual.rows.get(0).unwrap().event else { panic!("owner") };
+        assert!(decoded.is_none());
+        let c::OwnerActivity::Kept { attempt, pending } = &source.line else { panic!("kept") };
+        assert_eq!((*attempt, pending.as_slice()), (3, [19, 23].as_slice()));
+        let c::Activity::Owner { source, .. } = &actual.rows.get(1).unwrap().event else { panic!("owner") };
+        let c::OwnerActivity::Heard(word) = &source.line else { panic!("heard") };
+        assert_eq!(word.kind, c::OwnerMessageKind::Met { dependency: 19, removed });
+        assert_eq!(word.from, c::OwnerRequester::Task(29));
+    }
+}

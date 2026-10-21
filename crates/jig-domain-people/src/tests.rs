@@ -922,12 +922,12 @@ fn refused_role_requests_restore_invalid_rosters_and_unknown_targets_for_replay(
                 [Request::RolesApplied {
                     reply_to: ReplyTo::new(reply_token),
                     request,
-                    result: Err(Outcome::Refused(refusal))
+                    result: Err(Outcome::Refused(refusal.clone()))
                 }]
             );
         }
-        rows = live.send_bounded(Event::Decided { request, outcome: Outcome::Refused(refusal) });
-        assert_eq!(reply(rows.as_slice()), Reply::Outcome(Outcome::Refused(refusal)));
+        rows = live.send_bounded(Event::Decided { request, outcome: Outcome::Refused(refusal.clone()) });
+        assert_eq!(reply(rows.as_slice()), Reply::Outcome(Outcome::Refused(refusal.clone())));
         let mut cold = Test::new(LIMITS);
         cold.d = Domain::new(&LIMITS, Box::new([]), 2);
         assert!(cold.send_bounded(Event::Restore { record: saved_answer(rows.as_slice()) }).is_empty());
@@ -938,7 +938,7 @@ fn refused_role_requests_restore_invalid_rosters_and_unknown_targets_for_replay(
         cold.signin_bounded(2, 20, identity(0, 1));
         let replayed = cold.request_bounded(20, 7, ask);
         assert_eq!(replayed.len(), 1);
-        assert_eq!(reply(replayed.as_slice()), Reply::Outcome(Outcome::Refused(refusal)));
+        assert_eq!(reply(replayed.as_slice()), Reply::Outcome(Outcome::Refused(refusal.clone())));
     }
 }
 
@@ -1292,7 +1292,7 @@ fn every_final_refusal_keeps_its_facts_under_the_key_when_roles_and_time_change(
         let mut test = Test::new(LIMITS);
         test.member();
         let request = route(&test.request(10, 1, ask(1)));
-        let outcome = Outcome::Refused(refusal);
+        let outcome = Outcome::Refused(refusal.clone());
         let decided = test.send(Event::Decided { request, outcome: outcome.clone() });
         assert_eq!(reply(&decided), Reply::Outcome(outcome.clone()));
         assert!(decided.iter().any(is_answer));

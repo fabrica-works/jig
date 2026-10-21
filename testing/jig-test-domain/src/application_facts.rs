@@ -5,6 +5,9 @@ use jig_test_connector::application_core as application;
 #[expect(clippy::manual_map, reason = "step code translates optional role numbers by matching")]
 pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
     match value {
+        people::Refusal::Circle { .. } | people::Refusal::Dependency { .. } | people::Refusal::Kept { .. } => {
+            unreachable!("the application routes only Release, never Create, Amend or Answer")
+        }
         people::Refusal::Role { held } => application::Refusal::Role {
             held: match held {
                 Some(role) => Some(role.number()),
@@ -149,6 +152,7 @@ pub(super) fn hold_reason(value: people::HoldReason) -> application::HoldReason 
         people::HoldReason::ResourceAccess => application::HoldReason::ResourceAccess,
         people::HoldReason::PoolLost { pool } => application::HoldReason::PoolLost { pool },
         people::HoldReason::Procedure => application::HoldReason::Procedure,
+        people::HoldReason::Circle => application::HoldReason::Circle,
     }
 }
 

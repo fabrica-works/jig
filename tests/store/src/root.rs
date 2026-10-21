@@ -21,6 +21,7 @@ pub const NOTES_LIMITS: jig_domain_notes::Limits = jig_domain_notes::Limits {
 };
 
 pub const TASKS_LIMITS: jig_domain_tasks::Limits = jig_domain_tasks::Limits {
+    circle: 8,
     tasks: 2,
     funders: 2,
     project_tasks: 2,
@@ -256,6 +257,8 @@ pub fn header(commits: u64) -> core::Record {
 #[must_use]
 pub fn live_task(number: u64) -> core::Record {
     core::Record::Tasks(tasks::Stored::Live(Box::new(tasks::TaskRecord {
+        added: Box::new([]),
+        hold_bound_since: None,
         kept_account: None,
         label: 0,
         flags: jig_domain_tasks::Flags::PLAIN,

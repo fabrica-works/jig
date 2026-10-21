@@ -223,7 +223,11 @@ batch's cycle becomes, *dependency* and *kept*; a task document's
 dependencies, each with its phase, its wall and maker when it was added,
 and whether they keep the task; a kept task's pending dependencies in what
 it waits on; and a hold for a circle of waits, naming it
-(`../client/domain/contract.md`, sections 3 to 5). Existing tags stay fixed.
+(`../client/domain/contract.md`, sections 3 to 5). The owner's activity
+also carries the parked run's kept line, its attempt and pending
+dependencies, and the owner's message kinds the met notice, the dependency
+and whether it was removed (`../domain/tasks.md`, 5.7 and 8.1;
+`../domain/engine.md`, section 7). Existing tags stay fixed.
 
 Client v11 also carries `TaskRunWait.refused`, as either
 `TaskWaitRefused.hello` (`TaskWaitHello`: the existing `OwnerHostKind`, wall

@@ -80,7 +80,7 @@ fn covers(
 fn beyond(value: &Beyond) -> Admission {
     match value {
         Beyond::Proposed { to } => Admission::Proposed { to: to.clone() },
-        Beyond::Refused(why) => Admission::Refused(*why),
+        Beyond::Refused(why) => Admission::Refused(why.clone()),
     }
 }
 /// `None` means the draft is outside the supplied supported form or its old facts are incomplete.

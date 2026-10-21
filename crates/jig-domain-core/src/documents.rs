@@ -65,9 +65,9 @@ pub use live_delegates::LiveDelegate;
 mod task_tree;
 mod task_wait;
 pub use task_tree::{
-    AuthorityLine, BudgetLine, ContractLine, Ending, EscalationState, FoldedCount, GrantLine, HoldLine, NoteScope,
-    Parameter, Part, PartKey, PartKind, PatternEnd, PhaseCounts, PriorPhase, ProposalRef, ResourceLine, ResultValue,
-    Task, TaskLink, Tree, TreeRow, task_from_row,
+    AuthorityLine, BudgetLine, ContractLine, Dependency, Ending, EscalationState, FoldedCount, GrantLine, HoldLine,
+    NoteScope, Parameter, Part, PartKey, PartKind, PatternEnd, PhaseCounts, PriorPhase, ProposalRef, ResourceLine,
+    ResultValue, Task, TaskLink, Tree, TreeRow, task_from_row,
 };
 pub use task_wait::{OpenProgram, TaskRunWait, TaskSourceState, TaskWaitRefused, TaskWaitWhy};
 

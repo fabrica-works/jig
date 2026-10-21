@@ -243,7 +243,7 @@ fn an_observers_core_role_refusals_match_their_offers() {
     let project = Subject::Project { project: 1 };
     let expected = people::Refusal::Role { held: Some(people::Role::Observer) };
     for act in [Act::Reorder, Act::Adopt, Act::ChangePolicy, Act::SetRoles, Act::MakeService, Act::SetPool] {
-        assert_eq!(offers::admit(&core, &limits, 1, act, &project, Wall::EPOCH), Admission::Refused(expected));
+        assert_eq!(offers::admit(&core, &limits, 1, act, &project, Wall::EPOCH), Admission::Refused(expected.clone()));
     }
     core.people = people::Domain::new(&limits.people, Box::new([]), 2);
     let mut child = Queue::with_capacity(people::max_out(&limits.people));
@@ -302,10 +302,10 @@ fn an_observers_core_role_refusals_match_their_offers() {
     {
         assert_eq!(
             offers::request(&core, &limits, 1, 1, Some(people::Role::Observer), &ask, Wall::EPOCH),
-            Err(expected)
+            Err(expected.clone())
         );
         let key = [u8::try_from(index).unwrap(); 16];
-        let outcome = people::Outcome::Refused(expected);
+        let outcome = people::Outcome::Refused(expected.clone());
         for replay in [false, true] {
             let Requests::Out(out) = step(
                 &mut core,
@@ -421,7 +421,7 @@ fn offered_person_handoffs_and_answers_reach_the_child_and_change_the_offer() {
     assert_eq!(core.tasks.task(5).unwrap().taken_by, None);
     holding(&mut core, &limits, people::Role::Owner);
     let why = people::Refusal::NotWaiting;
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Answer, &subject, Wall::EPOCH), Admission::Refused(why));
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Answer, &subject, Wall::EPOCH), Admission::Refused(why.clone()));
     let answer = people::Ask::AnswerPerson {
         project: 1,
         task: 5,
@@ -517,7 +517,7 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
     };
     assert_eq!(
         offers::admit(&core, &limits, 1, Act::Move, &Subject::Task { task: 2 }, Wall::EPOCH),
-        Admission::Refused(why)
+        Admission::Refused(why.clone())
     );
     assert_eq!(
         core.move_admit(1, Some(people::Role::Owner), 1, 2, limits.tasks.tree_tasks, limits.tasks.depth),
@@ -536,7 +536,7 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
     }
     let why = people::Refusal::Authority { lacking: people::Lack::Shape, proposable: None };
     for act in [Act::EditNote, Act::DeleteNote] {
-        assert_eq!(offers::note(&core, 1, 1, &people::NoteScope::Project, act), Err(why));
+        assert_eq!(offers::note(&core, 1, 1, &people::NoteScope::Project, act), Err(why.clone()));
     }
     let mut rules = core.authority.rules().clone();
     rules.ceiling.notes = authority::Scopes(2);
@@ -553,7 +553,7 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
     holding(&mut core, &limits, people::Role::Observer);
     let why = people::Refusal::Role { held: Some(people::Role::Observer) };
     for act in [Act::EditNote, Act::DeleteNote] {
-        assert_eq!(offers::note(&core, 1, 1, &people::NoteScope::Project, act), Err(why));
+        assert_eq!(offers::note(&core, 1, 1, &people::NoteScope::Project, act), Err(why.clone()));
     }
 }
 
@@ -688,7 +688,7 @@ fn a_move_offer_tracks_requester_changes_after_adoption() {
     assert_eq!(core.tasks.task(5).unwrap().requester, tasks::Party::Person(1));
     assert!(!core.tasks.takeover_state(5, 1));
     let why = people::Refusal::NotWaiting;
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Move, &object, Wall::EPOCH), Admission::Refused(why));
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Move, &object, Wall::EPOCH), Admission::Refused(why.clone()));
     assert_eq!(
         core.move_admit(1, Some(people::Role::Owner), 1, 5, limits.tasks.tree_tasks, limits.tasks.depth),
         Err(why)

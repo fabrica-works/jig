@@ -85,7 +85,7 @@ fn an_aged_span_is_beyond_its_accepter_and_passed_up() {
     f::clock(&mut world, 30);
     assert_eq!(f::holder(&world), tasks::ProposalHolder::Person(1));
     let why = p::Refusal::Authority { lacking: p::Lack::Deadline, proposable: Some(p::Accepter::Role(0)) };
-    assert_eq!(f::acceptance(&mut world, proposal), jig_domain_core::acts::Admission::Refused(why));
+    assert_eq!(f::acceptance(&mut world, proposal), jig_domain_core::acts::Admission::Refused(why.clone()));
     f::task_decide(&mut world, member, 33, proposal, p::ProposalDecision::Accept);
     refusal(&world, why);
     assert_eq!(live_row(&world, 1).numbers, before);

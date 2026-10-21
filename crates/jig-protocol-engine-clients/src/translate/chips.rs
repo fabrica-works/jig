@@ -59,6 +59,7 @@ pub fn hold(value: t::Hold, limits: &w::Limits) -> Result<w::HoldCategory, w::Pr
         t::Hold::ResourceUnavailable => w::HoldCategory::ResourceUnavailable,
         t::Hold::ResourceAccess => w::HoldCategory::ResourceAccess,
         t::Hold::Procedure => w::HoldCategory::Procedure,
+        t::Hold::Circle => w::HoldCategory::Circle,
     })
 }
 pub fn active(value: t::Active, limits: &w::Limits) -> Result<w::RunStage, w::Problem> {
@@ -201,6 +202,7 @@ pub fn held(value: &d::HoldLine, limits: &w::Limits) -> Result<w::OwnerChipHold,
     w::OwnerChipHold::new(
         limits,
         w::OwnerChipHoldParts {
+            circle: circle(value.circle.as_ref(), limits)?,
             account: match &value.account {
                 Some(item) => Some(owner::part(item, limits)?),
                 None => None,
@@ -425,6 +427,7 @@ fn details_fields(
     w::OwnerChipDetailsFields::new(
         limits,
         w::OwnerChipDetailsFieldsParts {
+            dependencies: dependencies(&value.dependencies, limits)?,
             project: value.project,
             executor: owner::executor(value.executor, limits)?,
             phase_since: value.phase_since.as_nanos(),
@@ -602,4 +605,50 @@ pub fn fact_pieces(rows: &List<w::Fact>, bound: u32, path: w::Path) -> Result<Bo
         encoded.push(out.finish()).expect("supplied piece count");
     }
     pieces(&encoded, bound, path)
+}
+
+fn circle(value: Option<&t::Circle>, limits: &w::Limits) -> Result<Option<w::Circle>, w::Problem> {
+    let Some(value) = value else { return Ok(None) };
+    let mut tasks = List::with_capacity(u32::try_from(value.tasks.len()).expect("bounded circle"));
+    for task in &value.tasks {
+        tasks.push(*task).expect("same circle");
+    }
+    Ok(Some(w::Circle::new(limits, w::CircleParts { tasks, cut: value.cut })?))
+}
+fn status(value: t::Status) -> w::OwnerTaskStatus {
+    match value {
+        t::Status::Done => w::OwnerTaskStatus::Done,
+        t::Status::Failed => w::OwnerTaskStatus::Failed,
+        t::Status::Cancelled => w::OwnerTaskStatus::Cancelled,
+    }
+}
+pub(crate) fn dependencies(
+    values: &List<d::Dependency>,
+    limits: &w::Limits,
+) -> Result<List<w::Dependency>, w::Problem> {
+    let mut rows = List::with_capacity(values.len());
+    for value in values {
+        let added = match &value.added {
+            Some(added) => Some(w::DependencyAdded::new(
+                limits,
+                w::DependencyAddedParts { at: added.at.as_nanos(), by: owner::requester(added.by, limits)? },
+            )?),
+            None => None,
+        };
+        rows.push(w::Dependency::new(
+            limits,
+            w::DependencyParts {
+                number: value.number,
+                pending: value.pending,
+                added,
+                keeps: value.keeps,
+                status: match value.status {
+                    Some(value) => Some(status(value)),
+                    None => None,
+                },
+            },
+        )?)
+        .expect("same dependency count");
+    }
+    Ok(rows)
 }

@@ -42,6 +42,8 @@ pub enum HoldReason {
     Deadline,
     /// It waited too long for its resource holds.
     HoldsWaited,
+    /// Joining a queue would close a circle of waits (domain/tasks.md, 6.7).
+    Circle,
     /// A required resource is unavailable.
     ResourceUnavailable,
     /// Adoption no longer permits its workspace writes.

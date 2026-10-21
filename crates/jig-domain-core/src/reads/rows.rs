@@ -651,6 +651,7 @@ fn object(
                     tasks::MessageKind::Words
                     | tasks::MessageKind::Answer { .. }
                     | tasks::MessageKind::EffectNotMade { .. }
+                    | tasks::MessageKind::Met { .. }
                     | tasks::MessageKind::Amendment { .. }
                     | tasks::MessageKind::Proposal { .. }
                     | tasks::MessageKind::ProposalDecision { .. }
@@ -667,6 +668,7 @@ fn object(
                 | tasks::Line::RunEnded { .. }
                 | tasks::Line::Turn { .. }
                 | tasks::Line::Decided { .. }
+                | tasks::Line::Kept { .. }
                 | tasks::Line::Milestone { .. } => return Ok(None),
             };
             if number != message || line.task != *task || !owner_matches(&row, *task) {
@@ -691,6 +693,7 @@ fn object(
                         | tasks::Line::RunEnded { .. }
                         | tasks::Line::Turn { .. }
                         | tasks::Line::Decided { .. }
+                        | tasks::Line::Kept { .. }
                         | tasks::Line::Milestone { .. } => None,
                     },
                     Some(_) | None => None,
@@ -752,6 +755,7 @@ fn object(
                 | tasks::Line::RunBegan { .. }
                 | tasks::Line::RunEnded { .. }
                 | tasks::Line::Decided { .. }
+                | tasks::Line::Kept { .. }
                 | tasks::Line::Milestone { .. } => Ok(None),
             }
         }
@@ -1180,6 +1184,7 @@ fn reply_update(
         | tasks::Line::RunBegan { .. }
         | tasks::Line::RunEnded { .. }
         | tasks::Line::Decided { .. }
+        | tasks::Line::Kept { .. }
         | tasks::Line::Milestone { .. } => return Ok(None),
     };
     let object = documents::InboxObject::Reply { message };
