@@ -307,6 +307,33 @@ fn a_compound_dependency_circle_is_refused_whole_naming_both_tasks() {
 }
 
 #[test]
+fn a_compound_closing_a_circle_through_a_staged_join_is_refused() {
+    let mut world = configured(&LIMITS, false);
+    world.make(Party::Person(PERSON), vec![task(ROOT, &[])]);
+    let mut holder = task(HOLDER, &[]);
+    holder.holdings = Box::new([holding(false)]);
+    world.make(Party::Task(ROOT), vec![task(REQUESTER, &[]), holder, task(PREREQUISITE, &[])]);
+    introduce(&mut world, REQUESTER, PREREQUISITE);
+    let mut waiter = task(WAITER, &[PREREQUISITE]);
+    waiter.holdings = Box::new([holding(false)]);
+    world.make(Party::Task(REQUESTER), vec![waiter]);
+    assert_eq!(world.record(WAITER).hold_wait_since, None);
+    let before = world.records.clone();
+    let operations = vec![amendment(&world, WAITER, &[]), amendment(&world, HOLDER, &[REQUESTER])];
+    let reply = compound(&mut world, operations);
+    assert!(
+        matches!(&reply, Reply::Refused(problem)
+        if problem.why == Refusal::Circle { cut: false }
+        && problem.blocked_by.as_deref() == Some(&[HOLDER, REQUESTER, WAITER])),
+        "{reply:?}"
+    );
+    assert_eq!(world.records, before);
+    assert_eq!(world.record(WAITER).dependencies.as_ref(), [PREREQUISITE]);
+    assert_eq!(world.record(WAITER).hold_wait_since, None);
+    assert!(world.record(HOLDER).dependencies.is_empty());
+}
+
+#[test]
 fn a_compound_removed_dependency_is_absent_from_the_circle_walk() {
     let mut world = configured(&LIMITS, false);
     world.make(Party::Person(PERSON), vec![task(HOLDER, &[REQUESTER]), task(REQUESTER, &[])]);

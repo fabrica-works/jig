@@ -265,6 +265,9 @@ fn rows<'a>(view: &'a View<'_>, number: u64) -> Row<'a> {
             state: WaitState {
                 requester: row.requester,
                 phase,
+                // A staged last dependency met joins the queue and gains its wait
+                // start in this commit; a circling amendment is refused, not held
+                // (domain/tasks.md, 6.2 and 6.7).
                 queued: waiting && pending.is_empty() && added.is_empty() && !row.holds_taken,
                 taken: row.holds_taken,
             },
