@@ -304,7 +304,10 @@ answers to a run's reads.
   one at a time: each ended task it adds, then the ended tasks above it
   that its reach is read through, at most one per level of the tree. Once
   they are in, it is admitted again from the start, on the rows and on
-  live state as it then is.
+  live state as it then is: the pass that found them missing answered
+  nothing and committed nothing. If what waits goes first (its run ends,
+  its party leaves, the engine restarts), its load goes with it, and its
+  request is left as any unanswered one is.
 - **What a decision loads stays as loaded until it is decided.** Its
   loads are held (4.2): each is sent once every commit made before it is
   durable, so it sees them. While they are in flight, a request whose
