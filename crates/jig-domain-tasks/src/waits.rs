@@ -221,69 +221,86 @@ struct WaitState {
     taken: bool,
 }
 
-// Borrowed query inputs remain function arguments, never fields (programming-model.md, 10.3).
-fn rows<'a>(
-    view: &'a (&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-    number: u64,
-) -> (&'a [u64], &'a [u64], &'a [u64], &'a [Holding], WaitState) {
-    let (domain, staged, entry, pending, added, batch) = view;
+/// The rows one judgement reads, borrowed for that call and never kept, as
+/// `compound::CompoundTask` is. Only the joining task's phase and lists differ
+/// from its row (domain/tasks.md, 6.7).
+struct View<'a> {
+    domain: &'a Domain,
+    staged: &'a Staged,
+    entry: Entry,
+    pending: &'a [u64],
+    added: &'a [u64],
+    batch: &'a [New],
+}
+
+/// One task's waits as a judgement sees them.
+struct Row<'a> {
+    waiting_on: &'a [u64],
+    added: &'a [u64],
+    delegates: &'a [u64],
+    holdings: &'a [Holding],
+    state: WaitState,
+}
+
+fn rows<'a>(view: &'a View<'_>, number: u64) -> Row<'a> {
+    let View { domain, staged, entry, pending, added, batch } = view;
     if let Some(row) = staged.record(domain, number) {
         let (phase, waiting, pending, added) = if number == entry.task {
             (entry.phase, entry.waiting, *pending, *added)
         } else {
             (WaitPhase::for_phase(&row.phase), row.phase == Phase::Waiting, row.waiting_on, &[][..])
         };
-        (
-            pending,
+        Row {
+            waiting_on: pending,
             added,
-            &row.base.delegates,
-            &row.base.holdings,
-            WaitState {
+            delegates: &row.base.delegates,
+            holdings: &row.base.holdings,
+            state: WaitState {
                 requester: row.requester,
                 phase,
                 queued: waiting && pending.is_empty() && added.is_empty() && !row.holds_taken,
                 taken: row.holds_taken,
             },
-        )
+        }
     } else {
         let row = member(batch, number);
-        (
-            &row.dependencies,
-            &[],
-            &[],
-            &row.holdings,
-            WaitState {
+        Row {
+            waiting_on: &row.dependencies,
+            added: &[],
+            delegates: &[],
+            holdings: &row.holdings,
+            state: WaitState {
                 requester: entry.creator,
                 phase: WaitPhase::Tasks,
                 queued: row.dependencies.is_empty(),
                 taken: false,
             },
-        )
+        }
     }
 }
 
-fn row_state(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64) -> WaitState {
-    rows(view, number).4
+fn row_state(view: &View<'_>, number: u64) -> WaitState {
+    rows(view, number).state
 }
 
-fn is_child(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), parent: u64, number: u64) -> bool {
-    let (_, _, delegates, _, state) = rows(view, parent);
+fn is_child(view: &View<'_>, parent: u64, number: u64) -> bool {
+    let Row { delegates, state, .. } = rows(view, parent);
     state.phase.delegates()
         && (crate::batch::contains(delegates, number)
-            || (view.2.creator == Party::Task(parent) && member_named(view.5, number)))
+            || (view.entry.creator == Party::Task(parent) && member_named(view.batch, number)))
 }
 
-fn transferred(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64, holding: &Holding) -> bool {
-    view.2.creator == Party::Task(number) && handed(view.5, holding)
+fn transferred(view: &View<'_>, number: u64, holding: &Holding) -> bool {
+    view.entry.creator == Party::Task(number) && handed(view.batch, holding)
 }
 
-fn is_holder(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64, holding: &Holding) -> bool {
+fn is_holder(view: &View<'_>, number: u64, holding: &Holding) -> bool {
     row_state(view, number).taken && !transferred(view, number, holding)
 }
 
-fn gate(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), waiter: u64, holding: &Holding) -> bool {
+fn gate(view: &View<'_>, waiter: u64, holding: &Holding) -> bool {
     // A first member receiving the creator's hold takes it without a queue (6.4).
-    for prior in view.5 {
+    for prior in view.batch {
         if prior.number == waiter {
             break;
         }
@@ -291,8 +308,8 @@ fn gate(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), waiter: u64, h
             return true;
         }
     }
-    match view.2.creator {
-        Party::Task(parent) => !row_state(view, parent).taken || !has(rows(view, parent).3, holding),
+    match view.entry.creator {
+        Party::Task(parent) => !row_state(view, parent).taken || !has(rows(view, parent).holdings, holding),
         Party::Person(_) | Party::Deployment { .. } => true,
     }
 }
@@ -330,8 +347,8 @@ impl Judge {
         }
     }
 
-    fn dependent(&mut self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), dependent: u64, dependency: u64) {
-        let (waiting_on, added, _, _, state) = rows(view, dependent);
+    fn dependent(&mut self, view: &View<'_>, dependent: u64, dependency: u64) {
+        let Row { waiting_on, added, state, .. } = rows(view, dependent);
         if state.phase.dependencies()
             && (crate::batch::contains(waiting_on, dependency) || crate::batch::contains(added, dependency))
         {
@@ -339,21 +356,21 @@ impl Judge {
         }
     }
 
-    fn waiter(&mut self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), waiter: u64) {
+    fn waiter(&mut self, view: &View<'_>, waiter: u64) {
         if row_state(view, waiter).queued {
             self.mark(waiter);
         }
     }
 
-    fn walk(&mut self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), links: &Links, limits: &Limits) {
-        self.mark(view.2.task);
+    fn walk(&mut self, view: &View<'_>, links: &Links, limits: &Limits) {
+        self.mark(view.entry.task);
         // Batch members can also form a circle without their creator. Judge them whole.
-        for member in view.5 {
+        for member in view.batch {
             self.mark(member.number);
         }
         for at in 0..limits.tasks {
             let Some(&number) = self.stack.get(at) else { break };
-            for ((_, dependent), ()) in view.0.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
+            for ((_, dependent), ()) in view.domain.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
                 self.dependent(view, *dependent, number);
             }
             for (dependency, dependent) in links.added.as_slice() {
@@ -361,7 +378,7 @@ impl Judge {
                     self.dependent(view, *dependent, number);
                 }
             }
-            let (_, _, _, holdings, state) = rows(view, number);
+            let Row { holdings, state, .. } = rows(view, number);
             if let Party::Task(parent) = state.requester
                 && is_child(view, parent, number)
             {
@@ -371,7 +388,7 @@ impl Judge {
                 continue;
             }
             for holding in holdings {
-                if transferred(view, number, holding) || threshold(view.0, holding).is_none() {
+                if transferred(view, number, holding) || threshold(view.domain, holding).is_none() {
                     continue;
                 }
                 let name = crate::holds::name(holding);
@@ -380,7 +397,7 @@ impl Judge {
                 if count != 1 {
                     continue;
                 }
-                for ((_, waiter), ()) in view.0.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+                for ((_, waiter), ()) in view.domain.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
                     self.waiter(view, *waiter);
                 }
                 for (resource, waiter) in links.queued.as_slice() {
@@ -392,13 +409,8 @@ impl Judge {
         }
     }
 
-    fn waits(
-        &self,
-        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-        number: u64,
-        gates: &Map<(Name, u64), Gate>,
-    ) -> u32 {
-        let (waiting_on, added, delegates, holdings, state) = rows(view, number);
+    fn waits(&self, view: &View<'_>, number: u64, gates: &Map<(Name, u64), Gate>) -> u32 {
+        let Row { waiting_on, added, delegates, holdings, state } = rows(view, number);
         let mut pending = 0_u32;
         if state.phase.dependencies() {
             for list in [waiting_on, added] {
@@ -415,9 +427,9 @@ impl Judge {
                     pending = pending.checked_add(1).expect("bounded waits");
                 }
             }
-            if view.2.creator == Party::Task(number) {
+            if view.entry.creator == Party::Task(number) {
                 pending =
-                    pending.checked_add(u32::try_from(view.5.len()).expect("batch bound")).expect("bounded waits");
+                    pending.checked_add(u32::try_from(view.batch.len()).expect("batch bound")).expect("bounded waits");
             }
         }
         if state.queued {
@@ -430,16 +442,10 @@ impl Judge {
         pending
     }
 
-    fn stuck(
-        &self,
-        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-        number: u64,
-        holding: &Holding,
-        gates: &Map<(Name, u64), Gate>,
-    ) -> bool {
-        let Some(threshold) = threshold(view.0, holding) else { return false };
+    fn stuck(&self, view: &View<'_>, number: u64, holding: &Holding, gates: &Map<(Name, u64), Gate>) -> bool {
+        let Some(threshold) = threshold(view.domain, holding) else { return false };
         let name = crate::holds::name(holding);
-        if member_named(view.5, number) {
+        if member_named(view.batch, number) {
             match gates.get(&(name.clone(), number)) {
                 Some(gate) => gate.count >= gate.threshold,
                 None => false,
@@ -449,13 +455,7 @@ impl Judge {
         }
     }
 
-    fn eliminate(
-        &mut self,
-        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-        links: &Links,
-        gates: &mut Map<(Name, u64), Gate>,
-        limits: &Limits,
-    ) {
+    fn eliminate(&mut self, view: &View<'_>, links: &Links, gates: &mut Map<(Name, u64), Gate>, limits: &Limits) {
         // Reuse the marking queue to initialize counts without changing membership.
         for at in 0..self.stack.len() {
             let number = *self.stack.get(at).expect("marked task");
@@ -471,15 +471,15 @@ impl Judge {
         for at in 0..limits.tasks {
             let Some(&number) = self.stack.get(at) else { break };
             self.pending.remove(&number);
-            for ((_, dependent), ()) in view.0.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
-                let (waiting_on, _, _, _, state) = rows(view, *dependent);
+            for ((_, dependent), ()) in view.domain.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
+                let Row { waiting_on, state, .. } = rows(view, *dependent);
                 if state.phase.dependencies() && crate::batch::contains(waiting_on, number) {
                     self.met(*dependent);
                 }
             }
             for (dependency, dependent) in links.added.as_slice() {
                 if *dependency == number {
-                    let (waiting_on, added, _, _, state) = rows(view, *dependent);
+                    let Row { waiting_on, added, state, .. } = rows(view, *dependent);
                     if state.phase.dependencies()
                         && (crate::batch::contains(waiting_on, number) || crate::batch::contains(added, number))
                     {
@@ -487,7 +487,7 @@ impl Judge {
                     }
                 }
             }
-            let (_, _, _, holdings, state) = rows(view, number);
+            let Row { holdings, state, .. } = rows(view, number);
             if let Party::Task(parent) = state.requester
                 && is_child(view, parent, number)
             {
@@ -500,9 +500,9 @@ impl Judge {
                     }
                 }
             }
-            if member_named(view.5, number) {
+            if member_named(view.batch, number) {
                 let mut after = false;
-                for later in view.5 {
+                for later in view.batch {
                     if later.number == number {
                         after = true;
                         continue;
@@ -523,31 +523,25 @@ impl Judge {
         }
     }
 
-    fn free_resource(
-        &mut self,
-        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-        links: &Links,
-        gates: &mut Map<(Name, u64), Gate>,
-        holding: &Holding,
-    ) {
-        let Some(threshold) = threshold(view.0, holding) else { return };
+    fn free_resource(&mut self, view: &View<'_>, links: &Links, gates: &mut Map<(Name, u64), Gate>, holding: &Holding) {
+        let Some(threshold) = threshold(view.domain, holding) else { return };
         let name = crate::holds::name(holding);
         let count = self.counts.get_mut(name).expect("marked resource holder");
         let before = *count;
         *count = count.checked_sub(1).expect("holder counted once");
         if before == threshold {
-            for ((_, waiter), ()) in view.0.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+            for ((_, waiter), ()) in view.domain.waits.waiters.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
                 if row_state(view, *waiter).queued {
                     self.met(*waiter);
                 }
             }
             for (resource, waiter) in links.queued.as_slice() {
-                if resource == name && !member_named(view.5, *waiter) && row_state(view, *waiter).queued {
+                if resource == name && !member_named(view.batch, *waiter) && row_state(view, *waiter).queued {
                     self.met(*waiter);
                 }
             }
         }
-        for member in view.5 {
+        for member in view.batch {
             if let Some(gate) = gates.get_mut(&(name.clone(), member.number)) {
                 let before = gate.count;
                 gate.count = gate.count.checked_sub(1).expect("live holder counted");
@@ -559,13 +553,8 @@ impl Judge {
     }
 
     /// Choose the first stuck wait's ordinal: dependencies, delegates, then resources (6.7).
-    fn choice(
-        &self,
-        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-        gates: &Map<(Name, u64), Gate>,
-        number: u64,
-    ) -> u64 {
-        let (waiting_on, added, delegates, holdings, state) = rows(view, number);
+    fn choice(&self, view: &View<'_>, gates: &Map<(Name, u64), Gate>, number: u64) -> u64 {
+        let Row { waiting_on, added, delegates, holdings, state } = rows(view, number);
         let mut at = 0_u64;
         for list in [waiting_on, added] {
             for dependency in list {
@@ -584,8 +573,8 @@ impl Judge {
             }
             at = at.checked_add(1).expect("bounded waits");
         }
-        if view.2.creator == Party::Task(number) {
-            for member in view.5 {
+        if view.entry.creator == Party::Task(number) {
+            for member in view.batch {
                 if state.phase.delegates() && self.pending.contains_key(&member.number) {
                     return at;
                 }
@@ -601,13 +590,7 @@ impl Judge {
         unreachable!("each remaining task has a stuck wait")
     }
 
-    fn problem(
-        &self,
-        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-        gates: &Map<(Name, u64), Gate>,
-        limits: &Limits,
-        task: u64,
-    ) -> Problem {
+    fn problem(&self, view: &View<'_>, gates: &Map<(Name, u64), Gate>, limits: &Limits, task: u64) -> Problem {
         let mut choices = Map::with_capacity(limits.tasks);
         for (number, _) in &self.pending {
             let choice = self.choice(view, gates, *number);
@@ -616,7 +599,7 @@ impl Judge {
         let mut knot =
             Knot { seen: Set::with_capacity(limits.tasks), tasks: List::with_capacity(limits.circle), cut: false };
         let mut root = task;
-        if !view.5.is_empty() {
+        if !view.batch.is_empty() {
             // A whole batch can leave a creator or member upstream of its knot.
             // Following the first witnesses removes that prefix before breadth-first naming.
             for _ in 0..=limits.tasks {
@@ -638,16 +621,16 @@ impl Judge {
         Problem::naming(Some(root), Refusal::Circle { cut: knot.cut }, knot.tasks.as_slice())
     }
 
-    fn first(&self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64, choice: u64) -> u64 {
+    fn first(&self, view: &View<'_>, number: u64, choice: u64) -> u64 {
         let at = match witness(view, number, choice) {
             Witness::Task(task) => return task,
             Witness::Resource(at) => at,
         };
         let holding =
-            rows(view, number).3.get(usize::try_from(at).expect("resource ordinal")).expect("chosen resource");
+            rows(view, number).holdings.get(usize::try_from(at).expect("resource ordinal")).expect("chosen resource");
         let name = crate::holds::name(holding);
-        if view.5.is_empty() {
-            for ((_, holder), ()) in view.0.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+        if view.batch.is_empty() {
+            for ((_, holder), ()) in view.domain.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
                 if self.pending.contains_key(holder) {
                     return *holder;
                 }
@@ -662,13 +645,7 @@ impl Judge {
         unreachable!("stuck resource has a remaining holder")
     }
 
-    fn name_wait(
-        &self,
-        view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-        number: u64,
-        choice: u64,
-        knot: &mut Knot,
-    ) {
+    fn name_wait(&self, view: &View<'_>, number: u64, choice: u64, knot: &mut Knot) {
         let at = match witness(view, number, choice) {
             Witness::Task(task) => {
                 knot.visit(task);
@@ -676,12 +653,12 @@ impl Judge {
             }
             Witness::Resource(at) => at,
         };
-        let holdings = rows(view, number).3;
+        let holdings = rows(view, number).holdings;
         let holding = holdings.get(usize::try_from(at).expect("bounded resource ordinal")).expect("chosen resource");
-        let mut left = threshold(view.0, holding).expect("stuck resource");
+        let mut left = threshold(view.domain, holding).expect("stuck resource");
         let name = crate::holds::name(holding);
-        if view.5.is_empty() {
-            for ((_, holder), ()) in view.0.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
+        if view.batch.is_empty() {
+            for ((_, holder), ()) in view.domain.waits.holders.range((name.clone(), 0)..=(name.clone(), u64::MAX)) {
                 if self.pending.contains_key(holder) && is_holder(view, *holder, holding) {
                     knot.visit(*holder);
                     left = left.checked_sub(1).expect("one resource witness");
@@ -706,8 +683,8 @@ impl Judge {
     }
 }
 
-fn witness(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64, mut choice: u64) -> Witness {
-    let (waiting_on, added, delegates, _, _) = rows(view, number);
+fn witness(view: &View<'_>, number: u64, mut choice: u64) -> Witness {
+    let Row { waiting_on, added, delegates, .. } = rows(view, number);
     for list in [waiting_on, added, delegates] {
         for witness in list {
             if choice == 0 {
@@ -716,8 +693,8 @@ fn witness(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64
             choice = choice.checked_sub(1).expect("chosen later wait");
         }
     }
-    if view.2.creator == Party::Task(number) {
-        for member in view.5 {
+    if view.entry.creator == Party::Task(number) {
+        for member in view.batch {
             if choice == 0 {
                 return Witness::Task(member.number);
             }
@@ -732,17 +709,12 @@ enum Witness {
     Resource(u32),
 }
 
-fn witnesses_resource(
-    view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-    waiter: u64,
-    number: u64,
-    holding: &Holding,
-) -> bool {
-    if is_holder(view, number, holding) && has(rows(view, number).3, holding) {
+fn witnesses_resource(view: &View<'_>, waiter: u64, number: u64, holding: &Holding) -> bool {
+    if is_holder(view, number, holding) && has(rows(view, number).holdings, holding) {
         return true;
     }
-    if member_named(view.5, waiter) {
-        for prior in view.5 {
+    if member_named(view.batch, waiter) {
+        for prior in view.batch {
             if prior.number == waiter {
                 break;
             }
@@ -776,25 +748,25 @@ struct Links {
 }
 
 impl Links {
-    fn new(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), limits: &Limits) -> Self {
+    fn new(view: &View<'_>, limits: &Limits) -> Self {
         let mut links = Self {
             added: List::with_capacity(limits.tasks.checked_mul(limits.dependencies).expect("dependency edges")),
             queued: List::with_capacity(resource_capacity(limits).expect("resource edges")),
         };
-        for (number, _) in &view.0.names {
+        for (number, _) in &view.domain.names {
             links.row(view, *number);
         }
-        for member in view.5 {
+        for member in view.batch {
             links.row(view, member.number);
         }
         links
     }
 
-    fn row(&mut self, view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), number: u64) {
-        let (waiting_on, added, _, holdings, state) = rows(view, number);
+    fn row(&mut self, view: &View<'_>, number: u64) {
+        let Row { waiting_on, added, holdings, state, .. } = rows(view, number);
         for list in [waiting_on, added] {
             for dependency in list {
-                if !view.0.waits.dependents.contains_key(&(*dependency, number)) {
+                if !view.domain.waits.dependents.contains_key(&(*dependency, number)) {
                     self.added.push((*dependency, number)).expect("bounded projected dependencies");
                 }
             }
@@ -802,7 +774,7 @@ impl Links {
         if state.queued {
             for holding in holdings {
                 let pair = (crate::holds::name(holding).clone(), number);
-                if !view.0.waits.waiters.contains_key(&pair) {
+                if !view.domain.waits.waiters.contains_key(&pair) {
                     self.queued.push(pair).expect("bounded projected queues");
                 }
             }
@@ -819,25 +791,21 @@ fn handed(batch: &[New], holding: &Holding) -> bool {
     false
 }
 
-fn batch_gates(
-    view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]),
-    judge: &Judge,
-    limits: &Limits,
-) -> Map<(Name, u64), Gate> {
-    let members = u32::try_from(view.5.len()).expect("admitted batch bound");
+fn batch_gates(view: &View<'_>, judge: &Judge, limits: &Limits) -> Map<(Name, u64), Gate> {
+    let members = u32::try_from(view.batch.len()).expect("admitted batch bound");
     let mut gates = Map::with_capacity(members.checked_mul(limits.holdings).expect("batch gates"));
-    for member in view.5 {
+    for member in view.batch {
         if !row_state(view, member.number).queued {
             continue;
         }
         for holding in &member.holdings {
-            let Some(threshold) = threshold(view.0, holding) else { continue };
+            let Some(threshold) = threshold(view.domain, holding) else { continue };
             if !gate(view, member.number, holding) {
                 continue;
             }
             let name = crate::holds::name(holding);
             let mut count = judge.counts.get(name).copied().unwrap_or(0);
-            for prior in view.5 {
+            for prior in view.batch {
                 if prior.number == member.number {
                     break;
                 }
@@ -851,22 +819,22 @@ fn batch_gates(
     gates
 }
 
-fn judge(view: &(&Domain, &Staged, Entry, &[u64], &[u64], &[New]), limits: &Limits) -> Result<(), Problem> {
+fn judge(view: &View<'_>, limits: &Limits) -> Result<(), Problem> {
     let links = Links::new(view, limits);
     let mut judge = Judge::new(limits);
     judge.walk(view, &links, limits);
     let mut gates = batch_gates(view, &judge, limits);
     // Phase B can end an already-ready source immediately. A batch also judges
     // its members, which can circle without their creator (domain/tasks.md, 6.7).
-    if view.5.is_empty() && judge.waits(view, view.2.task, &gates) == 0 {
+    if view.batch.is_empty() && judge.waits(view, view.entry.task, &gates) == 0 {
         return Ok(());
     }
     judge.eliminate(view, &links, &mut gates, limits);
-    if judge.pending.contains_key(&view.2.task) {
-        return Err(judge.problem(view, &gates, limits, view.2.task));
+    if judge.pending.contains_key(&view.entry.task) {
+        return Err(judge.problem(view, &gates, limits, view.entry.task));
     }
     // A batch can contain an internal circle while its creator is held or absent.
-    for member in view.5 {
+    for member in view.batch {
         if judge.pending.contains_key(&member.number) {
             return Err(judge.problem(view, &gates, limits, member.number));
         }
@@ -887,19 +855,19 @@ pub(crate) fn check_added(
         return Ok(());
     }
     judge(
-        &(
+        &View {
             domain,
             staged,
-            Entry {
+            entry: Entry {
                 task,
                 phase: WaitPhase::for_phase(&row.phase),
                 waiting: row.phase == Phase::Waiting,
                 creator: Party::Person(0),
             },
-            &[],
+            pending: &[],
             added,
-            &[],
-        ),
+            batch: &[],
+        },
         limits,
     )
 }
@@ -1019,19 +987,19 @@ fn eliminate(domain: &Domain, limits: &Limits) -> Map<u64, u32> {
     let Some((&task, _)) = domain.names.first() else { return Map::with_capacity(limits.tasks) };
     let staged = Staged::new(0);
     let row = record(domain, task).expect("live task");
-    let view = (
+    let view = View {
         domain,
-        &staged,
-        Entry {
+        staged: &staged,
+        entry: Entry {
             task,
             phase: WaitPhase::for_phase(&row.phase),
             waiting: row.phase == Phase::Waiting,
             creator: Party::Person(0),
         },
-        row.waiting_on.as_ref(),
-        &[][..],
-        &[][..],
-    );
+        pending: row.waiting_on.as_ref(),
+        added: &[],
+        batch: &[],
+    };
     let links = Links::new(&view, limits);
     let mut judge = Judge::new(limits);
     for (number, _) in &domain.names {
@@ -1057,14 +1025,14 @@ pub(crate) fn check_batch(domain: &Domain, limits: &Limits, creator: Party, batc
         None => (&Phase::Waiting, &[][..]),
     };
     judge(
-        &(
+        &View {
             domain,
-            &staged,
-            Entry { task, phase: WaitPhase::for_phase(phase), waiting: *phase == Phase::Waiting, creator },
+            staged: &staged,
+            entry: Entry { task, phase: WaitPhase::for_phase(phase), waiting: *phase == Phase::Waiting, creator },
             pending,
-            &[],
+            added: &[],
             batch,
-        ),
+        },
         limits,
     )
 }
@@ -1199,19 +1167,19 @@ pub(crate) fn check_waits(
     pending: &[u64],
 ) -> Result<(), Problem> {
     judge(
-        &(
+        &View {
             domain,
             staged,
-            Entry {
+            entry: Entry {
                 task,
                 phase: WaitPhase::for_phase(phase),
                 waiting: *phase == Phase::Waiting,
                 creator: Party::Person(0),
             },
             pending,
-            &[],
-            &[],
-        ),
+            added: &[],
+            batch: &[],
+        },
         limits,
     )
 }
