@@ -760,6 +760,18 @@ impl World {
             self.accounting_referee.committed(&self.records, &self.pending).expect("independent conservation");
         }
         self.observe(Seen::Durable { commit: self.commit });
+        self.observe_made();
+        for (task, attempt) in terminals {
+            self.runs.remove(&task);
+            self.observe(Seen::Terminal { task, attempt });
+        }
+        for seen in ordered {
+            self.observe(seen);
+        }
+    }
+
+    /// Each live row the referee has not met yet is made, as it was committed.
+    fn observe_made(&mut self) {
         let made = self
             .records
             .values()
@@ -773,13 +785,6 @@ impl World {
             })
             .collect::<Vec<_>>();
         for seen in made {
-            self.observe(seen);
-        }
-        for (task, attempt) in terminals {
-            self.runs.remove(&task);
-            self.observe(Seen::Terminal { task, attempt });
-        }
-        for seen in ordered {
             self.observe(seen);
         }
     }
