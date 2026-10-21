@@ -335,7 +335,7 @@ fn cycle(batch: &[people::Member], first: u64, bound: u32) -> Result<Option<task
     Ok(None)
 }
 
-fn well_formed(batch: &[people::Member]) -> Result<(), people::Refusal> {
+pub(crate) fn well_formed(batch: &[people::Member]) -> Result<(), people::Refusal> {
     let mut allowed = false;
     for (at, member) in batch.iter().enumerate() {
         let agent = match member.executor {

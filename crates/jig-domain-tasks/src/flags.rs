@@ -35,7 +35,8 @@ pub enum EndedBy {
 }
 
 /// An open task is an agent's conversation (5.8).
-pub(crate) fn shaped(flags: Flags, executor: crate::Executor) -> bool {
+#[must_use]
+pub fn shaped(flags: Flags, executor: crate::Executor) -> bool {
     if flags.ended_by == EndedBy::Result {
         return true;
     }
