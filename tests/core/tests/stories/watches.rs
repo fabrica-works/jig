@@ -164,7 +164,8 @@ fn inbox_across_projects_stories() {
     use skein_lib::{List, Map, Queue};
     let (mut config, mut limits) = super::amendment_world_fixture(788);
     limits.core.tasks.tasks = 4;
-    limits.core.people.projects = 2;
+    // Both configured projects and the deployment's roles.
+    limits.core.people.projects = 3;
     limits.core.people.initial_owners = 2;
     limits.core.authority.projects = 2;
     let policy = config.core.authority.policy(1).expect("configured policy").clone();

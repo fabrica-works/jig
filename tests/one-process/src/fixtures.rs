@@ -29,7 +29,8 @@ fn engine_document() -> String {
         .replace(r#""components":["accounts","workers"]"#, r#""components":["accounts","workers","clients"]"#)
         .replace(r#""credential":"app.secret""#, r#""workers":[{"root":"agent-root"}],"credential":"app.secret""#)
         .replace(r#""people.sign_ins":1"#, r#""people.sign_ins":2"#)
-        .replace(r#""people.projects":1"#, r#""people.projects":1,"authority.projects":1"#)
+        // Keep channel's room for the deployment's roles beside its configured project.
+        .replace(r#""people.projects":2"#, r#""people.projects":2,"authority.projects":1"#)
 }
 pub(crate) fn store_limits() -> jig_test_service::limits::Limits {
     static LIMITS: std::sync::OnceLock<jig_test_service::limits::Limits> = std::sync::OnceLock::new();

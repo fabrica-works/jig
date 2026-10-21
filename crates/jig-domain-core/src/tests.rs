@@ -92,7 +92,8 @@ pub(super) fn limits() -> Limits {
         inbox_tasks: 16,
         inbox_recipients: 64,
         sign_ins: 2,
-        projects: 1,
+        // The configured project and the deployment's roles.
+        projects: 2,
         holdings: 2,
         initial_owners: 1,
         requests: 4,

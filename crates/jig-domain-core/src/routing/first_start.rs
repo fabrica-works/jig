@@ -1,4 +1,5 @@
-//! Configuration's first-start project seed (protocol/configuration.md, 3 and 8).
+//! Configuration's first-start project seed and the deployment's roles
+//! (protocol/configuration.md, 3 and 8; domain/people.md, 3).
 
 use alloc::boxed::Box;
 use jig_domain_people as people;
@@ -64,6 +65,27 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
         for _ in 0..child.len() {
             let people::Request::Save { record } = child.pop().expect("seeded role row") else {
                 unreachable!("configured roster fits people limits");
+            };
+            out.push(Request::Write(Write::Save(Record::People(record))));
+        }
+    }
+    if !core.projects.as_slice().contains(&0) {
+        let mut holdings = List::with_capacity(env.limits.people.holdings);
+        for owner in &owners {
+            if let Some(person) = identities.remove(&owner.identity) {
+                holdings.push(people::Holding { person, role: people::Role::Owner }).expect("configured owner roster");
+            }
+        }
+        let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
+        people::step(
+            &mut core.people,
+            &Env { now: env.now, wall: env.wall, limits: env.limits.people },
+            people::Event::Roles { project: 0, holdings: holdings.into_boxed() },
+            &mut child,
+        );
+        for _ in 0..child.len() {
+            let people::Request::Save { record } = child.pop().expect("seeded deployment role row") else {
+                unreachable!("configured deployment roster fits people limits");
             };
             out.push(Request::Write(Write::Save(Record::People(record))));
         }
