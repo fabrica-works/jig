@@ -26,7 +26,7 @@ pub use boundary::{
 };
 pub use checks::{Bound, Refusal, SignIn, room_for_sign_in};
 pub use domain::{Account, Domain, fire, max_out, step};
-pub use keys::KEY_VALID;
+pub use keys::{KEY_VALID, PROGRAM_VALID};
 pub use limits::{Limits, worst_case};
 pub use providers::{MANAGE_USAGE, Offers, PROVIDER_NAME, Provider, Providers};
 pub use records::{DISPLAY, Held, Holder, Key, Kind, NAME, SUBJECT, Stored, USES, Use};

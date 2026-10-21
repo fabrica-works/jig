@@ -101,6 +101,7 @@ pub fn declare(
     out.push(Request::Save { record: crate::domain::stored(domain, env, number) });
     domain.counted(out);
     publish(domain, out);
+    crate::domain::changed(domain, env, number, None, out);
     Ok(number)
 }
 
@@ -222,12 +223,17 @@ pub(crate) fn publish(domain: &Domain, out: &mut Queue<Request>) {
     out.push(Request::Programs { names: names.into_boxed() });
 }
 /// An explicit holder check permits a fresh login on a live declaration.
+/// A Refused source is withdrawn and not granted again while held Refused; Resume clears
+/// only Limited holds. Withdrawal records no fact: facts are expendable.
 /// # Errors
 /// A foreign, retired or unknown source, or a closing child.
 pub fn check(domain: &mut Domain, holder: Holder, source: u32, out: &mut Queue<Request>) -> Result<(), Refusal> {
     crate::changes::source(domain, holder, source)?;
     if domain.programs.contains_key(&source) {
         return Err(Refusal::Limit { bound: crate::Bound::Sources });
+    }
+    if domain.numbers_left() == 0 {
+        return Err(Refusal::Numbers);
     }
     let issued = domain.issued.get_mut(&source).ok_or(Refusal::Unknown)?;
     issued.signed_out = false;
@@ -240,6 +246,11 @@ pub fn check(domain: &mut Domain, holder: Holder, source: u32, out: &mut Queue<R
             signed_out: false,
         },
     });
+    // A fresh login gets a fresh epoch through the existing durable counter.
+    domain.take();
+    domain.counted(out);
+    crate::domain::withdraw_program(domain, source);
+    crate::domain::program_grant(domain, source, out);
     publish(domain, out);
     out.push(Request::CheckProgram { name });
     Ok(())
@@ -262,6 +273,7 @@ pub(crate) fn begin(
             signed_out: true,
         },
     });
+    crate::domain::withdraw_program(domain, source);
     assert!(
         domain
             .programs

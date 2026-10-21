@@ -26,10 +26,15 @@ impl World {
         }
         match delivery {
             root::Delivery::Core(core::Held::Sources { channel, sources }) => {
-                assert!(sources.is_empty(), "scripted worker source fixture");
                 self.events.push_back(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Logins {
                     channel,
-                    logins: Box::new([]),
+                    logins: sources
+                        .iter()
+                        .map(|source| jig_domain_fleet::Login {
+                            name: *source,
+                            state: jig_domain_fleet::LoginState::Usable,
+                        })
+                        .collect(),
                 })));
             }
             root::Delivery::ApplicationRead { reply, number, answer } => {

@@ -12,6 +12,10 @@ fn a_grants_form_maps_one_to_one_into_smiths() {
         (host::Form::Credential(host::Scheme::Key), Some(smith::Form::Credential(smith::Scheme::Key))),
         (host::Form::Withdrawn, Some(smith::Form::Withdrawn)),
         (host::Form::Application, None),
+        (
+            host::Form::Program(host::SourceName::new(b"claude").expect("source name")),
+            Some(smith::Form::Program(smith::SourceName::new(b"claude").expect("smith source name"))),
+        ),
     ] {
         let grant = host::Grant { form, account: 7, generation: 4, valid: skein_lib::Duration::from_secs(30) };
         let actual = crate::translate::grant(grant);

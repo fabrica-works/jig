@@ -714,3 +714,45 @@ fn claim_keeps_pin_and_bindings(world: &World, task: u64, attempt: u64, account:
         pin && bindings
     })
 }
+
+fn program_configuration(seed: u64) -> (root::Config, root::Limits) {
+    let (mut config, limits) = jig_core_world::effects::fixture(seed, false);
+    config.core.settings.llm_providers.providers[0].offers.programs = Box::new([b"claude_code".as_slice().into()]);
+    (config, limits)
+}
+#[test]
+fn an_adopted_program_run_is_sent_its_grant_again() {
+    let (config, limits) = program_configuration(159);
+    let initial = jig_core_world::fixtures::create_chat(
+        &jig_core_world::fixtures::Creating::new(&config.core, limits.core.tasks.tree_tasks),
+        1,
+        0,
+        b"make an effect".as_slice().into(),
+    );
+    let mut rows = jig_core_world::fixtures::account_rows(&config.core.settings.llm_providers).into_vec();
+    for row in &mut rows {
+        if let root::Record::Core(core::Record::Accounts(accounts::Stored::Account { holder, .. })) = row {
+            *holder = accounts::Holder::Party(1);
+        }
+        if let root::Record::Core(core::Record::Accounts(accounts::Stored::Source { kind, name, .. })) = row {
+            *kind = accounts::Kind::Program;
+            *name = b"personal".as_slice().into();
+        }
+    }
+    rows.push(root::Record::Core(core::Record::Accounts(accounts::Stored::Issued {
+        number: 1,
+        holder: accounts::Holder::Party(1),
+        name: b"personal".as_slice().into(),
+        signed_out: false,
+    })));
+    let mut world = World::configured_with_rows(159, false, config, limits, initial, rows.into_boxed_slice());
+    let task = world.assigned.as_ref().expect("program run assigned").task;
+    world.restart_with(program_configuration(159).0);
+    hello(&mut world);
+    let (received_task, grant) = received(&world);
+    assert_eq!(
+        (received_task, grant.form, grant.account, grant.generation),
+        (Token::new(task), fleet::Form::Program(fleet::SourceName::new(b"personal").expect("source name")), 1, 2)
+    );
+    assert!(grant.valid > accounts::KEY_VALID);
+}

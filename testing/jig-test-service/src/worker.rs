@@ -656,6 +656,10 @@ fn grant_value(table: &Table, grant: &smith::Grant, now: Time) -> Option<host::V
     Some(host::Values { paths: Box::default(), credentials: Box::new([value]) })
 }
 fn account(table: &Table, grant: &smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
+    match grant.form {
+        smith::Form::Program(name) => return Some(smith_protocol_channel::GrantValue::Program(name.as_bytes().into())),
+        smith::Form::Credential(_) | smith::Form::Withdrawn => {}
+    }
     let value = table.value(grant.account, grant.generation, now)?;
     let token = value.token.expose().into();
     Some(match &value.scheme {
@@ -739,4 +743,34 @@ pub(super) fn worst_case(worker: &config::Worker, agent: &Agent, root_bytes: usi
         .checked_add(payload.checked_mul(u64::from(room).checked_mul(3)?)?)?
         .checked_add(command.checked_mul(u64::from(worker.slots).checked_add(1)?)?)?
         .checked_add(skein_io::worst_case(&worker.limits.io)?)
+}
+
+#[cfg(test)]
+mod program_grant_tests {
+    use super::*;
+    fn program_grant() -> smith::Grant {
+        smith::Grant {
+            form: smith::Form::Program(smith::SourceName::new(b"personal").expect("source name")),
+            account: 7,
+            generation: 2,
+            valid: skein_lib::Duration::from_secs(60),
+        }
+    }
+    #[test]
+    fn a_program_grant_reaches_smith_as_a_program_value() {
+        let table = Table::new(0, 1);
+        let values = start_values(&table, &[program_grant()], Time::ZERO).expect("program values");
+        assert_eq!(
+            values.credentials.as_ref(),
+            &[smith_protocol_channel::GrantValue::Program(b"personal".as_slice().into())]
+        );
+    }
+    #[test]
+    fn a_program_grant_needs_no_table_entry() {
+        let table = Table::new(0, 1);
+        assert_eq!(
+            account(&table, &program_grant(), Time::ZERO),
+            Some(smith_protocol_channel::GrantValue::Program(b"personal".as_slice().into()))
+        );
+    }
 }

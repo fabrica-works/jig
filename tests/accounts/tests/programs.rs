@@ -62,6 +62,7 @@ fn a_declaration_saves_its_reservation_atomically() {
                         cleanup: false
                     }])
                 },
+                Request::Granted { grant: named_grant(1, 2) },
             ]
         )
     );
@@ -450,7 +451,9 @@ fn an_accepted_program_name_is_a_fleet_source_name() {
     let name = b"a-0123456789";
     let (result, rows) = declare(&mut world, HOLDER, PROVIDER, None, name);
     assert!(result.is_ok());
-    let Some(Request::Programs { names }) = rows.last() else { panic!("published names") };
+    let Some(Request::Programs { names }) = rows.iter().find(|row| matches!(row, Request::Programs { .. })) else {
+        panic!("published names")
+    };
     assert_eq!(Some(names[0].name), jig_domain_workers::SourceName::new(name));
 }
 #[test]
@@ -544,4 +547,108 @@ fn an_issued_name_answers_its_source_holder() {
         );
         assert_eq!(programs::issued(&world.domain, b"personal"), Some((21, HOLDER)));
     }
+}
+
+fn named_grant(source: u32, generation: u64) -> jig_domain_accounts::Grant {
+    jig_domain_accounts::Grant {
+        form: jig_domain_accounts::Form::Program(
+            jig_domain_accounts::SourceName::new(b"personal").expect("source name"),
+        ),
+        account: source,
+        generation,
+        valid: jig_domain_accounts::PROGRAM_VALID,
+    }
+}
+#[test]
+fn a_usable_program_source_is_granted_by_its_name() {
+    let mut world = fresh();
+    let (source, requests) = declare(&mut world, HOLDER, PROVIDER, None, b"personal");
+    let source = source.expect("declared source");
+    assert!(requests.contains(&Request::Granted { grant: named_grant(source, 2) }));
+}
+#[test]
+fn a_program_grant_never_lapses() {
+    let mut world = fresh();
+    let (source, _) = declare(&mut world, HOLDER, PROVIDER, None, b"personal");
+    let source = source.expect("declared source");
+    assert_eq!(world.domain.source_grant(source, skein_lib::Time::from_nanos(u64::MAX)), Some(named_grant(source, 2)));
+    assert_eq!(world.domain.next_deadline(), None);
+}
+#[test]
+fn a_new_login_raises_the_program_grant_s_generation() {
+    let mut world = fresh();
+    let (source, _) = declare(&mut world, HOLDER, PROVIDER, None, b"personal");
+    let source = source.expect("declared source");
+    sign_out(&mut world, HOLDER);
+    world.step(Event::ProgramTargets { source, hosts: Box::new([]) });
+    let requests = world.step(Event::Change {
+        request: skein_lib::Token::new(44),
+        holder: HOLDER,
+        change: jig_domain_accounts::Change::CheckProgram { source },
+    });
+    assert!(requests.contains(&Request::Save { record: Stored::Next { number: 3 } }));
+    assert!(requests.contains(&Request::Granted { grant: named_grant(source, 3) }));
+}
+#[test]
+fn a_restored_program_grant_uses_the_durable_counter_epoch() {
+    for held in [None, Some(jig_domain_accounts::Held::Refused)] {
+        let program = Stored::Source {
+            account: 0,
+            number: 1,
+            place: 0,
+            kind: Kind::Program,
+            name: b"personal".as_slice().into(),
+            held,
+        };
+        let mut world = World::with(
+            configured(),
+            &[account(0, PROVIDER, HOLDER, b""), program, issued(1, b"personal"), Stored::Next { number: 3 }],
+        );
+        let requests = world.step(Event::Want);
+        assert_eq!(requests.contains(&Request::Granted { grant: named_grant(1, 3) }), held.is_none());
+        assert!(!requests.iter().any(|request| matches!(request, Request::Save { record: Stored::Source { .. } })));
+    }
+}
+
+#[test]
+fn signing_out_withdraws_the_program_grant() {
+    let mut world = fresh();
+    declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("source");
+    sign_out(&mut world, HOLDER);
+    assert_eq!(world.domain.source_grant(1, world.now), None);
+    assert_eq!(
+        world.domain.select(
+            jig_domain_accounts::Use::Party(7),
+            PROVIDER,
+            Some(0),
+            None,
+            &[jig_domain_accounts::Coverage { account: 0, serves: true }],
+            &[jig_domain_accounts::HostSource { source: 1, usable: true }],
+            world.now,
+        ),
+        jig_domain_accounts::Selection::Wait { account: 0, source: Some(1), why: jig_domain_accounts::WaitWhy::Host }
+    );
+}
+#[test]
+fn a_login_check_with_an_exhausted_epoch_changes_nothing() {
+    // Restoring the counter before Want gives the greatest representable epoch.
+    let rows = [
+        account(0, PROVIDER, HOLDER, b""),
+        Stored::Source {
+            account: 0,
+            number: 1,
+            place: 0,
+            kind: Kind::Program,
+            name: b"personal".as_slice().into(),
+            held: None,
+        },
+        issued(1, b"personal"),
+        Stored::Next { number: u32::MAX },
+    ];
+    let mut world = World::with(configured(), &rows);
+    world.step(Event::Want);
+    let mut out = Queue::with_capacity(jig_domain_accounts::max_out(&LIMITS));
+    assert_eq!(programs::check(&mut world.domain, HOLDER, 1, &mut out), Err(Refusal::Numbers));
+    assert!(out.is_empty());
+    assert_eq!(world.domain.source_grant(1, world.now), Some(named_grant(1, u64::from(u32::MAX))));
 }

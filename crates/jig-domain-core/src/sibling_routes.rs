@@ -178,9 +178,11 @@ impl Core {
             if source.kind == accounts::Kind::None {
                 continue;
             }
-            holds
-                .push(fleet::GrantName { table: fleet::GrantTable::Accounts, account: binding.source })
-                .expect("provider names");
+            let table = match source.kind {
+                accounts::Kind::Program => fleet::GrantTable::Name,
+                accounts::Kind::SignIn | accounts::Kind::Key | accounts::Kind::None => fleet::GrantTable::Accounts,
+            };
+            holds.push(fleet::GrantName { table, account: binding.source }).expect("provider names");
             if let Some(grant) = self.accounts.source_grant(binding.source, env.now) {
                 grants.push(fleet_grant(grant)).expect("provider grants");
             }

@@ -320,14 +320,14 @@ impl Domain {
     pub fn source_grant(&self, source: u32, now: Time) -> Option<Grant> {
         let entry = self.sources.get(&source)?;
         let grant = entry.grant?;
-        if !entry.usable || grant.expires <= now {
+        if !entry.usable || (entry.kind != Kind::Program && grant.expires <= now) {
             return None;
         }
         Some(Grant {
             form: grant.form,
             account: source,
             generation: grant.generation,
-            valid: grant.expires.saturating_since(now),
+            valid: if entry.kind == Kind::Program { crate::PROGRAM_VALID } else { grant.expires.saturating_since(now) },
         })
     }
     #[must_use]
@@ -548,6 +548,16 @@ fn want(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     }
     out.push(Request::Signing(Signing::Restored));
     crate::programs::publish(domain, out);
+    let mut programs = List::with_capacity(domain.sources.capacity());
+    for (number, source) in &domain.sources {
+        if source.kind == Kind::Program {
+            programs.push(*number).expect("one entry per program source");
+        }
+    }
+    for number in &programs {
+        let before = domain.sources.get(number).expect("collected program source").hold;
+        changed(domain, env, *number, before, out);
+    }
     for (number, source) in &domain.sources {
         if source.kind == Kind::SignIn || source.kind == Kind::Key {
             out.push(Request::Component(ToComponent::Want { account: *number }));
@@ -916,6 +926,7 @@ pub(crate) fn changed(
     before: Option<Hold>,
     out: &mut Queue<Request>,
 ) {
+    program_grant(domain, source, out);
     let view = settle(domain, env, source);
     if domain.facts.try_push(view).is_err() {
         domain.lost = domain.lost.saturating_add(1);
@@ -972,13 +983,17 @@ pub(crate) fn settle(domain: &mut Domain, env: &Env<Limits>, source: u32) -> Fac
                 None => false,
             },
             Kind::None => entry.state == State::Granted,
-            Kind::Program => false,
+            Kind::Program => entry.grant.is_some(),
         };
     let record = fact(source, entry);
     let mut alarm = entry.retry;
-    let expiry = match entry.grant {
-        Some(grant) => Some(grant.expires),
-        None => None,
+    let expiry = if entry.kind == Kind::Program {
+        None
+    } else {
+        match entry.grant {
+            Some(grant) => Some(grant.expires),
+            None => None,
+        }
     };
     let reset = match entry.hold {
         Some(Hold::Limited { until }) => until,
@@ -997,4 +1012,42 @@ pub(crate) fn settle(domain: &mut Domain, env: &Env<Limits>, source: u32) -> Fac
         None => domain.alarms.cancel(source),
     }
     record
+}
+
+/// A named grant derives its epoch from the durable counter, so no source record
+/// gains a generation. An explicit login check advances that counter; restart
+/// derives an epoch at least as new as every grant released before its commit.
+pub(crate) fn program_grant(domain: &mut Domain, source: u32, out: &mut Queue<Request>) {
+    if !domain.wanted() {
+        return;
+    }
+    let Some(issued) = domain.issued.get(&source) else { return };
+    if issued.signed_out {
+        return;
+    }
+    let name = issued.name;
+    let Some(entry) = domain.sources.get_mut(&source) else { return };
+    if entry.kind != Kind::Program || entry.grant.is_some() || entry.state == State::Closing {
+        return;
+    }
+    match entry.hold {
+        Some(Hold::Limited { until: Some(until) }) if until <= domain.now => {}
+        Some(Hold::Limited { .. } | Hold::Refused) => return,
+        None => {}
+    }
+    let generation = u64::from(domain.next);
+    entry.grant = Some(Granted { generation, expires: Time::from_nanos(u64::MAX), form: Form::Program(name) });
+    entry.state = State::Granted;
+    entry.usable = true;
+    out.push(Request::Granted {
+        grant: Grant { form: Form::Program(name), account: source, generation, valid: crate::PROGRAM_VALID },
+    });
+}
+/// Withdraw the grant without recording a fact; facts are expendable.
+pub(crate) fn withdraw_program(domain: &mut Domain, source: u32) {
+    if let Some(entry) = domain.sources.get_mut(&source) {
+        entry.grant = None;
+        entry.usable = false;
+        entry.state = State::Asking;
+    }
 }

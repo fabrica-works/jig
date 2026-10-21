@@ -186,7 +186,7 @@ impl Domain {
             let usable = match fact.kind {
                 Kind::None => fact.usable,
                 Kind::SignIn | Kind::Key => self.source_grant(*source, now).is_some(),
-                Kind::Program => on_host,
+                Kind::Program => on_host && self.source_grant(*source, now).is_some(),
             };
             if usable {
                 if !on_host {

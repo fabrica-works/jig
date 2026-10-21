@@ -3,12 +3,13 @@ use jig_domain_host as host;
 use smith_host_domain as smith;
 
 #[must_use]
-pub const fn grant(value: host::Grant) -> Option<smith::Grant> {
+pub fn grant(value: host::Grant) -> Option<smith::Grant> {
     let form = match value.form {
         host::Form::Credential(host::Scheme::Bearer) => smith::Form::Credential(smith::Scheme::Bearer),
         host::Form::Credential(host::Scheme::Key) => smith::Form::Credential(smith::Scheme::Key),
         host::Form::Withdrawn => smith::Form::Withdrawn,
-        host::Form::Application | host::Form::Program(_) => return None,
+        host::Form::Program(name) => smith::Form::Program(smith::SourceName::new(name.as_bytes())?),
+        host::Form::Application => return None,
     };
     Some(smith::Grant { account: value.account, generation: value.generation, valid: value.valid, form })
 }

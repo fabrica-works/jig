@@ -206,7 +206,9 @@ Account
   A check answers usable, not signed in, signed in otherwise (another
   way of paying than the holder's plan) or failed (smith's
   `protocol/programs.md`, section 3), and the deployment's document
-  shows each host's answer. Every notice names the worker's whole current
+  shows each host's answer. A holder's check withdraws the source's grant;
+  a source held Refused is not granted again while so held (Resume clears
+  only Limited holds). Withdrawal records no fact: facts are expendable. Every notice names the worker's whole current
   source list, without login contents; the fleet places a run on a
   program's source only where its login is usable (engine.md, section 8). The engine's
   own slots run `smith-inline-agent`, which has no program backend, so
