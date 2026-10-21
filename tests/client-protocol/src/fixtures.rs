@@ -83,7 +83,7 @@ pub fn models() -> Box<[jig_protocol_engine_clients::Model]> {
             output: model.output_price,
             unit: model.price_unit,
         },
-        description: None,
+        description: Some(Box::from(b"For scripted work".as_slice())),
     }])
 }
 // Match this world's HTTP intake and the small profile's component bound.

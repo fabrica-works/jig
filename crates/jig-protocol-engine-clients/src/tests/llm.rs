@@ -54,8 +54,18 @@ fn me_lists_only_the_models_the_party_s_authority_allows_by_name() {
     assert_eq!(careful.efforts().len(), 2);
     assert_eq!(careful.efforts().get(0).unwrap().as_ref(), b"low");
     assert_eq!(careful.efforts().get(1).unwrap().as_ref(), b"high");
+    assert_eq!(
+        careful.prices().clone().into_parts(),
+        w::MePricesParts { input: 3, cached: 1, cache_write: Some(5), output: 15, unit: 1_000_000 }
+    );
+    assert_eq!(careful.description().as_deref(), Some(b"For careful work".as_slice()));
     let quick = all.models().get(1).unwrap();
     assert_eq!((quick.name(), quick.provider(), quick.efforts().len()), (b"quick".as_slice(), &None, 0));
+    assert_eq!(
+        quick.prices().clone().into_parts(),
+        w::MePricesParts { input: 1, cached: 1, cache_write: None, output: 2, unit: 1000 }
+    );
+    assert_eq!(quick.description(), &None);
 }
 
 #[test]
@@ -117,6 +127,10 @@ fn configured_models_past_the_wire_or_named_twice_cannot_start_the_component() {
         let mut out = Queue::with_capacity(8);
         assert_eq!(Component::new(settings, &env, &mut out).err(), Some(Unusable::Limits), "{name}");
     }
+    let mut smaller = env;
+    smaller.limits.wire.me_model_description_some = 3;
+    let mut out = Queue::with_capacity(8);
+    assert_eq!(Component::new(fixtures::settings(), &smaller, &mut out).err(), Some(Unusable::Limits));
 }
 
 fn settings_with(model: crate::Model) -> crate::Settings {

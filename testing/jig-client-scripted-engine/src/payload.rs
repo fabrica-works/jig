@@ -403,7 +403,8 @@ fields!(Me {
 fields!(MeParty { number, kind, login, name });
 fields!(Needs { questions, proposals, escalations, person_tasks });
 fields!(MeProject { templates, creating, project, name, role, pool, models });
-fields!(jig_client_domain::contract::MeModel { name, provider, window, output, efforts });
+fields!(jig_client_domain::contract::MeModel { name, provider, window, output, efforts, prices, description });
+fields!(jig_client_domain::contract::ModelPrices { input, cached, cache_write, output, unit });
 fields!(jig_client_domain::contract::LlmChoice { account, main, subagents });
 fields!(jig_client_domain::contract::ModelEffort { model, effort });
 fields!(Budget { total, own, ended, reserved, left, funder });

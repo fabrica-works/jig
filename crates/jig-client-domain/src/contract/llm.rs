@@ -33,6 +33,21 @@ pub struct MeModel {
     pub output: u32,
     /// The efforts it declares, in its order.
     pub efforts: List<Text>,
+    /// Its configured prices.
+    pub prices: ModelPrices,
+    /// What it is good at, as configured, if given.
+    pub description: Option<Text>,
+}
+
+/// Amounts per `unit` tokens in the deployment's spend unit. Without a separate cache-write
+/// price, cache writes are priced at input (client/domain/contract.md, 5.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ModelPrices {
+    pub input: u64,
+    pub cached: u64,
+    pub cache_write: Option<u64>,
+    pub output: u64,
+    pub unit: u32,
 }
 
 /// Why a named model was refused (domain/tasks.md, 4 and 7).

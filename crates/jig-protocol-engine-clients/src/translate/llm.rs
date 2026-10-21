@@ -102,7 +102,8 @@ pub(crate) fn fits(models: &[Model], limits: &w::Limits) -> bool {
             && (description.is_empty()
                 || !skein_codec::text_is_valid(description)
                 || description.len()
-                    > usize::try_from(jig_domain_core::MODEL_DESCRIPTION_BYTES).expect("u32 fits usize"))
+                    > usize::try_from(jig_domain_core::MODEL_DESCRIPTION_BYTES).expect("u32 fits usize")
+                || description.len() > usize::try_from(limits.me_model_description_some).expect("u32 fits usize"))
         {
             return false;
         }
@@ -144,6 +145,17 @@ pub fn models(allowed: Models, models: &[Model], limits: &w::Limits) -> Result<L
                 window: model.window,
                 output: model.output,
                 efforts,
+                prices: w::MePrices::new(
+                    limits,
+                    w::MePricesParts {
+                        input: model.prices.input,
+                        cached: model.prices.cached,
+                        cache_write: model.prices.cache_write,
+                        output: model.prices.output,
+                        unit: model.prices.unit,
+                    },
+                )?,
+                description: model.description.clone(),
             },
         )?)
         .expect("same capacity");

@@ -476,10 +476,12 @@ served is held, kept and unsent, for its owner's version (client.md,
     any; the models they may choose in each project, as the brief's
     catalogue gives them (`../../domain/engine.md`, section 9): each
     with its LLM provider, window and output, the efforts it takes, its
-    prices and its description, so that a task's LLM choice (3.2) is
-    drafted from it; the most bytes a key may have, which bounds a
-    request carrying one (3.1); and the retention of the engine's
-    answers (3.1). It carries no version: the stream's hello does
+    prices (amounts per `unit` tokens in the deployment's spend unit;
+    cache writes are priced at input when no separate price is given)
+    and its optional description as configured, so that a task's LLM
+    choice (3.2) is drafted from it; the most bytes a key may have,
+    which bounds a request carrying one (3.1); and the retention of the
+    engine's answers (3.1). It carries no version: the stream's hello does
     (section 8);
   - *a task:* its header, overview, budget and authority; its fields
     (3.2): tracked and priority, label, flags, last activity, and what

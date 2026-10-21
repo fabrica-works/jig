@@ -47,6 +47,14 @@ pub(super) fn models(
             window: model.window,
             output: model.output,
             efforts,
+            prices: c::ModelPrices {
+                input: model.input_price,
+                cached: model.cached_price,
+                cache_write: model.cache_write_price,
+                output: model.output_price,
+                unit: model.price_unit,
+            },
+            description: None,
         })
         .map_err(|_| owner::Invalid::TooLarge)?;
     }

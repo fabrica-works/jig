@@ -637,7 +637,9 @@ record MeParty { number: u64 kind: PartyKind login: DocumentText name: DocumentT
 record Needs { questions: u32 proposals: u32 escalations: u32 person_tasks: u32 }
 record CreatingBounds { within: BoundsCreate beyond: Beyond }
 record Template { number: u32 name: DocumentText executor: TemplateExecutor contract: TaskContractDocument shallower: u32 budget: TemplateBudget deadline: TemplateDeadline tracked: option u32 flags: TaskFlags label: u32 grace: option duration llm: option LlmChoice }
-record MeModel { name: text 4096 provider: option u32 window: u32 output: u32 efforts: list 16 text 32 }
+record MePrices { input: u64 cached: u64 cache_write: option u64 output: u64 unit: u32 }
+# The description's 512 bytes are MODEL_DESCRIPTION_BYTES (configuration.md, 6).
+record MeModel { name: text 4096 provider: option u32 window: u32 output: u32 efforts: list 16 text 32 prices: MePrices description: option text 512 }
 record MeProject { project: u32 name: option DocumentText role: HeldRole pool: option PoolLedger templates: bytes 16777216 creating: option CreatingBounds models: list 64 MeModel }
 record ProviderOffer { provider: u32 name: DocumentText sign_in: bool key: bool programs: list 32 text 32 programs_cut: bool none: bool signed_in_plan: bool manage_usage: option bytes 2048 key_bytes: u32 }
 enum Readiness { usable, unavailable, unknown }

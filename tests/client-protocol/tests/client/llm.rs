@@ -13,8 +13,8 @@ fn text(bytes: &[u8]) -> contract::Text {
 fn named(model: &[u8], effort: &[u8]) -> contract::ModelEffort {
     contract::ModelEffort { model: text(model), effort: Some(text(effort)) }
 }
-/// A model's name and its efforts' names.
-type Named = (Vec<u8>, Vec<Vec<u8>>);
+/// A model's name, efforts, configured prices and optional description.
+type Named = (Vec<u8>, Vec<Vec<u8>>, contract::ModelPrices, Option<Vec<u8>>);
 
 /// Each model `me` names in the project, with its efforts.
 fn me_models(story: &Story) -> Option<Vec<Named>> {
@@ -25,7 +25,12 @@ fn me_models(story: &Story) -> Option<Vec<Named>> {
             .models
             .iter()
             .map(|model| {
-                (model.name.bytes().to_vec(), model.efforts.iter().map(|value| value.bytes().to_vec()).collect())
+                (
+                    model.name.bytes().to_vec(),
+                    model.efforts.iter().map(|value| value.bytes().to_vec()).collect(),
+                    model.prices,
+                    model.description.as_ref().map(|value| value.bytes().to_vec()),
+                )
             })
             .collect(),
     )
@@ -43,7 +48,15 @@ fn me_names_the_models_a_create_chooses_from_and_the_task_shows_the_choice() {
     let mut story = Story::live_batch(fixtures::SEED, true);
     story.watch(ME, Watchable::Jig(contract::Subject::Me));
     assert!(story.run_until(|s| me_models(s).is_some(), PROOF_WAIT));
-    assert_eq!(me_models(&story), Some(vec![(b"scripted".to_vec(), vec![b"low".to_vec(), b"high".to_vec()])]));
+    assert_eq!(
+        me_models(&story),
+        Some(vec![(
+            b"scripted".to_vec(),
+            vec![b"low".to_vec(), b"high".to_vec()],
+            contract::ModelPrices { input: 1, cached: 1, cache_write: None, output: 1, unit: 1_000_000 },
+            Some(b"For scripted work".to_vec()),
+        )])
+    );
     let mut subagents = List::with_capacity(1);
     subagents.push(named(b"scripted", b"low")).expect("one sub-agent");
     let choice = contract::LlmChoice { account: None, main: named(b"scripted", b"high"), subagents };

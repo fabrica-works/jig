@@ -55,6 +55,22 @@ fn model_effort(value: &w::ModelEffort, limits: &Limits) -> Result<c::ModelEffor
 pub(crate) fn models(values: &List<w::MeModel>, limits: &Limits) -> Result<List<c::MeModel>, w::Problem> {
     let mut models = List::with_capacity(values.len());
     for value in values {
+        let prices = value.prices();
+        if prices.unit() == 0
+            || prices.input() == 0
+            || prices.cached() == 0
+            || *prices.cache_write() == Some(0)
+            || prices.output() == 0
+        {
+            return Err(w::Problem { path: w::Path::MeModelPrices, reason: skein_codec::Reason::Malformed });
+        }
+        let description = match value.description() {
+            Some(value) if value.is_empty() => {
+                return Err(w::Problem { path: w::Path::MeModelDescription, reason: skein_codec::Reason::Malformed });
+            }
+            Some(value) => Some(name(value, limits.wire.me_model_description_some)?),
+            None => None,
+        };
         let mut efforts = List::with_capacity(value.efforts().len());
         for effort in value.efforts() {
             efforts.push(name(effort, limits.wire.me_model_efforts_item)?).expect("same capacity");
@@ -66,6 +82,14 @@ pub(crate) fn models(values: &List<w::MeModel>, limits: &Limits) -> Result<List<
                 window: value.window(),
                 output: value.output(),
                 efforts,
+                prices: c::ModelPrices {
+                    input: prices.input(),
+                    cached: prices.cached(),
+                    cache_write: *prices.cache_write(),
+                    output: prices.output(),
+                    unit: prices.unit(),
+                },
+                description,
             })
             .expect("same capacity");
     }
