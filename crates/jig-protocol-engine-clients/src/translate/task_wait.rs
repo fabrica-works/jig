@@ -7,6 +7,35 @@ pub(super) fn waiting(value: Option<d::TaskRunWait>, limits: &w::Limits) -> Resu
     Ok(Some(match value {
         d::TaskRunWait::Credential => w::TaskRunWait::Credential,
         d::TaskRunWait::Host => w::TaskRunWait::Host,
+        d::TaskRunWait::Refused(value) => w::TaskRunWait::Refused(w::TaskRunWaitRefused::new(
+            limits,
+            w::TaskRunWaitRefusedParts {
+                value: match value {
+                    d::TaskWaitRefused::Hello { kind, at, why } => w::TaskWaitRefused::Hello(w::TaskWaitHello::new(
+                        limits,
+                        w::TaskWaitHelloParts {
+                            kind: super::deployment::host_kind(kind),
+                            at: at.as_nanos(),
+                            why: super::deployment::hello(why, limits)?,
+                        },
+                    )?),
+                    d::TaskWaitRefused::Program(value) => w::TaskWaitRefused::Program(w::TaskWaitRefusedProgram::new(
+                        limits,
+                        w::TaskWaitRefusedProgramParts {
+                            value: match value {
+                                d::OpenProgram::Model => w::TaskWaitProgram::Model,
+                                d::OpenProgram::Source { account, source } => {
+                                    w::TaskWaitProgram::Source(w::TaskWaitProgramSource::new(
+                                        limits,
+                                        w::TaskWaitProgramSourceParts { account, source },
+                                    )?)
+                                }
+                            },
+                        },
+                    )?),
+                },
+            },
+        )?),
         d::TaskRunWait::Account { account, source, why } => w::TaskRunWait::Account(w::TaskWaitAccount::new(
             limits,
             w::TaskWaitAccountParts {

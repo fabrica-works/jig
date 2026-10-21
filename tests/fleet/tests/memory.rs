@@ -538,3 +538,30 @@ fn source_lifecycle_at_capacity_fits_the_memory_bound() {
         });
     }
 }
+
+#[test]
+fn two_standing_refusals_with_no_history_retain_no_additional_heap() {
+    let limits = Limits { needs_bytes: 4096, engine_slots: 1, history: 0, ..LIMITS };
+    let mut world = Measured::with_needs(limits, || jig_domain_fleet::Needs {
+        message_bytes: 10,
+        ..jig_fleet_world::fixtures::model_needs()
+    });
+    let before = world.meter.held();
+    for channel in [Token::new(0), Token::new(1), Token::new(2)] {
+        world.step(Event::Hello {
+            channel,
+            worker: 0,
+            hello: Hello {
+                bounds: jig_domain_fleet::Bounds { message_bytes: 9, ..jig_fleet_world::fixtures::bounds() },
+                stop_bound: Duration::ZERO,
+                slots: 1,
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+            },
+        });
+    }
+    assert_eq!(world.meter.held(), before, "standing facts occupy the Domain's two inline options");
+    assert!(world.domain.standing_refusal(jig_domain_fleet::Kinds::Engine).is_some());
+    assert!(world.domain.standing_refusal(jig_domain_fleet::Kinds::Workers).is_some());
+    assert!(world.domain.hello_refusals().is_empty());
+}

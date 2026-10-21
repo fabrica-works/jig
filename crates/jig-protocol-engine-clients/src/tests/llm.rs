@@ -317,3 +317,71 @@ fn an_account_refusal_preserves_its_number() {
         assert_eq!(account.account(), 42);
     }
 }
+
+fn assert_task_refusal_round_trip(
+    source: jig_domain_core::documents::TaskWaitRefused,
+    expected: jig_client_domain::contract::TaskWaitRefused,
+) {
+    use jig_client_domain::contract as c;
+    use jig_domain_core::documents as d;
+    let limits = fixtures::wire_limits();
+    let client_limits = fixtures::client_limits();
+    let mut task = fixtures::task_with_hold();
+    task.run_wait = Some(d::TaskRunWait::Refused(source));
+    let record = translate::task::document(&task, &[], &limits).unwrap();
+    let mut writer = Writer::new(usize::try_from(record.measure()).unwrap());
+    record.encode(&mut writer).unwrap();
+    let bytes = writer.finish();
+    assert!(u64::from(record.measure()) <= w::Task::worst_case_bytes(&limits).unwrap());
+    let decoded = w::Task::decode(&limits, &mut Reader::new(&bytes)).unwrap();
+    assert_eq!(decoded, record);
+    let client = jig_client_protocol_link::translate::documents::task(decoded, &client_limits).unwrap();
+    assert_eq!(client.run_wait, Some(c::TaskRunWait::Refused(expected)));
+    assert_eq!(client.project, task.project);
+    assert_eq!(client.chip.task, task.chip.number);
+}
+
+#[test]
+fn program_refusals_survive_server_bytes_and_client_task_translation() {
+    use jig_client_domain::contract as c;
+    use jig_domain_core::documents as d;
+    for (source, expected) in [
+        (d::OpenProgram::Model, c::OpenProgram::Model),
+        (d::OpenProgram::Source { account: 42, source: 91 }, c::OpenProgram::Source { account: 42, source: 91 }),
+    ] {
+        assert_task_refusal_round_trip(d::TaskWaitRefused::Program(source), c::TaskWaitRefused::Program(expected));
+    }
+}
+
+#[test]
+fn hello_refusals_reuse_the_deployment_context_through_server_bytes_and_client_tasks() {
+    use jig_client_domain::contract as c;
+    use jig_domain_core::documents as d;
+    use jig_domain_fleet as fleet;
+    use skein_lib::{Duration, Wall};
+    for (why, expected) in [
+        (
+            fleet::HelloRefusal::Agent { why: fleet::AgentShortfall::Turns { charter: 17 } },
+            c::OwnerHelloRefusal::Agent { why: c::OwnerAgentShortfall::Turns },
+        ),
+        (
+            fleet::HelloRefusal::Agent { why: fleet::AgentShortfall::Window { charter: 17, model: 2 } },
+            c::OwnerHelloRefusal::Agent { why: c::OwnerAgentShortfall::Window { charter: 17, model: 2 } },
+        ),
+        (
+            fleet::HelloRefusal::StopBound { grace: Duration::from_secs(10) },
+            c::OwnerHelloRefusal::StopBound { grace: Duration::from_secs(10) },
+        ),
+        (fleet::HelloRefusal::Position { worker: 7 }, c::OwnerHelloRefusal::Position { worker: 7 }),
+        (fleet::HelloRefusal::Workers { limit: 3 }, c::OwnerHelloRefusal::Workers { limit: 3 }),
+    ] {
+        for (kind, client_kind) in
+            [(fleet::HostKind::Engine, c::OwnerHostKind::Engine), (fleet::HostKind::Worker, c::OwnerHostKind::Worker)]
+        {
+            assert_task_refusal_round_trip(
+                d::TaskWaitRefused::Hello { kind, at: Wall::from_nanos(1234), why },
+                c::TaskWaitRefused::Hello { kind: client_kind, at: Wall::from_nanos(1234), why: expected },
+            );
+        }
+    }
+}

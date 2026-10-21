@@ -225,6 +225,23 @@ and whether they keep the task; a kept task's pending dependencies in what
 it waits on; and a hold for a circle of waits, naming it
 (`../client/domain/contract.md`, sections 3 to 5). Existing tags stay fixed.
 
+Client v11 also carries `TaskRunWait.refused`, as either
+`TaskWaitRefused.hello` (`TaskWaitHello`: the existing `OwnerHostKind`, wall
+receipt time and `OwnerHelloRefusal`) or `TaskWaitRefused.program`
+(`TaskWaitProgram.model` or `.source`, with account and source numbers).
+The Program arm has no producer until the Open compatibility slice.
+The server and client reuse the deployment's hello-refusal translations;
+shortfall dimensions that already omit charter numbers keep that wire shape.
+The existing `TaskWaitSource { state }` stays unchanged.
+`TaskWaitProgramSource { account, source }` names the Program source pair.
+`TaskWaitRefusedProgram { value: TaskWaitProgram }` and
+`TaskRunWaitRefused { value: TaskWaitRefused }` wrap enum payloads for the
+generator; these unversioned records add no tag or header bytes. Shared admission
+types precede their task-wait consumers in the schema, as the generator
+requires. Existing variant tags, client version 11, worker version 4 and
+all store families stay fixed. Nothing in this data slice changes status
+or person-facing words (`../client/domain/contract.md`, 5.1).
+
 ## 4. The connection
 
 A client keeps one connection to the engine, whatever carries it, of

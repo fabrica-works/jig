@@ -779,3 +779,132 @@ fn a_declared_model_with_mains_program_shares_mains_account() {
     );
     assert_eq!(choice.policy.alternatives.as_ref(), core::slice::from_ref(&core.settings.models[1]));
 }
+
+fn fleet_event(core: &mut Core, limits: &Limits, wall: Wall, event: fleet::Event) {
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(&mut core.fleet, &Env { now: Time::ZERO, wall, limits: limits.fleet }, event, &mut out);
+}
+fn document_wait(core: &Core, limits: &Limits) -> Option<TaskRunWait> {
+    task_from_row(core, limits, 1, core.tasks.task(TASK).unwrap(), Wall::EPOCH).unwrap().run_wait
+}
+
+#[test]
+fn due_and_preparing_documents_refine_only_the_host_wait_from_an_actual_refused_hello() {
+    for kind in [fleet::HostKind::Engine, fleet::HostKind::Worker] {
+        let (mut core, mut limits) = ready(false);
+        limits.fleet.history = 0;
+        limits.fleet.engine_slots = 1;
+        core.settings.charters[0].hosts = fleet::Kinds::Both;
+        let mut configuration = config(41);
+        configuration.settings.charters[0].hosts = fleet::Kinds::Both;
+        let needs = fleet_needs::configured(&configuration, &limits);
+        core.fleet = fleet::Domain::new(&limits.fleet, needs.clone());
+        assert_eq!(document_wait(&core, &limits), Some(TaskRunWait::Host));
+        let channel = if kind == fleet::HostKind::Engine { Token::new(0) } else { FIRST };
+        let at = Wall::from_nanos(1234);
+        let mut bounds = fixtures::bounds();
+        bounds.turns = 0;
+        fleet_event(
+            &mut core,
+            &limits,
+            at,
+            fleet::Event::Hello {
+                channel,
+                worker: 0,
+                hello: fleet::Hello {
+                    bounds,
+                    stop_bound: Duration::ZERO,
+                    slots: 1,
+                    workstreams: Box::new([]),
+                    hosting: Box::new([]),
+                },
+            },
+        );
+        let expected = Some(TaskRunWait::Refused(TaskWaitRefused::Hello {
+            kind,
+            at,
+            why: fleet::HelloRefusal::Agent { why: fleet::AgentShortfall::Turns { charter: 1 } },
+        }));
+        assert_eq!(document_wait(&core, &limits), expected);
+        assert!(core.fleet.hello_refusals().is_empty());
+        core.settings.charters[0].hosts = match kind {
+            fleet::HostKind::Engine => fleet::Kinds::Workers,
+            fleet::HostKind::Worker => fleet::Kinds::Engine,
+        };
+        assert_eq!(document_wait(&core, &limits), Some(TaskRunWait::Host), "another kind cannot explain this task");
+        core.settings.charters[0].hosts = fleet::Kinds::Both;
+        send_task(&mut core, &limits, tasks::Event::Prepare { reply_to: ReplyTo::new(FIRST), task: TASK });
+        assert_eq!(core.tasks.task(TASK).unwrap().phase, tasks::Phase::Active(tasks::Active::Preparing));
+        assert_eq!(document_wait(&core, &limits), expected);
+        send_task(&mut core, &limits, tasks::Event::Hold { task: TASK, why: tasks::Hold::Uncertain { entry: 1 } });
+        assert_eq!(document_wait(&core, &limits), None);
+        // A new fleet has no durable refusal; observing it again reconstructs the explanation.
+        core.fleet = fleet::Domain::new(&limits.fleet, needs);
+        let mut row = core.tasks.task(TASK).unwrap().clone();
+        row.phase = tasks::Phase::Active(tasks::Active::Due);
+        assert_eq!(task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap().run_wait, Some(TaskRunWait::Host));
+        fleet_event(
+            &mut core,
+            &limits,
+            at,
+            fleet::Event::Hello {
+                channel,
+                worker: 0,
+                hello: fleet::Hello {
+                    bounds: fleet::Bounds { turns: 0, ..fixtures::bounds() },
+                    stop_bound: Duration::ZERO,
+                    slots: 1,
+                    workstreams: Box::new([]),
+                    hosting: Box::new([]),
+                },
+            },
+        );
+        assert_eq!(task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap().run_wait, expected);
+    }
+}
+
+#[test]
+fn a_standing_refusal_does_not_replace_account_or_credential_waits_or_placed_work() {
+    let (mut core, limits) = ready(false);
+    let at = Wall::from_nanos(1234);
+    fleet_event(
+        &mut core,
+        &limits,
+        at,
+        fleet::Event::Hello {
+            channel: Token::new(99),
+            worker: 0,
+            hello: fleet::Hello {
+                bounds: fleet::Bounds { turns: 0, ..fixtures::bounds() },
+                stop_bound: Duration::ZERO,
+                slots: 1,
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+            },
+        },
+    );
+    assert_eq!(document_wait(&core, &limits), None, "an admitted compatible path remains usable");
+    core.workspace_credentials.insert(TASK, Box::new([7])).unwrap();
+    assert_eq!(document_wait(&core, &limits), Some(TaskRunWait::Credential));
+    account(&mut core, &limits, accounts::Event::Limited { account: 1, reset: None });
+    assert_eq!(
+        document_wait(&core, &limits),
+        Some(TaskRunWait::Account {
+            account: Some(0),
+            source: Some(1),
+            why: TaskWaitWhy::Source(TaskSourceState::Limited { until: None }),
+        })
+    );
+    let mut row = core.tasks.task(TASK).unwrap().clone();
+    for phase in [tasks::Active::Claimed { attempt: 1 }, tasks::Active::Running { attempt: 1 }, tasks::Active::Idle] {
+        row.phase = tasks::Phase::Active(phase);
+        assert_eq!(task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap().run_wait, None);
+    }
+    row.phase = tasks::Phase::Active(tasks::Active::Due);
+    for executor in
+        [tasks::Executor::Procedure { connector: 1, code: 1 }, tasks::Executor::Person(tasks::PersonAddress::Person(1))]
+    {
+        row.executor = executor;
+        assert_eq!(task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap().run_wait, None);
+    }
+}

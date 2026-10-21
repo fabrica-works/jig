@@ -62,6 +62,19 @@ pub(crate) fn lost(domain: &mut crate::Domain, host: LostHost) {
 }
 
 pub(crate) fn refused(domain: &mut crate::Domain, record: HelloRefusalRecord) {
+    match record.why {
+        HelloRefusal::ReservedChannel => {}
+        HelloRefusal::Agent { .. }
+        | HelloRefusal::Workers { .. }
+        | HelloRefusal::Position { .. }
+        | HelloRefusal::StopBound { .. } => {
+            if record.channel == Token::new(0) {
+                domain.standing_engine = Some(record);
+            } else {
+                domain.standing_worker = Some(record);
+            }
+        }
+    }
     if domain.hello_refusals.capacity() == 0 {
         domain.hello_history_lost = domain.hello_history_lost.saturating_add(1);
         return;

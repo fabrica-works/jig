@@ -95,6 +95,17 @@ fn wait(value: documents::TaskRunWait) -> client::TaskRunWait {
     match value {
         documents::TaskRunWait::Credential => client::TaskRunWait::Credential,
         documents::TaskRunWait::Host => client::TaskRunWait::Host,
+        documents::TaskRunWait::Refused(value) => client::TaskRunWait::Refused(match value {
+            documents::TaskWaitRefused::Hello { kind, at, why } => client::TaskWaitRefused::Hello {
+                kind: super::deployment::host_kind(kind),
+                at,
+                why: super::deployment::hello(why),
+            },
+            documents::TaskWaitRefused::Program(value) => client::TaskWaitRefused::Program(match value {
+                documents::OpenProgram::Model => client::OpenProgram::Model,
+                documents::OpenProgram::Source { account, source } => client::OpenProgram::Source { account, source },
+            }),
+        }),
         documents::TaskRunWait::Account { account, source, why } => client::TaskRunWait::Account {
             account,
             source,

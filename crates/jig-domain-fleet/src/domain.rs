@@ -33,11 +33,12 @@ pub const fn max_out(limits: &Limits) -> u32 {
     if runs > sources { runs } else { sources }
 }
 
-/// Whether the engine's construction hello has been heard.
+/// The engine's construction hello is reserved once heard, even if it fails admission.
 #[derive(Debug)]
 pub(crate) enum EngineHello {
     Expected,
     Heard,
+    Admitted,
 }
 
 /// The fleet's state.
@@ -50,6 +51,9 @@ pub struct Domain {
     pub(crate) channels: Slab<Channel>,
     pub(crate) needs: crate::Needs,
     pub(crate) engine_hello: EngineHello,
+    /// Latest actual refusals, independent of history and cleared only by same-kind admission.
+    pub(crate) standing_engine: Option<crate::HelloRefusalRecord>,
+    pub(crate) standing_worker: Option<crate::HelloRefusalRecord>,
     pub(crate) tokens: Map<Token, Id<Channel>>,
     /// The attempts tracked, by their run's and their own names.
     pub(crate) attempts: Slab<Attempt>,
@@ -160,6 +164,8 @@ impl Domain {
             cleanup_programs: Box::new([]),
             needs,
             engine_hello: EngineHello::Expected,
+            standing_engine: None,
+            standing_worker: None,
             channels,
             tokens,
             attempts: Slab::with_capacity(tracked),
@@ -230,6 +236,45 @@ impl Domain {
         excluded: &[Token],
     ) -> Option<crate::PlacementConstraint> {
         channel::probe(self, workstream, kinds, models, excluded)
+    }
+
+    /// Latest observed refusal of an allowed kind, while no admitted, connected,
+    /// non-draining host of any allowed kind exists (domain/engine.md, section 8).
+    /// Slot use and model eligibility do not affect suppression. Engine wins equal
+    /// wall times. These two inline facts live only until same-kind admission or restart.
+    #[must_use]
+    pub fn standing_refusal(&self, kinds: crate::Kinds) -> Option<(HostKind, crate::HelloRefusalRecord)> {
+        for (_, id) in &self.tokens {
+            let host = self.channels.get(*id).expect("connected host");
+            let admitted = match host.kind {
+                HostKind::Worker => true,
+                HostKind::Engine => match self.engine_hello {
+                    EngineHello::Admitted => true,
+                    EngineHello::Expected | EngineHello::Heard => false,
+                },
+            };
+            if admitted && kinds.allows(host.kind) && !host.draining {
+                return None;
+            }
+        }
+        let mut latest = None;
+        if kinds.allows(HostKind::Engine)
+            && let Some(record) = self.standing_engine
+        {
+            latest = Some((HostKind::Engine, record));
+        }
+        if kinds.allows(HostKind::Worker)
+            && let Some(record) = self.standing_worker
+        {
+            let newer = match latest {
+                Some((_, previous)) => record.at > previous.at,
+                None => true,
+            };
+            if newer {
+                latest = Some((HostKind::Worker, record));
+            }
+        }
+        latest
     }
 
     #[must_use]

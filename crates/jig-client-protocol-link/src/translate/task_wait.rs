@@ -2,10 +2,23 @@
 use jig_client_domain::contract as c;
 use jig_client_protocol_wire::v11 as w;
 
-pub(super) fn waiting(value: Option<&w::TaskRunWait>) -> Option<c::TaskRunWait> {
+pub(super) fn waiting(value: Option<&w::TaskRunWait>, limits: &crate::Limits) -> Option<c::TaskRunWait> {
     Some(match value? {
         w::TaskRunWait::Credential => c::TaskRunWait::Credential,
         w::TaskRunWait::Host => c::TaskRunWait::Host,
+        w::TaskRunWait::Refused(value) => c::TaskRunWait::Refused(match value.value() {
+            w::TaskWaitRefused::Hello(row) => c::TaskWaitRefused::Hello {
+                kind: super::documents::owner_host_kind_fields(row.kind(), limits),
+                at: skein_lib::Wall::from_nanos(row.at()),
+                why: super::documents::owner_hello_refusal_fields(row.why(), limits),
+            },
+            w::TaskWaitRefused::Program(value) => c::TaskWaitRefused::Program(match value.value() {
+                w::TaskWaitProgram::Model => c::OpenProgram::Model,
+                w::TaskWaitProgram::Source(row) => {
+                    c::OpenProgram::Source { account: row.account(), source: row.source() }
+                }
+            }),
+        }),
         w::TaskRunWait::Account(row) => c::TaskRunWait::Account {
             account: *row.account(),
             source: *row.source(),

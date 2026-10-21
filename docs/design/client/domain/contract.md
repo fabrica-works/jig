@@ -498,7 +498,17 @@ served is held, kept and unsent, for its owner's version (client.md,
     it waits on; its LLM choice with the creator's optional account preference,
     the separate account kept by the last successful claim, and its next-run
     account/source wait with the source's typed state and optional wall reset
-    (unknown stays unknown), or a credential or host wait; its hold
+    (unknown stays unknown), or a credential or host wait. `Task.run_wait`
+    also carries `Refused(TaskWaitRefused)`: `Hello { kind, at, why }` is
+    the fleet's latest observed allowed-kind refusal, suppressed by any
+    admitted connected non-draining allowed-kind host; `Program(OpenProgram)`
+    names `Model` or `Source { account, source }`. The latter is carried
+    without a producer until the Open compatibility slice. The client uses
+    its own `OwnerHostKind` and `OwnerHelloRefusal` vocabulary; the canonical
+    deployment translation retains the existing shortfall context limits.
+    These are derived document facts, never a new hold or stored state.
+    Client wire 11 carries both arms; status and person-facing words are a
+    separate follow-up. Task summary rows do not gain a wait field. Its hold
     and its escalation if held; its dependencies, each a task's number
     and phase, pending or done, with when and by whom each was added
     after the task was made, and whether they keep it

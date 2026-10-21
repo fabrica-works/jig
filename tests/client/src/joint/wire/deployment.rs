@@ -160,7 +160,7 @@ fn task_refusal(value: &tasks::CapacityRefusal) -> client::OwnerTaskCapacityRefu
     }
 }
 
-fn host_kind(value: fleet::HostKind) -> client::OwnerHostKind {
+pub(super) fn host_kind(value: fleet::HostKind) -> client::OwnerHostKind {
     match value {
         fleet::HostKind::Worker => client::OwnerHostKind::Worker,
         fleet::HostKind::Engine => client::OwnerHostKind::Engine,
@@ -207,7 +207,7 @@ pub(super) fn account_state(value: documents::AccountState) -> client::OwnerAcco
     }
 }
 
-fn hello(value: fleet::HelloRefusal) -> client::OwnerHelloRefusal {
+pub(super) fn hello(value: fleet::HelloRefusal) -> client::OwnerHelloRefusal {
     match value {
         fleet::HelloRefusal::Agent { why } => client::OwnerHelloRefusal::Agent { why: shortfall(why) },
         fleet::HelloRefusal::ReservedChannel => client::OwnerHelloRefusal::ReservedChannel,

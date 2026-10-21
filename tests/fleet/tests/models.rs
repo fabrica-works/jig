@@ -224,3 +224,6 @@ fn a_pending_assignment_keeps_its_checked_host_when_room_is_lost() {
     assert!(fleet.settle().is_empty(), "the second same-kind host is not a substitute");
     assert_eq!(fleet.domain.waiting(), 0, "the stale check is refused for a fresh allowance");
 }
+
+#[path = "models/standing_refusal.rs"]
+mod standing_refusal;

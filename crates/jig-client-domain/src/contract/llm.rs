@@ -82,7 +82,24 @@ pub enum TaskRunWait {
     Account { account: Option<u32>, source: Option<u32>, why: TaskWaitWhy },
     Credential,
     Host,
+    Refused(TaskWaitRefused),
 }
+/// The engine's current refusal explanation (client/domain/contract.md, 5.1).
+/// Hello is an observed volatile fleet fact; Program names a task-specific path.
+/// Neither changes task phase. Kept only as part of the current document.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum TaskWaitRefused {
+    Hello { kind: super::OwnerHostKind, at: skein_lib::Wall, why: super::OwnerHelloRefusal },
+    Program(OpenProgram),
+}
+
+/// Which configured path cannot serve Open; no producer exists in this data slice.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum OpenProgram {
+    Model,
+    Source { account: u32, source: u32 },
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TaskWaitWhy {
     Source(TaskSourceState),

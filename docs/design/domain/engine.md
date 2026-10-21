@@ -838,6 +838,20 @@ The fleet child domain knows the hosts and the runs they host:
   position. Callers can then read required and offered amounts without
   repeating admission policy. The current client wire still reports turns,
   time, waiting and checks as dimensions without a charter number.
+- **Standing hello refusals are volatile facts.** The fleet keeps the latest
+  actual refusal for each host kind, even with no diagnostic history room.
+  Admitting a hello clears only that kind's fact; duplicate hellos neither
+  replace nor clear it, and channel zero's reserved-channel refusal is excluded.
+  `standing_refusal(kinds)` returns the newest allowed kind's fact (engine
+  wins equal wall times), only while no admitted, connected, non-draining
+  host of any allowed kind exists. Busy slots and model eligibility do not
+  weaken that suppression. The engine's construction placeholder is not an
+  admitted hello. History eviction and fact drains do not affect this query;
+  a new fleet starts with neither fact.
+  The core uses it only to refine an agent's Active Due or Preparing
+  `RunWait::Host` into `TaskRunWait::Refused(TaskWaitRefused::Hello { kind,
+  at, why })`. Account and credential waits keep their precedence. No task
+  state, placement decision, attempt, retry or stored record changes.
 - **Grants follow their attempts:** each new generation of an LLM
   account's source or an application's credential goes to every live
   attempt that holds one (section 12), and each attempt the fleet keeps

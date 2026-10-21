@@ -137,7 +137,7 @@ pub(crate) fn hello(
     let engine = channel == Token::new(0);
     let reserved = match domain.engine_hello {
         crate::domain::EngineHello::Expected => false,
-        crate::domain::EngineHello::Heard => true,
+        crate::domain::EngineHello::Heard | crate::domain::EngineHello::Admitted => true,
     };
     if engine && reserved {
         refuse(domain, env, channel, &hello, crate::HelloRefusal::ReservedChannel, out);
@@ -158,6 +158,8 @@ pub(crate) fn hello(
             host.eligible = Box::new([]);
             host.eligible = crate::needs::eligibility(&domain.needs, &hello.bounds.models);
             host.declarations = crate::needs::declarations(&domain.needs, &hello.bounds.models);
+            domain.engine_hello = crate::domain::EngineHello::Admitted;
+            domain.standing_engine = None;
             domain.placing = true;
         }
         return;
@@ -201,6 +203,7 @@ pub(crate) fn hello(
     };
     let named = domain.tokens.insert(channel, id);
     assert!(named == Ok(None), "a channel is named once, with room for every worker");
+    domain.standing_worker = None;
     let most = limits.slots.saturating_mul(2);
     let mut listed: u32 = 0;
     for Hosted { run, attempt, phase } in hosting {

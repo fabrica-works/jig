@@ -8,7 +8,7 @@ use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Writer};
-fn host_kind(value: fleet::HostKind) -> w::OwnerHostKind {
+pub(super) fn host_kind(value: fleet::HostKind) -> w::OwnerHostKind {
     match value {
         fleet::HostKind::Worker => w::OwnerHostKind::Worker,
         fleet::HostKind::Engine => w::OwnerHostKind::Engine,
@@ -50,7 +50,7 @@ fn shortfall(value: fleet::AgentShortfall, limits: &w::Limits) -> Result<w::Owne
         fleet::AgentShortfall::Unacknowledged => w::OwnerAgentShortfall::Unacknowledged,
     })
 }
-fn hello(value: fleet::HelloRefusal, limits: &w::Limits) -> Result<w::OwnerHelloRefusal, w::Problem> {
+pub(super) fn hello(value: fleet::HelloRefusal, limits: &w::Limits) -> Result<w::OwnerHelloRefusal, w::Problem> {
     Ok(match value {
         fleet::HelloRefusal::Agent { why } => w::OwnerHelloRefusal::Agent(w::OwnerHelloRefusalAgent::new(
             limits,
