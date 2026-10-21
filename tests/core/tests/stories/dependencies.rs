@@ -105,11 +105,6 @@ fn an_agents_failed_dependency_amendment_names_the_ended_task() {
     let dependency_run = running(&world, dependency);
     let kept = member(&world, tasks::Executor::Agent { charter: 1 }, b"live report");
     let kept = delegate(&mut world, parent, 2, kept);
-    let kept_run = running(&world, kept);
-    // Once the dependency ends, explicit introductions keep its identity
-    // within the parent's reach and retain its historical result stub.
-    named_for(&mut world, parent, 4, core::NamedAction::Introduce { left: kept, right: dependency });
-    named_for(&mut world, kept_run, 1, core::NamedAction::Introduce { left: parent.0, right: dependency });
     world.send(root::Event::Answer {
         read: None,
         refused: Box::new([]),
@@ -267,4 +262,188 @@ fn an_earlier_compound_move_brings_an_added_dependency_within_reach() {
     );
     assert_eq!(live_row(&world, kept).dependencies.as_ref(), [outside]);
     assert_eq!(live_row(&world, outside).requester, live_row(&world, world.assignments[0].0).requester);
+}
+
+// These stories observe the store load and externally durable rows, rather than
+// duplicating the tasks child's place-reach table.
+fn ended_dependency_world(seed: u64) -> (World, (u64, u64), u64, u64) {
+    let mut world = plan_world(seed);
+    let parent = world.assignments[0];
+    let target = member(&world, tasks::Executor::Agent { charter: 1 }, b"report");
+    let target = delegate(&mut world, parent, 1, target);
+    let dependency = member(&world, tasks::Executor::Agent { charter: 1 }, b"prerequisite");
+    let dependency = delegate(&mut world, parent, 2, dependency);
+    (world, parent, target, dependency)
+}
+
+fn assert_met(world: &World, target: u64, dependency: u64, by: tasks::Party) {
+    let row = live_row(world, target);
+    assert_eq!(row.dependencies.as_ref(), [dependency]);
+    assert!(row.waiting_on.is_empty());
+    let added = row.added.first().expect("added dependency retained");
+    assert_eq!((added.task, added.by), (dependency, by));
+}
+
+fn assert_ended_refusal(world: &World, dependency: u64, how: tasks::Status) {
+    let core::CallPart::ControlRefused(problem) = &world.answers.last().expect("amendment answer").2 else {
+        panic!("ended dependency refused");
+    };
+    assert_eq!(problem.why, tasks::Refusal::DependencyEnded { how });
+    assert_eq!(problem.blocked_by.as_deref(), Some([dependency].as_slice()));
+}
+
+// Intercept exactly one outgoing store demand at the root boundary. The normal
+// world transport resumes it after the story has supplied the intervening input.
+fn wait_for_dependency(world: &mut World, seed: u64, parent: (u64, u64), target: u64, dependency: u64) -> core::Now {
+    let (_, limits) = jig_core_world::faults::plan_fixture(seed);
+    let (now, wall) = world.clocks();
+    let env = skein_lib::Env { now, wall, limits };
+    let mut amendment = unchanged(b"wait for prerequisite");
+    amendment.dependencies = Some(Box::new([dependency]));
+    let before = world.store.rows.clone();
+    let mut event = root::Event::Core(core::Event::NamedAction {
+        to: ReplyTo::new(Token::new(9199)),
+        key: core::CallKey { task: parent.0, attempt: parent.1, completion: 99, position: 0 },
+        action: core::NamedAction::Amend { target, revision: 0, amendment },
+    });
+    world.observer.inbound(&world.store, now.as_nanos(), &mut event);
+    root::step(&mut world.domain, &env, event);
+    let mut out = Queue::with_capacity(root::max_out(&limits));
+    root::release(&mut world.domain, &env, &mut out);
+    let mut load = None;
+    while let Some(output) = out.pop() {
+        let root::Request::Deliver(root::Delivery::Core(core::Held::Load(now))) = output else {
+            panic!("asking pass emitted more than a load: {output:?}");
+        };
+        let core::Now::EndedTask { task, .. } = now.as_ref() else { panic!("ended task load") };
+        assert_eq!(*task, dependency);
+        assert!(load.replace(*now).is_none(), "one load at a time");
+    }
+    assert_eq!(world.store.rows, before);
+    load.expect("amendment loads the ended dependency")
+}
+
+#[test]
+fn an_ended_dependency_load_waits_then_adds_done_as_met() {
+    const SEED: u64 = 878;
+    let (mut world, parent, target, dependency) = ended_dependency_world(SEED);
+    let run = running(&world, dependency);
+    finish(&mut world, run, b"prerequisite done");
+    let answers = world.answers.len();
+    let load = wait_for_dependency(&mut world, SEED, parent, target, dependency);
+    assert_eq!(world.answers.len(), answers);
+    assert!(live_row(&world, target).dependencies.is_empty());
+    world.store.ask(jig_test_store::StoreOut::Now(load));
+    world.drain();
+    assert_met(&world, target, dependency, tasks::Party::Task(parent.0));
+}
+
+#[test]
+fn a_waiting_amendment_rechecks_its_revision_after_loading() {
+    const SEED: u64 = 879;
+    let (mut world, parent, target, dependency) = ended_dependency_world(SEED);
+    let run = running(&world, dependency);
+    finish(&mut world, run, b"prerequisite done");
+    let load = wait_for_dependency(&mut world, SEED, parent, target, dependency);
+    let mut edit = unchanged(b"newer instructions");
+    edit.instructions = Some(b"revised while the row loads".as_slice().into());
+    named_for(&mut world, parent, 100, core::NamedAction::Amend { target, revision: 0, amendment: edit });
+    let before = live_row(&world, target).clone();
+    world.store.ask(jig_test_store::StoreOut::Now(load));
+    world.drain();
+    assert!(matches!(world.answers.last().map(|answer| &answer.2),
+        Some(core::CallPart::Moved { task, now: people::Moved::Spec { revision: 1 } }) if *task == target));
+    assert_eq!(live_row(&world, target), &before);
+}
+
+#[test]
+fn a_cancelled_added_dependency_is_refused_by_name() {
+    let (mut world, parent, target, dependency) = ended_dependency_world(880);
+    named_for(
+        &mut world,
+        parent,
+        4,
+        core::NamedAction::Control {
+            target: dependency,
+            control: tasks::Control::Cancel {
+                reason: b"no longer needed".as_slice().into(),
+                grace: None,
+                message: None,
+            },
+        },
+    );
+    let run = running(&world, dependency);
+    finish(&mut world, run, b"cancelled run settled");
+    let before = live_row(&world, target).clone();
+    amend_delegate(&mut world, parent, target, dependency);
+    assert_ended_refusal(&world, dependency, tasks::Status::Cancelled);
+    assert_eq!(live_row(&world, target), &before);
+}
+
+#[test]
+fn an_unknown_added_dependency_is_refused_by_name() {
+    const UNKNOWN: u64 = u64::MAX;
+    let (mut world, parent, target, _) = ended_dependency_world(881);
+    let before = live_row(&world, target).clone();
+    amend_delegate(&mut world, parent, target, UNKNOWN);
+    let core::CallPart::ControlRefused(problem) = &world.answers.last().expect("amendment answer").2 else {
+        panic!("unknown dependency refused");
+    };
+    assert_eq!((problem.task, problem.why), (Some(UNKNOWN), tasks::Refusal::Unknown));
+    assert_eq!(live_row(&world, target), &before);
+}
+
+#[test]
+fn a_done_former_delegate_named_by_a_sibling_is_met() {
+    let (mut world, parent, target, dependency) = ended_dependency_world(882);
+    let sibling = member(&world, tasks::Executor::Agent { charter: 1 }, b"live sibling");
+    let sibling = delegate(&mut world, parent, 4, sibling);
+    named_for(&mut world, parent, 5, core::NamedAction::Introduce { left: sibling, right: dependency });
+    let run = running(&world, dependency);
+    finish(&mut world, run, b"prerequisite done");
+    amend_delegate(&mut world, parent, target, dependency);
+    assert_met(&world, target, dependency, tasks::Party::Task(parent.0));
+    // The introduction was to the sibling, not to the parent amender.
+    assert!(live_row(&world, sibling).references.contains(&dependency));
+}
+
+#[test]
+fn another_subtrees_ended_task_is_refused_unchanged() {
+    let (mut world, parent, _, dependency) = ended_dependency_world(883);
+    let run = running(&world, dependency);
+    finish(&mut world, run, b"prerequisite done");
+    let amender = member(&world, tasks::Executor::Agent { charter: 1 }, b"other subtree");
+    let amender = delegate(&mut world, parent, 4, amender);
+    let amender_run = running(&world, amender);
+    let mut target = member(&world, tasks::Executor::Agent { charter: 1 }, b"other report");
+    // The amender's 20 includes its running allowance of 10; the leaf
+    // needs only 5 and has no further delegation authority.
+    target.authority.budget.spend = 5;
+    target.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    let target = delegate(&mut world, amender_run, 1, target);
+    let before = live_row(&world, target).clone();
+    amend_delegate(&mut world, amender_run, target, dependency);
+    let core::CallPart::ControlRefused(problem) = &world.answers.last().expect("amendment answer").2 else {
+        panic!("outside dependency refused");
+    };
+    assert_eq!(problem.why, tasks::Refusal::Dependencies);
+    assert_eq!(problem.blocked_by.as_deref(), Some([dependency].as_slice()));
+    assert_eq!(live_row(&world, target), &before);
+}
+
+#[test]
+fn a_person_adds_an_ended_dependency_from_its_stored_row() {
+    let (mut world, _, target, dependency) = ended_dependency_world(884);
+    let run = running(&world, dependency);
+    finish(&mut world, run, b"prerequisite done");
+    let tasks::Party::Person(person) = live_row(&world, world.assignments[0].0).requester else {
+        panic!("person's tree");
+    };
+    let sign_in = world.sign_in.expect("signed-in requester");
+    person_amend(&mut world, sign_in, 209, target, &[dependency]);
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Amended { task: target, released: false }))
+    );
+    assert_met(&world, target, dependency, tasks::Party::Person(person));
 }
