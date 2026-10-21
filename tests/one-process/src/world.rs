@@ -19,10 +19,12 @@ use std::{cell::RefCell, rc::Rc};
 pub struct Settings {
     pub seed: u64,
     pub config: skein_sim::Config,
+    pub chat: fixtures::Chat,
 }
 #[derive(Debug)]
 pub struct Outcome {
     pub verdict: skein_world::domain::Verdict,
+    pub chat: Option<crate::referee::ChatOutcome>,
     pub chats_made: u32,
     pub runs_answered: u32,
     pub drained: bool,
@@ -139,12 +141,18 @@ impl Host for Proc {
     }
 }
 fn service(inherited: &Inherited) -> Proc {
+    service_chat(inherited, fixtures::Chat::Finite)
+}
+fn open_service(inherited: &Inherited) -> Proc {
+    service_chat(inherited, fixtures::Chat::OpenText)
+}
+fn service_chat(inherited: &Inherited, chat: fixtures::Chat) -> Proc {
     let root = inherited.roots.iter().find(|(name, _)| name.as_ref() == b"state").expect("store root").1;
     let worker = inherited.roots.iter().find(|(name, _)| name.as_ref() == b"worker").expect("worker root").1;
     let mut roots = List::with_capacity(1);
     roots.push(worker).expect("worker root");
     let mut service = jig_test_service::startup(
-        &fixtures::document(),
+        &fixtures::document(chat),
         &fixtures::files(),
         Some(&channel::agent()),
         &channel::seeds(),
@@ -244,7 +252,7 @@ fn client(inherited: &Inherited) -> Proc {
     Proc::Client(Box::new(SignalHost::new(client, Some(inherited.signal))))
 }
 fn peer(inherited: &Inherited) -> Proc {
-    Proc::Peer(Box::new(SignalHost::new(fixtures::provider(), Some(inherited.signal))))
+    Proc::Peer(Box::new(SignalHost::new(fixtures::provider(fixtures::Chat::Finite), Some(inherited.signal))))
 }
 fn machine() -> skein_fake_machine::Machine {
     let mut machine = skein_fake_machine::Machine::for_user(1000);
@@ -263,8 +271,17 @@ fn run_phase(
 ) -> (Outcome, skein_fake_machine::Machine, Store, Rc<RefCell<jig_conformance::referee::Referee>>) {
     let client_root = machine.reopen_root(2);
     let restarts = Rc::new(RefCell::new(0));
+    let chat_outcome = Rc::new(RefCell::new(None));
     let mut world = skein_world::World::new_controlled(settings.seed, settings.config, Memory::Unchecked, |controls| {
-        Judge::new(scenario, controls, durable_observer, reference.clone(), restarts.clone())
+        Judge::new(
+            scenario,
+            controls,
+            durable_observer,
+            reference.clone(),
+            restarts.clone(),
+            settings.chat,
+            chat_outcome.clone(),
+        )
     })
     .with_machine(Machine(machine));
     world.host(skein_world::HostedProgram {
@@ -278,7 +295,7 @@ fn run_phase(
             skein_world::StartupRoot { name: b"state".as_slice().into(), path: b"state".as_slice().into() },
             skein_world::StartupRoot { name: b"worker".as_slice().into(), path: b"agent-root".as_slice().into() },
         ],
-        service,
+        if settings.chat == fixtures::Chat::OpenText { open_service } else { service },
     );
     if let Scenario::Fault { cut, before } = scenario {
         world.spawn_restartable(
@@ -295,7 +312,7 @@ fn run_phase(
                 Proc::Client(Box::new(SignalHost::new(client, None)))
             });
         }
-        world.spawn(|| Proc::Peer(Box::new(SignalHost::new(fixtures::provider(), None))));
+        world.spawn(|| Proc::Peer(Box::new(SignalHost::new(fixtures::provider(settings.chat), None))));
     }
     let mut outcome = world.run();
     let chats_made = outcome
@@ -308,6 +325,7 @@ fn run_phase(
         .sum();
     let result = Outcome {
         verdict: skein_world::domain::Verdict::Passed,
+        chat: chat_outcome.borrow().clone(),
         chats_made,
         restarts: *restarts.borrow(),
         runs_answered: outcome

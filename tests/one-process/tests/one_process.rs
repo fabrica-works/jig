@@ -45,3 +45,35 @@ fn a_power_loss_mid_run_restarts_and_adopts_nothing_from_the_dead_worker() {
 fn crash(cut: skein_world::Cut, before: u32) -> world::Outcome {
     world::crash(fixtures::calm(fixtures::SEED), cut, before)
 }
+
+#[test]
+fn an_open_text_reply_parks_after_one_call() {
+    let chat = text_chat(fixtures::Chat::OpenText);
+    assert_eq!(chat.calls, 1);
+    assert_eq!(chat.reply, fixtures::TEXT);
+    assert_eq!(chat.last_reply, 1);
+    assert_eq!(chat.phase, jig_domain_tasks::Phase::Active(jig_domain_tasks::Active::Idle));
+    assert_eq!(chat.tries, jig_domain_tasks::Tries::NONE);
+    assert!(chat.idle_elapsed);
+    assert_eq!(chat.claims, 1);
+    assert_eq!(chat.mode, Some(smith_charter::Mode::Open));
+}
+
+#[test]
+fn a_finite_text_reply_fails_as_a_run_and_retries() {
+    let chat = text_chat(fixtures::Chat::FiniteText);
+    assert_eq!(chat.calls, 2, "initial completion and one unfinished nudge");
+    assert_eq!(chat.tries.run, 1);
+    assert_eq!(chat.tries.invalid, 0);
+    assert!(matches!(chat.phase, jig_domain_tasks::Phase::Active(jig_domain_tasks::Active::BackingOff { .. })));
+    assert_eq!(chat.claims, 2);
+    assert_eq!(chat.mode, Some(smith_charter::Mode::Finite));
+}
+
+fn text_chat(chat: fixtures::Chat) -> jig_one_process_world::referee::ChatOutcome {
+    let mut settings = fixtures::calm(fixtures::SEED);
+    settings.chat = chat;
+    let outcome = world::run(settings, Box::new([jig_one_process_world::Script::start_chat(b"Hello")]));
+    assert_eq!(outcome.verdict, Verdict::Passed);
+    outcome.chat.expect("text scenario evidence")
+}

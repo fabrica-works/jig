@@ -16,3 +16,18 @@ fn drawn_kills_and_drains_keep_the_conformance_rules() {
         }
     }
 }
+
+#[test]
+fn text_chats_park_or_retry_across_seeds() {
+    for seed in 1..=3 {
+        for chat in [fixtures::Chat::OpenText, fixtures::Chat::FiniteText] {
+            let mut settings = fixtures::calm(seed);
+            settings.chat = chat;
+            let outcome = world::run(settings, Box::new([jig_one_process_world::Script::start_chat(b"Hello")]));
+            assert_eq!(outcome.verdict, Verdict::Passed, "{chat:?} seed {seed}");
+            let evidence = outcome.chat.expect("text scenario evidence");
+            assert_eq!(evidence.calls, if chat == fixtures::Chat::OpenText { 1 } else { 2 });
+            assert_eq!(evidence.claims, if chat == fixtures::Chat::OpenText { 1 } else { 2 });
+        }
+    }
+}

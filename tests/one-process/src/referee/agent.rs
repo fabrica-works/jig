@@ -1,5 +1,6 @@
 //! The worker's actual agent pipe bytes, decoded independently of its root.
-use jig_conformance::referee::{Observed, Receipt};
+//! Agent ACKs attest hub retention, not engine durability (domain/hosts.md, 6.4).
+use jig_conformance::referee::Observed;
 use skein_io::kernel::{Complete, Done, Op};
 use skein_lib::Reader;
 use std::collections::BTreeMap;
@@ -9,6 +10,7 @@ pub(crate) struct Wire {
     pipes: BTreeMap<i32, (bool, Vec<u8>)>,
     attempt: u64,
     pub events: Vec<Observed>,
+    pub mode: Option<smith_charter::Mode>,
 }
 impl Wire {
     pub fn complete(&mut self, complete: &Complete) {
@@ -18,10 +20,12 @@ impl Wire {
                     self.pipes.insert(pipe.parent.expect("real agent pipe").raw(), (pipe.child == 0, Vec::new()));
                 }
             }
-            (Op::Write { fd, bytes, from, .. }, Ok(Done::Count(count))) => {
+            (Op::Write { fd, bytes, from, .. } | Op::PipeWrite { fd, bytes, from }, Ok(Done::Count(count))) => {
                 self.bytes(fd.raw(), &bytes[*from as usize..(*from + *count) as usize]);
             }
-            (Op::Read { fd, buf, .. }, Ok(Done::Count(count))) => self.bytes(fd.raw(), &buf[..*count as usize]),
+            (Op::Read { fd, buf, .. } | Op::PipeRead { fd, buf }, Ok(Done::Count(count))) => {
+                self.bytes(fd.raw(), &buf[..*count as usize]);
+            }
             (Op::Close { fd }, _) => {
                 self.pipes.remove(&fd.raw());
             }
@@ -53,6 +57,7 @@ impl Wire {
             assert_eq!(*start.identity(), Some(crate::fixtures::RUN_ID), "logical chat identity");
             let charter = smith_charter::Charter::decode(&smith_charter::CEILINGS, &mut Reader::new(start.charter()))
                 .expect("agent charter bytes");
+            self.mode = Some(charter.mode().clone());
             self.attempt = start.activation();
             self.events.push(Observed::Assigned {
                 task: 1,
@@ -64,9 +69,6 @@ impl Wire {
         } else if !down && kind == 0x0109 {
             let turn = smith_channel::Turn::decode(&limits, &mut Reader::new(bytes)).expect("agent Turn bytes");
             self.events.push(Observed::Completion { task: 1, attempt: self.attempt, cumulative: turn.spent() });
-        } else if down && kind == 0x0103 {
-            let ack = smith_channel::Acknowledge::decode(&limits, &mut Reader::new(bytes)).expect("agent ACK bytes");
-            self.events.push(Observed::Released { requires: vec![Receipt::Turn(1, self.attempt, ack.number())] });
         }
     }
 }

@@ -22,8 +22,23 @@ pub(super) enum Scenario {
     Restart,
     Fault { cut: skein_world::Cut, before: u32 },
 }
+/// Read-only evidence captured before shutdown changes the task.
+#[derive(Clone, Debug)]
+pub struct ChatOutcome {
+    pub calls: usize,
+    pub claims: u64,
+    pub tries: jig_domain_tasks::Tries,
+    pub phase: jig_domain_tasks::Phase,
+    pub last_reply: u64,
+    pub reply: Vec<u8>,
+    pub mode: Option<smith_charter::Mode>,
+    pub idle_elapsed: bool,
+}
 /// The world's external observer survives every service lifetime.
 pub struct Referee {
+    chat: crate::fixtures::Chat,
+    chat_outcome: Rc<RefCell<Option<ChatOutcome>>>,
+    idle_until: Option<Time>,
     handed: bool,
     done: bool,
     scenario: Scenario,
@@ -52,6 +67,8 @@ impl Referee {
         mut store: Store,
         rules: Rc<RefCell<rules::Referee>>,
         restarts: Rc<RefCell<u32>>,
+        chat: crate::fixtures::Chat,
+        chat_outcome: Rc<RefCell<Option<ChatOutcome>>>,
     ) -> Self {
         let applied = store.applied;
         let rows = store.rows.clone();
@@ -60,6 +77,9 @@ impl Referee {
             store.recovering();
         }
         Self {
+            chat,
+            chat_outcome,
+            idle_until: None,
             handed: false,
             done: false,
             scenario,
@@ -81,6 +101,9 @@ impl Referee {
             drained: None,
             restarts,
         }
+    }
+    fn expectation_deadline(&self) -> Time {
+        Time::from_nanos(if self.chat == crate::fixtures::Chat::Finite { 10_000_000_000 } else { 60_000_000_000 })
     }
     fn accounts(&mut self, procs: &mut [Proc]) {
         for (index, proc) in procs.iter_mut().enumerate() {
@@ -112,6 +135,81 @@ impl Referee {
                     client.resume_after_account_setup();
                 }
             }
+        }
+    }
+    fn text_reached(&mut self, now: Time, service: &crate::world::ServiceHost, other: &[Proc]) -> bool {
+        use crate::fixtures::Chat;
+        use jig_domain_tasks::{Active, Phase, Stored};
+        let calls = other
+            .iter()
+            .filter_map(|proc| {
+                if let Proc::Peer(peer) = proc {
+                    Some(
+                        peer.observations()
+                            .iter()
+                            .filter(|seen| matches!(seen, skein_fake_peers::llm::Observation::Query { .. }))
+                            .count(),
+                    )
+                } else {
+                    None
+                }
+            })
+            .sum();
+        let store = self.store.borrow();
+        let task = store.rows.values().find_map(|row| {
+            if let root::Record::Core(core::Record::Tasks(Stored::Live(task))) = row { Some(task) } else { None }
+        });
+        let Some(task) = task else { return false };
+        let parked = task.phase == Phase::Active(Active::Idle);
+        let backing_off = matches!(task.phase, Phase::Active(Active::BackingOff { .. }));
+        if (self.chat == Chat::OpenText && parked || self.chat == Chat::FiniteText && backing_off)
+            && self.chat_outcome.borrow().is_none()
+        {
+            let mut reply = Vec::new();
+            for row in store.rows.values() {
+                if let root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = row {
+                    let config = jig_channel_world::fixtures::agent_configuration();
+                    let decoded = smith_protocol_channel::decode_turn(
+                        &turn.transcript,
+                        turn.turn,
+                        &config.limits.channel.transcript,
+                        &config.channel_endpoints,
+                    )
+                    .expect("committed turn bytes");
+                    for message in &decoded.messages {
+                        if message.role == smith_domain::llm::Role::Assistant {
+                            for block in &message.content {
+                                if let smith_domain::session::llm::Block::Text { text, .. } = block {
+                                    reply.extend_from_slice(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            *self.chat_outcome.borrow_mut() = Some(ChatOutcome {
+                calls,
+                claims: task.attempt,
+                tries: task.tries,
+                phase: task.phase.clone(),
+                last_reply: task.last_reply,
+                reply,
+                mode: service.wire.mode.clone(),
+                idle_elapsed: false,
+            });
+            self.idle_until = Some(now.saturating_add(crate::fixtures::idle_interval()));
+        }
+        let mut outcome = self.chat_outcome.borrow_mut();
+        let Some(outcome) = outcome.as_mut() else { return false };
+        outcome.claims = task.attempt;
+        outcome.calls = calls;
+        if self.chat == Chat::OpenText {
+            assert_eq!(calls, 1, "an idle Open chat makes no further LLM call");
+            assert_eq!(task.attempt, 1, "an idle Open chat takes no further claim");
+            outcome.idle_elapsed = self.idle_until.is_some_and(|until| now >= until);
+            outcome.idle_elapsed && parked
+        } else {
+            task.attempt == 2
         }
     }
     fn say(&mut self, now: Time, event: rules::Observed) {
@@ -314,7 +412,14 @@ impl skein_world::Referee<Proc> for Referee {
             self.handed = true;
         }
         let reached = match self.scenario {
-            Scenario::Answer => clients_done && terminals(&self.store.borrow()) > 0,
+            Scenario::Answer => {
+                clients_done
+                    && if self.chat == crate::fixtures::Chat::Finite {
+                        terminals(&self.store.borrow()) > 0
+                    } else {
+                        self.text_reached(now, service, other)
+                    }
+            }
             Scenario::MidRun => {
                 clients_done
                     && agent_started
@@ -404,10 +509,18 @@ impl skein_world::Referee<Proc> for Referee {
         self.say(now, rules::Observed::Tick);
     }
     fn next_deadline(&self) -> Option<Time> {
-        if self.done { None } else { Some(Time::from_nanos(10_000_000_000)) }
+        if self.done {
+            None
+        } else {
+            Some(
+                self.idle_until
+                    .filter(|_| self.chat == crate::fixtures::Chat::OpenText)
+                    .unwrap_or(self.expectation_deadline()),
+            )
+        }
     }
     fn overdue(&self, now: Time) -> Option<String> {
-        if !self.done && now >= Time::from_nanos(10_000_000_000) {
+        if !self.done && now >= self.expectation_deadline() {
             Some(format!(
                 "one-process expectation not met: restarts{} link{}, finished{} lost{}, durable{}, clients{:?}",
                 *self.restarts.borrow(),

@@ -1,20 +1,32 @@
-//! One admitted deployment and one answer, shared by this world's stories.
+//! Named chat deployments and provider replies shared by this world's stories.
 use crate::{Script, world::Settings};
 use jig_channel_world::fixtures as channel;
 
 pub const SEED: u64 = 7;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Chat {
+    Finite,
+    OpenText,
+    FiniteText,
+}
+pub const TEXT: &[u8] = b"hello";
 pub const ANSWER: &[u8] = b"World answer";
 
 #[must_use]
 pub fn calm(seed: u64) -> Settings {
-    Settings { seed, config: skein_sim::Config::calm() }
+    Settings { seed, config: skein_sim::Config::calm(), chat: Chat::Finite }
 }
 #[must_use]
 pub fn one_person_chat(words: &[u8]) -> Box<[Script]> {
     Box::new([Script::answered_chat(words, ANSWER)])
 }
-pub(crate) fn document() -> Vec<u8> {
+pub(crate) fn document(chat: Chat) -> Vec<u8> {
     let engine = engine_document();
+    let engine = if chat == Chat::OpenText {
+        engine.replace(r#""conversation": true"#, r#""conversation": true, "ended_by": "requester""#)
+    } else {
+        engine
+    };
     let worker = std::str::from_utf8(channel::WORKER_DOCUMENT).expect("worker JSON");
     let end = worker.find("],\"application\"").expect("worker array").checked_add(1).expect("array end");
     let worker = worker.get(1..end).expect("worker member");
@@ -66,13 +78,22 @@ pub(crate) fn files() -> jig_test_service::Files {
     engine.entries = entries;
     engine
 }
-pub(crate) fn provider() -> skein_fake_peers::llm::Peer {
+pub(crate) fn provider(chat: Chat) -> skein_fake_peers::llm::Peer {
     let mut script = channel::one_chat(b"Hello");
     // Keep the worker alive beyond its first committed turn for the mid-run cuts.
     script.leading_turns = 1;
     script.result = br#"{"form":"report","text":"World answer","fields":{}}"#.as_slice().into();
+    let turns = if chat == Chat::Finite {
+        channel::provider_turns(&script)
+    } else {
+        use skein_fake_llm_domain::api::{Finish, Line, Turn};
+        (0..=smith_agent_process_world::limits().domain.run.nudges)
+            .map(|_| Turn { lines: Box::new([Line::Text { text: TEXT.into() }]), finish: Finish::Stop, tokens: 1 })
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
+    };
     channel::provider(
-        Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: channel::provider_turns(&script) }]),
+        Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns }]),
         skein_llm::Credential::bearer(channel::TOKEN.into()),
         skein_lib::Duration::ZERO,
         skein_fake_peers::Transport::Plaintext,
@@ -104,4 +125,8 @@ pub(crate) fn client_settings() -> jig_client_shell_native::Settings {
 pub(crate) const RUN_ID: [u8; 16] = [245, 11, 125, 102, 96, 250, 0, 253, 157, 194, 14, 99, 169, 218, 74, 33];
 pub(crate) fn agent_limits() -> smith_channel::Limits {
     channel::agent().limits.bodies
+}
+
+pub(crate) fn idle_interval() -> skein_lib::Duration {
+    store_limits().root.core.tasks.retries.run.max.saturating_add(skein_lib::Duration::from_secs(1))
 }
