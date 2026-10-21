@@ -489,39 +489,48 @@ fn an_early_program_terminal_finishes_account_removal() {
     );
 }
 
+fn removal_failures(
+    first: jig_domain_accounts::ProgramResult,
+    last: jig_domain_accounts::ProgramResult,
+) -> Vec<Request> {
+    let mut world = fresh();
+    declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("first declaration");
+    declare(&mut world, HOLDER, PROVIDER, Some(0), b"work").0.expect("second declaration");
+    let request = skein_lib::Token::new(92);
+    world.step(Event::Change { request, holder: HOLDER, change: jig_domain_accounts::Change::Remove { account: 0 } });
+    for source in [1, 2] {
+        world.step(Event::ProgramTargets { source, hosts: Box::new([jig_accounts_world::worker(0)]) });
+    }
+    assert!(
+        world
+            .step(Event::ProgramSignedOut { source: 1, host: jig_accounts_world::worker(0), result: first })
+            .is_empty()
+    );
+    world.step(Event::ProgramSignedOut { source: 2, host: jig_accounts_world::worker(0), result: last })
+}
+fn removal_answer(result: jig_domain_accounts::ProgramFailure) -> Vec<Request> {
+    vec![Request::Answer {
+        request: skein_lib::Token::new(92),
+        answer: jig_domain_accounts::Answer::Removed {
+            confirmed: false,
+            failed_hosts: Box::new([jig_domain_accounts::ProgramHost {
+                worker: jig_accounts_world::worker(0),
+                result,
+            }]),
+        },
+    }]
+}
 #[test]
 fn account_removal_keeps_the_most_severe_worker_failure() {
-    use jig_domain_accounts::{Answer, ProgramFailure as Failure, ProgramHost, ProgramResult as Result};
+    use jig_domain_accounts::{ProgramFailure as Failure, ProgramResult as Result};
     for (first, last) in [(Result::Lost, Result::Failed), (Result::Failed, Result::Lost)] {
-        let mut world = fresh();
-        declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("first declaration");
-        declare(&mut world, HOLDER, PROVIDER, Some(0), b"work").0.expect("second declaration");
-        let request = skein_lib::Token::new(92);
-        world.step(Event::Change {
-            request,
-            holder: HOLDER,
-            change: jig_domain_accounts::Change::Remove { account: 0 },
-        });
-        for source in [1, 2] {
-            world.step(Event::ProgramTargets { source, hosts: Box::new([jig_accounts_world::worker(0)]) });
-        }
-        assert!(
-            world
-                .step(Event::ProgramSignedOut { source: 1, host: jig_accounts_world::worker(0), result: first })
-                .is_empty()
-        );
-        assert_eq!(
-            world.step(Event::ProgramSignedOut { source: 2, host: jig_accounts_world::worker(0), result: last }),
-            vec![Request::Answer {
-                request,
-                answer: Answer::Removed {
-                    confirmed: false,
-                    failed_hosts: Box::new([ProgramHost {
-                        worker: jig_accounts_world::worker(0),
-                        result: Failure::Lost
-                    }])
-                }
-            }]
-        );
+        assert_eq!(removal_failures(first, last), removal_answer(Failure::Lost));
+    }
+}
+#[test]
+fn account_removal_prefers_failure_to_absent_contact() {
+    use jig_domain_accounts::{ProgramFailure as Failure, ProgramResult as Result};
+    for (first, last) in [(Result::NotInContact, Result::Failed), (Result::Failed, Result::NotInContact)] {
+        assert_eq!(removal_failures(first, last), removal_answer(Failure::Failed));
     }
 }

@@ -70,13 +70,14 @@ an application's worker, if it has workers
 ├── smith-host-domain           their agent, smith's: processes; or smith-inline-agent, as the root chooses
 └── <workspace>                 the application's
 
+jig-domain-workers             shared checked names and worker membership values (root.md, section 2)
 skein-lib's journal             the commit barrier every root holds (root.md, section 4)
 ```
 
 The crate graph is the role graph: no jig crate depends on an
-application's; the core and its children depend on skein-lib alone; the
-hub depends on skein-lib alone too, and carries smith's payloads as
-bytes; the agent capabilities are smith's crates, and jig ships none.
+application's; the core and its children depend on skein-lib and the shared
+value crate jig-domain-workers alone (root.md, section 2); the hub depends
+on skein-lib alone too, and carries smith's payloads as bytes; the agent capabilities are smith's crates, and jig ships none.
 Which crates link smith is hosts.md, 6.8. Nothing in jig names a
 system.
 

@@ -90,17 +90,11 @@ impl Domain {
         self.cleanup_programs.contains(&name)
     }
 
-    /// Supply the fixed configured membership before admitting channels.
-    /// Returns false for names outside the startup bounds or a late replacement.
-    pub fn configure_workers(&mut self, limits: &Limits, names: Box<[Box<[u8]>]>) -> bool {
-        if self.workers() != 0 || !self.worker_names.is_empty() {
-            return false;
-        }
-        let Ok(names) = crate::Membership::new(names, limits.configured_workers, limits.worker_name_bytes) else {
-            return false;
-        };
+    /// Supply the checked fixed membership once, before admitting channels.
+    /// Its minter uses the fleet's configured-worker and name-byte limits.
+    pub fn configure_workers(&mut self, names: crate::Membership) {
+        assert!(self.workers() == 0 && self.worker_names.is_empty(), "membership supplied once before channels");
         self.worker_names = names;
-        true
     }
     /// Admit a position only from this fleet's fixed configured membership.
     #[must_use]

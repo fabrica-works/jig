@@ -16,9 +16,13 @@ impl World {
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(fleet::max_out(&limits)),
         };
-        assert!(
-            world.domain.configure_workers(&limits, Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]))
-        );
+        let membership = fleet::Membership::new(
+            Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]),
+            limits.configured_workers,
+            limits.worker_name_bytes,
+        )
+        .expect("fixture membership");
+        world.domain.configure_workers(membership);
         assert!(world.step(Event::Sources { sources: names.iter().map(|name| source(name)).collect() }).is_empty());
         world
     }

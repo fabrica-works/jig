@@ -239,7 +239,13 @@ fn program_sign_out_routes_the_offline_member_result() {
     let mut providers = core.settings.llm_providers.clone();
     providers.providers[0].offers.programs = Box::new([b"claude_code".as_slice().into()]);
     core.accounts = accounts::Domain::new(&env.limits.accounts, providers);
-    assert!(core.fleet.configure_workers(&env.limits.fleet, Box::new([b"offline".as_slice().into()])));
+    let membership = fleet::Membership::new(
+        Box::new([b"offline".as_slice().into()]),
+        env.limits.fleet.configured_workers,
+        env.limits.fleet.worker_name_bytes,
+    )
+    .expect("fixture membership");
+    core.fleet.configure_workers(membership);
     for record in [
         accounts::Stored::Issued { number: 21, holder: PARTY, name: b"personal".as_slice().into(), signed_out: false },
         accounts::Stored::Account {

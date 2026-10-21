@@ -1,6 +1,6 @@
 //! Shared admitted program names and fixed worker membership (domain/root.md, 2).
 //! These are configuration values; the crate holds no channel or domain state.
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
 use alloc::boxed::Box;

@@ -5,7 +5,7 @@ use skein_lib::{List, Queue, Token};
 
 pub(crate) fn check(domain: &mut Domain, name: SourceName, out: &mut Queue<Request>) {
     for (_, id) in &domain.tokens {
-        let Some(host) = domain.channels.get_mut(*id) else { continue };
+        let host = domain.channels.get_mut(*id).expect("current channel");
         if host.kind == HostKind::Engine {
             continue;
         }
@@ -68,7 +68,7 @@ pub(crate) fn sign_out(domain: &mut Domain, source: u32, name: SourceName, out: 
 /// A failed cleanup remains visible/restrictive; it never completes an old answer.
 pub(crate) fn cleanup(domain: &mut Domain, channel: Token, out: &mut Queue<Request>) {
     let Some(id) = domain.tokens.get(&channel) else { return };
-    let Some(host) = domain.channels.get_mut(*id) else { return };
+    let host = domain.channels.get_mut(*id).expect("current channel");
     if host.kind == HostKind::Engine || host.sources.awaiting() {
         return;
     }
@@ -99,7 +99,7 @@ pub(crate) fn flush(sources: &mut Sources, channel: Token, out: &mut Queue<Reque
         }
     }
     for name in &pending {
-        let Some(row) = sources.pending.get_mut(name) else { continue };
+        let row = sources.pending.get_mut(name).expect("collected from pending");
         row.sent = true;
         out.push(Request::SignOut { channel, name: *name });
     }

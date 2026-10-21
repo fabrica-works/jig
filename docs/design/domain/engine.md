@@ -89,6 +89,8 @@ jig-domain-core             the core: routing among its children, runs, calls, t
 ├── jig-domain-brief        a run's brief, from typed sections and connectors' sized ones, within a budget
 ├── jig-domain-notes        notes: scopes, entries, indexes
 └── jig-domain-views        parties' watches, level-triggered
+
+jig-domain-workers         shared checked names and worker membership values (root.md, 2)
 ```
 
 The tree follows programming-model.md, 4.5: each child domain has its
@@ -830,8 +832,10 @@ The fleet child domain knows the hosts and the runs they host:
   restart.
 
 Workers are known by their delivery channel and by the configured worker
-position that channel authenticated as. Program login answers and deployment
-facts name the configured worker, whose name is supplied at startup, never
+position that channel authenticated as. A hello naming an unconfigured
+position or one held by a live channel is refused as `Position`, naming that
+position separately from capacity refusals. Program login answers and
+deployment facts name the configured worker, whose name is supplied at startup, never
 from a worker message. A sign-out targets every configured worker; one not in
 contact is unconfirmed at once. An old channel's result cannot change a new
 channel's inventory or complete a later operation. Cleanup of issued names

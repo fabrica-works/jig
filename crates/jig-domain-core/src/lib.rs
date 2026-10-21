@@ -514,8 +514,8 @@ impl Core {
     /// # Errors
     /// A configured worker count or name exceeds the priced membership bounds.
     #[expect(clippy::too_many_lines, reason = "construct all bounded children, bindings and subject marks together")]
-    pub fn new(config: Config, limits: &Limits) -> Result<Core, Problem> {
-        memory::problems(&config, limits)?;
+    pub fn new(mut config: Config, limits: &Limits) -> Result<Core, Problem> {
+        let worker_names = memory::problems(core::mem::replace(&mut config.worker_names, Box::new([])), limits)?;
         assert!(limits.people.words <= limits.tasks.message_bytes, "party words fit one run message");
         assert!(limits.tasks.message_bytes >= 24, "projection refusal news fits one run message");
         assert!(config.settings.tools.valid(), "each engine tool has one configured authority bit");
@@ -643,7 +643,7 @@ impl Core {
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
             fleet: {
                 let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs);
-                assert!(fleet.configure_workers(&limits.fleet, config.worker_names), "admitted by problems");
+                fleet.configure_workers(worker_names);
                 fleet
             },
             accounts: accounts::Domain::new(&limits.accounts, config.settings.llm_providers.clone()),

@@ -73,7 +73,9 @@ impl Harness {
             let name = skein_lib::Decimal::of(u64::from(index));
             names.push(skein_lib::bytes::copy_of(name.as_bytes())).expect("configured fixture worker count");
         }
-        assert!(domain.configure_workers(&limits, names.into_boxed()));
+        let names = crate::Membership::new(names.into_boxed(), limits.configured_workers, limits.worker_name_bytes)
+            .expect("fixture membership");
+        domain.configure_workers(names);
         Harness { domain, env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, out }
     }
 

@@ -189,7 +189,8 @@ worker, `Accept` or `Refuse` from the engine, then each side's `Terms`.
 - **The engine's domain hears a channel only with its hello.** A channel
   refused during its opening, or lost before its hello, is never
   announced. Nothing but the hello is taken before it.
-- **The fleet may refuse the hello:** no room for another host; a stop
+- **The fleet may refuse the hello:** no room for another host; a worker
+  position that is not configured or is held by a live channel; a stop
   bound not strictly shorter than the engine's grace; or an agent whose
   bounds cannot run the engine's charters, a model it declares among
   them held with a smaller window or output than configuration's

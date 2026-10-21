@@ -126,8 +126,8 @@ fn context_carrier(limits: &Limits) -> Option<u64> {
 }
 
 pub use fleet::WorkerProblem as Problem;
-pub(crate) fn problems(config: &crate::Config, limits: &Limits) -> Result<(), Problem> {
-    fleet::Membership::check(&config.worker_names, limits.fleet.configured_workers, limits.fleet.worker_name_bytes)
+pub(crate) fn problems(names: Box<[Box<[u8]>]>, limits: &Limits) -> Result<fleet::Membership, Problem> {
+    fleet::Membership::new(names, limits.fleet.configured_workers, limits.fleet.worker_name_bytes)
 }
 
 /// Pure checked heap ceiling for the core's eight children, its retained

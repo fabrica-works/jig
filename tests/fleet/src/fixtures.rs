@@ -94,6 +94,8 @@ pub fn domain(limits: &jig_domain_fleet::Limits, needs: jig_domain_fleet::Needs)
     let mut domain = jig_domain_fleet::Domain::new(limits, needs);
     let names =
         (0..limits.configured_workers).map(|index| format!("worker-{index}").into_bytes().into_boxed_slice()).collect();
-    assert!(domain.configure_workers(limits, names));
+    let names = jig_domain_fleet::Membership::new(names, limits.configured_workers, limits.worker_name_bytes)
+        .expect("fixture membership");
+    domain.configure_workers(names);
     domain
 }
