@@ -276,7 +276,7 @@ fn waiting_count(domain: &Domain, holding: &Holding) -> u32 {
     let mut count = 0_u32;
     for (number, _) in &domain.names {
         let row = record(domain, *number).expect("indexed live task");
-        if row.phase == Phase::Waiting && row.hold_wait_since.is_some() && !row.holds_taken {
+        if queued(row) {
             for needed in &row.holdings {
                 if same(needed, holding) {
                     count = count.saturating_add(1);
@@ -489,16 +489,21 @@ pub(crate) fn wait(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mu
     let Some(resource) = blocked else { return };
     task_mut(domain, number).expect("waiting task live").record.hold_wait_since = Some(env.wall);
     publish(domain, env, number, out);
+    let place = place(domain, &env.limits, number, &resource);
+    out.push(Request::Waiting { task: number, resource, place });
+    let due = env.now.saturating_add(env.limits.hold_wait);
+    domain.hold_alarms.arm(number, due).expect("one alarm per task");
+}
+
+/// Where `number` stands among the queued waiters for `resource`, counting from 1.
+fn place(domain: &Domain, limits: &Limits, number: u64, resource: &Name) -> u32 {
     let mut place = 1_u32;
     for (other, _) in &domain.names {
         if *other != number {
             let row = record(domain, *other).expect("indexed live task");
-            if row.phase == Phase::Waiting
-                && row.hold_wait_since.is_some()
-                && earlier(domain, *other, number, &env.limits)
-            {
+            if queued(row) && earlier(domain, *other, number, limits) {
                 for needed in &row.holdings {
-                    if name(needed) == &resource {
+                    if name(needed) == resource {
                         place = place.saturating_add(1);
                         break;
                     }
@@ -506,9 +511,42 @@ pub(crate) fn wait(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mu
             }
         }
     }
-    out.push(Request::Waiting { task: number, resource, place });
+    place
+}
+
+/// A waiting task given a dependency leaves its queues, keeping when it began to wait: its
+/// bound stops while the dependency is pending (domain/tasks.md, 6.2).
+#[expect(dead_code, reason = "the amendment that adds a dependency to a waiting task calls it")]
+pub(crate) fn leave(domain: &mut Domain, number: u64) {
+    domain.hold_alarms.cancel(number);
+}
+
+/// A task that left its queues comes back at its place once its dependencies are done again,
+/// its bound counted afresh from then (domain/tasks.md, 6.2).
+pub(crate) fn back(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
+    let Some(row) = record(domain, number) else { return };
+    if !queued(row) {
+        return;
+    }
+    let mut blocked = None;
+    for needed in &row.holdings {
+        if !available(domain, needed, 0) {
+            blocked = Some(name(needed).clone());
+            break;
+        }
+    }
+    task_mut(domain, number).expect("returning task live").record.hold_bound_since = Some(env.wall);
+    publish(domain, env, number, out);
     let due = env.now.saturating_add(env.limits.hold_wait);
     domain.hold_alarms.arm(number, due).expect("one alarm per task");
+    let Some(resource) = blocked else { return };
+    let place = place(domain, &env.limits, number, &resource);
+    out.push(Request::Waiting { task: number, resource, place });
+}
+
+/// In a queue: waiting for holds with every dependency done (domain/tasks.md, 6.2).
+pub(crate) fn queued(row: &TaskRecord) -> bool {
+    row.phase == Phase::Waiting && row.hold_wait_since.is_some() && !row.holds_taken && row.waiting_on.is_empty()
 }
 
 /// Take every resource in the same commit as activation.
@@ -534,7 +572,7 @@ pub(crate) fn take(domain: &mut Domain, _env: &Env<Limits>, number: u64, out: &m
 pub(crate) fn expire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     if let Some(number) = domain.hold_alarms.expire(env.now) {
         let waiting = match record(domain, number) {
-            Some(row) => row.phase == Phase::Waiting && row.hold_wait_since.is_some() && !row.holds_taken,
+            Some(row) => queued(row),
             None => false,
         };
         if waiting {
@@ -658,6 +696,9 @@ pub(crate) fn valid_record(domain: &Domain, limits: &Limits, row: &TaskRecord) -
     if row.hold_wait_since.is_some() && (row.holds_taken || row.holdings.is_empty()) {
         return false;
     }
+    if row.hold_bound_since.is_some() && row.hold_wait_since.is_none() {
+        return false;
+    }
     true
 }
 
@@ -665,7 +706,7 @@ pub(crate) fn valid_record(domain: &Domain, limits: &Limits, row: &TaskRecord) -
 pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>) {
     for (number, _) in &domain.names {
         let row = record(domain, *number).expect("restored live row");
-        if row.phase == Phase::Waiting
+        if queued(row)
             && let Some(since) = row.hold_wait_since
         {
             let since = match row.hold_bound_since {

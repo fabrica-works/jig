@@ -395,7 +395,11 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
                 }
             },
         }
-        publish(domain, env, dependent, out);
+        if crate::holds::queued(&task.record) {
+            crate::holds::back(domain, env, dependent, out);
+        } else {
+            publish(domain, env, dependent, out);
+        }
     }
     match requester {
         Party::Task(parent) => {
