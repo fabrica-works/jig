@@ -584,7 +584,7 @@ fn saturated_verdict_machine_field_arrays_fit_their_declared_owner_bound() {
 #[test]
 fn a_wide_back_walk_with_ancestors_and_dependents_fits_its_priced_scratch() {
     const ROOT: u64 = 1;
-    const BRANCH: u64 = 2;
+    const MIDDLE: u64 = 2;
     const SOURCE: u64 = 3;
     const FIRST_LEAF: u64 = 10;
     const PROPOSED: u64 = 18;
@@ -595,19 +595,19 @@ fn a_wide_back_walk_with_ancestors_and_dependents_fits_its_priced_scratch() {
     measured.bootstrap();
     let reply_to = measured.to();
     measured.event(Event::Make { reply_to, creator: Party::Person(9), batch: Box::new([pool_task(ROOT, &[])]) });
-    let batch = (BRANCH..FIRST_LEAF).map(|number| pool_task(number, &[])).collect();
+    let batch = (MIDDLE..FIRST_LEAF).map(|number| pool_task(number, &[])).collect();
     let reply_to = measured.to();
     measured.event(Event::Make { reply_to, creator: Party::Task(ROOT), batch });
     for sibling in SOURCE..FIRST_LEAF {
         let reply_to = measured.to();
-        measured.event(Event::Introduce { reply_to, by: ROOT, left: BRANCH, right: sibling });
+        measured.event(Event::Introduce { reply_to, by: ROOT, left: MIDDLE, right: sibling });
     }
     let dependencies: Vec<_> = (SOURCE..FIRST_LEAF).collect();
     let batch = (FIRST_LEAF..FIRST_LEAF + WIDTH).map(|number| pool_task(number, &dependencies)).collect();
     let reply_to = measured.to();
-    measured.event(Event::Make { reply_to, creator: Party::Task(BRANCH), batch });
+    measured.event(Event::Make { reply_to, creator: Party::Task(MIDDLE), batch });
     let reply_to = measured.to();
-    measured.event(Event::Introduce { reply_to, by: BRANCH, left: SOURCE, right: FIRST_LEAF });
+    measured.event(Event::Introduce { reply_to, by: MIDDLE, left: SOURCE, right: FIRST_LEAF });
     let reply_to = measured.to();
     measured.event(Event::Make {
         reply_to,
@@ -617,7 +617,7 @@ fn a_wide_back_walk_with_ancestors_and_dependents_fits_its_priced_scratch() {
     assert!(measured.refused, "the creator's eight waiting dependents close the proposed circle");
     let width = usize::try_from(WIDTH).expect("small tree width");
     assert_eq!(measured.d.task(ROOT).expect("root").delegates.len(), width);
-    assert_eq!(measured.d.task(BRANCH).expect("branch").delegates.len(), width);
+    assert_eq!(measured.d.task(MIDDLE).expect("middle").delegates.len(), width);
 }
 
 #[test]

@@ -362,7 +362,10 @@ fn memory_below_the_components_sum_is_refused() {
     // Added dependencies (including the seed's task/run carriers), retained
     // refusal names, circle scratch and document facts add 21,322,048 bytes.
     // The profile is unchanged and still supplies one byte in this refusal test.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_724_669_203 });
+    // The tasks domain's wait index, its circle scratch and an amendment's staged
+    // promise (tasks::worst_case at this profile's tasks limits) add 2,100,096:
+    // 18,724,669,203 + 2,100,096 = 18,726,769,299.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_726_769_299 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

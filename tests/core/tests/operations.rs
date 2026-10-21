@@ -278,7 +278,7 @@ fn a_tasks_refusal_precedes_a_later_core_refusal_in_a_compound() {
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::CompoundRefused {
             at: 0,
-            why: people::Refusal::Limit { which: people::LimitKind::Dependencies }
+            why: people::Refusal::Circle { tasks: Box::new([chat]), cut: false }
         }))
     );
     assert_eq!(live_row(&world, chat).revision, revision);
