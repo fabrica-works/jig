@@ -1654,6 +1654,8 @@ pub enum Event {
     },
     /// Root numbers the news requested by the due person-task timer.
     PersonStallNotice { task: u64, message: u64 },
+    /// Root numbers the notice that a kept task goes on (domain/tasks.md, 5.7 and 8.1).
+    MetNotice { task: u64, dependency: u64, removed: bool, by: Party, message: u64 },
     /// Admit one `Live`/`Ledger` row during restoring; invalid input permanently fails restoration
     /// with `RestoreRefused`.
     Restore {
@@ -1690,6 +1692,8 @@ pub enum Request {
     ProposalRerouteNeeded { proposer: u64, proposal: u64 },
     /// Root supplies one message number for the elapsed person-task wait.
     PersonStallDue { task: u64 },
+    /// Root supplies one message number for the notice that a kept task goes on (domain/tasks.md, 5.7 and 8.1).
+    MetDue { task: u64, dependency: u64, removed: bool, by: Party },
     /// One nonfinal held decision passed its configured wait.
     EscalationStalled { task: u64, revision: u64, holder: crate::EscalationHolder },
     /// One nonfinal holder's wait bound elapsed; root chooses the next holder.

@@ -369,6 +369,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
         if !crate::batch::contains(&task.record.waiting_on, number) {
             continue;
         }
+        let was_kept = crate::run::ends::for_record(&task.record).blocks_claims();
         let mut remaining = List::with_capacity(env.limits.dependencies);
         for &waiting in &task.record.waiting_on {
             if waiting != number {
@@ -384,7 +385,16 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
             Executor::Agent { .. } | Executor::Procedure { .. } => {}
         }
         match status {
-            Status::Done => {}
+            Status::Done => {
+                if was_kept && task.record.waiting_on.is_empty() {
+                    out.push(Request::MetDue {
+                        task: dependent,
+                        dependency: number,
+                        removed: false,
+                        by: Party::Task(number),
+                    });
+                }
+            }
             Status::Failed | Status::Cancelled => match &task.record.phase {
                 Phase::Closing(_) | Phase::Held { was: Was::Closing(_), .. } | Phase::Ended(_) => {}
                 Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => {

@@ -1313,6 +1313,21 @@ pub(super) fn tag_tasks(
                 }
                 continue;
             }
+            tasks::Request::MetDue { task, dependency, removed, by } => {
+                let message =
+                    crate::fresh(&mut core.counters, crate::Family::Message).expect("met notice number admitted");
+                let mut follow = Queue::with_capacity(room);
+                tasks::step(
+                    &mut core.tasks,
+                    &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
+                    tasks::Event::MetNotice { task, dependency, removed, by, message },
+                    &mut follow,
+                );
+                for _ in 0..follow.len() {
+                    pending.push(follow.pop().expect("met notice output count"));
+                }
+                continue;
+            }
             tasks::Request::Notify { task, subscription, target, state, words } => {
                 let event = core.notice(task, subscription, target, state, words, env.wall);
                 let mut follow = Queue::with_capacity(room);

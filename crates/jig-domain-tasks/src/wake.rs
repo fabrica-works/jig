@@ -114,6 +114,48 @@ fn batch_state(domain: &Domain, number: u64, word: &Word) -> (u32, Wall, bool) {
     (hits, oldest, latched)
 }
 
+/// Admit root's numbered notice only while the kept task can go on (domain/tasks.md, 5.7).
+#[expect(clippy::too_many_arguments, reason = "root-numbered notice fields accompany the step environment")]
+pub(crate) fn met(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    number: u64,
+    dependency: u64,
+    removed: bool,
+    by: Party,
+    message: u64,
+    out: &mut Queue<Request>,
+) {
+    let Some(row) = record(domain, number) else { return };
+    match row.phase {
+        Phase::Active(_) | Phase::Held { was: crate::Was::Active(_), .. } => {}
+        Phase::Waiting
+        | Phase::Closing(_)
+        | Phase::Held { was: crate::Was::Waiting | crate::Was::Closing(_), .. }
+        | Phase::Ended(_) => return,
+    }
+    if crate::run::ends::for_record(row).blocks_claims() || message == 0 || message <= row.last_message {
+        return;
+    }
+    let word = Word {
+        number: message,
+        from: by,
+        kind: MessageKind::Met { dependency, removed },
+        words: Box::new([]),
+        at: env.wall,
+        hits: 1,
+        eligible: false,
+    };
+    let prepared = crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::Merged)
+        .expect("kept task has merged notice room");
+    let task = task_mut(domain, number).expect("notice task remains live");
+    task.record.last_message = message;
+    task.record.inbox = prepared.inbox;
+    crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);
+    publish(domain, env, number, out);
+    after_message(domain, env, number, prepared.previous, prepared.word, out);
+}
+
 pub(crate) fn after_message(
     domain: &mut Domain,
     env: &Env<Limits>,

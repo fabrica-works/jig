@@ -334,6 +334,21 @@ impl World {
                     &mut self.out,
                 );
             }
+            Request::MetDue { task, dependency, removed, by } => {
+                self.message = self.message.checked_add(1).expect("met message number room");
+                tasks::step(
+                    &mut self.domain,
+                    &self.env,
+                    Event::MetNotice {
+                        task: *task,
+                        dependency: *dependency,
+                        removed: *removed,
+                        by: *by,
+                        message: self.message,
+                    },
+                    &mut self.out,
+                );
+            }
             Request::Notify { task, subscription, target, state, words } => {
                 self.message = self.message.checked_add(1).expect("message number room");
                 tasks::step(
@@ -494,6 +509,7 @@ impl World {
             | Event::Subscribe { .. }
             | Event::SubscribeTopic { .. }
             | Event::Unsubscribe { .. }
+            | Event::MetNotice { .. }
             | Event::PersonStallNotice { .. }
             | Event::Notice { .. } => None,
         };
@@ -564,6 +580,7 @@ impl World {
             | Event::Subscribe { .. }
             | Event::SubscribeTopic { .. }
             | Event::Unsubscribe { .. }
+            | Event::MetNotice { .. }
             | Event::PersonStallNotice { .. }
             | Event::Turn { .. } => {}
         }
@@ -717,6 +734,7 @@ impl World {
                 | Request::ResolveUncertain { .. }
                 | Request::Sent { .. }
                 | Request::Relay { .. }
+                | Request::MetDue { .. }
                 | Request::PersonStallDue { .. }
                 | Request::Notify { .. }
                 | Request::Timer { .. }
@@ -778,6 +796,7 @@ impl World {
                 | Request::Ended { .. }
                 | Request::EscalationNeeded { .. }
                 | Request::Relay { .. }
+                | Request::MetDue { .. }
                 | Request::PersonStallDue { .. }
                 | Request::Notify { .. }
                 | Request::Timer { .. }

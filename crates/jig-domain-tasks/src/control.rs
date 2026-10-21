@@ -587,7 +587,7 @@ pub(crate) fn apply_amend(
         release,
         waiting_on,
         added,
-        met: _,
+        met,
     } = plan;
     if let Some((destination, budget)) = funding {
         crate::funders::refunding::apply(domain, env, number, destination, budget, out);
@@ -600,6 +600,7 @@ pub(crate) fn apply_amend(
     {
         crate::funders::resize(domain, env, number, authority.budget.spend, out);
     }
+    let was_kept = crate::run::ends::kept(domain, number).blocks_claims();
     let was_queued = crate::holds::queued(record(domain, number).expect("amendment task live"));
     let task = task_mut(domain, number).expect("amendment task live");
     if let Some(tracked) = amendment.tracked {
@@ -680,6 +681,9 @@ pub(crate) fn apply_amend(
         out.push(Request::Stop { task: number, attempt });
     } else {
         crate::wake::after_message(domain, env, number, prepared.previous, prepared.word, out);
+    }
+    if was_kept && let Some(dependency) = met {
+        out.push(Request::MetDue { task: number, dependency, removed: true, by });
     }
     if let Some(release) = release {
         apply_release(domain, env, by, release, out);

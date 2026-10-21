@@ -167,6 +167,12 @@ fn a_live_run_finishes_done_as_parked_keeps_saved_state_and_names_its_dependenci
         .position(|line| matches!(line, Line::RunEnded { end: tasks::EndKind::Parked, .. }))
         .expect("fixture evidence");
     assert!(matches!(lines.get(end + 1), Some(Line::Kept { attempt: 1, pending }) if pending.as_ref() == [2]));
+    done(&mut world, 2);
+    assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
+    assert!(world.contexts[&1].pending.is_empty());
+    assert_eq!(world.contexts[&1].added.as_ref(), [tasks::Added { task: 2, at: world.env.wall, by: Party::Person(9) }]);
+    done(&mut world, 1);
+    assert!(matches!(world.results[&1], Ending::Done(_)));
 }
 
 #[test]
@@ -215,6 +221,20 @@ fn a_procedures_done_step_is_refused_whole_while_kept_but_wait_and_failure_still
     let before = world.records.clone();
     refused(procedure(&mut world, 1, ProcedureEnd::Result(report())), 1, Refusal::Kept, &[2]);
     assert_eq!(world.records, before);
+    assert_eq!(procedure(&mut world, 1, ProcedureEnd::Wait), Reply::Done);
+    done(&mut world, 2);
+    assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
+    assert!(world.contexts[&1].pending.is_empty());
+    assert_eq!(procedure(&mut world, 1, ProcedureEnd::Result(report())), Reply::Done);
+    world.settle(1);
+    assert!(matches!(world.results[&1], Ending::Done(_)));
+
+    // A separate kept procedure may still fail without its dependency ending.
+    let mut world = World::new(852, LIMITS);
+    let mut new = task(1, &[]);
+    new.executor = Executor::Procedure { connector: 1, code: 1 };
+    world.make(Party::Person(9), vec![new, task(2, &[])]);
+    keep(&mut world);
     assert_eq!(
         procedure(&mut world, 1, ProcedureEnd::Result(TaskResult::Failure { reason: Box::new([1]) })),
         Reply::Done
@@ -602,8 +622,7 @@ fn a_kept_runs_invalid_result_still_spends_an_invalid_try() {
 fn a_restored_met_and_amendment_leave_all_ordinary_sender_room_available() {
     let mut world = pair();
     assert_eq!(amend(&mut world, Party::Person(9), 1, &[]), Reply::Done);
-    // Restore a valid numbered Met row: root numbering is the integration seam,
-    // while the child's sender-room promise is observable here.
+    // Restore accounting complements the live Met story in met.rs.
     let Stored::Live(row) = world.records.get_mut(&Key::Live(1)).expect("live row") else { panic!("live") };
     row.last_message += 1;
     let mut inbox = row.inbox.to_vec();

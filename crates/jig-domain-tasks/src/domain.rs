@@ -671,6 +671,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Retained { task, root, holding } => crate::holds::retained(domain, env, task, root, &holding, out),
         Event::Settled { task } => crate::closing::settled(domain, env, task, out),
         Event::PersonStallNotice { task, message } => crate::person::stalled(domain, env, task, message, out),
+        Event::MetNotice { task, dependency, removed, by, message } => {
+            crate::wake::met(domain, env, task, dependency, removed, by, message, out);
+        }
         Event::Restore { record } => crate::stored::restore(domain, env, record, out),
         Event::Restored => {
             crate::stored::restored(domain, env, out);
