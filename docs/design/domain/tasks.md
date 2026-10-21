@@ -558,8 +558,10 @@ A task its requester ends:
   a failure among them, or with follow-ups, parks before its result is
   judged. The result and its follow-ups are discarded, and no try is
   spent. What the run spent, saved and committed stays, with its turns,
-  its read fences, its delegates and its history. The fences of saved
-  work, of charge and of messages are checked first, as for any finish.
+  its read fences, its delegates and its history. The discard writes no
+  line of its own: it is the run's ordinary turn end, and the committed
+  reply is the history's line. The fences of saved work, of charge and
+  of messages are checked first, as for any finish.
 - **ends as its requester says,** or by cancel. While it closes, a
   cancel keeps its partial result. A narrowing run goes Due, as ever,
   and a held task stays held.
