@@ -1,7 +1,7 @@
 //! Open and finite runs after the same committed turn (domain/tasks.md, 5.8).
 use jig_domain_tasks::{
-    Accepted, Active, End, EndedBy, Event, Flags, InvalidResult, Line, MessageKind, Party, Phase, Stored, TaskResult,
-    Tries, Word,
+    Accepted, Active, End, EndedBy, Event, Executor, Flags, InvalidResult, Line, MessageKind, Party, PersonAddress,
+    Phase, Problem, Refusal, Stored, TaskResult, Tries, Word,
 };
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::Duration;
@@ -103,4 +103,49 @@ fn a_finite_tasks_invalid_finish_after_its_reply_retries() {
     assert_eq!(w.record(1).phase, Phase::Active(Active::Due));
     assert_eq!(w.activations(1), 2);
     assert_eq!(w.contexts[&1].invalid_result, Some(InvalidResult::Form));
+}
+
+#[test]
+fn a_batchs_requester_authority_takes_one_shape() {
+    const PARENT: u64 = 1;
+    const MEMBER: u64 = 2;
+    const PERSON: Party = Party::Person(7);
+    const AGENT: Executor = Executor::Agent { charter: 1 };
+    const OPEN: Flags = Flags { conversation: true, ended_by: EndedBy::Requester, ..Flags::PLAIN };
+    let accepted = Reply::Made(vec![MEMBER]);
+    let refused = Reply::Refused(Problem::new(Some(MEMBER), Refusal::Contract));
+    for (name, flags, executor, creator, expected) in [
+        ("person's agent conversation", OPEN, AGENT, PERSON, accepted.clone()),
+        ("person executor", OPEN, Executor::Person(PersonAddress::Person(7)), PERSON, refused.clone()),
+        ("procedure executor", OPEN, Executor::Procedure { connector: 1, code: 1 }, PERSON, refused.clone()),
+        ("no conversation", Flags { conversation: false, ..OPEN }, AGENT, PERSON, refused.clone()),
+        ("task creator", OPEN, AGENT, Party::Task(PARENT), refused.clone()),
+        ("deployment creator", OPEN, AGENT, Party::Deployment { project: 1 }, refused.clone()),
+        ("zero person", OPEN, AGENT, Party::Person(0), refused),
+        ("result authority control", Flags::PLAIN, AGENT, PERSON, accepted),
+    ] {
+        let mut w = World::new(328, LIMITS);
+        w.make(PERSON, vec![task(PARENT, &[])]);
+        let before = w.live();
+        let records = w.records.clone();
+        let mut member = task(MEMBER, &[]);
+        member.flags = flags;
+        member.executor = executor;
+        assert_eq!(w.make(creator, vec![member]), expected, "{name}");
+        match expected {
+            Reply::Made(_) => {
+                assert_eq!(w.live(), before + 1, "{name}");
+                assert_eq!(w.record(MEMBER).flags.ended_by, flags.ended_by, "{name}");
+                assert_eq!(w.record(MEMBER).executor, executor, "{name}");
+                assert_eq!(w.record(MEMBER).requester, creator, "{name}");
+            }
+            Reply::Refused(_) => {
+                assert_eq!(w.live(), before, "{name}");
+                assert_eq!(w.records, records, "{name}");
+            }
+            Reply::Done | Reply::Acknowledged(_) | Reply::Turn(_) | Reply::WriterWaiting(_) => {
+                panic!("batch outcome")
+            }
+        }
+    }
 }
