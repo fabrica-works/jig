@@ -93,10 +93,7 @@ impl CompoundTask<'_> {
                 | crate::MessageKind::News { .. } => true,
             },
         };
-        let blocked = match self.executor {
-            Executor::Agent { .. } => crate::run::ends::pending(self.waiting_on).blocks_claims(),
-            Executor::Person(_) | Executor::Procedure { .. } => false,
-        };
+        let blocked = !crate::run::ends::pending(self.waiting_on).may_be_due(self.executor);
         if wakes && !blocked && self.phase == Phase::Active(Active::Idle) {
             self.phase = Phase::Active(Active::Due);
         }

@@ -32,36 +32,51 @@ pub(crate) fn pending(dependencies: &[u64]) -> Kept {
     Kept { dependencies: !dependencies.is_empty() }
 }
 
+/// Each caller asks its own question; a new reason to keep a task answers every one.
 impl Kept {
+    /// The task starts no run: an agent is never prepared, claimed or Due (5.7).
     pub(crate) fn blocks_claims(self) -> bool {
         self.dependencies
     }
 
+    /// A done end waits until every dependency is met: a person's answer is refused, a run's parks.
+    pub(crate) fn refuses_done(self) -> bool {
+        self.dependencies
+    }
+
+    /// No run of it may end it, so a finish grace without a live run cancels it at once.
+    pub(crate) fn finishes_alone(self) -> bool {
+        !self.dependencies
+    }
+
+    /// Whether a wake may make this executor Due; a person or a procedure is never kept from its step.
+    pub(crate) fn may_be_due(self, executor: Executor) -> bool {
+        match executor {
+            Executor::Agent { .. } => !self.blocks_claims(),
+            Executor::Person(_) | Executor::Procedure { .. } => true,
+        }
+    }
+
     /// An amendment invalidates an agent's queued preparation; a committed claim stays live.
     pub(crate) fn amended(self, executor: Executor, phase: Phase) -> Phase {
-        let agent = match executor {
-            Executor::Agent { .. } => true,
-            Executor::Person(_) | Executor::Procedure { .. } => false,
-        };
-        if self.blocks_claims() && agent {
-            match phase {
-                Phase::Active(Active::Due | Active::Preparing) => Phase::Active(Active::Idle),
-                Phase::Waiting
-                | Phase::Active(
-                    Active::Idle | Active::Claimed { .. } | Active::Running { .. } | Active::BackingOff { .. },
-                )
-                | Phase::Held { .. }
-                | Phase::Closing(_)
-                | Phase::Ended(_) => phase,
-            }
-        } else {
-            phase
+        if self.may_be_due(executor) {
+            return phase;
+        }
+        match phase {
+            Phase::Active(Active::Due | Active::Preparing) => Phase::Active(Active::Idle),
+            Phase::Waiting
+            | Phase::Active(
+                Active::Idle | Active::Claimed { .. } | Active::Running { .. } | Active::BackingOff { .. },
+            )
+            | Phase::Held { .. }
+            | Phase::Closing(_)
+            | Phase::Ended(_) => phase,
         }
     }
 
     /// A failed result still ends; a done result keeps the committed conversation.
     pub(crate) fn parks(self, end: &End) -> bool {
-        self.dependencies
+        self.refuses_done()
             && match end {
                 End::Finished { result, .. } | End::FinishedWithFollowups { result, .. } => match result {
                     TaskResult::Failure { .. } => false,

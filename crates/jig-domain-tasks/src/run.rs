@@ -463,7 +463,7 @@ pub(crate) fn activation(
         None => next,
     };
     crate::writers::answered(domain, env, number, attempt, lost_writer, out);
-    if (parked || kept.blocks_claims() && end_kind == crate::EndKind::Parked)
+    if (parked || !kept.finishes_alone() && end_kind == crate::EndKind::Parked)
         && let Some(grace) = record(domain, number).expect("answered task live").grace.clone()
     {
         crate::closing::cancel_tree(domain, env, number, grace.by, &grace.reason, out);

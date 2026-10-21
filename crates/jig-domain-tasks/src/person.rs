@@ -93,7 +93,7 @@ pub(crate) fn answer(
     if !addressed || !active(&row.phase) {
         return refused(to, Some(number), Refusal::State, out);
     }
-    if crate::run::ends::kept(domain, number).blocks_claims() {
+    if crate::run::ends::kept(domain, number).refuses_done() {
         return out.push(Request::Refused {
             reply_to: to,
             problem: crate::Problem::naming(Some(number), Refusal::Kept, &row.waiting_on),

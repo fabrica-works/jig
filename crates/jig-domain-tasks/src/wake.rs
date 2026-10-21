@@ -166,10 +166,7 @@ pub(crate) fn after_message(
         return;
     }
     let row = record(domain, number).expect("batch task live");
-    let blocked = match row.executor {
-        crate::Executor::Agent { .. } => crate::run::ends::kept(domain, number).blocks_claims(),
-        crate::Executor::Procedure { .. } | crate::Executor::Person(_) => false,
-    };
+    let blocked = !crate::run::ends::kept(domain, number).may_be_due(row.executor);
     let phase = row.phase.clone();
     match phase {
         Phase::Active(Active::Idle) if !blocked => {
