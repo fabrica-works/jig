@@ -20,8 +20,9 @@ enum Reached {
     Met,
     QueueLeft,
     QueueReturned,
+    CompoundAmended,
 }
-const MARKERS: [Reached; 7] = [
+const MARKERS: [Reached; 8] = [
     Reached::Amended,
     Reached::Circle,
     Reached::Kept,
@@ -29,11 +30,10 @@ const MARKERS: [Reached; 7] = [
     Reached::Met,
     Reached::QueueLeft,
     Reached::QueueReturned,
+    Reached::CompoundAmended,
 ];
 
-// Each operation carries its complete draw. A future Compound case can carry
-// Vec<jig_domain_tasks::Operation> and send those amends/controls in one event
-// once staged-circle integration has landed.
+// Each operation carries its complete draw.
 #[derive(Debug)]
 enum Operation {
     Amend { task: u64, dependencies: Vec<u64> },
@@ -42,6 +42,7 @@ enum Operation {
     End { task: u64, failed: bool },
     Cancel { task: u64 },
     Restart,
+    Compound(Vec<jig_domain_tasks::Operation>),
 }
 
 fn name(value: u8) -> Name {
@@ -89,7 +90,7 @@ fn population(seed: u64) -> World {
 
 fn live(world: &World) -> Vec<u64> {
     let mut live = Vec::new();
-    for key in world.records.keys() {
+    for (key, _) in world.records.range(Key::Live(0)..=Key::Live(u64::MAX)) {
         if let Key::Live(number) = key {
             live.push(*number);
         }
@@ -103,7 +104,7 @@ fn pick(random: &mut Rng, choices: &[u64]) -> u64 {
 
 fn draw(world: &World, random: &mut Rng) -> Operation {
     let task = pick(random, &live(world));
-    match random.below(12) {
+    match random.below(13) {
         0..=5 => {
             let mut dependencies = world.record(task).dependencies.to_vec();
             match random.below(3) {
@@ -118,8 +119,18 @@ fn draw(world: &World, random: &mut Rng) -> Operation {
                 }
                 2 => {
                     dependencies.clear();
-                    // Ended names deliberately exercise both met and refusal.
-                    dependencies.push(random.below(6) + 1);
+                    // Prefer a new done stub when one is visible, so compound
+                    // draws do not crowd out the already-met admission marker.
+                    let mut met = Vec::new();
+                    for (_, record) in world.records.range(Key::Stub(0)..=Key::Stub(u64::MAX)) {
+                        if let Stored::Stub(stub) = record
+                            && stub.phase == Status::Done
+                            && !world.record(task).dependencies.contains(&stub.task)
+                        {
+                            met.push(stub.task);
+                        }
+                    }
+                    dependencies.push(if met.is_empty() { random.below(6) + 1 } else { pick(random, &met) });
                 }
                 _ => unreachable!(),
             }
@@ -130,6 +141,39 @@ fn draw(world: &World, random: &mut Rng) -> Operation {
         9 => Operation::End { task, failed: random.chance(200) },
         10 => Operation::Cancel { task },
         11 => Operation::Restart,
+        12 => {
+            let mut operations = Vec::new();
+            for at in 0..=random.below(3) {
+                let number = pick(random, &live(world));
+                let row = world.record(number);
+                if random.chance(650) {
+                    let mut dependencies = row.dependencies.to_vec();
+                    if random.chance(500) {
+                        dependencies.pop();
+                    }
+                    operations.push(jig_domain_tasks::Operation::Amend {
+                        task: number,
+                        message: row.last_message + at + 1,
+                        stop_run: false,
+                        amendment: Box::new(Amendment {
+                            tracked: None,
+                            addressed: None,
+                            instructions: None,
+                            release: if random.chance(500) { Some(row.revisions.hold) } else { None },
+                            spec: None,
+                            wake: None,
+                            dependencies: Some(dependencies.into()),
+                            authority: None,
+                            llm: None,
+                            reason: Box::new([1]),
+                        }),
+                    });
+                } else {
+                    operations.push(jig_domain_tasks::Operation::Release { task: number, again: None, message: None });
+                }
+            }
+            Operation::Compound(operations)
+        }
         _ => unreachable!(),
     }
 }
@@ -240,17 +284,6 @@ fn control(world: &mut World, task: u64, control: Control) {
     }
 }
 
-// i3-0517.md: a released failed-dependency hold can incorrectly become Due.
-// Use only observed requester endings to avoid claiming that known domain gap.
-fn dependencies_done(world: &World, task: u64) -> bool {
-    for dependency in &world.record(task).dependencies {
-        if !matches!(world.results.get(dependency), Some(jig_domain_tasks::Ending::Done(_))) {
-            return false;
-        }
-    }
-    true
-}
-
 // i3-0526.md: the backward pool walk misses a circle made by keeping its
 // second holder. Draw those amendments, but leave that known case unsent.
 fn keeps_second_pool_holder(world: &World, task: u64, dependencies: &[u64]) -> bool {
@@ -289,6 +322,53 @@ fn keeps_second_pool_holder(world: &World, task: u64, dependencies: &[u64]) -> b
     false
 }
 
+fn compound(world: &mut World, operations: Vec<jig_domain_tasks::Operation>, seen: &mut BTreeSet<Reached>) {
+    let mut amended = false;
+    let mut staged = skein_lib::List::with_capacity(u32::try_from(operations.len()).expect("small draw"));
+    for operation in operations {
+        if matches!(operation, jig_domain_tasks::Operation::Amend { .. }) {
+            amended = true;
+        }
+        staged.push(operation).expect("drawn compound bound");
+    }
+    let reply_to = world.to();
+    let call = reply_to.into_token();
+    world.send(Event::Compound {
+        reply_to: ReplyTo::new(call),
+        person: 9,
+        project: 1,
+        operations: staged,
+        period: 0,
+        pool_budget: 1_000,
+        period_budget: 10_000,
+    });
+    match world.replies.get(&call.raw()).expect("compound reply") {
+        Reply::Done => {
+            if amended {
+                seen.insert(Reached::CompoundAmended);
+            }
+        }
+        Reply::Refused(problem) => {
+            if let Refusal::Circle { .. } = problem.why {
+                let members = problem.blocked_by.as_ref().expect("circle names its members");
+                assert!(!members.is_empty(), "circle names at least one member");
+                seen.insert(Reached::Circle);
+            } else if let Refusal::DependencyEnded { how: Status::Failed | Status::Cancelled } = problem.why {
+                let dependencies = problem.blocked_by.as_ref().expect("ended dependency is named");
+                assert_eq!(dependencies.len(), 1);
+            } else {
+                assert!(
+                    matches!(problem.why, Refusal::State | Refusal::Read),
+                    "unexpected compound refusal: {problem:?}"
+                );
+            }
+        }
+        reply @ (Reply::Made(_) | Reply::Acknowledged(_) | Reply::Turn(_) | Reply::WriterWaiting(_)) => {
+            panic!("unexpected compound reply: {reply:?}");
+        }
+    }
+}
+
 fn apply(world: &mut World, operation: Operation, seen: &mut BTreeSet<Reached>, attempt: &mut u64) {
     match operation {
         Operation::Amend { task, dependencies } => {
@@ -304,10 +384,7 @@ fn apply(world: &mut World, operation: Operation, seen: &mut BTreeSet<Reached>, 
             }
         }
         Operation::Claim { task } => {
-            if matches!(world.record(task).phase, Phase::Active(Active::Due))
-                && !world.runs.contains_key(&task)
-                && dependencies_done(world, task)
-            {
+            if matches!(world.record(task).phase, Phase::Active(Active::Due)) && !world.runs.contains_key(&task) {
                 *attempt += 1;
                 match world.claim_budget_writing(task, *attempt, 1, Box::new([])) {
                     Reply::Done => {}
@@ -363,6 +440,7 @@ fn apply(world: &mut World, operation: Operation, seen: &mut BTreeSet<Reached>, 
             control(world, task, Control::Cancel { reason: Box::new([1]), grace: None, message: None });
         }
         Operation::Restart => world.restart(),
+        Operation::Compound(operations) => compound(world, operations, seen),
     }
     drain(world);
 }

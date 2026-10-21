@@ -130,10 +130,14 @@ impl Staged {
                 }
                 Plan::Amend(plan) if plan.number == number => {
                     project_amend(&mut row, plan);
+                    if plan.release.is_some() {
+                        project_dependency_hold(domain, &mut row);
+                    }
                 }
                 Plan::Release(plan) if plan.number == number => {
                     row.phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, plan.next.clone());
                     row.revision = row.revision.checked_add(1).expect("admission checked");
+                    project_dependency_hold(domain, &mut row);
                     if let Some(notice) = &plan.notice {
                         row.last_message = notice.word.number;
                         row.inbox = &notice.inbox;
@@ -197,7 +201,15 @@ impl Staged {
         let mut row = self.record(domain, plan.number).expect("admitted amendment");
         project_amend(&mut row, plan);
         if plan.release.is_some() || (row.phase == Phase::Waiting && row.waiting_on.is_empty() && !row.holds_taken) {
-            crate::control::returned_phase(domain, self, limits, plan.number, row.phase, row.waiting_on)
+            crate::control::returned_phase(
+                domain,
+                self,
+                limits,
+                plan.number,
+                row.phase,
+                row.dependencies,
+                row.waiting_on,
+            )
         } else {
             row.phase
         }
@@ -216,7 +228,15 @@ impl Staged {
                 let phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, plan.next.clone());
                 returned_circle(
                     plan.number,
-                    crate::control::returned_phase(domain, self, limits, plan.number, phase, row.waiting_on),
+                    crate::control::returned_phase(
+                        domain,
+                        self,
+                        limits,
+                        plan.number,
+                        phase,
+                        row.dependencies,
+                        row.waiting_on,
+                    ),
                 )
             }
             Plan::Cancel(_) | Plan::Move { .. } | Plan::Message(_) | Plan::Stop(_) => None,
@@ -398,6 +418,16 @@ fn project_amend<'a>(row: &mut CompoundTask<'a>, plan: &'a crate::control::Amend
     if let Some(release) = &plan.release {
         row.phase = crate::run::ends::pending(row.waiting_on).amended(row.executor, release.next.clone());
         row.revision = row.revision.checked_add(1).expect("admission checked");
+    }
+}
+
+// Stubs do not change during admission; project the hold and its fresh revision
+// without caching another collection alongside the circle judgements.
+fn project_dependency_hold(domain: &crate::Domain, row: &mut CompoundTask<'_>) {
+    if let Some(task) = crate::control::failed_dependency(domain, &row.phase, row.dependencies) {
+        row.phase =
+            Phase::Held { was: crate::run::was(row.phase.clone()), why: crate::Hold::Dependency(task), source: None };
+        row.revisions.hold = row.revisions.hold.checked_add(1).expect("admission checked");
     }
 }
 

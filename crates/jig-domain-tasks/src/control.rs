@@ -905,8 +905,12 @@ pub(crate) fn returned_phase(
     limits: &Limits,
     number: u64,
     phase: Phase,
+    dependencies: &[u64],
     pending: &[u64],
 ) -> Phase {
+    if let Some(task) = failed_dependency(domain, &phase, dependencies) {
+        return Phase::Held { was: crate::run::was(phase), why: crate::Hold::Dependency(task), source: None };
+    }
     match crate::waits::check_waits(domain, staged, limits, number, &phase, pending) {
         Ok(()) => phase,
         Err(problem) => {
@@ -923,8 +927,30 @@ pub(crate) fn returned_phase(
     }
 }
 
-/// Rejudge every wait a release gives back before resuming it (domain/tasks.md, 6.7).
+/// Judge ended prerequisites in list order, except while settling (domain/tasks.md, 5.1 and 5.5).
+pub(crate) fn failed_dependency(domain: &Domain, phase: &Phase, dependencies: &[u64]) -> Option<u64> {
+    match phase {
+        Phase::Closing(_) | Phase::Held { was: Was::Closing(_), .. } => return None,
+        Phase::Waiting | Phase::Active(_) | Phase::Held { .. } | Phase::Ended(_) => {}
+    }
+    for dependency in dependencies {
+        if let Some(stub) = domain.stub(*dependency) {
+            match stub.phase {
+                crate::Status::Failed | crate::Status::Cancelled => return Some(*dependency),
+                crate::Status::Done => {}
+            }
+        }
+    }
+    None
+}
+
+/// Rejudge a release before resuming it (domain/tasks.md, 5.5 and 6.7).
 pub(crate) fn return_to_waits(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
+    let row = record(domain, number).expect("released task");
+    if let Some(task) = failed_dependency(domain, &row.phase, &row.dependencies) {
+        crate::run::hold(domain, env, number, crate::Hold::Dependency(task), out);
+        return;
+    }
     if let Err(problem) = crate::waits::check_return(domain, &crate::compound::Staged::new(0), &env.limits, number) {
         crate::waits::hold_circle(domain, env, number, problem, out);
     } else if crate::holds::queued(record(domain, number).expect("released task")) {

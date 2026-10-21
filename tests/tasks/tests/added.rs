@@ -688,3 +688,285 @@ fn cancelling_a_kept_task_still_accepts_its_live_runs_partial_result() {
     world.settle(1);
     assert!(matches!(world.results[&1], Ending::Cancelled { result: Some(_), .. }));
 }
+
+fn end_dependency(world: &mut World, number: u64, how: Status) {
+    match how {
+        Status::Failed => {
+            world.claim_fresh(number);
+            assert_eq!(
+                world.terminal(
+                    number,
+                    End::Finished { result: TaskResult::Failure { reason: Box::new([1]) }, cancel_delegates: false }
+                ),
+                Reply::Acknowledged(tasks::Accepted::New)
+            );
+        }
+        Status::Cancelled => {
+            assert_eq!(
+                response(world, |reply_to| Event::Control {
+                    reply_to,
+                    by: Party::Person(9),
+                    task: number,
+                    control: Control::Cancel { reason: Box::new([1]), grace: None, message: None },
+                }),
+                Reply::Done
+            );
+        }
+        Status::Done => panic!("fixture ends unsuccessfully"),
+    }
+    world.settle(number);
+}
+
+fn release(world: &mut World, number: u64) -> Reply {
+    response(world, |reply_to| Event::Control {
+        reply_to,
+        by: Party::Person(9),
+        task: number,
+        control: Control::Release { again: None, message: None },
+    })
+}
+
+fn dependency_hold(world: &World, number: u64, was: tasks::Was, dependency: u64, revision: u64) {
+    let row = world.record(number);
+    assert_eq!(row.phase, Phase::Held { was, why: Hold::Dependency(dependency), source: None });
+    assert_eq!(row.revisions.hold, revision);
+    assert!(
+        matches!(row.escalation, tasks::Escalation::Waiting {
+        revision: held, holder: tasks::EscalationHolder::Person(9), ..
+    } if held == revision),
+        "fresh routed escalation: {:?}",
+        row.escalation
+    );
+}
+
+fn remove_and_release(world: &mut World, number: u64) -> Reply {
+    let mut amendment = amendment(&[]);
+    amendment.release = Some(world.record(number).revisions.hold);
+    let message = world.record(number).last_message + 1;
+    response(world, |reply_to| Event::Amend {
+        reply_to,
+        by: Party::Person(9),
+        task: number,
+        message,
+        stop_run: false,
+        funder: None,
+        amendment,
+    })
+}
+
+fn no_met(world: &World, number: u64) {
+    for word in &world.record(number).inbox {
+        assert!(!matches!(word.kind, tasks::MessageKind::Met { .. }), "failed dependency was no longer pending");
+    }
+}
+
+#[test]
+fn releasing_a_waiter_reholds_on_a_failed_or_cancelled_dependency_with_a_fresh_escalation() {
+    for how in [Status::Failed, Status::Cancelled] {
+        let mut world = World::new(881, LIMITS);
+        world.make(Party::Person(9), vec![task(1, &[2]), task(2, &[])]);
+        end_dependency(&mut world, 2, how);
+        let revision = world.record(1).revisions.hold;
+        dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision);
+        world.restart();
+        assert_eq!(release(&mut world, 1), Reply::Done);
+        dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision + 1);
+        assert!(!world.activations.contains(&1));
+        assert_eq!(
+            response(&mut world, |reply_to| Event::Claim {
+                reply_to,
+                task: 1,
+                attempt: 2,
+                resumed: false,
+                budget: 1,
+                account: None,
+                writes: Box::new([]),
+            }),
+            Reply::Refused(tasks::Problem::new(Some(1), Refusal::State))
+        );
+        assert_eq!(remove_and_release(&mut world, 1), Reply::Done);
+        assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
+        no_met(&world, 1);
+        done(&mut world, 1);
+    }
+}
+
+#[test]
+fn a_kept_live_agents_release_reholds_and_removing_its_failed_dependency_resumes_it() {
+    let mut world = pair();
+    world.claim_fresh(1);
+    keep(&mut world);
+    end_dependency(&mut world, 2, Status::Failed);
+    let was = tasks::Was::Active(Active::Running { attempt: world.record(1).attempt });
+    let revision = world.record(1).revisions.hold;
+    dependency_hold(&world, 1, was.clone(), 2, revision);
+    assert_eq!(release(&mut world, 1), Reply::Done);
+    dependency_hold(&world, 1, was, 2, revision + 1);
+    assert_eq!(world.terminal(1, End::Parked), Reply::Acknowledged(tasks::Accepted::New));
+    assert_eq!(remove_and_release(&mut world, 1), Reply::Done);
+    assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
+    no_met(&world, 1);
+    done(&mut world, 1);
+}
+
+#[test]
+fn a_release_scans_all_dependencies_in_list_order_even_after_the_hold_reason_changed() {
+    let mut world = World::new(882, LIMITS);
+    world.make(Party::Person(9), vec![task(1, &[2, 3]), task(2, &[]), task(3, &[])]);
+    end_dependency(&mut world, 3, Status::Failed);
+    let revision = world.record(1).revisions.hold;
+    assert_eq!(release(&mut world, 1), Reply::Done);
+    dependency_hold(&world, 1, tasks::Was::Waiting, 3, revision + 1);
+    end_dependency(&mut world, 2, Status::Failed);
+    world.send(Event::Hold { task: 1, why: Hold::Budget });
+    let revision = world.record(1).revisions.hold;
+    assert_eq!(release(&mut world, 1), Reply::Done);
+    dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision + 1);
+}
+
+fn dependency_compound(world: &mut World, operations: Vec<tasks::Operation>) -> Reply {
+    let mut staged = skein_lib::List::with_capacity(u32::try_from(operations.len()).expect("small fixture"));
+    for operation in operations {
+        staged.push(operation).expect("fixture operations bound");
+    }
+    response(world, |reply_to| Event::Compound {
+        reply_to,
+        person: 9,
+        project: 1,
+        operations: staged,
+        period: 0,
+        pool_budget: 1_000,
+        period_budget: 10_000,
+    })
+}
+
+fn release_operation() -> tasks::Operation {
+    tasks::Operation::Release { task: 1, again: None, message: None }
+}
+
+fn removing_operation(world: &World, release: Option<u64>) -> tasks::Operation {
+    let mut amendment = amendment(&[]);
+    amendment.release = release;
+    tasks::Operation::Amend {
+        task: 1,
+        message: world.record(1).last_message + 1,
+        stop_run: false,
+        amendment: Box::new(amendment),
+    }
+}
+
+fn failed_waiter() -> World {
+    let mut world = World::new(883, LIMITS);
+    world.make(Party::Person(9), vec![task(1, &[2]), task(2, &[])]);
+    end_dependency(&mut world, 2, Status::Failed);
+    world
+}
+
+#[test]
+fn a_compounds_later_release_sees_the_dependency_hold_projected_by_its_first_release() {
+    let mut world = failed_waiter();
+    let revision = world.record(1).revisions.hold;
+    assert_eq!(dependency_compound(&mut world, vec![release_operation(), release_operation()]), Reply::Done);
+    dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision + 2);
+    let remove = removing_operation(&world, None);
+    assert_eq!(dependency_compound(&mut world, vec![remove, release_operation()]), Reply::Done);
+    assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
+}
+
+#[test]
+fn a_compound_can_remove_the_failed_dependency_and_release_in_its_amendment() {
+    let mut world = failed_waiter();
+    let revision = world.record(1).revisions.hold;
+    let remove = removing_operation(&world, Some(revision));
+    assert_eq!(
+        dependency_compound(&mut world, vec![remove.clone(), release_operation()]),
+        Reply::Refused(tasks::Problem::new(Some(1), Refusal::State))
+    );
+    dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision);
+    assert_eq!(dependency_compound(&mut world, vec![remove]), Reply::Done);
+    assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
+}
+
+#[test]
+fn a_compounds_amendment_release_projects_the_new_hold_revision_for_its_next_amendment() {
+    let mut world = failed_waiter();
+    let revision = world.record(1).revisions.hold;
+    let mut retained = amendment(&[2]);
+    retained.release = Some(revision);
+    let message = world.record(1).last_message + 1;
+    let mut removed = amendment(&[]);
+    removed.release = Some(revision + 1);
+    assert_eq!(
+        dependency_compound(
+            &mut world,
+            vec![
+                tasks::Operation::Amend { task: 1, message, stop_run: false, amendment: Box::new(retained) },
+                tasks::Operation::Amend {
+                    task: 1,
+                    message: message + 1,
+                    stop_run: false,
+                    amendment: Box::new(removed)
+                },
+            ]
+        ),
+        Reply::Done
+    );
+    assert_eq!(world.record(1).phase, Phase::Active(Active::Due));
+    assert_eq!(world.record(1).revisions.hold, revision + 1);
+}
+
+#[test]
+fn an_escalation_resolution_reholds_on_the_failed_dependency_with_a_fresh_escalation() {
+    let mut world = failed_waiter();
+    let revision = world.record(1).revisions.hold;
+    let reply_to = world.to();
+    world.stage(Event::DecideEscalation {
+        reply_to,
+        task: 1,
+        revision,
+        by: 9,
+        entry: None,
+        decision: tasks::EscalationDecision::Release,
+    });
+    world.durable();
+    dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision + 1);
+    // As in kept.rs, commit the decision then crash before its terminal is delivered.
+    world.restart();
+    dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision + 1);
+}
+
+#[test]
+fn a_person_and_a_procedure_rehold_on_the_failed_dependency_as_an_agent_does() {
+    for executor in [Executor::Person(PersonAddress::Person(10)), Executor::Procedure { connector: 1, code: 1 }] {
+        let mut world = World::new(884, LIMITS);
+        let mut waiter = task(1, &[2]);
+        waiter.executor = executor;
+        world.make(Party::Person(9), vec![waiter, task(2, &[])]);
+        end_dependency(&mut world, 2, Status::Failed);
+        let revision = world.record(1).revisions.hold;
+        dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision);
+        assert_eq!(release(&mut world, 1), Reply::Done);
+        dependency_hold(&world, 1, tasks::Was::Waiting, 2, revision + 1);
+    }
+}
+
+#[test]
+fn a_closing_task_releases_to_settlement_even_with_a_failed_dependency() {
+    let mut world = pair();
+    world.claim_fresh(1);
+    keep(&mut world);
+    assert_eq!(
+        world.terminal(
+            1,
+            End::Finished { result: TaskResult::Failure { reason: Box::new([1]) }, cancel_delegates: false }
+        ),
+        Reply::Acknowledged(tasks::Accepted::New)
+    );
+    world.send(Event::Hold { task: 1, why: Hold::Budget });
+    assert!(matches!(world.record(1).phase, Phase::Held { was: tasks::Was::Closing(_), .. }));
+    end_dependency(&mut world, 2, Status::Failed);
+    assert_eq!(release(&mut world, 1), Reply::Done);
+    assert!(matches!(world.record(1).phase, Phase::Closing(_)));
+    world.settle(1);
+    assert!(matches!(world.results.get(&1), Some(Ending::Failed { .. })));
+}
