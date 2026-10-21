@@ -405,7 +405,7 @@ fn placement_fleet(core: &Core, limits: &Limits) -> fleet::Domain {
     );
     fleet
 }
-fn placement_fixture(
+pub(super) fn placement_fixture(
     main_holder: accounts::Holder,
     login_holder: accounts::Holder,
     personal_first: bool,
@@ -676,4 +676,18 @@ fn a_retained_provider_binds_an_account_the_rule_allows() {
             authority::AccountBinding { provider: 2, account: 5, source: 6 }
         ]
     );
+}
+
+#[test]
+fn a_login_kept_after_the_check_fails_the_assignment_recheck() {
+    let (mut core, limits) =
+        placement_fixture(accounts::Holder::Deployment, accounts::Holder::Party(OTHER_PERSON), false);
+    inventory(&mut core, &limits, FIRST, Box::new([login(b"personal", fleet::LoginState::NotSignedIn)]));
+    let choice = core.run_choice(TASK).unwrap();
+    let mut proof = RunProof::claimed(TASK, 7, 7, None, choice.placement.kind);
+    proof.placement = Some(choice.placement.channel);
+    proof.accounts = choice.accounts;
+    core.proofs.insert(TASK, proof).unwrap();
+    inventory(&mut core, &limits, FIRST, Box::new([login(b"personal", fleet::LoginState::Usable)]));
+    assert!(!core.claim_bindings_usable(TASK, 7));
 }

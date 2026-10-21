@@ -160,6 +160,19 @@ impl Core {
         }
         let Some(payer) = self.tasks.payer(task) else { return false };
         let coverage = self.account_coverage(payer);
+        let channel = match proof.placement {
+            Some(channel) => channel,
+            None => match proof.host {
+                fleet::HostKind::Engine => skein_lib::Token::new(0),
+                fleet::HostKind::Worker => return false,
+            },
+        };
+        let placement = fleet::PlacementConstraint { channel, kind: proof.host };
+        if proof.host == fleet::HostKind::Worker && self.fleet.awaiting_logins(channel) {
+            return false;
+        }
+        let mut facts = List::with_capacity(self.host_fact_capacity());
+        self.host_facts(placement, self.host_rule(placement), &mut facts);
         for binding in &proof.accounts {
             let selected = self.accounts.select(
                 crate::coverage::payer(payer),
@@ -167,7 +180,7 @@ impl Core {
                 Some(binding.account),
                 None,
                 coverage.as_slice(),
-                &[],
+                facts.as_slice(),
                 self.run_now,
             );
             if selected != (accounts::Selection::Chosen { account: binding.account, source: binding.source }) {

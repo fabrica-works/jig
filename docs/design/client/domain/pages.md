@@ -458,13 +458,11 @@ The existing LLM accounts section also renders the public offers and the
 viewer's provider/payer readiness through reusable fragments. These fragments
 may be composed on an application's own accounts page. No reference route,
 place or navigation is added; unknown and cut facts remain visible.
-Readiness mirrors the current run host rule: until program check facts are
-integrated, any retained program source makes workers unknown for every
-provider, even another provider. This exposes a deployment-wide availability
-bit, never the source or its holder. A pending worker inventory also makes
-that host unknown for sign-in and key providers, as fleet placement waits for
-it too. Provider-scoped host checks are deferred until both selectors can
-consume the same positive evidence.
+Readiness reads each candidate host's rule and program logins, using the same
+facts as a run's check. Another provider's sources do not impose a deployment-wide
+barrier. A pending inventory keeps that host unknown for every provider, because
+the host rule covers every run. Readiness names neither a source nor its holder;
+it is an observation without a reservation and does not require a free slot.
 
 Lost workers, refused hellos and refusals for want of room are the
 engine's diagnostics, kept in memory within its limits: after the engine

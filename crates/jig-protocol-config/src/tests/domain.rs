@@ -352,7 +352,8 @@ fn memory_below_the_components_sum_is_refused() {
     // Hub: 2 slots * 8 accounts * 32 = 512. Total: 284 * 32 = 9,088.
     // 18,703,334,740 + 9,088 = 18,703,343,828; one byte is supplied.
     // The placement check adds 4 accounts * 3 sources * 8-byte HostSource = 96 bytes.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_343_923 });
+    // Catalogue scratch keeps those same 12 facts beside the host/model walk: another 96 bytes.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_344_019 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

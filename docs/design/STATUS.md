@@ -310,7 +310,8 @@ development.md, section 3.3).
   Client v10 now supplies public provider offers and the startup key ceiling in
   `me`, plus provider/payer readiness in `accounts` without serving account identities. The
   reference deployment accounts section composes a reusable catalogue fragment.
-  Program readiness remains explicitly unknown pending host check facts. Model
+  Readiness now reads per-host rules and current login facts, including the
+  pending-inventory barrier on each host for every provider. Model
   prices and optional configured descriptions are supplied in `me` (JP10d);
   a plan's first use remains, its own task after x1g; the composer's presentation is the application's.
   The design's end state: accounts held by people or the deployment,

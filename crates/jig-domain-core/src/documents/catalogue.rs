@@ -137,66 +137,50 @@ fn append(
 fn readiness(core: &Core, payer: tasks::Payer, provider: u32) -> (Readiness, bool) {
     let coverage = core.account_coverage(payer);
     let candidates = core.accounts.candidates(crate::coverage::payer(payer), provider, None, None, coverage.as_slice());
-    let mut host_wait = false;
-    let mut refreshing = false;
-    for account in &candidates {
-        match core.accounts.select(
-            crate::coverage::payer(payer),
-            provider,
-            Some(*account),
-            None,
-            coverage.as_slice(),
-            &[],
-            core.run_now,
-        ) {
-            accounts::Selection::Chosen { .. } => return (eligible_host(core, provider), false),
-            accounts::Selection::Wait { why: accounts::WaitWhy::Host, .. } => host_wait = true,
-            accounts::Selection::Wait { why: accounts::WaitWhy::Refreshing, .. } => refreshing = true,
-            accounts::Selection::Wait { why: accounts::WaitWhy::Source(_) | accounts::WaitWhy::Empty, .. }
-            | accounts::Selection::NoAccount => {}
-        }
+    if candidates.is_empty() {
+        return (Readiness::Unavailable, false);
     }
-    // Until T12, absence of a program account is not a negative inventory fact.
-    let unknown_inventory = candidates.is_empty()
-        && match core.settings.llm_providers.get(provider) {
-            Some(offer) => !offer.offers.programs.is_empty(),
-            None => false,
-        };
-    (if host_wait || refreshing || unknown_inventory { Readiness::Unknown } else { Readiness::Unavailable }, refreshing)
-}
-/// Host model support does not require a free slot. Until T12, unknown personal
-/// program logins exclude workers as in `run_choice`; the engine can still serve.
-fn eligible_host(core: &Core, provider: u32) -> Readiness {
+    let hosts = core.fleet.host_views();
+    let mut facts = List::with_capacity(core.host_fact_capacity());
     let mut unknown = false;
-    let mut unknown_logins = false;
-    for source in &core.accounts.source_views() {
-        if source.kind == accounts::Kind::Program {
-            unknown_logins = true;
-        }
-    }
-    for host in &core.fleet.host_views() {
+    let mut refreshing = false;
+    for host in &hosts {
         if !host.connected || host.draining || host.slots == 0 {
             continue;
         }
-        match host.kind {
-            fleet::HostKind::Worker if core.fleet.awaiting_logins(host.channel) || unknown_logins => {
-                unknown = true;
-                continue;
-            }
-            fleet::HostKind::Engine | fleet::HostKind::Worker => {}
+        if host.kind == fleet::HostKind::Worker && core.fleet.awaiting_logins(host.channel) {
+            unknown = true;
+            continue;
         }
-        for model in &core.settings.models {
-            if core.provider(model) == Some(provider)
-                && core.fleet.supports(
-                    fleet::PlacementConstraint { channel: host.channel, kind: host.kind },
-                    &[crate::fleet_needs::model(model)],
-                )
-            {
-                return Readiness::Usable;
+        let placement = fleet::PlacementConstraint { channel: host.channel, kind: host.kind };
+        core.host_facts(placement, core.host_rule(placement), &mut facts);
+        for account in &candidates {
+            match core.accounts.select(
+                crate::coverage::payer(payer),
+                provider,
+                Some(*account),
+                None,
+                coverage.as_slice(),
+                facts.as_slice(),
+                core.run_now,
+            ) {
+                accounts::Selection::Chosen { .. } => {
+                    for model in &core.settings.models {
+                        if core.provider(model) == Some(provider)
+                            && core.fleet.supports(placement, &[crate::fleet_needs::model(model)])
+                        {
+                            return (Readiness::Usable, false);
+                        }
+                    }
+                }
+                accounts::Selection::Wait { why: accounts::WaitWhy::Host, .. } => unknown = true,
+                accounts::Selection::Wait { why: accounts::WaitWhy::Refreshing, .. } => refreshing = true,
+                accounts::Selection::Wait { why: accounts::WaitWhy::Source(_) | accounts::WaitWhy::Empty, .. }
+                | accounts::Selection::NoAccount => {}
             }
         }
     }
-    if unknown { Readiness::Unknown } else { Readiness::Unavailable }
+    (if unknown || refreshing { Readiness::Unknown } else { Readiness::Unavailable }, refreshing)
 }
 
 pub(super) fn offers_worst_case(limits: &DocumentLimits) -> Option<u64> {
@@ -211,7 +195,7 @@ pub(super) fn rows_worst_case(limits: &DocumentLimits) -> Option<u64> {
 }
 
 /// Pending and roles survive each payer walk; coverage and candidates survive its host check.
-/// Candidate ranking is temporary, as are source views and host/model-support facts.
+/// Candidate ranking is temporary; host facts survive the per-host model support check.
 pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
     let ranking = List::<(u8, accounts::Holder, u32, u32)>::worst_case(limits.accounts.accounts)?;
     let hosts = List::<fleet::HostView>::worst_case(
@@ -223,15 +207,11 @@ pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
     )?
     .checked_add(u64::try_from(size_of::<fleet::ModelNeed>()).ok()?)?
     .checked_add(u64::from(crate::MODEL_NAME_BYTES))?;
+    let host_facts =
+        List::<accounts::HostSource>::worst_case(limits.accounts.accounts.checked_mul(limits.accounts.sources)?)?;
     List::<accounts::Pending>::worst_case(limits.accounts.sign_ins)?
         .checked_add(List::<jig_domain_people::ProjectRole>::worst_case(limits.people.projects)?)?
         .checked_add(List::<accounts::Coverage>::worst_case(limits.accounts.accounts)?)?
         .checked_add(List::<u32>::worst_case(limits.accounts.accounts)?)?
-        .checked_add(
-            ranking
-                .max(List::<accounts::Fact>::worst_case(
-                    limits.accounts.accounts.checked_mul(limits.accounts.sources)?,
-                )?)
-                .max(hosts),
-        )
+        .checked_add(ranking.max(hosts.checked_add(host_facts)?))
 }

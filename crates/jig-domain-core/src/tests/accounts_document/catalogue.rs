@@ -6,10 +6,15 @@ fn serving() -> (Core, Env<Limits>) {
     serving_records(own_records())
 }
 fn serving_records(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
+    hosted_records(records, true)
+}
+fn hosted_records(records: Vec<accounts::Stored>, granted: bool) -> (Core, Env<Limits>) {
     let (mut core, env) = fixture(records);
     core.settings.models[0].name = b"scripted".as_slice().into();
     core.settings.llm_providers.providers[0].models = Box::new([b"scripted".as_slice().into()]);
-    grant(&mut core, &env, FIRST_SOURCE);
+    if granted {
+        grant(&mut core, &env, FIRST_SOURCE);
+    }
     let mut out = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
     let host_env = Env { now: env.now, wall: env.wall, limits: env.limits.fleet };
     fleet::step(
@@ -28,12 +33,13 @@ fn serving_records(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
         },
         &mut out,
     );
-    fleet::step(
-        &mut core.fleet,
-        &host_env,
-        fleet::Event::Logins { channel: Token::new(77), logins: Box::new([]) },
-        &mut out,
-    );
+    let logins = core
+        .fleet
+        .program_names()
+        .iter()
+        .map(|name| fleet::Login { name: *name, state: fleet::LoginState::NotSignedIn })
+        .collect();
+    fleet::step(&mut core.fleet, &host_env, fleet::Event::Logins { channel: Token::new(77), logins }, &mut out);
     (core, env)
 }
 fn own(core: &Core, env: &Env<Limits>, party: u64) -> PayerReadiness {
@@ -80,10 +86,10 @@ fn readiness_excludes_a_disconnected_host() {
     assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unavailable);
 }
 #[test]
-fn programs_keep_readiness_explicitly_unknown() {
+fn program_offers_without_an_account_are_unavailable() {
     let (mut core, env) = fixture(vec![]);
     core.settings.llm_providers.providers[0].offers.programs = Box::new([b"arbitrary".as_slice().into()]);
-    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unknown);
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unavailable);
 }
 #[test]
 fn program_settlement_is_unknown_before_check_facts() {
@@ -180,7 +186,7 @@ fn a_limited_candidate_does_not_hide_a_program_host_wait() {
             held: None,
         },
     ]);
-    let (mut core, env) = fixture(records);
+    let (mut core, env) = serving_records(records);
     drop(step(&mut core, &env, Event::Account(accounts::Event::Limited { account: FIRST_SOURCE, reset: None })));
     let coverage = core.account_coverage(tasks::Payer::Party(ALICE));
     assert_eq!(
@@ -191,12 +197,12 @@ fn a_limited_candidate_does_not_hide_a_program_host_wait() {
 }
 #[test]
 fn a_restored_source_awaiting_its_grant_reads_unknown() {
-    let (core, env) = fixture(own_records());
+    let (core, env) = hosted_records(own_records(), false);
     assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unknown);
 }
 #[test]
 fn a_restored_source_awaiting_its_grant_is_unsettled() {
-    let (core, env) = fixture(own_records());
+    let (core, env) = hosted_records(own_records(), false);
     assert_eq!(own(&core, &env, ALICE).settled, Some(false));
 }
 #[test]
@@ -204,4 +210,27 @@ fn a_pending_personal_sign_in_leaves_project_settlement_alone() {
     let (mut core, env) = fixture(vec![]);
     ask(&mut core, &env, ALICE, 1, people::AccountHolder::Own);
     assert_eq!(document(&core, &env, ALICE).readiness.get(1).unwrap().settled, Some(true));
+}
+
+fn catalogue_host(holder: accounts::Holder, program_first: bool) -> (Core, Env<Limits>) {
+    let (mut core, limits) = run_choice::placement_fixture(accounts::Holder::Party(ALICE), holder, program_first);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    change_account(
+        &mut core,
+        &env,
+        accounts::Holder::Party(ALICE),
+        accounts::Change::SetUses { account: 0, uses: Some(Box::new([Use::Party(ALICE)])) },
+    );
+    (core, env)
+}
+#[test]
+fn readiness_ignores_another_provider_s_logins() {
+    let (core, env) = catalogue_host(accounts::Holder::Deployment, false);
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Usable);
+}
+#[test]
+fn readiness_reads_a_usable_program_login() {
+    let (mut core, env) = catalogue_host(accounts::Holder::Party(ALICE), true);
+    drop(step(&mut core, &env, Event::Account(accounts::Event::Limited { account: 1, reset: None })));
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Usable);
 }

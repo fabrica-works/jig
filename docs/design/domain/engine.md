@@ -786,7 +786,8 @@ The fleet child domain knows the hosts and the runs they host:
   only runs that person's accounts pay for, until a run's process tree is
   contained from them (accounts.md, 3.4; hosts.md, 5.1). One person's
   deployment is unaffected. The deployment's document names each host
-  the rule keeps a run from, and why.
+  the rule keeps a run from, and why. The rule governs placement: a queued
+  assignment rechecks it, while assigned and adopted runs continue.
 - **Attempts are fenced.** Everything a host sends is dropped unless its
   attempt is its task's live one, but a cancelled attempt's answer. No
   attempt of a task is placed while the fleet knows a host may still run
