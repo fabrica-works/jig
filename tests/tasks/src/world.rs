@@ -687,6 +687,12 @@ impl World {
         for request in &self.pending {
             match request {
                 Request::Save { record } => {
+                    if let Stored::Live(row) = record
+                        && let Some(Stored::Live(before)) = self.records.get(&record.key())
+                        && row.requester != before.requester
+                    {
+                        ordered.push(Seen::Moved { task: row.number, parent: row.requester });
+                    }
                     if let Stored::History(history) = record
                         && let Some(amendment) = &history.amendment
                     {

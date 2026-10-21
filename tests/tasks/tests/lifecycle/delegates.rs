@@ -1,4 +1,4 @@
-use jig_domain_tasks::{Edge, Event, Key, Party, Stored};
+use jig_domain_tasks::{Edge, Event, Key, Party, Refusal, Stored};
 use jig_tasks_world::{LIMITS, Reply, World, task};
 
 fn delegates() -> World {
@@ -55,6 +55,60 @@ fn an_adopted_task_leaves_its_old_requesters_delegate_rows() {
 
 const MOVED_REQUESTER: u64 = 9;
 const MOVED_DELEGATE: u64 = 2;
+const OLD_ROOT: u64 = 1;
+
+#[test]
+fn a_moved_delegate_outlives_its_old_root_and_tears_down_cleanly() {
+    let mut world = delegates();
+    let reply_to = world.to();
+    let call = reply_to.into_token();
+    world.send(Event::Move {
+        reply_to: skein_lib::ReplyTo::new(call),
+        task: MOVED_DELEGATE,
+        person: MOVED_REQUESTER,
+        period: 0,
+        pool_budget: 100,
+        period_budget: 1000,
+        reason: Box::new([]),
+    });
+    assert_eq!(world.replies.get(&call.raw()), Some(&Reply::Done));
+    assert_eq!(world.record(MOVED_DELEGATE).requester, Party::Person(MOVED_REQUESTER));
+    assert_eq!(world.record(MOVED_DELEGATE).root, MOVED_DELEGATE);
+    assert_eq!(world.record(MOVED_DELEGATE).depth, 0);
+    assert!(world.record(OLD_ROOT).delegates.is_empty());
+    assert!(world.record(OLD_ROOT).references.contains(&MOVED_DELEGATE));
+    world.claim(OLD_ROOT, OLD_ROOT);
+    world.finish(OLD_ROOT);
+    world.settle(OLD_ROOT);
+    assert_eq!(world.live(), 1);
+    finish_delegate(&mut world);
+    world.complete_cancel();
+    assert_eq!(world.live(), 0);
+}
+
+#[test]
+fn a_refused_move_keeps_the_old_requesters_delegate_in_the_referee() {
+    let mut world = delegates();
+    let reply_to = world.to();
+    let call = reply_to.into_token();
+    world.send(Event::Move {
+        reply_to: skein_lib::ReplyTo::new(call),
+        task: MOVED_DELEGATE,
+        person: 0,
+        period: 0,
+        pool_budget: 100,
+        period_budget: 1000,
+        reason: Box::new([]),
+    });
+    assert!(matches!(world.replies.get(&call.raw()), Some(Reply::Refused(problem)) if problem.why == Refusal::State));
+    assert_eq!(world.record(MOVED_DELEGATE).requester, Party::Task(OLD_ROOT));
+    assert_eq!(world.referee.expectations().descendants(OLD_ROOT), [OLD_ROOT, MOVED_DELEGATE]);
+    finish_delegate(&mut world);
+    world.claim(OLD_ROOT, OLD_ROOT);
+    world.finish(OLD_ROOT);
+    world.settle(OLD_ROOT);
+    world.complete_cancel();
+}
 
 #[test]
 fn a_delegate_moved_to_a_party_is_indexed_by_that_party_when_it_ends() {

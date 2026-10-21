@@ -21,6 +21,10 @@ pub enum Seen {
         dependencies: Vec<u64>,
         depth: u32,
     },
+    Moved {
+        task: u64,
+        parent: Party,
+    },
     Amended {
         task: u64,
         dependencies: Vec<u64>,
@@ -242,6 +246,13 @@ impl Expectations for Tasks {
                     judge.fail("delegate has no live parent");
                 }
                 self.dependencies.insert(task, dependencies);
+            }
+            Seen::Moved { task, parent } => {
+                if let Some(requester) = self.parents.get_mut(&task) {
+                    *requester = parent;
+                } else {
+                    judge.fail("moved task was never made");
+                }
             }
             Seen::Amended { task, dependencies } => {
                 for dependency in &dependencies {
