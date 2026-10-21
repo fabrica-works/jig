@@ -259,7 +259,7 @@ fn requester_template_authority_crosses_shapes_and_new_task_bytes() {
 }
 
 #[test]
-fn requester_without_conversation_is_a_typed_malformed_creation() {
+fn requester_without_conversation_is_refused_as_malformed() {
     let mut story = Story::requester_chat(fixtures::SEED);
     let me = story.shapes_me();
     let c::Ask::Create { project, mut tasks } =
