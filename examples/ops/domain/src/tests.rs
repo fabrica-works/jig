@@ -793,3 +793,47 @@ fn chat_request(limits: &core::Limits, words: &[u8]) -> jig_domain_people::Ask {
     let members = jig_core_world::fixtures::Creating::new(&config, limits.tasks.tree_tasks);
     jig_core_world::fixtures::create_chat(&members, 1, 0, words.into())
 }
+
+#[test]
+fn a_host_start_refusal_assembles_its_grants_cause_with_a_refused_end() {
+    for (cause, expected) in [(host::StartCause::Grants, true), (host::StartCause::Other, false)] {
+        let (mut domain, _env) = fixture();
+        let run = Token::new(1);
+        let attempt = Token::new(7);
+        let payload = Token::new(99);
+        domain
+            .payloads
+            .insert(
+                payload,
+                crate::boundary::Payload::Answer {
+                    task: run.raw(),
+                    attempt: attempt.raw(),
+                    spent: 0,
+                    ending: host::Ending::Refused(host::Refusal::Invalid(host::Invalid::Start {
+                        cause,
+                        why: Box::from(&b"start refused"[..]),
+                    })),
+                    read: None,
+                    refused: Box::new([]),
+                },
+            )
+            .unwrap();
+        let mut work = Queue::with_capacity(1);
+        crate::assemble::answer_payload(&mut domain, run, attempt, payload, &mut work);
+        let Some(crate::domain::Work::Core(core::Event::AnswerPayload {
+            run: answered_run,
+            attempt: answered_attempt,
+            payload: answered_payload,
+            end,
+            grants_refused,
+            ..
+        })) = work.pop()
+        else {
+            panic!("one assembled answer")
+        };
+        assert_eq!((answered_run, answered_attempt, answered_payload), (run, attempt, payload));
+        assert_eq!(end, jig_domain_tasks::End::Refused);
+        assert_eq!(grants_refused, expected);
+        assert!(work.is_empty());
+    }
+}

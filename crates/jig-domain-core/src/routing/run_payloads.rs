@@ -48,8 +48,8 @@ pub(super) fn route_answer_payload(
                         offered: proof.offered,
                     }));
                 }
+                // Only Invalid(Start { cause: Grants, .. }) sets grants_refused; Busy cannot.
                 let end = if grants_refused
-                    && end == tasks::End::Failed(tasks::Class::Invalid)
                     && cumulative == 0
                     && proof.turn.is_none()
                     && core.program_offered(run.raw(), &proof.accounts)

@@ -1083,6 +1083,57 @@ fn only_fenced_uncommitted_open_program_grants_refusals_recheck() {
 }
 
 #[test]
+fn a_fenced_grants_refusal_rechecks_independently_of_its_end_class() {
+    for end in [tasks::End::Failed(tasks::Class::Invalid), tasks::End::Refused] {
+        for grants_refused in [true, false] {
+            let (mut core, limits) =
+                placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
+            open(&mut core, &limits);
+            send_task(&mut core, &limits, tasks::Event::Prepare { reply_to: ReplyTo::new(FIRST), task: OPEN_TASK });
+            send_task(
+                &mut core,
+                &limits,
+                tasks::Event::Claim {
+                    reply_to: ReplyTo::new(FIRST),
+                    task: OPEN_TASK,
+                    attempt: 7,
+                    resumed: false,
+                    budget: 10,
+                    account: Some(0),
+                    writes: Box::new([]),
+                },
+            );
+            let mut proof = RunProof::claimed(OPEN_TASK, 7, 7, None, fleet::HostKind::Worker);
+            proof.placement = Some(FIRST);
+            proof.accounts = Box::new([authority::AccountBinding { provider: 1, account: 0, source: PERSONAL_SOURCE }]);
+            core.proofs.insert(OPEN_TASK, proof).unwrap();
+            let before = core.tasks.task(OPEN_TASK).unwrap().refusals;
+            let expected = if grants_refused { tasks::End::Recheck } else { end.clone() };
+            let _out = step(
+                &mut core,
+                &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
+                Event::AnswerPayload {
+                    grants_refused,
+                    run: Token::new(OPEN_TASK),
+                    attempt: Token::new(7),
+                    payload: Token::new(99),
+                    cumulative: 0,
+                    end: end.clone(),
+                    saved: None,
+                    invalid_saved: false,
+                    read: None,
+                    refused: Box::new([]),
+                },
+            );
+            assert_eq!(core.proofs.get(&OPEN_TASK).unwrap().terminal.as_ref().unwrap().end, expected);
+            let refusals = core.tasks.task(OPEN_TASK).unwrap().refusals;
+            let added = u32::from(!grants_refused && end == tasks::End::Refused);
+            assert_eq!(refusals, before.checked_add(added).unwrap());
+        }
+    }
+}
+
+#[test]
 fn open_omits_a_same_provider_alternative_on_a_program_endpoint() {
     const PROGRAM_ENDPOINT: u32 = 17;
     let (mut core, limits) = ready(false);
