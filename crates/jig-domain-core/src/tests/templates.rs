@@ -259,6 +259,70 @@ fn template_policy(core: &Core) -> people::PolicyValue {
     .expect("snapshot")
 }
 
+fn requester_template(conversation: bool) -> Template {
+    let mut value = template();
+    value.executor = people::TemplateExecutor::Charter(PROJECT);
+    value.flags.ended_by = tasks::EndedBy::Requester;
+    value.flags.conversation = conversation;
+    value
+}
+
+#[test]
+fn requester_template_overrides_refuse_invalid_ending_authority_without_changing_policy() {
+    for (conversation, executor) in
+        [(false, people::TemplateExecutor::Charter(PROJECT)), (true, people::TemplateExecutor::Chosen)]
+    {
+        let (mut core, limits) = make_tree();
+        core.settings.templates = Box::new([requester_template(conversation)]);
+        let templates = core.settings.templates.clone();
+        let before = template_policy(&core);
+        let change = people::PolicyChange::Templates {
+            overrides: Box::new([people::TemplateOverride { executor: Some(executor), ..executor_override(PROJECT) }]),
+        };
+        assert_eq!(
+            core.change_policy(&limits, OWNER, PROJECT, change),
+            Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape }),
+        );
+        assert_eq!(template_policy(&core), before);
+        assert_eq!(core.settings.templates, templates);
+        assert_eq!(core.template_overrides.len(), 0);
+    }
+}
+
+#[test]
+fn requester_template_restore_refuses_invalid_ending_authority_without_changing_policy() {
+    for (conversation, executor) in
+        [(false, people::TemplateExecutor::Charter(PROJECT)), (true, people::TemplateExecutor::Chosen)]
+    {
+        let (mut core, limits) = make_tree();
+        core.settings.templates = Box::new([requester_template(conversation)]);
+        let templates = core.settings.templates.clone();
+        let before = template_policy(&core);
+        let mut restored = before.clone();
+        restored.templates =
+            Box::new([people::TemplateOverride { executor: Some(executor), ..executor_override(PROJECT) }]);
+        assert!(!core.restore_policy(&limits, PROJECT, restored));
+        assert_eq!(template_policy(&core), before);
+        assert_eq!(core.settings.templates, templates);
+        assert_eq!(core.template_overrides.len(), 0);
+    }
+}
+
+#[test]
+fn startup_refuses_requester_templates_without_conversation_or_a_named_executor() {
+    for (conversation, executor) in
+        [(false, people::TemplateExecutor::Charter(PROJECT)), (true, people::TemplateExecutor::Chosen)]
+    {
+        let mut config = config(41);
+        let mut template = requester_template(conversation);
+        template.executor = executor;
+        config.settings.templates = Box::new([template]);
+        let refused = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| Core::new(config, &limits())));
+        let Err(panic) = refused else { panic!("no core is constructed from an invalid template") };
+        assert_eq!(panic.downcast_ref::<&str>(), Some(&"configured template choices fit their executors"));
+    }
+}
+
 #[test]
 fn an_incompatible_template_edit_leaves_the_entire_policy_unchanged() {
     let (mut core, limits) = template_core();

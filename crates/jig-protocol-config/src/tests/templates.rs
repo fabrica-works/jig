@@ -379,3 +379,22 @@ fn requester_ending_is_explicit_and_requires_an_agent_conversation() {
         fixtures::engine(&bad).expect_err("invalid ending authority");
     }
 }
+
+#[test]
+fn a_misspelled_requester_ending_refuses_the_template_at_ended_by() {
+    let bytes = fixtures::with(
+        fixtures::ENGINE_SMALL,
+        br#""conversation": true"#,
+        br#""conversation": true, "ended_by": "requestor""#,
+    );
+    let problems = fixtures::engine(&bytes).expect_err("no engine or template is produced");
+    assert_eq!(problems.problems.len(), 1);
+    assert_eq!(problems.past, 0);
+    assert_eq!(
+        problems.problems.get(0),
+        Some(&crate::Problem {
+            path: fixtures::path(&[b"templates"]).child(Segment::Index(0)).member(b"ended_by"),
+            what: What::Form,
+        }),
+    );
+}
