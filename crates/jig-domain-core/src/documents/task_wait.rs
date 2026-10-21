@@ -14,7 +14,7 @@ pub enum TaskRunWait {
 }
 /// A derived explanation, never a durable task state (domain/engine.md, section 8).
 /// Hello keeps the fleet's observed receipt time and cause until admission or restart.
-/// Program is carried by the contract for the later Open compatibility producer.
+/// Program names an incompatible Open path, derived by `waiting` from the run choice.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TaskWaitRefused {
     Hello { kind: jig_domain_fleet::HostKind, at: Wall, why: jig_domain_fleet::HelloRefusal },
@@ -22,7 +22,7 @@ pub enum TaskWaitRefused {
 }
 
 /// The incompatible model path or configured account/source of an Open run.
-/// The core owns this vocabulary; this data slice has no Program producer.
+/// `waiting` produces this explanation from an incompatible Open run choice.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum OpenProgram {
     Model,

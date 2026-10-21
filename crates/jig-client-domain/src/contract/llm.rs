@@ -93,7 +93,8 @@ pub enum TaskWaitRefused {
     Program(OpenProgram),
 }
 
-/// Which configured path cannot serve Open; no producer exists in this data slice.
+/// Which configured path cannot serve Open, derived by the core's
+/// `documents/task_wait.rs::waiting` for the current task document.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum OpenProgram {
     Model,
