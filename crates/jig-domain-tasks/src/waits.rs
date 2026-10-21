@@ -242,6 +242,13 @@ struct Row<'a> {
     state: WaitState,
 }
 
+impl Row<'_> {
+    fn waits_for(&self, dependency: u64) -> bool {
+        self.state.phase.dependencies()
+            && (crate::batch::contains(self.waiting_on, dependency) || crate::batch::contains(self.added, dependency))
+    }
+}
+
 fn rows<'a>(view: &'a View<'_>, number: u64) -> Row<'a> {
     let View { domain, staged, entry, pending, added, batch } = view;
     if let Some(row) = staged.record(domain, number) {
@@ -348,10 +355,7 @@ impl Judge {
     }
 
     fn dependent(&mut self, view: &View<'_>, dependent: u64, dependency: u64) {
-        let Row { waiting_on, added, state, .. } = rows(view, dependent);
-        if state.phase.dependencies()
-            && (crate::batch::contains(waiting_on, dependency) || crate::batch::contains(added, dependency))
-        {
+        if rows(view, dependent).waits_for(dependency) {
             self.mark(dependent);
         }
     }
@@ -413,8 +417,12 @@ impl Judge {
         let Row { waiting_on, added, delegates, holdings, state } = rows(view, number);
         let mut pending = 0_u32;
         if state.phase.dependencies() {
-            for list in [waiting_on, added] {
+            // Count the union, as Row::waits_for does when an edge is removed.
+            for (at, list) in [waiting_on, added].into_iter().enumerate() {
                 for dependency in list {
+                    if at == 1 && crate::batch::contains(waiting_on, *dependency) {
+                        continue;
+                    }
                     if self.pending.contains_key(dependency) {
                         pending = pending.checked_add(1).expect("bounded waits");
                     }
@@ -472,19 +480,13 @@ impl Judge {
             let Some(&number) = self.stack.get(at) else { break };
             self.pending.remove(&number);
             for ((_, dependent), ()) in view.domain.waits.dependents.range((number, 0)..=(number, u64::MAX)) {
-                let Row { waiting_on, state, .. } = rows(view, *dependent);
-                if state.phase.dependencies() && crate::batch::contains(waiting_on, number) {
+                if rows(view, *dependent).waits_for(number) {
                     self.met(*dependent);
                 }
             }
             for (dependency, dependent) in links.added.as_slice() {
-                if *dependency == number {
-                    let Row { waiting_on, added, state, .. } = rows(view, *dependent);
-                    if state.phase.dependencies()
-                        && (crate::batch::contains(waiting_on, number) || crate::batch::contains(added, number))
-                    {
-                        self.met(*dependent);
-                    }
+                if *dependency == number && rows(view, *dependent).waits_for(number) {
+                    self.met(*dependent);
                 }
             }
             let Row { holdings, state, .. } = rows(view, number);
@@ -764,8 +766,12 @@ impl Links {
 
     fn row(&mut self, view: &View<'_>, number: u64) {
         let Row { waiting_on, added, holdings, state, .. } = rows(view, number);
-        for list in [waiting_on, added] {
+        for (at, list) in [waiting_on, added].into_iter().enumerate() {
             for dependency in list {
+                if at == 1 && crate::batch::contains(waiting_on, *dependency) {
+                    continue;
+                }
+                // Indexed pairs are visited there, never a second time through added.
                 if !view.domain.waits.dependents.contains_key(&(*dependency, number)) {
                     self.added.push((*dependency, number)).expect("bounded projected dependencies");
                 }

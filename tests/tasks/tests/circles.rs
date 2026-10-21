@@ -731,3 +731,21 @@ fn a_hand_down_uses_the_resource_name_despite_a_different_declared_kind() {
     finish_task(&mut world, WAITER);
     finish_task(&mut world, ROOT);
 }
+
+#[test]
+fn a_compound_readding_an_indexed_dependency_frees_it_once() {
+    let mut world = second_holder();
+    assert_eq!(amend_dependencies(&mut world, HOLDER, &[ROOT]), Reply::Done);
+    let mut readded = amendment(&world, HOLDER, &[ROOT]);
+    let Operation::Amend { message, .. } = &mut readded else { unreachable!("amendment fixture") };
+    *message += 1;
+    let operations = vec![amendment(&world, HOLDER, &[]), readded];
+    assert_eq!(compound(&mut world, operations), Reply::Done);
+    assert_eq!(world.record(HOLDER).waiting_on.as_ref(), [ROOT]);
+    cancel(&mut world, WAITER);
+    world.settle(WAITER);
+    finish_task(&mut world, PREREQUISITE);
+    finish_task(&mut world, ROOT);
+    finish_task(&mut world, HOLDER);
+    finish_task(&mut world, DEPENDENT);
+}
