@@ -345,7 +345,13 @@ fn memory_below_the_components_sum_is_refused() {
     // the clients' component, outside this core + hub + provider-terms sum.
     // The clients' Model grows from 48 to 112 bytes: Prices is 48 bytes and the
     // optional description's slice header is 16. List::worst_case prices that growth.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_334_739 });
+    // JP12: Form grows 1 -> 34 bytes; aligned Granted, Source, Kept and Grant
+    // each grow 32 bytes. Accounts: (3 source nodes + 1 credential node) * 11
+    // B-tree slots * 32 = 1,408. Fleet: 12 tracked (8 attempts + 2 workers * 2 slots)
+    // * 8 grants * 32 = 3,072. Core: 2 copies * 8 tasks * 8 grants * 32 = 4,096.
+    // Hub: 2 slots * 8 accounts * 32 = 512. Total: 284 * 32 = 9,088.
+    // 18,703,334,740 + 9,088 = 18,703,343,828; one byte is supplied.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_343_827 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

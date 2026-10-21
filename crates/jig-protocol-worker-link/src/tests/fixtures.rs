@@ -63,7 +63,7 @@ pub const TOKEN_ONE: &[u8] = b"access";
 pub const ACCOUNT_ONE: &[u8] = b"account";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
-pub fn codec() -> wire::v3::Limits {
+pub fn codec() -> wire::v4::Limits {
     wire::sizes::limits(&SIZES).expect("small codec limits")
 }
 pub fn hello() -> host::Hello {

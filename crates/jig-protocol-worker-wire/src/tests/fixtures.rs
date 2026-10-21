@@ -1,6 +1,6 @@
 use crate::{
     Bounds, BoundsParts, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,
-    ModelBoundParts, Phase, v3,
+    ModelBoundParts, Phase, v4,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Secret, Writer};
@@ -9,7 +9,7 @@ pub const WORKER_A: &[u8] = b"worker-a";
 pub const WORKER_B: &[u8] = b"worker-b";
 pub const MODEL_SMALL: &[u8] = b"small";
 
-pub const LIMITS: v3::Limits = v3::Limits {
+pub const LIMITS: v4::Limits = v4::Limits {
     program_source_name: 32,
     sources_sources: 2,
     check_name: 32,
@@ -50,6 +50,7 @@ pub const LIMITS: v3::Limits = v3::Limits {
     withdrawn_value_id: 16,
     withdrawn_value_bearer: 32,
     application_value_secret: 32,
+    program_value_name: 32,
     assignment_charter: 32,
     assignment_transcript: 32,
     assignment_answered: 2,
@@ -249,7 +250,7 @@ pub fn grant(value: crate::GrantValue, number: u32, generation: u64) -> crate::G
         .expect("grant within small limits")
 }
 
-pub fn granted_key(limits: &v3::Limits, key: &[u8]) -> crate::Granted {
+pub fn granted_key(limits: &v4::Limits, key: &[u8]) -> crate::Granted {
     let value = crate::CredentialValue::new(
         limits,
         crate::CredentialValueParts { scheme: crate::Scheme::Key, bytes: Secret::new(key.into()) },
@@ -395,7 +396,7 @@ pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
     facts: 4096,
 };
 
-fn one_slot_limits() -> v3::Limits {
+fn one_slot_limits() -> v4::Limits {
     crate::sizes::limits(&SIZES_ONE_SLOT).expect("small size bounds")
 }
 
@@ -423,7 +424,7 @@ pub fn fullest_turn() -> crate::Turn {
     .expect("full turn")
 }
 
-fn fullest_call(limits: &v3::Limits) -> crate::AnsweredCall {
+fn fullest_call(limits: &v4::Limits) -> crate::AnsweredCall {
     let answer = crate::HostAnswer::new(limits, crate::HostAnswerParts { error: true, body: full_bytes() })
         .expect("full host answer");
     crate::AnsweredCall::new(
@@ -433,7 +434,7 @@ fn fullest_call(limits: &v3::Limits) -> crate::AnsweredCall {
     .expect("full answered call")
 }
 
-fn fullest_grants(limits: &v3::Limits) -> List<crate::Grant> {
+fn fullest_grants(limits: &v4::Limits) -> List<crate::Grant> {
     let mut grants = List::with_capacity(2);
     for number in [5, 6] {
         let value = crate::WithdrawnValue::new(

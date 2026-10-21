@@ -493,7 +493,7 @@ impl Core {
     }
 }
 
-const fn fleet_form(form: accounts::Form) -> fleet::Form {
+fn fleet_form(form: accounts::Form) -> fleet::Form {
     match form {
         accounts::Form::Credential(scheme) => fleet::Form::Credential(match scheme {
             accounts::Scheme::Bearer => fleet::Scheme::Bearer,
@@ -501,5 +501,6 @@ const fn fleet_form(form: accounts::Form) -> fleet::Form {
         }),
         accounts::Form::Withdrawn => fleet::Form::Withdrawn,
         accounts::Form::Application => fleet::Form::Application,
+        accounts::Form::Program(name) => fleet::Form::Program(name),
     }
 }

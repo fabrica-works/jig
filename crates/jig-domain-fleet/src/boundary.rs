@@ -107,6 +107,8 @@ pub enum Form {
     Withdrawn,
     /// An application's credential, held in its own table.
     Application,
+    /// A program source lent by its configuration-directory name.
+    Program(crate::SourceName),
 }
 
 /// A credential's scheme (protocol/channel.md, section 8).
@@ -125,6 +127,7 @@ impl Form {
         match self {
             Self::Credential(_) | Self::Withdrawn => GrantTable::Accounts,
             Self::Application => GrantTable::Application,
+            Self::Program(_) => GrantTable::Name,
         }
     }
 }
@@ -134,6 +137,8 @@ impl Form {
 pub enum GrantTable {
     Accounts,
     Application,
+    /// The value is the form's name; no table entry is held.
+    Name,
 }
 
 /// A credential's name, independent of its current generation.
@@ -734,16 +739,22 @@ mod tests {
     use super::{Form, GrantTable, Scheme};
 
     #[test]
-    fn a_form_names_its_table_and_takes_one_byte() {
+    fn a_form_names_its_table() {
         for (form, table) in [
             (Form::Credential(Scheme::Bearer), GrantTable::Accounts),
             (Form::Credential(Scheme::Key), GrantTable::Accounts),
             (Form::Withdrawn, GrantTable::Accounts),
             (Form::Application, GrantTable::Application),
+            (Form::Program(crate::SourceName::new(b"claude").expect("source name")), GrantTable::Name),
         ] {
             assert_eq!(form.table(), table);
         }
-        assert_eq!(size_of::<Form>(), 1);
+    }
+
+    #[test]
+    fn a_form_takes_34_bytes() {
+        // tag 1 + length 1 + 32 name bytes.
+        assert_eq!(size_of::<Form>(), 34);
     }
 }
 

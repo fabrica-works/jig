@@ -10,14 +10,15 @@ pub struct Worker {
     pub name: Box<[u8]>,
     pub digest: Digest,
 }
-/// A grant's value: a credential with its scheme, or an application's
-/// secret. `Withdrawn` keeps a provider account id beside a bearer token for
+/// A grant's value: a credential with its scheme, an application's
+/// secret, or a program source's name. `Withdrawn` keeps a provider account id beside a bearer token for
 /// jig's live test only, until JP13 removes it.
 #[derive(Clone, Debug)]
 pub enum GrantValue {
     Credential { scheme: Scheme, token: Secret },
     Withdrawn { id: Secret, bearer: Secret },
     Application { secret: Secret },
+    Program { name: host::SourceName },
 }
 /// How a credential is presented (protocol/channel.md, 8).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

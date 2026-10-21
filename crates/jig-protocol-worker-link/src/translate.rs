@@ -6,7 +6,7 @@ use jig_protocol_worker_wire::{self as wire, Part};
 use skein_channel::{Frame, frame_writer};
 use skein_lib::{List, Queue, Reader, Time, Token, Writer, bytes};
 
-pub(crate) fn hello(hello: host::Hello, limits: &wire::v3::Limits) -> Option<Frame> {
+pub(crate) fn hello(hello: host::Hello, limits: &wire::v4::Limits) -> Option<Frame> {
     let bounds = hello.bounds;
     let mut models = List::with_capacity(limits.bounds_models);
     for model in bounds.models {
@@ -54,7 +54,7 @@ pub(crate) fn hello(hello: host::Hello, limits: &wire::v3::Limits) -> Option<Fra
     frame(0x0100, body.finish())
 }
 
-pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v3::Limits) -> Option<Frame> {
+pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v4::Limits) -> Option<Frame> {
     match up {
         host::LinkUp::Logins { logins } => logins_frame(logins, limits),
         host::LinkUp::SignedOut { name, result } => signed_out_frame(name, result, limits),
@@ -164,14 +164,14 @@ fn part(token: Option<Token>, parts: &[Part]) -> Result<Option<Box<[u8]>>, ()> {
 fn name(token: Option<Token>) -> Option<u64> {
     Some(token?.raw())
 }
-fn work(work: host::Work, parts: &[Part], limits: &wire::v3::Limits) -> Option<wire::Work> {
+fn work(work: host::Work, parts: &[Part], limits: &wire::v4::Limits) -> Option<wire::Work> {
     wire::Work::new(
         limits,
         wire::WorkParts { left: part(work.left, parts).ok()?, saved: part(work.saved, parts).ok()? },
     )
     .ok()
 }
-fn refused(items: Box<[host::Refused]>, limits: &wire::v3::Limits) -> Option<List<wire::Refused>> {
+fn refused(items: Box<[host::Refused]>, limits: &wire::v4::Limits) -> Option<List<wire::Refused>> {
     let mut list = List::with_capacity(limits.turn_refused);
     for item in items {
         let reason = match item.reason {
@@ -185,7 +185,7 @@ fn refused(items: Box<[host::Refused]>, limits: &wire::v3::Limits) -> Option<Lis
     }
     Some(list)
 }
-fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v3::Limits) -> Option<wire::Ending> {
+fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v4::Limits) -> Option<wire::Ending> {
     Some(match ending {
         host::Ending::Refused(refusal) => {
             let value = match refusal {
@@ -214,7 +214,7 @@ fn ending(ending: host::Ending, parts: &[Part], limits: &wire::v3::Limits) -> Op
         }
     })
 }
-fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v3::Limits) -> Option<wire::Failure> {
+fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v4::Limits) -> Option<wire::Failure> {
     Some(match failure {
         host::Failure::Unprepared(preparation) => {
             let value = match preparation {
@@ -240,7 +240,7 @@ fn failure(failure: host::Failure, parts: &[Part], limits: &wire::v3::Limits) ->
         }
     })
 }
-fn activity(activity: host::Activity, limits: &wire::v3::Limits) -> Option<wire::Activity> {
+fn activity(activity: host::Activity, limits: &wire::v4::Limits) -> Option<wire::Activity> {
     Some(match activity {
         host::Activity::Phase(value) => {
             let value = phase(value);
@@ -267,7 +267,7 @@ fn phase(value: host::Phase) -> wire::Phase {
         host::Phase::Ending => wire::Phase::Ending,
     }
 }
-fn invalid_value(value: host::Invalid, limits: &wire::v3::Limits) -> Option<wire::Invalid> {
+fn invalid_value(value: host::Invalid, limits: &wire::v4::Limits) -> Option<wire::Invalid> {
     Some(match value {
         host::Invalid::Start { why } => {
             wire::Invalid::Start(wire::InvalidStart::new(limits, wire::InvalidStartParts { why }).ok()?)
@@ -278,7 +278,7 @@ fn invalid_value(value: host::Invalid, limits: &wire::v3::Limits) -> Option<wire
         host::Invalid::Messages => wire::Invalid::Messages,
     })
 }
-fn run_failure(value: host::RunFailure, limits: &wire::v3::Limits) -> Option<wire::RunFailure> {
+fn run_failure(value: host::RunFailure, limits: &wire::v4::Limits) -> Option<wire::RunFailure> {
     Some(match value {
         host::RunFailure::Model => wire::RunFailure::Model,
         host::RunFailure::Budget => wire::RunFailure::Budget,
@@ -334,7 +334,7 @@ fn count_kind(value: host::CountKind) -> wire::CountKind {
 pub(crate) fn down(
     kind: u16,
     body: &[u8],
-    limits: &wire::v3::Limits,
+    limits: &wire::v4::Limits,
     now: Time,
     parts: &mut List<Part>,
     next: &mut u64,
@@ -368,7 +368,7 @@ pub(crate) fn down(
         },
         wire::Kind::Assignment => {
             let record = wire::Assignment::decode(limits, &mut reader).ok()?;
-            host::LinkDown::Assign { assignment: assignment(record, now, parts, next, out) }
+            host::LinkDown::Assign { assignment: assignment(record, now, parts, next, out)? }
         }
         wire::Kind::Message => {
             let record = wire::Inbound::decode(limits, &mut reader).ok()?.into_parts();
@@ -398,7 +398,7 @@ pub(crate) fn down(
         }
         wire::Kind::Grant => {
             let record = wire::Granted::decode(limits, &mut reader).ok()?.into_parts();
-            let grant = grant(record.grant, now, out);
+            let grant = grant(record.grant, now, out)?;
             host::LinkDown::Grant { run: Token::new(record.task), attempt: Token::new(record.attempt), grant }
         }
         wire::Kind::Relayed => {
@@ -433,34 +433,41 @@ pub(crate) fn down(
     Some(down)
 }
 /// A value's arm and scheme name the form in which it is lent.
-fn grant(grant: wire::Grant, now: Time, out: &mut Queue<Request>) -> host::Grant {
+fn grant_form(value: &wire::GrantValue) -> Option<host::Form> {
+    Some(match value {
+        wire::GrantValue::Program(value) => host::Form::Program(host::SourceName::new(value.name())?),
+        wire::GrantValue::Credential(value) => host::Form::Credential(match value.scheme() {
+            wire::Scheme::Bearer => host::Scheme::Bearer,
+            wire::Scheme::Key => host::Scheme::Key,
+        }),
+        wire::GrantValue::Withdrawn(_) => host::Form::Withdrawn,
+        wire::GrantValue::Application(_) => host::Form::Application,
+    })
+}
+fn grant(grant: wire::Grant, now: Time, out: &mut Queue<Request>) -> Option<host::Grant> {
     let grant = grant.into_parts();
-    let (form, value) = match grant.value {
+    let form = grant_form(&grant.value)?;
+    let value = match grant.value {
+        wire::GrantValue::Program(_) => {
+            return Some(host::Grant { form, account: grant.number, generation: grant.generation, valid: grant.valid });
+        }
         wire::GrantValue::Credential(value) => {
             let value = value.into_parts();
             let scheme = match value.scheme {
                 wire::Scheme::Bearer => Scheme::Bearer,
                 wire::Scheme::Key => Scheme::Key,
             };
-            (
-                host::Form::Credential(match scheme {
-                    Scheme::Bearer => host::Scheme::Bearer,
-                    Scheme::Key => host::Scheme::Key,
-                }),
-                GrantValue::Credential { scheme, token: value.bytes },
-            )
+            GrantValue::Credential { scheme, token: value.bytes }
         }
         wire::GrantValue::Withdrawn(value) => {
             let value = value.into_parts();
-            (host::Form::Withdrawn, GrantValue::Withdrawn { id: value.id, bearer: value.bearer })
+            GrantValue::Withdrawn { id: value.id, bearer: value.bearer }
         }
-        wire::GrantValue::Application(value) => {
-            (host::Form::Application, GrantValue::Application { secret: value.into_parts().secret })
-        }
+        wire::GrantValue::Application(value) => GrantValue::Application { secret: value.into_parts().secret },
     };
     let expires = now.saturating_add(grant.valid);
     out.push(Request::Value { account: grant.number, generation: grant.generation, expires, value });
-    host::Grant { form, account: grant.number, generation: grant.generation, valid: grant.valid }
+    Some(host::Grant { form, account: grant.number, generation: grant.generation, valid: grant.valid })
 }
 fn transcript(bytes: &[u8]) -> Box<[Box<[u8]>]> {
     let mut reader = Reader::new(bytes);
@@ -481,8 +488,13 @@ fn assignment(
     parts: &mut List<Part>,
     next: &mut u64,
     out: &mut Queue<Request>,
-) -> host::Assignment {
+) -> Option<host::Assignment> {
     let record = record.into_parts();
+    // Decode every form before emitting values or parts. A second bounded pass
+    // avoids staging credential copies or another output queue.
+    for granted in &record.grants {
+        grant_form(granted.value())?;
+    }
 
     let workspace = match record.workspace {
         Some(workspace) => {
@@ -526,10 +538,10 @@ fn assignment(
     let turns = transcript(&record.transcript);
     let mut grants = List::with_capacity(record.grants.len());
     for granted in record.grants.into_boxed() {
-        let granted = grant(granted, now, out);
+        let granted = grant(granted, now, out)?;
         grants.push(granted).expect("one slot per grant");
     }
-    host::Assignment {
+    Some(host::Assignment {
         assignment: host::RunAssignment {
             identity: record.identity,
             run: Token::new(record.task),
@@ -542,10 +554,10 @@ fn assignment(
         messages: messages.into_boxed(),
         answered: answered.into_boxed(),
         turns,
-    }
+    })
 }
 
-fn login_state(state: host::LoginState, limits: &wire::v3::Limits) -> Option<wire::LoginState> {
+fn login_state(state: host::LoginState, limits: &wire::v4::Limits) -> Option<wire::LoginState> {
     Some(match state {
         host::LoginState::Usable => wire::LoginState::Usable,
         host::LoginState::NotSignedIn => wire::LoginState::NotSignedIn,
@@ -559,7 +571,7 @@ fn login_state(state: host::LoginState, limits: &wire::v3::Limits) -> Option<wir
 fn source_failed(
     reason: host::SourceFailure,
     detail: Box<[u8]>,
-    limits: &wire::v3::Limits,
+    limits: &wire::v4::Limits,
 ) -> Option<wire::SourceFailed> {
     let reason = match reason {
         host::SourceFailure::Missing => wire::SourceFailure::Missing,
@@ -573,7 +585,7 @@ fn source_failed(
     wire::SourceFailed::new(limits, wire::SourceFailedParts { reason, detail }).ok()
 }
 
-fn logins_frame(logins: Box<[host::Login]>, limits: &wire::v3::Limits) -> Option<Frame> {
+fn logins_frame(logins: Box<[host::Login]>, limits: &wire::v4::Limits) -> Option<Frame> {
     let mut rows = List::<wire::Login>::with_capacity(limits.logins_logins);
     for login in logins {
         for row in &rows {
@@ -595,7 +607,7 @@ fn logins_frame(logins: Box<[host::Login]>, limits: &wire::v3::Limits) -> Option
     record.encode(&mut body).ok()?;
     frame(wire::Kind::Logins.number(), body.finish())
 }
-fn signed_out_frame(name: host::SourceName, result: host::SignOutResult, limits: &wire::v3::Limits) -> Option<Frame> {
+fn signed_out_frame(name: host::SourceName, result: host::SignOutResult, limits: &wire::v4::Limits) -> Option<Frame> {
     let result = match result {
         host::SignOutResult::SignedOut => wire::SignOutResult::SignedOut,
         host::SignOutResult::Failed { reason, detail } => {

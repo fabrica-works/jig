@@ -87,7 +87,11 @@ impl Peer {
         use jig_protocol_worker_wire as wire;
         use skein_lib::{Duration, Secret, Writer};
         let (mut schema, limits) = crate::fixtures::peer_bounds();
-        let chosen = if matches!(case, Some(Opening::Version)) { 4 } else { wire::VERSION };
+        let chosen = if matches!(case, Some(Opening::Version)) {
+            wire::VERSION.checked_add(1).expect("one past the worker version")
+        } else {
+            wire::VERSION
+        };
         if matches!(case, Some(Opening::Family)) {
             schema.magic = *b"else";
         }

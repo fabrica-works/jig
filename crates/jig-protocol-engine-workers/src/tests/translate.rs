@@ -196,7 +196,7 @@ fn down(record: jig_domain_host::LinkDown) -> translate::Down {
     };
     translated.expect("complete output")
 }
-fn codec() -> jig_protocol_worker_wire::v3::Limits {
+fn codec() -> jig_protocol_worker_wire::v4::Limits {
     jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).expect("small codec")
 }
 fn assignment_output() -> jig_domain_host::LinkDown {
@@ -507,4 +507,38 @@ fn an_invalid_start_answer_keeps_its_words_in_the_hub() {
             why: b"budget too small".as_slice().into()
         },))
     );
+}
+
+fn program_name() -> jig_domain_host::SourceName {
+    jig_domain_host::SourceName::new(b"claude").expect("source name")
+}
+#[test]
+fn a_program_grant_crosses_as_its_name() {
+    let name = program_name();
+    let grant = granted_value(granted(jig_domain_host::Form::Program(name), crate::GrantValue::Program { name }));
+    let jig_protocol_worker_wire::GrantValue::Program(value) = grant.value() else { panic!("program value") };
+    assert_eq!(value.name(), b"claude");
+}
+#[test]
+fn another_value_under_a_program_form_is_not_sent() {
+    for value in [
+        fixtures::credential_value(crate::Scheme::Bearer),
+        fixtures::credential_value(crate::Scheme::Key),
+        fixtures::values()[0].take().expect("withdrawn"),
+        fixtures::values()[1].take().expect("application"),
+    ] {
+        assert!(granted(jig_domain_host::Form::Program(program_name()), value).is_none());
+    }
+}
+#[test]
+fn a_program_name_unlike_its_form_s_is_not_sent() {
+    let name = jig_domain_host::SourceName::new(b"other").expect("source name");
+    assert!(granted(jig_domain_host::Form::Program(program_name()), crate::GrantValue::Program { name }).is_none());
+}
+#[test]
+fn a_program_value_under_another_form_is_not_sent() {
+    use jig_domain_host::{Form, Scheme};
+    for form in [Form::Credential(Scheme::Bearer), Form::Credential(Scheme::Key), Form::Withdrawn, Form::Application] {
+        assert!(granted(form, crate::GrantValue::Program { name: program_name() }).is_none());
+    }
 }

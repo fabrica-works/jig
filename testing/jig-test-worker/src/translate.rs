@@ -8,7 +8,7 @@ pub const fn grant(value: host::Grant) -> Option<smith::Grant> {
         host::Form::Credential(host::Scheme::Bearer) => smith::Form::Credential(smith::Scheme::Bearer),
         host::Form::Credential(host::Scheme::Key) => smith::Form::Credential(smith::Scheme::Key),
         host::Form::Withdrawn => smith::Form::Withdrawn,
-        host::Form::Application => return None,
+        host::Form::Application | host::Form::Program(_) => return None,
     };
     Some(smith::Grant { account: value.account, generation: value.generation, valid: value.valid, form })
 }

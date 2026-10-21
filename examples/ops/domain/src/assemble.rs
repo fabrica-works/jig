@@ -363,7 +363,7 @@ pub(crate) fn host_grant(grant: fleet::Grant) -> host::Grant {
     }
 }
 
-const fn accounts_form(form: accounts::Form) -> host::Form {
+fn accounts_form(form: accounts::Form) -> host::Form {
     match form {
         accounts::Form::Credential(scheme) => host::Form::Credential(match scheme {
             accounts::Scheme::Bearer => host::Scheme::Bearer,
@@ -371,10 +371,13 @@ const fn accounts_form(form: accounts::Form) -> host::Form {
         }),
         accounts::Form::Withdrawn => host::Form::Withdrawn,
         accounts::Form::Application => host::Form::Application,
+        accounts::Form::Program(name) => {
+            host::Form::Program(host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))
+        }
     }
 }
 
-const fn fleet_form(form: host::Form) -> fleet::Form {
+fn fleet_form(form: host::Form) -> fleet::Form {
     match form {
         host::Form::Credential(scheme) => fleet::Form::Credential(match scheme {
             host::Scheme::Bearer => fleet::Scheme::Bearer,
@@ -382,10 +385,13 @@ const fn fleet_form(form: host::Form) -> fleet::Form {
         }),
         host::Form::Withdrawn => fleet::Form::Withdrawn,
         host::Form::Application => fleet::Form::Application,
+        host::Form::Program(name) => {
+            fleet::Form::Program(fleet::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))
+        }
     }
 }
 
-const fn host_form(form: fleet::Form) -> host::Form {
+fn host_form(form: fleet::Form) -> host::Form {
     match form {
         fleet::Form::Credential(scheme) => host::Form::Credential(match scheme {
             fleet::Scheme::Bearer => host::Scheme::Bearer,
@@ -393,5 +399,8 @@ const fn host_form(form: fleet::Form) -> host::Form {
         }),
         fleet::Form::Withdrawn => host::Form::Withdrawn,
         fleet::Form::Application => host::Form::Application,
+        fleet::Form::Program(name) => {
+            host::Form::Program(host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))
+        }
     }
 }

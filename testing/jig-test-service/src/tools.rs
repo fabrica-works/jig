@@ -380,7 +380,7 @@ fn family(name: &[u8]) -> u64 {
     }
 }
 
-const fn host_form(form: jig_domain_accounts::Form) -> jig_domain_host::Form {
+fn host_form(form: jig_domain_accounts::Form) -> jig_domain_host::Form {
     match form {
         jig_domain_accounts::Form::Credential(scheme) => jig_domain_host::Form::Credential(match scheme {
             jig_domain_accounts::Scheme::Bearer => jig_domain_host::Scheme::Bearer,
@@ -388,5 +388,8 @@ const fn host_form(form: jig_domain_accounts::Form) -> jig_domain_host::Form {
         }),
         jig_domain_accounts::Form::Withdrawn => jig_domain_host::Form::Withdrawn,
         jig_domain_accounts::Form::Application => jig_domain_host::Form::Application,
+        jig_domain_accounts::Form::Program(name) => jig_domain_host::Form::Program(
+            jig_domain_host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"),
+        ),
     }
 }

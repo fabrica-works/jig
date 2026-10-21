@@ -429,6 +429,7 @@ pub fn form(value: &engine::GrantValue) -> host::Form {
         }),
         engine::GrantValue::Withdrawn { .. } => host::Form::Withdrawn,
         engine::GrantValue::Application { .. } => host::Form::Application,
+        engine::GrantValue::Program { name } => host::Form::Program(*name),
     }
 }
 /// A value's arm and its bytes, so the engine's value and the layer's
@@ -442,6 +443,7 @@ pub fn sent(value: &engine::GrantValue) -> (&'static str, Vec<u8>, Vec<u8>) {
         engine::GrantValue::Credential { scheme: engine::Scheme::Key, token } => ("key", token.expose().into(), vec![]),
         engine::GrantValue::Withdrawn { id, bearer } => ("withdrawn", bearer.expose().into(), id.expose().into()),
         engine::GrantValue::Application { secret } => ("application", secret.expose().into(), vec![]),
+        engine::GrantValue::Program { name } => ("program", name.as_bytes().into(), vec![]),
     }
 }
 #[must_use]

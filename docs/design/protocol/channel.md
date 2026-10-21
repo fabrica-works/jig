@@ -138,10 +138,11 @@ The opening is skein's (skein's `channel.md`, section 5): `Open` from the
 worker, `Accept` or `Refuse` from the engine, then each side's `Terms`.
 
 - **The magic** names jig's channel; the schema gives its four bytes.
-- **One version at a time.** jig's channel speaks the one version of its
-  release; a worker of another is refused with skein's *version*, and
-  nothing is translated (skein's `codec.md`, section 5). An engine and its
-  workers are one application, released together.
+- **One version at a time.** jig's worker channel speaks version 4,
+  which adds `ProgramValue` as `GrantValue` tag 3 and keeps the kind
+  numbers. A worker of another version is refused with skein's *version*,
+  and nothing is translated (skein's `codec.md`, section 5). An engine
+  and its workers are one application, released together.
 - **A worker's credential** is a record of `jig-protocol-worker-wire`'s:
   - the worker's name, which the engine's configuration lists;
   - its secret;
@@ -520,8 +521,9 @@ holds, and neither of its components reads them.
   table, LLM accounts' (`llm.md`, 5.3), and the application's own table,
   its credentials' (below). `jig-protocol-engine-workers` fills a grant's
   value in as it encodes an assignment or a grant record, reading it from
-  the table its form selects, through its protocol layer. A value whose
-  arm or credential scheme differs from the grant's form is not sent.
+  the table its form selects, through its protocol layer, or taking a
+  program source's name from its form. A value whose arm, credential
+  scheme or program name differs from the grant's form is not sent.
   A grant whose generation the table no longer holds is left out as it
   is encoded: a newer one follows it.
 - **A value crosses as one of:** a credential, its scheme, `bearer` or
@@ -535,7 +537,8 @@ holds, and neither of its components reads them.
   smith's `protocol/channel.md`, section 6.
 - **The worker's side takes the values out** as it decodes, into the
   worker's table of the same owner, by number, at most the two newest
-  generations of each, and the hub hears the names. The worker's
+  generations of each, and the hub hears the names. A program source's
+  name stays in its form, with no table entry. The worker's
   protocol layer hands LLM accounts' values to smith's host half, which
   fills them into its agent's start and grants, a credential with its
   scheme or a program source's name (smith's `protocol/hosts.md`,
@@ -552,8 +555,9 @@ holds, and neither of its components reads them.
   source of its own, and are taken out on the worker into its table
   there, for its workspace. A grant names its form, from which its table
   follows: jig's accounts' for an LLM credential, the application's for
-  the application form. The worker's link derives the form from the
-  value as it decodes it, and hands that form to smith with the grant.
+  the application form, and the form's own name for a program source.
+  The worker's link derives the form from the value as it decodes it,
+  and hands that form to smith with the grant.
   The notices limited, refused and unauthorized are LLM accounts' only
   (`../domain/engine.md`, section 12). A worker's configuration holds no
   credential but its own secret; a program's login is the program's own,
@@ -562,9 +566,9 @@ holds, and neither of its components reads them.
 - **Grants cross only over TLS, in plaintext over loopback, or in one
   process,** as the worker's secret does (section 1).
 - **An entry goes** when its token has expired on the holder's clock, or a
-  newer generation pushes it out; a key's or a program source's, which
-  do not lapse, also when no attempt the worker hosts holds a grant of
-  it. Nothing else tells a table to forget.
+  newer generation pushes it out; a key's, which does not lapse, also
+  when no attempt the worker hosts holds a grant of it. Nothing else
+  tells a table to forget.
 
 ## 9. Liveness and flow control
 

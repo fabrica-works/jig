@@ -94,7 +94,8 @@ impl Net {
             && let Some(mut bytes) = self.peer.pop_output()
         {
             if self.other_version && parse_header(&bytes[..8]).expect("frame").kind == 2 {
-                bytes[8..10].copy_from_slice(&4_u16.to_be_bytes());
+                let other = jig_protocol_worker_wire::VERSION.checked_add(1).expect("one past the worker version");
+                bytes[8..10].copy_from_slice(&other.to_be_bytes());
                 self.other_version = false;
             }
             self.bytes.extend(bytes);

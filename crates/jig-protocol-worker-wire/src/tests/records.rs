@@ -145,7 +145,7 @@ fn a_reason_below_256_reads_as_none() {
 #[test]
 fn the_schema_lists_the_hello_from_the_initiator() {
     let schema = hello_schema();
-    let version = schema.version(3).expect("one version");
+    let version = schema.version(4).expect("one version");
     assert_eq!(schema.magic, *b"jigw");
     assert_eq!(version.kinds.len(), 21);
     assert_eq!(
@@ -283,7 +283,7 @@ fn through_bytes<T>(
     value: &T,
     measure: fn(&T) -> u32,
     encode: fn(&T, &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow>,
-    decode: fn(&crate::v3::Limits, &mut Reader<'_>) -> Result<T, crate::v3::Problem>,
+    decode: fn(&crate::v4::Limits, &mut Reader<'_>) -> Result<T, crate::v4::Problem>,
 ) -> T {
     let mut writer = skein_lib::Writer::new(usize::try_from(measure(value)).expect("small notice"));
     encode(value, &mut writer).expect("measured room");
@@ -424,12 +424,16 @@ fn an_assignment_keeps_its_sixteen_byte_identity() {
     assert_eq!(decoded.identity(), &fixtures::IDENTITY_FIRST);
 }
 
-fn every_grant_value() -> [crate::GrantValue; 4] {
+fn every_grant_value() -> [crate::GrantValue; 5] {
     [
         fixtures::credential_value(crate::Scheme::Bearer, fixtures::TOKEN_ONE),
         fixtures::credential_value(crate::Scheme::Key, fixtures::KEY_ONE),
         fixtures::withdrawn_value(),
         fixtures::application_value(),
+        crate::GrantValue::Program(
+            crate::ProgramValue::new(&fixtures::LIMITS, crate::ProgramValueParts { name: b"claude".as_slice().into() })
+                .expect("source name"),
+        ),
     ]
 }
 
@@ -527,7 +531,7 @@ fn an_assignment_past_its_grant_bound_is_refused() {
 #[test]
 fn the_schema_lists_every_down_kind_from_the_responder() {
     let schema = hello_schema();
-    let version = schema.version(3).expect("one version");
+    let version = schema.version(4).expect("one version");
     assert_eq!(version.kinds.len(), 21);
     for term in &down_terms() {
         assert_eq!(

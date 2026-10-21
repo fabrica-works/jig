@@ -426,7 +426,7 @@ fn start_prepared(domain: &mut Domain, owner: Token, workspace: Option<Token>, o
         State::Preparing { charter, held } => {
             let mut grants = List::with_capacity(u32::try_from(entry.grants.len()).expect("validated grants"));
             for grant in &entry.grants {
-                if grant.form.table() == GrantTable::Accounts {
+                if agent_grant(grant.form) {
                     grants.push(*grant).expect("room for every account grant");
                 }
             }
@@ -509,7 +509,7 @@ pub(crate) fn started(domain: &mut Domain, env: &Env<Limits>, owner: Token, agen
         State::Starting { workspace, mut held } => {
             if entry.refreshed {
                 for grant in &entry.grants {
-                    if grant.form.table() == GrantTable::Accounts {
+                    if agent_grant(grant.form) {
                         out.push(Request::Grant { agent, grant: *grant });
                     }
                 }
@@ -1224,7 +1224,7 @@ pub(crate) fn grant(domain: &mut Domain, run: Token, attempt: Token, grant: Gran
             accepted = true;
         }
     }
-    if !accepted || grant.form.table() != GrantTable::Accounts {
+    if !accepted || !agent_grant(grant.form) {
         return;
     }
     entry.refreshed = true;
@@ -1353,5 +1353,12 @@ pub(crate) fn finished(
 impl Hosted {
     pub(crate) fn grants(&self) -> &[Grant] {
         &self.grants
+    }
+}
+
+fn agent_grant(form: crate::Form) -> bool {
+    match form.table() {
+        GrantTable::Accounts | GrantTable::Name => true,
+        GrantTable::Application => false,
     }
 }

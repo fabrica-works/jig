@@ -2,7 +2,7 @@ use crate::{Request, tests::fixtures, translate};
 use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Queue, Reader, Time, Token};
-fn translated(kind: u16, bytes: &[u8], limits: &wire::v3::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
+fn translated(kind: u16, bytes: &[u8], limits: &wire::v4::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
     let mut parts = List::with_capacity(1);
     let mut values = Queue::with_capacity(4);
     let down =
@@ -268,4 +268,105 @@ fn a_failed_answer_keeps_the_limited_or_refused_account_in_its_record() {
         };
         assert_eq!(kept, failure);
     }
+}
+
+fn program_granted(name: &[u8]) -> Box<[u8]> {
+    let record = wire::Granted::new(
+        &fixtures::codec(),
+        wire::GrantedParts { task: 7, attempt: 2, grant: fixtures::grant_record(program_value(name)) },
+    )
+    .expect("grant");
+    fixtures::granted_bytes(&record)
+}
+#[test]
+fn the_worker_link_derives_the_program_form() {
+    let bytes = program_granted(b"claude");
+    let (down, _, values) = translated(0x0187, &bytes, &fixtures::codec());
+    let host::LinkDown::Grant { grant, .. } = down else { panic!("grant") };
+    assert_eq!(grant.form, host::Form::Program(host::SourceName::new(b"claude").expect("source name")));
+    assert!(values.is_empty(), "a program name needs no table entry");
+}
+#[test]
+fn a_program_name_the_rules_refuse_is_malformed() {
+    for name in [b"".as_slice(), b"Upper", b"bad_name", b"../claude"] {
+        let mut parts = List::with_capacity(1);
+        let mut values = Queue::with_capacity(4);
+        assert!(
+            translate::down(
+                0x0187,
+                &program_granted(name),
+                &fixtures::codec(),
+                Time::ZERO,
+                &mut parts,
+                &mut 1,
+                &mut values
+            )
+            .is_none(),
+            "{name:?}"
+        );
+        assert!(values.is_empty());
+    }
+}
+
+fn program_value(name: &[u8]) -> wire::GrantValue {
+    wire::GrantValue::Program(
+        wire::ProgramValue::new(&fixtures::codec(), wire::ProgramValueParts { name: name.into() }).expect("wire name"),
+    )
+}
+fn program_assignment(name: &[u8]) -> Box<[u8]> {
+    let mut grants = List::with_capacity(1);
+    grants.push(fixtures::grant_record(program_value(name))).expect("one grant");
+    assignment_grants(grants)
+}
+#[test]
+fn an_assignment_keeps_a_program_name_without_a_table_value() {
+    let (down, _, values) = translated(0x0180, &program_assignment(b"claude"), &fixtures::codec());
+    let host::LinkDown::Assign { assignment } = down else { panic!("assignment") };
+    assert_eq!(
+        assignment.assignment.grants[0].form,
+        host::Form::Program(host::SourceName::new(b"claude").expect("source name"))
+    );
+    assert!(values.is_empty());
+}
+#[test]
+fn an_assignment_with_a_refused_program_name_is_malformed() {
+    let mut parts = List::with_capacity(1);
+    let mut values = Queue::with_capacity(4);
+    assert!(
+        translate::down(
+            0x0180,
+            &program_assignment(b"../claude"),
+            &fixtures::codec(),
+            Time::ZERO,
+            &mut parts,
+            &mut 1,
+            &mut values
+        )
+        .is_none()
+    );
+}
+
+fn assignment_grants(grants: List<wire::Grant>) -> Box<[u8]> {
+    let mut record = fixtures::assignment_record(fixtures::window()).into_parts();
+    record.grants = grants;
+    fixtures::assignment_bytes(&wire::Assignment::new(&fixtures::codec(), record).expect("assignment"))
+}
+#[test]
+fn a_refused_later_program_grant_leaves_no_value_queued() {
+    let mut grants = List::with_capacity(2);
+    grants.push(fixtures::grant_record(fixtures::credential_value(wire::Scheme::Bearer))).expect("first grant");
+    grants.push(fixtures::grant_record(program_value(b"../claude"))).expect("later grant");
+    let mut parts = List::with_capacity(1);
+    let mut values = Queue::with_capacity(4);
+    let refused = translate::down(
+        0x0180,
+        &assignment_grants(grants),
+        &fixtures::codec(),
+        Time::ZERO,
+        &mut parts,
+        &mut 1,
+        &mut values,
+    );
+    assert!(refused.is_none());
+    assert!(values.is_empty(), "a refused assignment queues no earlier credential");
 }

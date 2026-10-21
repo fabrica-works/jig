@@ -431,6 +431,12 @@ mod fixtures {
     pub fn application_grant(generation: u64) -> crate::Grant {
         crate::Grant { form: crate::Form::Application, ..account_grant(generation) }
     }
+    pub fn program_grant(generation: u64) -> crate::Grant {
+        crate::Grant {
+            form: crate::Form::Program(crate::SourceName::new(b"claude").expect("source name")),
+            ..account_grant(generation)
+        }
+    }
     pub fn assign(assignment: RunAssignment) -> Event {
         Event::Down(LinkDown::Assign {
             assignment: Assignment { messages: Box::new([]), assignment, turns: Box::new([]), answered: Box::new([]) },
@@ -481,6 +487,31 @@ fn a_grant_keeps_its_form_through_the_start() {
     let mut h = Harness::new();
     let (_, start) = assigned_grants(&mut h, Box::new([fixtures::account_grant(1)]));
     assert_eq!(&*start.grants, &[fixtures::account_grant(1)]);
+}
+
+#[test]
+fn a_program_grant_reaches_the_agents_start_and_renewals() {
+    let mut h = Harness::new();
+    let (owner, start) = assigned_grants(&mut h, Box::new([fixtures::program_grant(1)]));
+    assert_eq!(&*start.grants, &[fixtures::program_grant(1)]);
+    let agent = Token::new(301);
+    h.step(Event::Started { owner, agent });
+    assert_eq!(
+        &*renewal(&mut h, fixtures::program_grant(2)),
+        &[Request::Grant { agent, grant: fixtures::program_grant(2) }]
+    );
+}
+
+#[test]
+fn a_program_renewal_while_starting_reaches_the_agent() {
+    let mut h = Harness::new();
+    let (owner, _) = assigned_grants(&mut h, Box::new([fixtures::program_grant(1)]));
+    renewal(&mut h, fixtures::program_grant(2));
+    let agent = Token::new(301);
+    assert_eq!(
+        &*h.step(Event::Started { owner, agent }),
+        &[Request::Grant { agent, grant: fixtures::program_grant(2) }]
+    );
 }
 
 #[test]

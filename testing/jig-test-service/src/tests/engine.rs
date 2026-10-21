@@ -281,7 +281,7 @@ fn each_scheme_reaches_the_engine_s_grant_value() {
             Some(GrantValue::Credential { scheme: engine::Scheme::Bearer, token }) => ("bearer", token, b"".as_slice()),
             Some(GrantValue::Credential { scheme: engine::Scheme::Key, token }) => ("key", token, b"".as_slice()),
             Some(GrantValue::Withdrawn { id, bearer }) => ("withdrawn", bearer, id.expose()),
-            Some(GrantValue::Application { .. }) | None => panic!("an account grant"),
+            Some(GrantValue::Application { .. } | GrantValue::Program { .. }) | None => panic!("an account grant"),
         };
         assert_eq!((found.0, found.1.expose(), found.2), (expected.0, fixtures::TOKEN, expected.1));
     }
@@ -328,7 +328,9 @@ fn application_grants_keep_the_two_newest_generations_per_number() {
         );
         match &grants[0] {
             Some(GrantValue::Application { secret }) => assert_eq!(Some(secret.expose()), expected),
-            Some(GrantValue::Credential { .. } | GrantValue::Withdrawn { .. }) => panic!("an application grant"),
+            Some(GrantValue::Credential { .. } | GrantValue::Withdrawn { .. } | GrantValue::Program { .. }) => {
+                panic!("an application grant")
+            }
             None => assert_eq!(expected, None),
         }
     }
@@ -501,4 +503,32 @@ fn the_store_waits_for_other_drivers_before_closing_its_root() {
     engine.store.close();
     assert!(!engine.store.work_pending(skein_lib::Time::ZERO), "root close waits for outstanding drivers");
     assert!(!engine.store.closed(), "the owned root is still held");
+}
+
+#[test]
+fn a_program_grant_needs_no_table_entry() {
+    use jig_domain_host::{Form, Grant, SourceName};
+    let values = fixtures::values();
+    let name = SourceName::new(b"claude").expect("source name");
+    let grants = values.grants(
+        &[Grant { form: Form::Program(name), account: 99, generation: 7, valid: skein_lib::Duration::from_secs(1) }],
+        skein_lib::Time::ZERO,
+    );
+    let Some(GrantValue::Program { name }) = &grants[0] else { panic!("program name") };
+    assert_eq!(name.as_bytes(), b"claude");
+}
+
+#[test]
+fn program_names_share_the_wire_and_domain_bounds() {
+    use jig_protocol_worker_wire::v4;
+    // Schema source names and grant names both admit exactly 32 bytes.
+    let bound = usize::try_from(v4::CEILINGS.program_value_name).expect("name bound fits usize");
+    assert_eq!(v4::CEILINGS.program_value_name, v4::CEILINGS.program_source_name);
+    let past = bound.checked_add(1).expect("small name bound");
+    let name = [b'a'; 33]; // The schema's 32-byte name plus one byte.
+    for (length, admitted) in [(bound, true), (past, false)] {
+        let value = name.get(..length).expect("fixture spans both sides of the bound");
+        assert_eq!(jig_domain_host::SourceName::new(value).is_some(), admitted);
+        assert_eq!(jig_domain_accounts::SourceName::new(value).is_some(), admitted);
+    }
 }

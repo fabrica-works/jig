@@ -327,6 +327,7 @@ fn secrets(grants: &mut Vec<Box<[u8]>>, grant: &jig_protocol_worker_wire::Grant)
             }
         }
         GrantValue::Application(value) => grants.push(value.secret().expose().into()),
+        GrantValue::Program(_) => {}
     }
 }
 

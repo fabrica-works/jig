@@ -500,7 +500,7 @@ pub(super) enum Work {
     },
 }
 
-const fn host_form(form: fleet::Form) -> host::Form {
+fn host_form(form: fleet::Form) -> host::Form {
     match form {
         fleet::Form::Credential(scheme) => host::Form::Credential(match scheme {
             fleet::Scheme::Bearer => host::Scheme::Bearer,
@@ -508,6 +508,9 @@ const fn host_form(form: fleet::Form) -> host::Form {
         }),
         fleet::Form::Withdrawn => host::Form::Withdrawn,
         fleet::Form::Application => host::Form::Application,
+        fleet::Form::Program(name) => {
+            host::Form::Program(host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))
+        }
     }
 }
 

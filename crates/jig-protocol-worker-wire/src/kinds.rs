@@ -1,5 +1,5 @@
 //! Project record sizes into skein's schema (protocol/channel.md, 4.1).
-use crate::{MAGIC, VERSION, v3};
+use crate::{MAGIC, VERSION, v4};
 use skein_channel::{Direction, Kind as ChannelKind, Role, Schema, Term, Version};
 use skein_lib::List;
 
@@ -80,31 +80,31 @@ pub enum Overflow {
     Frame,
 }
 
-pub fn schema(limits: &v3::Limits) -> Result<Schema, Overflow> {
+pub fn schema(limits: &v4::Limits) -> Result<Schema, Overflow> {
     let mut kinds = List::with_capacity(u32::try_from(KINDS.len()).expect("kind count fits"));
     for rule in KINDS {
         let largest = match rule.body {
-            Kind::Hello => v3::Hello::worst_case_bytes(limits),
-            Kind::Turn => v3::Turn::worst_case_bytes(limits),
-            Kind::Call => v3::Call::worst_case_bytes(limits),
-            Kind::Answer => v3::Answer::worst_case_bytes(limits),
-            Kind::Fact => v3::Fact::worst_case_bytes(limits),
-            Kind::Unauthorized => v3::Unauthorized::worst_case_bytes(limits),
-            Kind::Limited => v3::Limited::worst_case_bytes(limits),
-            Kind::AccountRefused => v3::AccountRefused::worst_case_bytes(limits),
-            Kind::Assignment => v3::Assignment::worst_case_bytes(limits),
-            Kind::Message => v3::Inbound::worst_case_bytes(limits),
-            Kind::Relayed => v3::Relayed::worst_case_bytes(limits),
-            Kind::TurnKept => v3::TurnKept::worst_case_bytes(limits),
-            Kind::TurnBusy => v3::TurnBusy::worst_case_bytes(limits),
-            Kind::Acknowledge => v3::Acknowledge::worst_case_bytes(limits),
-            Kind::Cancel => v3::Cancel::worst_case_bytes(limits),
-            Kind::Sources => v3::Sources::worst_case_bytes(limits),
-            Kind::Check => v3::Check::worst_case_bytes(limits),
-            Kind::SignOut => v3::SignOut::worst_case_bytes(limits),
-            Kind::Logins => v3::Logins::worst_case_bytes(limits),
-            Kind::SignedOut => v3::SignedOut::worst_case_bytes(limits),
-            Kind::Grant => v3::Granted::worst_case_bytes(limits),
+            Kind::Hello => v4::Hello::worst_case_bytes(limits),
+            Kind::Turn => v4::Turn::worst_case_bytes(limits),
+            Kind::Call => v4::Call::worst_case_bytes(limits),
+            Kind::Answer => v4::Answer::worst_case_bytes(limits),
+            Kind::Fact => v4::Fact::worst_case_bytes(limits),
+            Kind::Unauthorized => v4::Unauthorized::worst_case_bytes(limits),
+            Kind::Limited => v4::Limited::worst_case_bytes(limits),
+            Kind::AccountRefused => v4::AccountRefused::worst_case_bytes(limits),
+            Kind::Assignment => v4::Assignment::worst_case_bytes(limits),
+            Kind::Message => v4::Inbound::worst_case_bytes(limits),
+            Kind::Relayed => v4::Relayed::worst_case_bytes(limits),
+            Kind::TurnKept => v4::TurnKept::worst_case_bytes(limits),
+            Kind::TurnBusy => v4::TurnBusy::worst_case_bytes(limits),
+            Kind::Acknowledge => v4::Acknowledge::worst_case_bytes(limits),
+            Kind::Cancel => v4::Cancel::worst_case_bytes(limits),
+            Kind::Sources => v4::Sources::worst_case_bytes(limits),
+            Kind::Check => v4::Check::worst_case_bytes(limits),
+            Kind::SignOut => v4::SignOut::worst_case_bytes(limits),
+            Kind::Logins => v4::Logins::worst_case_bytes(limits),
+            Kind::SignedOut => v4::SignedOut::worst_case_bytes(limits),
+            Kind::Grant => v4::Granted::worst_case_bytes(limits),
         };
         let largest = largest.ok_or(Overflow::Body)?;
         let Ok(largest) = u32::try_from(largest) else { return Err(Overflow::Frame) };

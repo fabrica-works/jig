@@ -4,11 +4,11 @@ use std::{fs, path::Path};
 #[test]
 fn worker_wire_schema_matches_generated_code_and_goldens() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-worker-wire");
-    let source = fs::read_to_string(root.join("schema/worker-wire-v3.schema")).expect("schema");
+    let source = fs::read_to_string(root.join("schema/worker-wire-v4.schema")).expect("schema");
     let schema = parse(&source).expect("schema valid");
     let output = generate(&schema);
-    let code = root.join("src/generated/v3.rs");
-    let goldens = root.join("golden/v3");
+    let code = root.join("src/generated/v4.rs");
+    let goldens = root.join("golden/v4");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 cargo nextest run -p jig-worker-wire-world --test drift";
     if write {
