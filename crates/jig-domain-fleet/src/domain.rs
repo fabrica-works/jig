@@ -45,7 +45,7 @@ pub(crate) enum EngineHello {
 pub struct Domain {
     pub(crate) program_sources: Box<[crate::SourceName]>,
     pub(crate) cleanup_programs: Box<[crate::SourceName]>,
-    pub(crate) worker_names: Box<[Box<[u8]>]>,
+    pub(crate) worker_names: crate::Membership,
     /// The workers in contact, and their channels' names.
     pub(crate) channels: Slab<Channel>,
     pub(crate) needs: crate::Needs,
@@ -93,35 +93,28 @@ impl Domain {
     /// Supply the fixed configured membership before admitting channels.
     /// Returns false for names outside the startup bounds or a late replacement.
     pub fn configure_workers(&mut self, limits: &Limits, names: Box<[Box<[u8]>]>) -> bool {
-        let Ok(count) = u32::try_from(names.len()) else { return false };
-        if self.workers() != 0 || !self.worker_names.is_empty() || count > limits.configured_workers {
+        if self.workers() != 0 || !self.worker_names.is_empty() {
             return false;
         }
-        for name in &names {
-            let Ok(length) = u32::try_from(name.len()) else { return false };
-            if length > limits.worker_name_bytes {
-                return false;
-            }
-        }
+        let Ok(names) = crate::Membership::new(names, limits.configured_workers, limits.worker_name_bytes) else {
+            return false;
+        };
         self.worker_names = names;
         true
     }
     /// Admit a position only from this fleet's fixed configured membership.
     #[must_use]
     pub fn configured_worker(&self, position: u32) -> Option<crate::Worker> {
-        self.worker_names.get(usize::try_from(position).ok()?)?;
-        Some(crate::Worker { position })
+        self.worker_names.worker(position)
     }
     /// The name of a position this fleet admitted; membership never changes.
     #[must_use]
     pub fn configured_name(&self, worker: crate::Worker) -> &[u8] {
-        self.worker_names
-            .get(usize::try_from(worker.position).expect("admitted position fits usize"))
-            .expect("admitted configured position")
+        self.worker_names.name(worker)
     }
     #[must_use]
     pub fn worker_name(&self, worker: u32) -> Option<&[u8]> {
-        Some(self.worker_names.get(usize::try_from(worker).ok()?)?)
+        self.worker_names.get(worker)
     }
 
     #[must_use]
@@ -169,7 +162,7 @@ impl Domain {
         }
         Domain {
             program_sources: Box::new([]),
-            worker_names: Box::new([]),
+            worker_names: crate::Membership::empty(),
             cleanup_programs: Box::new([]),
             needs,
             engine_hello: EngineHello::Expected,

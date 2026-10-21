@@ -422,11 +422,13 @@ pub enum ProgramResult {
     Failed,
 }
 /// Only unconfirmed terminal results can enter a failed-host list.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// Account removal keeps the greatest severity: `NotInContact` < `Failed` < `Lost`.
+/// Lost means an admitted in-flight operation ended without its worker's terminal.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum ProgramFailure {
     NotInContact,
-    Lost,
     Failed,
+    Lost,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ProgramHost {

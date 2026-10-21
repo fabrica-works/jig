@@ -149,6 +149,7 @@ fn records_4(bytes: &[u8]) {
     check!(OwnerAgentShortfall, bytes);
     check!(OwnerHelloRefusalAgent, bytes);
     check!(OwnerHelloRefusalWorkers, bytes);
+    check!(OwnerHelloRefusalPosition, bytes);
     check!(OwnerHelloRefusalStopBound, bytes);
     check!(OwnerHelloRefusal, bytes);
     check!(OwnerHelloRefusalLine, bytes);

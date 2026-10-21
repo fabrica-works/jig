@@ -59,3 +59,14 @@ fn program_names_past_the_wire_bound_are_refused() {
         Some(w::Problem { path: w::Path::OwnerProgramLoginName, reason: skein_codec::Reason::Bound })
     );
 }
+
+#[test]
+fn a_refused_worker_position_reaches_the_wire_record() {
+    let mut value = super::fixtures::deployment_document();
+    value.hello_refusals.get_mut(0).expect("fixture refusal").why = fleet::HelloRefusal::Position { worker: u32::MAX };
+    let record = crate::translate::deployment::document(&value, &w::CEILINGS).expect("deployment record");
+    let w::OwnerHelloRefusal::Position(row) = record.hello_refusals().get(0).expect("wire refusal").why() else {
+        panic!("position refusal");
+    };
+    assert_eq!(row.worker(), u32::MAX);
+}

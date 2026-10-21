@@ -47,12 +47,10 @@ fn core_breaches(manifests: &[CrateManifest]) -> Vec<String> {
                 .iter()
                 .filter(|name| {
                     if manifest.name.as_deref() == Some("jig-domain-core") {
-                        **name != "skein-lib" && !CORE_FAMILY.contains(&name.as_str())
-                    } else if manifest.name.as_deref() == Some("jig-domain-accounts") {
-                        // Admitted program names and positions only (domain/root.md, 2).
-                        !["skein-lib", "jig-domain-fleet"].contains(&name.as_str())
+                        !["skein-lib", "jig-domain-workers"].contains(&name.as_str())
+                            && !CORE_FAMILY.contains(&name.as_str())
                     } else {
-                        **name != "skein-lib"
+                        !["skein-lib", "jig-domain-workers"].contains(&name.as_str())
                     }
                 })
                 .map(|name| format!("{}: {name}", manifest.path.display()))
@@ -742,4 +740,19 @@ fn client_crate_links_only_its_domain_link_and_foundation() {
     let mut dependencies = clients[0].dependencies.clone();
     dependencies.sort();
     assert_eq!(dependencies, ["jig-client-domain", "jig-client-protocol-link", "skein-lib", "skein-ui"]);
+}
+
+#[test]
+fn worker_values_have_no_dependencies() {
+    let crates: Vec<_> =
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-domain-workers")).collect();
+    assert_eq!(crates.len(), 1);
+    assert!(crates[0].dependencies.is_empty());
+}
+
+#[test]
+fn accounts_cannot_depend_on_fleet() {
+    let source = "[package]\nname = \"jig-domain-accounts\"\n[dependencies]\njig-domain-fleet.workspace = true\n";
+    let manifest = parse_manifest(PathBuf::from("accounts/Cargo.toml"), source);
+    assert_eq!(core_breaches(&[manifest]), ["accounts/Cargo.toml: jig-domain-fleet"]);
 }

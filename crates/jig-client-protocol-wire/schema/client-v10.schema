@@ -791,8 +791,9 @@ record OwnerAgentShortfallOutput { charter: u32 model: u32 }
 enum OwnerAgentShortfall { model: OwnerAgentShortfallModel, window: OwnerAgentShortfallWindow, output: OwnerAgentShortfallOutput, turns, spend, time, waiting, checks, message, inbox, unacknowledged }
 record OwnerHelloRefusalAgent { why: OwnerAgentShortfall }
 record OwnerHelloRefusalWorkers { limit: u32 }
+record OwnerHelloRefusalPosition { worker: u32 }
 record OwnerHelloRefusalStopBound { grace: duration }
-enum OwnerHelloRefusal { agent: OwnerHelloRefusalAgent, reserved_channel, workers: OwnerHelloRefusalWorkers, stop_bound: OwnerHelloRefusalStopBound }
+enum OwnerHelloRefusal { agent: OwnerHelloRefusalAgent, reserved_channel, workers: OwnerHelloRefusalWorkers, stop_bound: OwnerHelloRefusalStopBound, position: OwnerHelloRefusalPosition }
 record OwnerHelloRefusalLine { channel: u64 at: u64 slots: u32 stop_bound: duration why: OwnerHelloRefusal }
 record OwnerRequestKey { person: u64 key: fixed 16 }
 record OwnerPersonCapacityActionApplication { connector: u16 }

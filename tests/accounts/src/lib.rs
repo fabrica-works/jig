@@ -134,8 +134,8 @@ fn drain(out: &mut Queue<Request>) -> Vec<Request> {
 /// A configured position for account lifecycle inputs; no channel observation is invented.
 #[must_use]
 pub fn worker(number: u32) -> accounts::Worker {
-    let limits =
-        jig_domain_fleet::Limits { configured_workers: accounts::programs::PROGRAM_HOSTS, ..jig_fleet_world::LIMITS };
-    let domain = jig_fleet_world::fixtures::domain(&limits, jig_fleet_world::fixtures::needs());
-    domain.configured_worker(number).expect("configured fixture worker")
+    let count = accounts::programs::PROGRAM_HOSTS;
+    let names = (0..count).map(|index| format!("worker-{index}").into_bytes().into_boxed_slice()).collect();
+    let membership = jig_domain_workers::Membership::new(names, count, 32).expect("fixture membership");
+    membership.worker(number).expect("configured fixture worker")
 }

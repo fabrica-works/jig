@@ -187,6 +187,7 @@ fn deployment_accounts_five_states_independent_flags_spend_overlay_and_generatio
 #[test]
 fn deployment_three_hello_refusals_keep_advertised_stop_bound_allowed_grace_and_original_clock() {
     for why in [
+        OwnerHelloRefusal::Position { worker: u32::MAX },
         OwnerHelloRefusal::ReservedChannel,
         OwnerHelloRefusal::Workers { limit: u32::MAX },
         OwnerHelloRefusal::StopBound { grace: Duration::from_nanos(17) },

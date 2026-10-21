@@ -60,6 +60,10 @@ fn hello(value: fleet::HelloRefusal, limits: &w::Limits) -> Result<w::OwnerHello
             limits,
             w::OwnerHelloRefusalWorkersParts { limit },
         )?),
+        fleet::HelloRefusal::Position { worker } => w::OwnerHelloRefusal::Position(w::OwnerHelloRefusalPosition::new(
+            limits,
+            w::OwnerHelloRefusalPositionParts { worker },
+        )?),
         fleet::HelloRefusal::StopBound { grace } => w::OwnerHelloRefusal::StopBound(
             w::OwnerHelloRefusalStopBound::new(limits, w::OwnerHelloRefusalStopBoundParts { grace })?,
         ),

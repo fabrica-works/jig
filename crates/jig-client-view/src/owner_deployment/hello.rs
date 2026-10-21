@@ -21,6 +21,9 @@ pub(super) fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLin
             text(b, words, P::HelloRefusalWorkers, &[]);
             field_number(b, words, P::Limit, u64::from(limit));
         }
+        OwnerHelloRefusal::Position { worker } => {
+            text(b, words, P::HelloRefusalPosition, &[Hole::Number(u64::from(worker))]);
+        }
         OwnerHelloRefusal::StopBound { grace } => {
             text(b, words, P::HelloRefusalStopBound, &[]);
             duration(b, words, P::AllowedGrace, grace);

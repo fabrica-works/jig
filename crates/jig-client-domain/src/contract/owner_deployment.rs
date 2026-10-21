@@ -234,6 +234,10 @@ pub enum OwnerHelloRefusal {
     },
     /// `ReservedChannel` as supplied by its owner.
     ReservedChannel,
+    /// An unconfigured or occupied worker position, supplied by its owner.
+    Position {
+        worker: u32,
+    },
     /// Workers as supplied by its owner.
     Workers {
         limit: u32,

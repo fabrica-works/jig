@@ -32,4 +32,4 @@ pub use providers::{MANAGE_USAGE, Offers, PROVIDER_NAME, Provider, Providers};
 pub use records::{DISPLAY, Held, Holder, Key, Kind, NAME, SUBJECT, Stored, USES, Use};
 pub use selection::{Coverage, Excluded, HostSource, Selection, WaitWhy};
 
-pub use jig_domain_fleet::{SourceName, Worker};
+pub use jig_domain_workers::{SourceName, Worker};

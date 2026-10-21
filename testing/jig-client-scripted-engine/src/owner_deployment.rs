@@ -131,7 +131,11 @@ impl Payload for OwnerAccountState {
 impl Payload for OwnerHelloRefusal {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::ReservedChannel | Self::Workers { .. } | Self::StopBound { .. } | Self::Agent { .. } => Some(0),
+            Self::Position { .. }
+            | Self::ReservedChannel
+            | Self::Workers { .. }
+            | Self::StopBound { .. }
+            | Self::Agent { .. } => Some(0),
         }
     }
 }

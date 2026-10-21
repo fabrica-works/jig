@@ -286,6 +286,10 @@ fn a_hello_refuses_an_unconfigured_position() {
     let rows = world.hello_at(CHANNEL, 2);
     assert_eq!(rows, vec![Request::Refuse { channel: CHANNEL }]);
     assert_eq!(world.domain.workers(), 0);
+    assert_eq!(
+        world.domain.hello_refusals().get(0).expect("position refusal").why,
+        fleet::HelloRefusal::Position { worker: 2 }
+    );
 }
 #[test]
 fn a_hello_refuses_an_occupied_position() {
@@ -294,6 +298,10 @@ fn a_hello_refuses_an_occupied_position() {
     let other = Token::new(102);
     assert_eq!(world.hello(other), vec![Request::Refuse { channel: other }]);
     assert_eq!(world.domain.workers(), 1);
+    assert_eq!(
+        world.domain.hello_refusals().get(0).expect("position refusal").why,
+        fleet::HelloRefusal::Position { worker: 0 }
+    );
 }
 #[test]
 fn fan_out_reaches_distinct_configured_positions() {
@@ -414,4 +422,47 @@ fn joined_calls_fit_the_loss_output_bound() {
         row,
         Request::SignedOut { result: None, .. } | Request::ProgramSignedOut { result: fleet::ProgramResult::Lost, .. }
     )));
+}
+
+#[test]
+fn a_second_holder_attachment_receives_a_failure() {
+    let mut world = configured();
+    world.hello(CHANNEL);
+    world.inventory(&[b"a"]);
+    world.step(Event::SignOutProgram { source: 3, name: source(b"a") });
+    assert_eq!(
+        world.step(Event::SignOutProgram { source: 7, name: source(b"a") }),
+        vec![
+            Request::ProgramTargets { source: 7, workers: Box::new([worker(0), worker(1)]) },
+            Request::ProgramSignedOut { source: 7, worker: worker(0), result: fleet::ProgramResult::Failed },
+            Request::ProgramSignedOut { source: 7, worker: worker(1), result: fleet::ProgramResult::NotInContact }
+        ]
+    );
+    assert_eq!(
+        world.step(Event::SignedOut { channel: CHANNEL, name: source(b"a"), result: fleet::SignOutResult::SignedOut }),
+        vec![Request::ProgramSignedOut { source: 3, worker: worker(0), result: fleet::ProgramResult::SignedOut }]
+    );
+}
+
+#[test]
+fn a_full_pending_map_answers_the_holder_failed() {
+    let mut world = World::new(&[b"a", b"b"]);
+    world.hello(CHANNEL);
+    world.inventory(&[b"a", b"b"]);
+    for (index, name) in [b"a", b"b"].iter().enumerate() {
+        world.step(Event::SignOut {
+            to: ReplyTo::new(Token::new(u64::try_from(index).expect("reply number"))),
+            channel: CHANNEL,
+            name: source(*name),
+        });
+    }
+    world.step(Event::Sources { sources: Box::new([source(b"c")]) });
+    assert_eq!(
+        world.step(Event::SignOutProgram { source: 7, name: source(b"c") }),
+        vec![
+            Request::ProgramTargets { source: 7, workers: Box::new([worker(0), worker(1)]) },
+            Request::ProgramSignedOut { source: 7, worker: worker(0), result: fleet::ProgramResult::Failed },
+            Request::ProgramSignedOut { source: 7, worker: worker(1), result: fleet::ProgramResult::NotInContact }
+        ]
+    );
 }

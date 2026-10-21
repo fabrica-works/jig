@@ -251,7 +251,7 @@ pub(crate) fn begin(
     leaving: crate::changes::Leaving,
     out: &mut Queue<Request>,
 ) {
-    let Some(issued) = domain.issued.get_mut(&source) else { return };
+    let issued = domain.issued.get_mut(&source).expect("admitted issued program source");
     issued.signed_out = true;
     let name = issued.name;
     out.push(Request::Save {
@@ -320,24 +320,20 @@ fn complete(domain: &mut Domain, source: u32, out: &mut Queue<Request>) {
     if !pending.targeted {
         return;
     }
-    for row in &pending.hosts {
-        if row.result.is_none() {
-            return;
-        }
-    }
-    let pending = domain.programs.remove(&source).expect("the completed program operation is still held");
     let mut failed = List::with_capacity(pending.hosts.capacity());
-    for row in pending.hosts.into_boxed() {
+    for row in &pending.hosts {
         let failure = match row.result {
+            None => return,
             Some(crate::ProgramResult::NotInContact) => Some(crate::ProgramFailure::NotInContact),
             Some(crate::ProgramResult::Lost) => Some(crate::ProgramFailure::Lost),
             Some(crate::ProgramResult::Failed) => Some(crate::ProgramFailure::Failed),
-            Some(crate::ProgramResult::SignedOut) | None => None,
+            Some(crate::ProgramResult::SignedOut) => None,
         };
         if let Some(result) = failure {
             failed.push(crate::ProgramHost { worker: row.worker, result }).expect("one per configured worker");
         }
     }
+    let pending = domain.programs.remove(&source).expect("the completed program operation is still held");
     let failed_hosts = failed.into_boxed();
     let confirmed = failed_hosts.is_empty();
     match pending.leaving {

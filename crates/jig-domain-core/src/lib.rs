@@ -643,9 +643,7 @@ impl Core {
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
             fleet: {
                 let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs);
-                if !fleet.configure_workers(&limits.fleet, config.worker_names) {
-                    return Err(Problem::Workers { limit: limits.fleet.configured_workers });
-                }
+                assert!(fleet.configure_workers(&limits.fleet, config.worker_names), "admitted by problems");
                 fleet
             },
             accounts: accounts::Domain::new(&limits.accounts, config.settings.llm_providers.clone()),

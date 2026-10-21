@@ -206,6 +206,7 @@ fn hello(value: fleet::HelloRefusal) -> client::OwnerHelloRefusal {
         fleet::HelloRefusal::Agent { why } => client::OwnerHelloRefusal::Agent { why: shortfall(why) },
         fleet::HelloRefusal::ReservedChannel => client::OwnerHelloRefusal::ReservedChannel,
         fleet::HelloRefusal::Workers { limit } => client::OwnerHelloRefusal::Workers { limit },
+        fleet::HelloRefusal::Position { worker } => client::OwnerHelloRefusal::Position { worker },
         fleet::HelloRefusal::StopBound { grace } => client::OwnerHelloRefusal::StopBound { grace },
     }
 }

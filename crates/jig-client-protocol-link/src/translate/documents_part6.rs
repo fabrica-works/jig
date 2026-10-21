@@ -109,6 +109,7 @@ pub(crate) fn owner_hello_refusal_fields(value: &w::OwnerHelloRefusal, limits: &
         }
         w::OwnerHelloRefusal::ReservedChannel => c::OwnerHelloRefusal::ReservedChannel,
         w::OwnerHelloRefusal::Workers(row) => c::OwnerHelloRefusal::Workers { limit: row.limit() },
+        w::OwnerHelloRefusal::Position(row) => c::OwnerHelloRefusal::Position { worker: row.worker() },
         w::OwnerHelloRefusal::StopBound(row) => c::OwnerHelloRefusal::StopBound { grace: row.grace() },
     }
 }

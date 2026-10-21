@@ -12,6 +12,8 @@ pub enum HelloRefusal {
     Agent { why: crate::AgentShortfall },
     /// The connected worker set has no admission room.
     Workers { limit: u32 },
+    /// The position is unconfigured or already held by a live channel.
+    Position { worker: u32 },
     /// A worker must stop strictly before the engine's grace expires.
     StopBound { grace: Duration },
 }

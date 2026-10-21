@@ -399,6 +399,7 @@ fn deployment_accounts_preserve_every_supplied_state() {
 #[test]
 fn deployment_hello_refusals_keep_each_owner_reason_and_its_full_width_bound() {
     for (source, expected) in [
+        (fleet::HelloRefusal::Position { worker: u32::MAX }, client::OwnerHelloRefusal::Position { worker: u32::MAX }),
         (fleet::HelloRefusal::ReservedChannel, client::OwnerHelloRefusal::ReservedChannel),
         (fleet::HelloRefusal::Workers { limit: u32::MAX }, client::OwnerHelloRefusal::Workers { limit: u32::MAX }),
         (

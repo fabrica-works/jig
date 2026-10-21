@@ -350,3 +350,34 @@ fn unsafe_manage_addresses_refuse_deployment_frames() {
         assert_eq!(watches::delivery(&out.finish(), &limits), Err(Undecodable::Malformed));
     }
 }
+
+#[test]
+fn a_refused_worker_position_survives_wire_receipt() {
+    let limits = fixtures::limits();
+    let mut record = fixtures::owner_deployment_record().into_parts();
+    let mut expected = fixtures::owner_deployment();
+    let position = u32::MAX;
+    record.hello_refusals = list([w::OwnerHelloRefusalLine::new(
+        &limits.wire,
+        w::OwnerHelloRefusalLineParts {
+            channel: 9,
+            at: 0,
+            slots: 1,
+            stop_bound: Duration::ZERO,
+            why: w::OwnerHelloRefusal::Position(
+                w::OwnerHelloRefusalPosition::new(&limits.wire, w::OwnerHelloRefusalPositionParts { worker: position })
+                    .expect("position record"),
+            ),
+        },
+    )
+    .expect("hello refusal")]);
+    expected.hello_refusals = list([c::OwnerHelloRefusalLine {
+        channel: 9,
+        at: Wall::EPOCH,
+        slots: 1,
+        stop_bound: Duration::ZERO,
+        why: c::OwnerHelloRefusal::Position { worker: position },
+    }]);
+    let record = w::OwnerDeployment::new(&limits.wire, record).expect("deployment");
+    assert_eq!(crate::translate::documents::owner_deployment(record, &limits), Ok(expected));
+}

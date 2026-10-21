@@ -125,31 +125,9 @@ fn context_carrier(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(task.result_bytes))
 }
 
-/// A directly supplied startup value exceeds the core's priced worker membership.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Problem {
-    Workers { limit: u32 },
-    WorkerName { worker: u32, limit: u32 },
-}
+pub use fleet::WorkerProblem as Problem;
 pub(crate) fn problems(config: &crate::Config, limits: &Limits) -> Result<(), Problem> {
-    let Ok(count) = u32::try_from(config.worker_names.len()) else {
-        return Err(Problem::Workers { limit: limits.fleet.configured_workers });
-    };
-    if count > limits.fleet.configured_workers {
-        return Err(Problem::Workers { limit: limits.fleet.configured_workers });
-    }
-    for (index, name) in config.worker_names.iter().enumerate() {
-        let Ok(worker) = u32::try_from(index) else {
-            return Err(Problem::Workers { limit: limits.fleet.configured_workers });
-        };
-        let Ok(bytes) = u32::try_from(name.len()) else {
-            return Err(Problem::WorkerName { worker, limit: limits.fleet.worker_name_bytes });
-        };
-        if bytes > limits.fleet.worker_name_bytes {
-            return Err(Problem::WorkerName { worker, limit: limits.fleet.worker_name_bytes });
-        }
-    }
-    Ok(())
+    fleet::Membership::check(&config.worker_names, limits.fleet.configured_workers, limits.fleet.worker_name_bytes)
 }
 
 /// Pure checked heap ceiling for the core's eight children, its retained

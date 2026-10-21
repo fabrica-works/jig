@@ -334,6 +334,12 @@ fn memory_below_the_components_sum_is_refused() {
     // Projection caches: 8 tasks * (2 connectors + 2) caches * 32 extra milestones
     // * (168 inline + 4,096 words + 2 * 512 result bytes) = 5,414,912.
     // Review delta = 144 + 792 + 528 + 1,408 + 20,452,608 + 5,414,912 = 25,870,392.
+    // Re-review: the leaf keeps SourceName 33 bytes and Worker 4 bytes; Membership
+    // replaces one 16-byte Box carrier with one 16-byte wrapper (1 * 0 bytes).
+    // Names remain 8 * (16 carrier + 32 payload) = 384 bytes. Position's u32 fits
+    // the existing HelloRefusal envelope: 8 history rows * 0 added bytes.
+    // The one-pass collector uses the already priced 9 failures * 8 = 72 bytes.
+    // No changed routed/document maximum and no change to the sum below.
     // 18,677,464,347 + 25,870,392 = 18,703,334,739; the sum is one byte greater.
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_703_334_739 });
 }

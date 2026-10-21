@@ -451,14 +451,14 @@ fn an_accepted_program_name_is_a_fleet_source_name() {
     let (result, rows) = declare(&mut world, HOLDER, PROVIDER, None, name);
     assert!(result.is_ok());
     let Some(Request::Programs { names }) = rows.last() else { panic!("published names") };
-    assert_eq!(Some(names[0].name), jig_domain_fleet::SourceName::new(name));
+    assert_eq!(Some(names[0].name), jig_domain_workers::SourceName::new(name));
 }
 #[test]
 fn a_refused_program_name_is_not_a_fleet_source_name() {
     let mut world = fresh();
     let name = b"not portable";
     assert_eq!(declare(&mut world, HOLDER, PROVIDER, None, name), (Err(programs::DeclarationRefusal::Name), vec![]));
-    assert_eq!(jig_domain_fleet::SourceName::new(name), None);
+    assert_eq!(jig_domain_workers::SourceName::new(name), None);
 }
 
 #[test]
@@ -487,4 +487,41 @@ fn an_early_program_terminal_finishes_account_removal() {
             answer: jig_domain_accounts::Answer::Removed { confirmed: true, failed_hosts: Box::new([]) }
         }]
     );
+}
+
+#[test]
+fn account_removal_keeps_the_most_severe_worker_failure() {
+    use jig_domain_accounts::{Answer, ProgramFailure as Failure, ProgramHost, ProgramResult as Result};
+    for (first, last) in [(Result::Lost, Result::Failed), (Result::Failed, Result::Lost)] {
+        let mut world = fresh();
+        declare(&mut world, HOLDER, PROVIDER, None, b"personal").0.expect("first declaration");
+        declare(&mut world, HOLDER, PROVIDER, Some(0), b"work").0.expect("second declaration");
+        let request = skein_lib::Token::new(92);
+        world.step(Event::Change {
+            request,
+            holder: HOLDER,
+            change: jig_domain_accounts::Change::Remove { account: 0 },
+        });
+        for source in [1, 2] {
+            world.step(Event::ProgramTargets { source, hosts: Box::new([jig_accounts_world::worker(0)]) });
+        }
+        assert!(
+            world
+                .step(Event::ProgramSignedOut { source: 1, host: jig_accounts_world::worker(0), result: first })
+                .is_empty()
+        );
+        assert_eq!(
+            world.step(Event::ProgramSignedOut { source: 2, host: jig_accounts_world::worker(0), result: last }),
+            vec![Request::Answer {
+                request,
+                answer: Answer::Removed {
+                    confirmed: false,
+                    failed_hosts: Box::new([ProgramHost {
+                        worker: jig_accounts_world::worker(0),
+                        result: Failure::Lost
+                    }])
+                }
+            }]
+        );
+    }
 }

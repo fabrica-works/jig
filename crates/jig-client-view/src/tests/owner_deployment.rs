@@ -238,6 +238,7 @@ fn deployment_view_all_attempt_account_hello_states_clocks_keys_and_independent_
         );
     }
     for why in [
+        OwnerHelloRefusal::Position { worker: u32::MAX },
         OwnerHelloRefusal::ReservedChannel,
         OwnerHelloRefusal::Workers { limit: u32::MAX },
         OwnerHelloRefusal::StopBound { grace: Duration::from_secs(17) },
@@ -328,7 +329,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 275);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 276);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -1116,4 +1117,21 @@ fn configured_names_use_their_own_byte_bound() {
     value.hosts.push(host).unwrap();
     let limits = crate::Limits { text: 1, ..CLIENT };
     assert!(view::required(&value, &limits, shared_words()).is_some());
+}
+
+#[test]
+fn a_refused_worker_position_is_shown() {
+    let mut value = empty();
+    value
+        .hello_refusals
+        .push(OwnerHelloRefusalLine {
+            channel: 9,
+            at: Wall::EPOCH,
+            slots: 1,
+            stop_bound: Duration::ZERO,
+            why: OwnerHelloRefusal::Position { worker: u32::MAX },
+        })
+        .unwrap();
+    let tree = round_trip(value);
+    assert!(contains(&tree, b"Unconfigured or occupied worker position 4294967295"));
 }

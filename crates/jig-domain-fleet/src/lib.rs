@@ -58,9 +58,8 @@ mod channel;
 mod programs;
 mod source_values;
 mod sources;
-pub use source_values::{
-    Login, LoginMethod, LoginState, ProgramResult, SignOutResult, SourceFailure, SourceName, WORKER_NAME, Worker,
-};
+pub use jig_domain_workers::{Membership, Problem as WorkerProblem, SourceName, Worker};
+pub use source_values::{Login, LoginMethod, LoginState, ProgramResult, SignOutResult, SourceFailure, WORKER_NAME};
 mod domain;
 mod facts;
 mod grants;

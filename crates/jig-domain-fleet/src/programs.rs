@@ -19,34 +19,37 @@ pub(crate) fn check(domain: &mut Domain, name: SourceName, out: &mut Queue<Reque
     }
 }
 pub(crate) fn sign_out(domain: &mut Domain, source: u32, name: SourceName, out: &mut Queue<Request>) {
-    let mut workers = List::with_capacity(u32::try_from(domain.worker_names.len()).unwrap_or(0));
-    for index in 0..domain.worker_names.len() {
-        if let Ok(worker) = u32::try_from(index) {
-            workers.push(crate::Worker { position: worker }).expect("configured worker count");
-        }
+    let count = domain.worker_names.len();
+    let mut workers = List::with_capacity(count);
+    for position in 0..count {
+        workers
+            .push(domain.worker_names.worker(position).expect("admitted configured position"))
+            .expect("configured worker count");
     }
     out.push(Request::ProgramTargets { source, workers: workers.into_boxed() });
-    for index in 0..domain.worker_names.len() {
-        let Ok(worker) = u32::try_from(index) else { continue };
+    for position in 0..count {
+        let worker = domain.worker_names.worker(position).expect("admitted configured position");
         let mut target = None;
         for (_, id) in &domain.tokens {
-            let Some(host) = domain.channels.get(*id) else { continue };
-            if host.worker == Some(worker) {
+            let host = domain.channels.get(*id).expect("current channel");
+            if host.worker == Some(position) {
                 target = Some(*id);
             }
         }
-        let worker = crate::Worker { position: worker };
         let Some(id) = target else {
             out.push(Request::ProgramSignedOut { source, worker, result: crate::ProgramResult::NotInContact });
             continue;
         };
-        let Some(host) = domain.channels.get_mut(id) else { continue };
+        let host = domain.channels.get_mut(id).expect("current configured worker channel");
         if let Some(pending) = host.sources.pending.get_mut(&name) {
             let reply = core::mem::replace(&mut pending.reply, Reply::Cleanup);
             pending.reply = match reply {
                 Reply::Cleanup => Reply::Program { source, worker },
                 Reply::Direct(to) => Reply::DirectProgram { to, source, worker },
-                kept @ (Reply::Program { .. } | Reply::DirectProgram { .. }) => kept,
+                kept @ (Reply::Program { .. } | Reply::DirectProgram { .. }) => {
+                    out.push(Request::ProgramSignedOut { source, worker, result: crate::ProgramResult::Failed });
+                    kept
+                }
             };
             continue;
         }

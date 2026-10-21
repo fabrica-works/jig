@@ -58,6 +58,7 @@ members = [
     "crates/jig-domain-authority",
     "crates/jig-domain-brief",
     "crates/jig-domain-fleet",
+    "crates/jig-domain-workers",
     "crates/jig-domain-notes",
     "crates/jig-domain-people",
     "crates/jig-domain-tasks",
@@ -201,6 +202,7 @@ jig-domain-people = { path = "crates/jig-domain-people" }
 jig-domain-tasks = { path = "crates/jig-domain-tasks" }
 jig-domain-brief = { path = "crates/jig-domain-brief" }
 jig-domain-fleet = { path = "crates/jig-domain-fleet" }
+jig-domain-workers = { path = "crates/jig-domain-workers" }
 jig-domain-views = { path = "crates/jig-domain-views" }
 jig-domain-host = { path = "crates/jig-domain-host" }
 jig-protocol-charter = { path = "crates/jig-protocol-charter" }

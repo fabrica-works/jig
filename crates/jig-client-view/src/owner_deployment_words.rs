@@ -120,6 +120,7 @@ pub enum DeploymentPhrase {
     AccountStateClosing,
     HelloRefusalReservedChannel,
     HelloRefusalWorkers,
+    HelloRefusalPosition,
     HelloRefusalStopBound,
     PersonCapacityActionCreate,
     PersonCapacityActionCompound,
@@ -228,7 +229,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 275] = [
+pub const ALL: [DeploymentPhrase; 276] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -380,6 +381,7 @@ pub const ALL: [DeploymentPhrase; 275] = [
     DeploymentPhrase::AccountStateClosing,
     DeploymentPhrase::HelloRefusalReservedChannel,
     DeploymentPhrase::HelloRefusalWorkers,
+    DeploymentPhrase::HelloRefusalPosition,
     DeploymentPhrase::HelloRefusalStopBound,
     DeploymentPhrase::PersonCapacityActionCreate,
     DeploymentPhrase::PersonCapacityActionCompound,
@@ -618,6 +620,7 @@ impl DeploymentPhrase {
                 Self::AccountStateClosing => 9300,
                 Self::HelloRefusalReservedChannel => 9301,
                 Self::HelloRefusalWorkers => 9302,
+                Self::HelloRefusalPosition => 9718,
                 Self::HelloRefusalStopBound => 9303,
                 Self::PersonCapacityActionCreate => 9422,
                 Self::PersonCapacityActionCompound => 9423,
@@ -922,6 +925,7 @@ impl DeploymentPhrase {
             | Self::Connector
             | Self::Name
             | Self::Number
+            | Self::HelloRefusalPosition
             | Self::Question
             | Self::Members
             | Self::First
@@ -1050,6 +1054,7 @@ impl DeploymentPhrase {
             Self::AccountStateClosing => b"Account State Closing",
             Self::HelloRefusalReservedChannel => b"Hello Refusal Reserved Channel",
             Self::HelloRefusalWorkers => b"Hello Refusal Workers",
+            Self::HelloRefusalPosition => b"Unconfigured or occupied worker position ",
             Self::HelloRefusalStopBound => b"Hello Refusal Stop Bound",
             Self::PersonCapacityActionCreate => b"Person Capacity Action Create",
             Self::PersonCapacityActionCompound => b"Person Capacity Action Compound",

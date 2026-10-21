@@ -277,7 +277,11 @@ pub(crate) fn signed_out(
     let entry = domain.removing.get_mut(&account).expect("an account removal names its pending request");
     entry.confirmed &= confirmed;
     for host in failed_hosts {
-        entry.failed_hosts.insert(host.worker, host.result).expect("configured membership bounds the union");
+        let result = match entry.failed_hosts.get(&host.worker) {
+            Some(previous) => (*previous).max(host.result),
+            None => host.result,
+        };
+        entry.failed_hosts.insert(host.worker, result).expect("configured membership bounds the union");
     }
     entry.left = entry.left.checked_sub(1).expect("one answer per signed-in source");
     if entry.left == 0 {

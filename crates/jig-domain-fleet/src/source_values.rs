@@ -1,33 +1,8 @@
 //! Source facts at the fleet boundary (engine.md, 8).
 //! Like hello bounds, these belong to the fleet; roots translate the link.
+use crate::SourceName;
 use alloc::boxed::Box;
 
-/// A configuration-directory name (accounts.md, 3.4), never an account number.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct SourceName {
-    length: u8,
-    bytes: [u8; 32],
-}
-impl SourceName {
-    #[must_use]
-    pub fn new(value: &[u8]) -> Option<Self> {
-        if value.is_empty() || value.len() > 32 {
-            return None;
-        }
-        let mut bytes = [0; 32];
-        for (index, byte) in value.iter().enumerate() {
-            if !byte.is_ascii_lowercase() && !byte.is_ascii_digit() && *byte != b'-' {
-                return None;
-            }
-            *bytes.get_mut(index)? = *byte;
-        }
-        Some(Self { length: u8::try_from(value.len()).ok()?, bytes })
-    }
-    #[must_use]
-    pub fn as_bytes(&self) -> &[u8] {
-        self.bytes.get(..usize::from(self.length)).expect("validated name")
-    }
-}
 /// The program's bounded, printable payment method, without login contents.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct LoginMethod {
@@ -93,15 +68,3 @@ pub enum ProgramResult {
 
 /// Whole configured worker names exposed in program facts and outcomes.
 pub const WORKER_NAME: u32 = 4_096;
-
-/// A position admitted from the fleet's immutable configured membership.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct Worker {
-    pub(crate) position: u32,
-}
-impl Worker {
-    #[must_use]
-    pub const fn number(self) -> u32 {
-        self.position
-    }
-}

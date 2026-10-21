@@ -110,7 +110,7 @@ fn admit_worker(
     hello: &Hello,
     out: &mut Queue<Request>,
 ) -> bool {
-    let configured = u32::try_from(domain.worker_names.len()).expect("admitted configured membership fits u32");
+    let configured = domain.worker_names.len();
     let mut occupied = false;
     for (_, id) in &domain.tokens {
         if let Some(host) = domain.channels.get(*id) {
@@ -118,7 +118,7 @@ fn admit_worker(
         }
     }
     if worker >= configured || occupied {
-        refuse(domain, env, channel, hello, crate::HelloRefusal::Workers { limit: configured }, out);
+        refuse(domain, env, channel, hello, crate::HelloRefusal::Position { worker }, out);
         return false;
     }
     true

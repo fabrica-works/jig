@@ -242,7 +242,10 @@ Account
   names: one already offline is not signed out (not in contact), and a channel
   lost during the operation is lost. A worker removed from configuration is
   not reportable and cannot reconnect or run work; its operator clears its
-  machine's logins.
+  machine's logins. When removing an account with several program sources,
+  its one row per worker keeps the most severe result, independent of arrival
+  order: not in contact, then failed, then lost. Lost means the admitted
+  operation ended without a worker terminal.
   The issued-name record keeps desired sign-out, independently of observed
   login state. A reconnect or engine restart checks all issued names, including
   retired names; a retained login requiring cleanup is signed out before that
