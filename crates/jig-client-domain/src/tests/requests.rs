@@ -244,3 +244,215 @@ fn a_name_admitted_again_is_retired_by_its_own_not_kept() {
     c.step(Event::Up { up: Up::NotKept { key: NAME } });
     assert_eq!(c.told().as_ref(), &[Told::Answered { key: OTHER_KEY, outcome: Outcome::NotKept }]);
 }
+
+fn seen_send(
+    c: &mut Client,
+    key: Key,
+    name: Option<skein_lib::RequestKey>,
+) -> (skein_lib::Token, skein_lib::RequestKey) {
+    c.step(Event::Send { key, name, request: fixtures::seen() });
+    seen_attempt(c)
+}
+fn seen_attempt(c: &mut Client) -> (skein_lib::Token, skein_lib::RequestKey) {
+    let downs = c.downs();
+    let [Down::Send { attempt, key, request, value: None }] = downs.as_ref() else {
+        panic!("Seen sends without saving: {downs:?}");
+    };
+    assert_eq!(*request, fixtures::seen());
+    (*attempt, *key)
+}
+fn retry_client() -> Client {
+    let mut c = Client::live();
+    c.step(Event::Up { up: me(PARTY, Duration::from_secs(60)) });
+    c.downs();
+    c.told();
+    c
+}
+fn confirm(c: &mut Client, watch: skein_lib::Token, party: u64) {
+    let mut up = me(party, Duration::from_secs(60));
+    let Up::Watched { watch: token, .. } = &mut up else { panic!("frame fixture") };
+    *token = watch;
+    c.step(Event::Up { up });
+}
+fn final_seen(c: &mut Client, attempt: skein_lib::Token) {
+    c.step(Event::Up {
+        up: Up::Answer {
+            attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(Answered::Jig(contract::Answer::Done(contract::Outcome::Changed))),
+            why: None,
+        },
+    });
+}
+#[test]
+fn seen_stays_pending_without_saving_and_draws_fresh_engine_keys() {
+    let mut c = Client::live();
+    let (_, first) = seen_send(&mut c, KEY, None);
+    assert_eq!(c.told().as_ref(), &[Told::Pending { key: KEY }]);
+    assert_eq!(c.domain.pending(KEY), Some(Pending { progress: Progress::InFlight, party: PARTY, owner: None }));
+    let (_, second) = seen_send(&mut c, OTHER_KEY, None);
+    assert_ne!(first, second);
+    assert_eq!(c.told().as_ref(), &[Told::Pending { key: OTHER_KEY }]);
+}
+#[test]
+fn seen_duplicates_join_with_or_without_a_caller_name() {
+    for name in [None, Some(NAME)] {
+        let mut c = Client::live();
+        let (_, engine) = seen_send(&mut c, KEY, name);
+        if let Some(name) = name {
+            assert_eq!(engine, name);
+        }
+        c.told();
+        for duplicate in [name, None] {
+            c.step(Event::Send { key: KEY, name: duplicate, request: fixtures::seen() });
+            assert!(c.downs().is_empty());
+            assert!(c.told().is_empty());
+        }
+    }
+}
+#[test]
+fn seen_and_ordinary_requests_hold_each_others_names() {
+    for (first, second) in
+        [(fixtures::seen(), stop()), (stop(), fixtures::seen()), (fixtures::seen(), fixtures::seen())]
+    {
+        let mut c = Client::live();
+        c.step(Event::Send { key: KEY, name: Some(NAME), request: first });
+        c.downs();
+        c.told();
+        c.step(Event::Send { key: OTHER_KEY, name: Some(NAME), request: second });
+        assert!(c.downs().is_empty());
+        assert_eq!(c.told().as_ref(), &[Told::Answered { key: OTHER_KEY, outcome: Outcome::Held }]);
+    }
+}
+#[test]
+#[should_panic(expected = "request key conflict")]
+fn seen_under_the_same_key_with_another_request_conflicts() {
+    let mut c = Client::live();
+    seen_send(&mut c, KEY, None);
+    c.step(Event::Send { key: KEY, name: None, request: stop() });
+}
+#[test]
+#[should_panic(expected = "request key conflict")]
+fn seen_under_the_same_key_with_another_name_conflicts() {
+    let mut c = Client::live();
+    seen_send(&mut c, KEY, Some(NAME));
+    c.step(Event::Send { key: KEY, name: Some(OTHER_NAME), request: fixtures::seen() });
+}
+#[test]
+fn seen_retries_under_the_same_key_without_saving() {
+    for (envelope, why) in [
+        (RequestEnvelope::Again, Retry::Busy),
+        (RequestEnvelope::Again, Retry::NotReady),
+        (RequestEnvelope::Lost, Retry::Lost),
+    ] {
+        let mut c = retry_client();
+        let (attempt, engine) = seen_send(&mut c, KEY, None);
+        c.told();
+        c.step(Event::Up { up: Up::Answer { attempt, envelope, answer: None, why: Some(why) } });
+        assert_eq!(c.domain.pending(KEY).unwrap().progress, Progress::Retrying { why });
+        assert_eq!(c.told().as_ref(), &[Told::Pending { key: KEY }]);
+        assert!(c.downs().is_empty());
+        c.step(Event::Up { up: Up::Answer { attempt, envelope, answer: None, why: Some(why) } });
+        assert!(c.told().is_empty());
+        c.at(next_deadline(&c.domain).unwrap());
+        let (next, key) = seen_attempt(&mut c);
+        assert_ne!(next, attempt);
+        assert_eq!(key, engine);
+        assert_eq!(c.told().as_ref(), &[Told::Pending { key: KEY }]);
+    }
+}
+#[test]
+fn seen_admitted_offline_is_not_saved_before_going_live() {
+    let mut c = retry_client();
+    c.end(fixtures::ME_WATCH, contract::WatchEnd::Dropped);
+    c.downs();
+    c.told();
+    c.step(Event::Send { key: KEY, name: Some(NAME), request: fixtures::seen() });
+    assert!(c.downs().is_empty());
+    assert_eq!(c.domain.pending(KEY).unwrap().progress, Progress::Parked);
+    c.told();
+    c.at(next_deadline(&c.domain).unwrap());
+    let watch = c.name(Watchable::Jig(contract::Subject::Me));
+    c.downs();
+    confirm(&mut c, watch, PARTY);
+    assert_eq!(seen_attempt(&mut c).1, NAME);
+    assert_eq!(c.domain.pending(KEY).unwrap().progress, Progress::InFlight);
+}
+#[test]
+fn seen_parks_across_signout_until_its_party_returns() {
+    let mut c = retry_client();
+    let (_, engine) = seen_send(&mut c, KEY, None);
+    c.told();
+    c.step(Event::Up { up: Up::SignedOut });
+    assert_eq!(c.domain.pending(KEY).unwrap().progress, Progress::Parked);
+    assert!(c.downs().is_empty());
+    c.told();
+    c.step(Event::Up { up: Up::SignedIn });
+    let watch = c.name(Watchable::Jig(contract::Subject::Me));
+    c.downs();
+    c.told();
+    confirm(&mut c, watch, OTHER_PARTY);
+    assert!(c.downs().is_empty());
+    assert_eq!(c.domain.pending(KEY).unwrap().progress, Progress::Parked);
+    c.told();
+    confirm(&mut c, watch, PARTY);
+    assert_eq!(seen_attempt(&mut c).1, engine);
+}
+#[test]
+fn seen_final_answer_erases_and_releases_its_name_once() {
+    let mut c = Client::live();
+    let (attempt, _) = seen_send(&mut c, KEY, Some(NAME));
+    c.told();
+    final_seen(&mut c, attempt);
+    assert_eq!(c.downs().as_ref(), &[Down::Erase { key: NAME }]);
+    assert_eq!(
+        c.told().as_ref(),
+        &[Told::Answered {
+            key: KEY,
+            outcome: Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Changed))),
+        }]
+    );
+    assert_eq!(c.domain.pending(KEY), None);
+    final_seen(&mut c, attempt);
+    assert!(c.downs().is_empty());
+    assert!(c.told().is_empty());
+    assert_eq!(seen_send(&mut c, OTHER_KEY, Some(NAME)).1, NAME);
+}
+#[test]
+fn seen_past_retention_erases_and_answers_unknown_once() {
+    let mut c = Client::live();
+    let (attempt, key) = seen_send(&mut c, KEY, None);
+    c.told();
+    c.at(Time::from_nanos(1));
+    assert_eq!(c.downs().as_ref(), &[Down::Erase { key }]);
+    assert_eq!(c.told().as_ref(), &[Told::Answered { key: KEY, outcome: Outcome::Unknown }]);
+    assert_eq!(c.domain.pending(KEY), None);
+    final_seen(&mut c, attempt);
+    assert!(c.told().is_empty());
+    assert!(c.downs().is_empty());
+}
+#[test]
+fn legacy_seen_restores_kept_without_resaving_then_erases() {
+    for first_sent in [None, Some(skein_lib::Wall::EPOCH)] {
+        let mut record = record(KEY, NAME, PARTY);
+        record.first_sent = first_sent;
+        record.request.request = fixtures::seen();
+        let mut kept = List::with_capacity(1);
+        kept.push(record).unwrap();
+        let mut c = Client::new(fixtures::limits());
+        c.step(Event::Start { kept });
+        assert_eq!(
+            c.told().as_ref(),
+            &[Told::Kept { key: KEY, request: fixtures::seen() }, Told::Pending { key: KEY }]
+        );
+        assert!(c.downs().is_empty());
+        c.step(Event::Up { up: me(PARTY, Duration::from_secs(60)) });
+        let (attempt, key) = seen_attempt(&mut c);
+        assert_eq!(key, NAME);
+        c.told();
+        final_seen(&mut c, attempt);
+        assert_eq!(c.downs().as_ref(), &[Down::Erase { key: NAME }]);
+        assert_eq!(c.told().len(), 1);
+        assert_eq!(c.domain.pending(KEY), None);
+    }
+}

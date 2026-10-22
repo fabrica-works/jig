@@ -244,6 +244,11 @@ pub(crate) const ME_WATCH: Token = Token::new(1);
 pub(crate) fn stop() -> Ask {
     Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: SUBJECT_TASK }))
 }
+pub(crate) fn seen() -> Ask {
+    Ask::Jig(Box::new(contract::Ask::Seen {
+        through: contract::SeenThrough::Conversation { task: SUBJECT_TASK, through: 1 },
+    }))
+}
 pub(crate) fn me(party: u64, retention: Duration) -> Up {
     Up::Watched {
         watch: ME_WATCH,

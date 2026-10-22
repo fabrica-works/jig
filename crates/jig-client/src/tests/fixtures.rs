@@ -56,6 +56,11 @@ pub fn task() -> Watchable {
 pub fn stop() -> Ask {
     Ask::Jig(Box::new(contract::Ask::Stop { project: PROJECT, task: SUBJECT_TASK }))
 }
+pub fn seen() -> Ask {
+    Ask::Jig(Box::new(contract::Ask::Seen {
+        through: contract::SeenThrough::Conversation { task: SUBJECT_TASK, through: 1 },
+    }))
+}
 pub fn hello(version: u32) -> Box<[u8]> {
     let served =
         w::Served::new(&w::CEILINGS, w::ServedParts { owner: w::Owner::Jig, first: version, last: version }).unwrap();
@@ -479,4 +484,42 @@ pub fn span_goal_me() -> contract::Me {
     within.latest = Some(Wall::from_nanos(100));
     within.maximum_deadline = Some(Wall::from_nanos(100));
     me
+}
+
+pub fn seen_answer() -> Box<[u8]> {
+    let seen = w::SeenThrough::Conversation(
+        w::SeenConversation::new(&w::CEILINGS, w::SeenConversationParts { task: SUBJECT_TASK, through: 1 }).unwrap(),
+    );
+    let marked = w::OwnerOutcomeMarkedSeen::new(&w::CEILINGS, w::OwnerOutcomeMarkedSeenParts { seen }).unwrap();
+    let outcome =
+        w::OutcomeOwner::new(&w::CEILINGS, w::OutcomeOwnerParts { value: w::OwnerOutcome::MarkedSeen(marked) })
+            .unwrap();
+    let done = w::Done::new(&w::CEILINGS, w::DoneParts { outcome: w::Outcome::Owner(outcome) }).unwrap();
+    let value = w::Final::Done(done);
+    let mut writer = Writer::new(usize::try_from(value.measure()).unwrap());
+    value.encode(&mut writer).unwrap();
+    let owned = w::Owned::new(
+        &w::CEILINGS,
+        w::OwnedParts { owner: w::Owner::Jig, version: jig_client_protocol_wire::VERSION, record: writer.finish() },
+    )
+    .unwrap();
+    answer(&w::KeyedAnswer::FinalAnswer(owned))
+}
+pub fn legacy_seen(key: Key, name: skein_lib::RequestKey, first_sent: Option<Wall>) -> Record {
+    let limits = jig_client_protocol_link::Limits::new(domain_limits(), limits().exchanges).unwrap();
+    let table = jig_client_protocol_link::translate::store::table(
+        &skein_lib::RequestRecord { key: name, scope: PARTY, first_sent, request: Held { key, request: seen() } },
+        &limits,
+    )
+    .unwrap();
+    let mut writer = Writer::new(usize::try_from(table.measure()).unwrap());
+    table.encode(&mut writer).unwrap();
+    let kept = w::Kept::new(
+        &w::CEILINGS,
+        w::KeptParts { store_version: jig_client_domain::TABLE_VERSION, record: writer.finish() },
+    )
+    .unwrap();
+    let mut writer = Writer::new(usize::try_from(kept.measure()).unwrap());
+    kept.encode(&mut writer).unwrap();
+    Record { key: Box::from(name), bytes: writer.finish() }
 }

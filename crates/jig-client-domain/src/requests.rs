@@ -1,4 +1,4 @@
-//! Keyed, durable requests and their display state (client/domain/client.md, 6 and 11).
+//! Keyed requests, memory-only Seen and kept work (client/domain/client.md, 6 and 11).
 use crate::{
     Ask, Domain, Down, Held, Key, Limits, Outcome, Pending, Progress, Request, Retry, State, Told, contract,
     domain::{down, tell},
@@ -183,7 +183,11 @@ impl Domain {
             let mut cursor = self.table.take(env.now, env.wall);
             for _ in 0..env.limits.requests.out {
                 match cursor.next_out() {
-                    Some(RequestOut::Save(record)) => down(out, Down::Save { record: record.clone() }),
+                    Some(RequestOut::Save(record)) => {
+                        if kept(&record.request.request) {
+                            down(out, Down::Save { record: record.clone() });
+                        }
+                    }
                     Some(RequestOut::Erase(key)) => down(out, Down::Erase { key }),
                     Some(RequestOut::Send { attempt, key, request }) => {
                         self.requests.get_mut(&request.key).expect("sending request").attempt = Some(attempt);
@@ -238,6 +242,37 @@ impl Domain {
                 tell(out, Told::Pending { key });
             }
         }
+    }
+}
+fn kept(request: &Ask) -> bool {
+    match request {
+        Ask::Jig(request) => match request.as_ref() {
+            contract::Ask::Seen { .. } => false,
+            contract::Ask::Create { .. }
+            | contract::Ask::Propose { .. }
+            | contract::Ask::Withdraw { .. }
+            | contract::Ask::Message { .. }
+            | contract::Ask::Compound { .. }
+            | contract::Ask::Answer { .. }
+            | contract::Ask::Take { .. }
+            | contract::Ask::HandBack { .. }
+            | contract::Ask::Decide { .. }
+            | contract::Ask::Release { .. }
+            | contract::Ask::Amend { .. }
+            | contract::Ask::Stop { .. }
+            | contract::Ask::Cancel { .. }
+            | contract::Ask::Move { .. }
+            | contract::Ask::EditNote { .. }
+            | contract::Ask::DeleteNote { .. }
+            | contract::Ask::ChangePolicy { .. }
+            | contract::Ask::SetRoles { .. }
+            | contract::Ask::MakeService { .. }
+            | contract::Ask::SetPool { .. }
+            | contract::Ask::SignIn { .. }
+            | contract::Ask::AccountChange { .. }
+            | contract::Ask::SignOut { .. } => true,
+        },
+        Ask::Family { .. } => true,
     }
 }
 pub(crate) fn declared(limits: &Limits, request: &Ask) -> u64 {
