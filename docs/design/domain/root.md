@@ -114,6 +114,21 @@ iterate, after the step:
 - **One decision per event.** Hand-offs complete within the step;
   nothing of a decision is left for a later step but what a child holds
   in its own state, saying so (a brief gathering, a load awaited).
+- **Finishing is the core's.** The pure, allocation-free `finish_owed`
+  answer states whether closure owes (1) an eligible projection feed,
+  update or final forgetting; (2) publication of gathered subject changes;
+  (3) reconciliation of retained writing with its current proof, watched
+  or not; (4) an unreported watch ending required by sign-in, role,
+  visibility or stopping state; or (5) a dirty deployment header or the
+  core's first drain notification. A projection pass that emits continues
+  to defer watch finishing. Accepting a decision or hearing `Committed`
+  does not itself discharge finishing. Work a child holds awaiting its
+  next input is not actionable finishing. Before omitting a closure, the
+  root also checks its own work, connectors, fleet, due activations and
+  timers at the supplied clocks. A due timer, including one refused
+  admission, forbids omission. `quiescent` includes this same finishing
+  derivation and its existing broader idle fences; false does not promise
+  that finishing can advance (engine.md, 6.1 and 11; people.md, 3).
 - **Released outputs addressed to a child** (the core's resumption after
   a claim commits, a connector's entry to make) are fed back to it as
   events by `iterate`, each as one more step of this shape.

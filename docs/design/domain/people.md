@@ -95,6 +95,12 @@ inbox are the views child's (engine.md, section 11).
   (`../protocol/store.md`, section 9), so a restart signs nobody out.
   The domain names a sign-in only by its number, and says each that ends
   or expires, so the component erases its digest.
+  A sign-in expires when either its original monotonic lifetime or its
+  saved wall expiry is reached. Both clocks make its people timer due;
+  a backward wall correction never extends the original monotonic
+  lifetime. Creation and restoration arm both expiry conditions; timer
+  scheduling translates the saved wall expiry at the current supplied
+  clocks (root.md, section 3; engine.md, section 11).
 - **Two ways of signing in are jig's own:**
   - *the printed link,* on one person's machine: the clients' component
     draws a one-time secret at start, which the application's startup
@@ -550,6 +556,9 @@ its surface owe this domain:
   verified to its sign-in; a sign-in's digest erased when the core says
   it ended or expired. The domain names a sign-in by its number
   (`../protocol/client.md`, section 8).
+- **Sign-in expiry timers** account for both clocks as section 3 says.
+  A root omitting an otherwise empty closure still checks its current
+  deadlines; refused admission leaves an expiry due (root.md, section 3).
 - **Turns** carried as the bytes the domain keeps, decoded below the
   client's surface by `jig-protocol-transcript`
   (`../client/domain/client.md`, section 10).

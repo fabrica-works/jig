@@ -473,6 +473,12 @@ It ends every watch saying the engine is stopping
 waits for a commit, so the service can close its components. A restart
 then starts from the store as section 6 says.
 
+Finishing continues while stopping. After routing previously accepted work,
+a Resume at which the core owes finishing closes without taking a new input,
+placing a run, stepping a procedure or resuming a connector. Follow-up watch
+endings and the one drain notification remain held behind the last commit.
+The continuation makes no new commit (root.md, section 3).
+
 ## 7. Agent executors
 
 ### 7.1 From a task to a run
@@ -1007,6 +1013,13 @@ computes for them is said below (11.1 to 11.5).
   between are coalesced, never queued. A watch ended with a delivery in
   flight ends once that delivery is taken or dropped
   (`../protocol/client.md`, section 7).
+- **Finishing belongs to the core** (root.md, section 3). Gathered subject
+  changes, retained writing's proof reconciliation and unreported watch
+  endings remain owed after a projection pass defers them. A closing watch
+  awaiting its delivery or stream acknowledgement waits on its child;
+  repeating its ending is not finishing work. Sign-in expiry reaches the
+  core through the people's timer (people.md, section 3); stopping still
+  completes watch endings and the drain notification (section 6.1).
 - **Watches are never stored.** A restart (section 6) starts with none,
   and is told nothing of the deliveries made before it; each client
   opens its watches again (`../protocol/client.md`, section 4).
