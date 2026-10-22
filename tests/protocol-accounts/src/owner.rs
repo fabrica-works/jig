@@ -614,7 +614,8 @@ impl Owner {
                         | child::Signing::Forget { .. }
                         | child::Signing::Restore { .. }
                         | child::Signing::Restored => continue,
-                        child::Signing::SignIn { .. }
+                        child::Signing::CancelSignIn { .. }
+                        | child::Signing::SignIn { .. }
                         | child::Signing::SignOut { .. }
                         | child::Signing::Replaced { .. } => {}
                     }
@@ -656,6 +657,9 @@ impl Owner {
                             }
                         }
                         translate::Down::SignIn { .. } => panic!("known account sign-in provider"),
+                        translate::Down::CancelSignIn { source } => {
+                            self.driver(env, driver::Request::Cancel { account: source });
+                        }
                         translate::Down::SignOut { source } => {
                             self.driver(env, driver::Request::SignOut { account: source });
                         }

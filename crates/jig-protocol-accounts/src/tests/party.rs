@@ -164,3 +164,8 @@ fn a_removed_account_frees_its_number() {
     records.remove(55);
     records.admit(56).unwrap();
 }
+
+#[test]
+fn cancelling_a_sign_in_reaches_the_driver_as_cancel() {
+    assert_eq!(translate::down_signing(child::Signing::CancelSignIn { source: 55 }), Down::CancelSignIn { source: 55 });
+}

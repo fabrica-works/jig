@@ -296,6 +296,10 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
 #[test]
 fn memory_below_the_components_sum_is_refused() {
     const BEFORE_FINISHING_OVER: u64 = 18_729_868_387;
+    // Small's two pending sign-ins need two additional close outputs for cancellation
+    // (protocol/llm.md, 5.2). Propagating that room through the core and journal
+    // queues adds 1,617,424 bytes to this fixture's components sum.
+    const SIGN_IN_CANCEL_GROWTH: u64 = 1_617_424;
     // Finishing (domain/root.md, section 3; domain/people.md, section 3):
     // people's sign_in_worst_case adds Set<(Wall, u64)> at 8 sign-ins: 576 bytes.
     // Core's Reconciliation scratch replaces the views' Token snapshot:
@@ -437,8 +441,9 @@ fn memory_below_the_components_sum_is_refused() {
     let wall_expiry_index = skein_lib::Set::<(skein_lib::Wall, u64)>::worst_case(limits.people.sign_ins).unwrap();
     let reconciliation_growth = u64::from(limits.views.runs) * RECONCILIATION_GROWTH_PER_RUN;
     let ending_saving = u64::from(limits.views.watchers) * ENDING_SAVING_PER_WATCHER;
-    let over =
-        BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving + SOURCE_DEADLINE_GROWTH;
+    let over = BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving
+        + SOURCE_DEADLINE_GROWTH
+        + SIGN_IN_CANCEL_GROWTH;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

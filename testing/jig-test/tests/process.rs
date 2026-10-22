@@ -67,6 +67,11 @@ fn a_party_signs_in_through_a_client_and_opens_the_address_at_the_issuer() {
     accounts::run(directory.path());
 }
 
+#[test]
+fn a_binary_told_to_stop_with_a_sign_in_under_way_ends_at_once() {
+    accounts::sigterm();
+}
+
 // Reuse the account sign-in world's browser source; it remains a private test helper.
 use jig_protocol_accounts_world::fixtures;
 #[path = "../../../tests/protocol-accounts/src/visitor.rs"]

@@ -325,6 +325,7 @@ impl Accounts {
                     self.inventory.forget(source);
                     self.forgotten.push(source);
                 }
+                translate::Down::CancelSignIn { source } => self.down(driver::Request::Cancel { account: source }),
                 translate::Down::SignOut { source } => self.down(driver::Request::SignOut { account: source }),
                 translate::Down::SignIn { source, provider } => {
                     let Some(template) = self.providers.get(&provider) else {

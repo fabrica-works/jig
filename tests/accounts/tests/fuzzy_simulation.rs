@@ -140,7 +140,8 @@ fn changes(seed: u64) -> Vec<Request> {
                     Some(Event::SignedOut { source, confirmed: rng.chance(70) })
                 }
                 Request::Signing(
-                    Signing::SignIn { .. }
+                    Signing::CancelSignIn { .. }
+                    | Signing::SignIn { .. }
                     | Signing::Replaced { .. }
                     | Signing::Forget { .. }
                     | Signing::Restore { .. }

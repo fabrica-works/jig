@@ -66,6 +66,9 @@ impl World {
                     declined: false,
                 }
             }
+            accounts::Signing::CancelSignIn { source } => {
+                accounts::Event::SignInFailed { source, failure: accounts::Failure::Cancelled }
+            }
             accounts::Signing::SignOut { source } => accounts::Event::SignedOut { source, confirmed: true },
             accounts::Signing::Keep { source, .. } => {
                 let response = if let Some(why) = self.fail_llm_key_keep.take() {

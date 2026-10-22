@@ -16,6 +16,7 @@ pub(crate) const fn out_bound(limits: &Limits) -> Option<u32> {
     let Some(per_account) = per_account.checked_add(3) else { return None };
     let Some(all) = limits.accounts.checked_mul(per_account) else { return None };
     let Some(all) = all.checked_add(limits.sign_ins) else { return None };
+    let Some(all) = all.checked_add(limits.sign_ins) else { return None };
     all.checked_add(6)
 }
 

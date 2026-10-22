@@ -255,11 +255,12 @@ pub(super) const IO: skein_io::Limits = skein_io::Limits {
     close_timeout: Duration::from_secs(30),
     retry: Duration::from_millis(250),
 };
-// The root adds 18 positions to core's 18,570. Joined direct/holder terminals
+// The root adds 18 positions to core's 18,572. Joined direct/holder terminals
 // raise fleet max_out 21 -> 25 and core room by 8 * 4 = 32 positions.
-// Held room covers three decisions: 3 * 18,588 = 55,764.
+// Close cancels each of Small's two pending sign-ins (protocol/llm.md, 5.2).
+// Held room covers three decisions: 3 * 18,590 = 55,770.
 pub(super) const JOURNAL: skein_lib::JournalLimits =
-    skein_lib::JournalLimits { commits: 3, writes: 18_588, held: 55_764, now: 256, release: 256 };
+    skein_lib::JournalLimits { commits: 3, writes: 18_590, held: 55_770, now: 256, release: 256 };
 pub(super) const LIMITS: Limits = Limits {
     core: CORE,
     store: STORE,
@@ -363,16 +364,16 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
     value: 1_567_819,
-    // Two operations per journal write plus three metadata operations: 2 * 18,588 + 3.
-    ops: 37_179,
-    // 256 MiB values + 37,179 operations * (2,079 key + 9 framing) + 26 frame bytes.
-    commit: 346_065_234,
+    // Two operations per journal write plus three metadata operations: 2 * 18,590 + 3.
+    ops: 37_183,
+    // 256 MiB values + 37,183 operations * (2,079 key + 9 framing) + 26 frame bytes.
+    commit: 346_073_586,
     queued: 3,
     // Three queued commits; segment holds two, snapshot follows one.
-    queued_bytes: 1_038_195_702,
+    queued_bytes: 1_038_220_758,
     budget: 268_435_456,
-    segment: 692_130_468,
-    snapshot_after: 346_065_234,
+    segment: 692_147_172,
+    snapshot_after: 346_073_586,
     chunk: 1_569_918,
     page: skein_kv::Page { rows: 2, bytes: 1_569_898 },
     deadline: Duration::from_secs(30),

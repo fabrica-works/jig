@@ -213,6 +213,7 @@ pub enum Down {
     Keep { source: u32, carried: u64, replaces: bool },
     Forget { source: u32 },
     SignIn { source: u32, provider: u32 },
+    CancelSignIn { source: u32 },
     SignOut { source: u32 },
 }
 #[must_use]
@@ -223,6 +224,7 @@ pub fn down_signing(signing: accounts::Signing) -> Down {
         accounts::Signing::Restore { source, provider, kind } => Down::Restore { source, provider, kind },
         accounts::Signing::Restored => Down::Restored,
         accounts::Signing::SignIn { source, provider } => Down::SignIn { source, provider },
+        accounts::Signing::CancelSignIn { source } => Down::CancelSignIn { source },
         accounts::Signing::SignOut { source } | accounts::Signing::Replaced { source, by: _ } => {
             Down::SignOut { source }
         }

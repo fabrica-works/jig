@@ -229,6 +229,10 @@ pub enum Signing {
         source: u32,
         provider: u32,
     },
+    /// Cancel a sign-in under way, including at close (protocol/llm.md, 5.2).
+    CancelSignIn {
+        source: u32,
+    },
     /// Revoke the source's record at its provider and forget it: a party's sign-out, or a
     /// sign-in refused (accounts.md, 3.3).
     SignOut {

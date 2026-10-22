@@ -317,14 +317,17 @@ fn an_account_sign_in_that_visited_is_not_answered_again_when_it_ends() {
 }
 
 #[test]
-fn a_close_while_an_account_sign_in_waits_for_its_visit_answers_it_closing() {
+fn a_close_cancels_each_account_sign_in_and_answers_it_closing_before_its_visit() {
     for visit in [false, true] {
         let mut world = started(vec![]);
         world.step(sign_in(1, ALICE, 1));
         if visit {
             world.step(visited(0));
         }
-        let mut expected = if visit { vec![] } else { refused(1, Refusal::Closing) };
+        let mut expected = vec![Request::Signing(Signing::CancelSignIn { source: 0 })];
+        if !visit {
+            expected.extend(refused(1, Refusal::Closing));
+        }
         expected.push(Request::Component(ToComponent::Close));
         assert_eq!(world.step(Event::Close), expected);
         assert!(world.step(Event::Close).is_empty());

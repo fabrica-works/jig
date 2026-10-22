@@ -76,7 +76,8 @@ fn not_started(under_way: &UnderWay, out: &mut Queue<Request>) {
 
 /// Close answers account sign-ins still waiting for their visit, before forgetting them.
 pub(crate) fn close(domain: &mut Domain, out: &mut Queue<Request>) {
-    for (_, under_way) in &domain.signing {
+    for (source, under_way) in &domain.signing {
+        out.push(Request::Signing(Signing::CancelSignIn { source: *source }));
         if !under_way.visited {
             out.push(Request::Answer {
                 request: under_way.request,
