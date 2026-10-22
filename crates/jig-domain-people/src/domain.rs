@@ -305,14 +305,15 @@ impl Domain {
         if identity.key.provider == self.deployment_provider { Kind::Service } else { Kind::Person }
     }
 
-    /// Project roles of a retained party, bounded by the role table; no admission changes.
+    /// Ordinary project roles of a retained party, bounded by the role table; no admission changes.
+    /// The deployment’s roster is read separately through `role` (people.md, 3).
     #[must_use]
     pub fn project_roles(&self, party: u64) -> Option<List<ProjectRole>> {
         self.identity(party)?;
         let mut result = List::with_capacity(self.roles.capacity());
         for (project, holdings) in &self.roles {
             for holding in holdings {
-                if holding.person == party {
+                if u64::from(*project) != crate::DEPLOYMENT && holding.person == party {
                     result.push(ProjectRole { project: *project, role: holding.role }).expect("one role per project");
                 }
             }

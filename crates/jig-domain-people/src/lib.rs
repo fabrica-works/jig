@@ -122,3 +122,6 @@ pub fn program_name(name: &[u8]) -> bool {
     }
     true
 }
+
+/// The deployment’s roster, not a project (people.md, 3: the deployment’s roles).
+pub const DEPLOYMENT: u64 = 0;
