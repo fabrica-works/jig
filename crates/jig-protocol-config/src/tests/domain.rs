@@ -375,8 +375,15 @@ fn memory_below_the_components_sum_is_refused() {
     // Each read holds 8 dependencies + 8 inputs: 16 * (8 ID + 48 HistoricalResult
     // + 512 result bytes * (32 ResultField + 1 payload byte)) = 271,232.
     // 1,984 + 8 reads * 271,232 = 2,171,840;
-    // 18,727,059,171 + 2,171,840 = 18,729,231,011 (one byte is supplied).
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_729_231_011 });
+    // 18,727,059,171 + 2,171,840 = 18,729,231,011.
+    // An amendment's ended-dependency read adds 349,360 bytes. ReadFor gains its
+    // amendment arm, 16 -> 24 bytes, so each read is 80: 2 nodes * 11 * 8 = 176.
+    // Each of the 8 tasks' amendment reads holds 456 bytes inline, 8 dependencies *
+    // (8 depth + 1) = 72 places * 48 = 3,456 and 72 IDs * 8 = 576, an 8-byte token,
+    // and its replay: max(30,960 task carrier + 4,096 spec + 4,096 message, 8,192
+    // amendment) = 39,152; 8 * 43,648 = 349,184.
+    // 18,729,231,011 + 176 + 349,184 = 18,729,580,371 (one byte is supplied).
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_729_580_371 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {
