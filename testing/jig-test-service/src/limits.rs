@@ -188,7 +188,6 @@ fn workers(jig: &jig_protocol_config::Limits) -> jig_protocol_engine_workers::Li
         result: u32::try_from(hub.outcome_bytes).expect("channel byte bound"),
         detail: hub.detail_bytes,
         grant: jig.driver.client.document.token_bytes,
-        account_id: jig_protocol_accounts::ACCOUNT_ID_BYTES,
         name: link.name,
         secret: link.secret,
         model_name: ceilings.model_bound_name,

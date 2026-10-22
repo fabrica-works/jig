@@ -202,7 +202,6 @@ pub const fn form(scheme: &table::Scheme) -> accounts::Form {
     match scheme {
         table::Scheme::Bearer => accounts::Form::Credential(accounts::Scheme::Bearer),
         table::Scheme::Key => accounts::Form::Credential(accounts::Scheme::Key),
-        table::Scheme::Withdrawn { .. } => accounts::Form::Withdrawn,
     }
 }
 /// A child's LLM account sign-in asks for an add before its driver request.

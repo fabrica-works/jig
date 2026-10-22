@@ -263,7 +263,7 @@ fn presented(worker: &crate::processes::Wire, procs: &[Proc], key: bool) -> (u64
         .iter()
         .find_map(|grant| match grant.value() {
             GrantValue::Credential(value) => Some((grant, value)),
-            GrantValue::Withdrawn(_) | GrantValue::Application(_) | GrantValue::Program(_) => None,
+            GrantValue::Application(_) | GrantValue::Program(_) => None,
         })
         .expect("assignment holds the account's credential");
     assert_eq!(*value.scheme(), Scheme::Key);
@@ -323,7 +323,7 @@ fn application_generation(worker: &crate::processes::Wire) {
         .iter()
         .find_map(|grant| match grant.value() {
             GrantValue::Application(value) => Some((grant, value.secret())),
-            GrantValue::Credential(_) | GrantValue::Withdrawn(_) | GrantValue::Program(_) => None,
+            GrantValue::Credential(_) | GrantValue::Program(_) => None,
         })
         .expect("assignment holds the application credential");
     assert_eq!(initial.number(), 1);
@@ -334,10 +334,7 @@ fn application_generation(worker: &crate::processes::Wire) {
         .iter()
         .find_map(|(fd, frame)| match frame.grant().value() {
             GrantValue::Application(value) if frame.grant().generation() == 2 => Some((fd, frame, value.secret())),
-            GrantValue::Application(_)
-            | GrantValue::Credential(_)
-            | GrantValue::Withdrawn(_)
-            | GrantValue::Program(_) => None,
+            GrantValue::Application(_) | GrantValue::Credential(_) | GrantValue::Program(_) => None,
         })
         .expect("generation 2 Application grant received on the live attempt's connection (0x0187)");
     assert_eq!((granted.task(), granted.attempt()), (assignment.task(), assignment.attempt()));

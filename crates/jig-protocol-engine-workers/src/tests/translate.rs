@@ -196,7 +196,7 @@ fn down(record: jig_domain_host::LinkDown) -> translate::Down {
     };
     translated.expect("complete output")
 }
-fn codec() -> jig_protocol_worker_wire::v4::Limits {
+fn codec() -> jig_protocol_worker_wire::v5::Limits {
     jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).expect("small codec")
 }
 fn assignment_output() -> jig_domain_host::LinkDown {
@@ -297,13 +297,6 @@ fn each_credential_scheme_reaches_the_wire_with_its_token() {
     }
 }
 #[test]
-fn a_withdrawn_grant_reaches_the_wire_with_its_account_id_apart() {
-    let value = fixtures::values()[0].take().expect("withdrawn value");
-    let grant = granted_value(granted(jig_domain_host::Form::Withdrawn, value));
-    let jig_protocol_worker_wire::GrantValue::Withdrawn(value) = grant.value() else { panic!("withdrawn value") };
-    assert_eq!((value.id().expose(), value.bearer().expose()), (fixtures::ACCOUNT_ID, fixtures::TOKEN_ONE));
-}
-#[test]
 fn an_application_grant_reaches_the_wire_with_its_secret() {
     let value = fixtures::values()[1].take().expect("application value");
     let grant = granted_value(granted(jig_domain_host::Form::Application, value));
@@ -318,16 +311,10 @@ fn a_value_unlike_its_grants_form_is_not_sent() {
     for (form, value) in [
         (key, fixtures::credential_value(crate::Scheme::Bearer)),
         (bearer, fixtures::credential_value(crate::Scheme::Key)),
-        (bearer, fixtures::values()[0].take().expect("withdrawn")),
-        (key, fixtures::values()[0].take().expect("withdrawn")),
-        (Form::Withdrawn, fixtures::credential_value(crate::Scheme::Bearer)),
-        (Form::Withdrawn, fixtures::credential_value(crate::Scheme::Key)),
         (bearer, fixtures::values()[1].take().expect("application")),
         (key, fixtures::values()[1].take().expect("application")),
-        (Form::Withdrawn, fixtures::values()[1].take().expect("application")),
         (Form::Application, fixtures::credential_value(crate::Scheme::Bearer)),
         (Form::Application, fixtures::credential_value(crate::Scheme::Key)),
-        (Form::Application, fixtures::values()[0].take().expect("withdrawn")),
     ] {
         assert!(granted(form, value).is_none(), "value unlike {form:?}");
     }
@@ -339,7 +326,7 @@ fn a_standalone_grant_without_a_value_is_not_sent() {
             jig_domain_host::LinkDown::Grant {
                 run: Token::new(7),
                 attempt: Token::new(2),
-                grant: fixtures::grant(jig_domain_host::Form::Withdrawn),
+                grant: fixtures::grant(jig_domain_host::Form::Credential(jig_domain_host::Scheme::Bearer)),
             },
             &[],
             Box::new([None]),
@@ -351,7 +338,7 @@ fn a_standalone_grant_without_a_value_is_not_sent() {
 #[test]
 fn a_down_event_debug_shows_value_lengths_only() {
     let text = alloc::fmt::format(format_args!("{:?}", fixtures::assignment_down(Token::new(1))));
-    for secret in [fixtures::TOKEN_ONE, fixtures::TOKEN_TWO, fixtures::ACCOUNT_ID] {
+    for secret in [fixtures::TOKEN_ONE, fixtures::TOKEN_TWO] {
         for window in text.as_bytes().windows(secret.len()) {
             assert_ne!(window, secret);
         }
@@ -524,7 +511,6 @@ fn another_value_under_a_program_form_is_not_sent() {
     for value in [
         fixtures::credential_value(crate::Scheme::Bearer),
         fixtures::credential_value(crate::Scheme::Key),
-        fixtures::values()[0].take().expect("withdrawn"),
         fixtures::values()[1].take().expect("application"),
     ] {
         assert!(granted(jig_domain_host::Form::Program(program_name()), value).is_none());
@@ -538,7 +524,7 @@ fn a_program_name_unlike_its_form_s_is_not_sent() {
 #[test]
 fn a_program_value_under_another_form_is_not_sent() {
     use jig_domain_host::{Form, Scheme};
-    for form in [Form::Credential(Scheme::Bearer), Form::Credential(Scheme::Key), Form::Withdrawn, Form::Application] {
+    for form in [Form::Credential(Scheme::Bearer), Form::Credential(Scheme::Key), Form::Application] {
         assert!(granted(form, crate::GrantValue::Program { name: program_name() }).is_none());
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     Bounds, BoundsParts, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,
-    ModelBoundParts, Phase, v4,
+    ModelBoundParts, Phase, v5,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Secret, Writer};
@@ -9,7 +9,7 @@ pub const WORKER_A: &[u8] = b"worker-a";
 pub const WORKER_B: &[u8] = b"worker-b";
 pub const MODEL_SMALL: &[u8] = b"small";
 
-pub const LIMITS: v4::Limits = v4::Limits {
+pub const LIMITS: v5::Limits = v5::Limits {
     program_source_name: 32,
     sources_sources: 2,
     check_name: 32,
@@ -47,8 +47,6 @@ pub const LIMITS: v4::Limits = v4::Limits {
     answered_call_name: 16,
     answered_call_tool: 16,
     credential_value_bytes: 32,
-    withdrawn_value_id: 16,
-    withdrawn_value_bearer: 32,
     application_value_secret: 32,
     program_value_name: 32,
     assignment_charter: 32,
@@ -218,22 +216,12 @@ pub const IDENTITY_FIRST: [u8; 16] = [7; 16];
 pub const TOKEN_ONE: &[u8] = b"token-one";
 pub const KEY_ONE: &[u8] = b"key-one";
 pub const CREDENTIAL_ONE: &[u8] = b"credential-one";
-pub const ACCOUNT_ONE: &[u8] = b"account-one";
 
 pub fn credential_value(scheme: crate::Scheme, bytes: &[u8]) -> crate::GrantValue {
     let value =
         crate::CredentialValue::new(&LIMITS, crate::CredentialValueParts { scheme, bytes: Secret::new(bytes.into()) })
             .expect("credential within small limits");
     crate::GrantValue::Credential(value)
-}
-
-pub fn withdrawn_value() -> crate::GrantValue {
-    let value = crate::WithdrawnValue::new(
-        &LIMITS,
-        crate::WithdrawnValueParts { id: Secret::new(ACCOUNT_ONE.into()), bearer: Secret::new(TOKEN_ONE.into()) },
-    )
-    .expect("withdrawn value within small limits");
-    crate::GrantValue::Withdrawn(value)
 }
 
 pub fn application_value() -> crate::GrantValue {
@@ -250,7 +238,7 @@ pub fn grant(value: crate::GrantValue, number: u32, generation: u64) -> crate::G
         .expect("grant within small limits")
 }
 
-pub fn granted_key(limits: &v4::Limits, key: &[u8]) -> crate::Granted {
+pub fn granted_key(limits: &v5::Limits, key: &[u8]) -> crate::Granted {
     let value = crate::CredentialValue::new(
         limits,
         crate::CredentialValueParts { scheme: crate::Scheme::Key, bytes: Secret::new(key.into()) },
@@ -340,7 +328,6 @@ pub const SIZES_ONE_SLOT: crate::sizes::Sizes = crate::sizes::Sizes {
     result: 16,
     detail: 16,
     grant: 16,
-    account_id: 16,
     name: 16,
     secret: 16,
     model_name: 16,
@@ -375,7 +362,6 @@ pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
     result: 67_108_864,
     detail: 4096,
     grant: 8192,
-    account_id: 256,
     name: 256,
     secret: 1024,
     model_name: 128,
@@ -396,7 +382,7 @@ pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
     facts: 4096,
 };
 
-fn one_slot_limits() -> v4::Limits {
+fn one_slot_limits() -> v5::Limits {
     crate::sizes::limits(&SIZES_ONE_SLOT).expect("small size bounds")
 }
 
@@ -424,7 +410,7 @@ pub fn fullest_turn() -> crate::Turn {
     .expect("full turn")
 }
 
-fn fullest_call(limits: &v4::Limits) -> crate::AnsweredCall {
+fn fullest_call(limits: &v5::Limits) -> crate::AnsweredCall {
     let answer = crate::HostAnswer::new(limits, crate::HostAnswerParts { error: true, body: full_bytes() })
         .expect("full host answer");
     crate::AnsweredCall::new(
@@ -434,21 +420,20 @@ fn fullest_call(limits: &v4::Limits) -> crate::AnsweredCall {
     .expect("full answered call")
 }
 
-fn fullest_grants(limits: &v4::Limits) -> List<crate::Grant> {
+fn fullest_grants(limits: &v5::Limits) -> List<crate::Grant> {
     let mut grants = List::with_capacity(2);
     for number in [5, 6] {
-        let value = crate::WithdrawnValue::new(
-            limits,
-            crate::WithdrawnValueParts { id: Secret::new(full_bytes()), bearer: Secret::new(full_bytes()) },
-        )
-        .expect("full withdrawn value");
+        let mut name =
+            skein_lib::bytes::zeroed(usize::try_from(limits.program_value_name).expect("program name bound"));
+        name.fill(b'x');
+        let value = crate::ProgramValue::new(limits, crate::ProgramValueParts { name }).expect("full program value");
         let grant = crate::Grant::new(
             limits,
             crate::GrantParts {
                 number,
                 generation: 9,
                 valid: Duration::from_secs(60),
-                value: crate::GrantValue::Withdrawn(value),
+                value: crate::GrantValue::Program(value),
             },
         )
         .expect("full grant");

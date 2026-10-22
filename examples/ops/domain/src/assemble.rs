@@ -369,7 +369,6 @@ fn accounts_form(form: accounts::Form) -> host::Form {
             accounts::Scheme::Bearer => host::Scheme::Bearer,
             accounts::Scheme::Key => host::Scheme::Key,
         }),
-        accounts::Form::Withdrawn => host::Form::Withdrawn,
         accounts::Form::Application => host::Form::Application,
         accounts::Form::Program(name) => {
             host::Form::Program(host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))
@@ -383,7 +382,6 @@ fn fleet_form(form: host::Form) -> fleet::Form {
             host::Scheme::Bearer => fleet::Scheme::Bearer,
             host::Scheme::Key => fleet::Scheme::Key,
         }),
-        host::Form::Withdrawn => fleet::Form::Withdrawn,
         host::Form::Application => fleet::Form::Application,
         host::Form::Program(name) => {
             fleet::Form::Program(fleet::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))
@@ -397,7 +395,6 @@ fn host_form(form: fleet::Form) -> host::Form {
             fleet::Scheme::Bearer => host::Scheme::Bearer,
             fleet::Scheme::Key => host::Scheme::Key,
         }),
-        fleet::Form::Withdrawn => host::Form::Withdrawn,
         fleet::Form::Application => host::Form::Application,
         fleet::Form::Program(name) => {
             host::Form::Program(host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))

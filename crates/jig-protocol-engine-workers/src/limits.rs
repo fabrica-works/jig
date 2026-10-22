@@ -60,7 +60,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // representation even when small wire payloads would dominate no other record.
     let sources = skein_lib::List::<jig_domain_host::Login>::worst_case(limits.sizes.program_sources)?
         .checked_add(u64::from(limits.sizes.program_sources).checked_mul(u64::from(limits.sizes.detail))?)?;
-    let records = wire::v4::worst_case_heap(&codec)?
+    let records = wire::v5::worst_case_heap(&codec)?
         .max(sources)
         .checked_mul(2)?
         .checked_add(skein_lib::List::<wire::Part>::worst_case(3)?)?

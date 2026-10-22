@@ -261,12 +261,7 @@ fn an_assignment_leaves_with_its_charter_encoded_and_grants_filled() {
 fn each_scheme_reaches_the_engine_s_grant_value() {
     use jig_domain_host::{Form, Grant};
     use skein_lib::{Duration, Time};
-    let id = Secret::new(b"acc".as_slice().into());
-    for (scheme, expected) in [
-        (Scheme::Bearer, ("bearer", b"".as_slice())),
-        (Scheme::Key, ("key", b"".as_slice())),
-        (Scheme::Withdrawn { id: id.clone() }, ("withdrawn", b"acc".as_slice())),
-    ] {
+    for (scheme, expected) in [(Scheme::Bearer, ("bearer", b"".as_slice())), (Scheme::Key, ("key", b"".as_slice()))] {
         let mut values = fixtures::values();
         let value = Value { token: Secret::new(fixtures::TOKEN.into()), scheme };
         values.accounts.granted(1, 2, value, Time::from_nanos(1)).expect("room");
@@ -280,7 +275,6 @@ fn each_scheme_reaches_the_engine_s_grant_value() {
         let found = match &grants[0] {
             Some(GrantValue::Credential { scheme: engine::Scheme::Bearer, token }) => ("bearer", token, b"".as_slice()),
             Some(GrantValue::Credential { scheme: engine::Scheme::Key, token }) => ("key", token, b"".as_slice()),
-            Some(GrantValue::Withdrawn { id, bearer }) => ("withdrawn", bearer, id.expose()),
             Some(GrantValue::Application { .. } | GrantValue::Program { .. }) | None => panic!("an account grant"),
         };
         assert_eq!((found.0, found.1.expose(), found.2), (expected.0, fixtures::TOKEN, expected.1));
@@ -328,7 +322,7 @@ fn application_grants_keep_the_two_newest_generations_per_number() {
         );
         match &grants[0] {
             Some(GrantValue::Application { secret }) => assert_eq!(Some(secret.expose()), expected),
-            Some(GrantValue::Credential { .. } | GrantValue::Withdrawn { .. } | GrantValue::Program { .. }) => {
+            Some(GrantValue::Credential { .. } | GrantValue::Program { .. }) => {
                 panic!("an application grant")
             }
             None => assert_eq!(expected, None),
@@ -520,10 +514,10 @@ fn a_program_grant_needs_no_table_entry() {
 
 #[test]
 fn program_names_share_the_wire_and_domain_bounds() {
-    use jig_protocol_worker_wire::v4;
+    use jig_protocol_worker_wire::v5;
     // Schema source names and grant names both admit exactly 32 bytes.
-    let bound = usize::try_from(v4::CEILINGS.program_value_name).expect("name bound fits usize");
-    assert_eq!(v4::CEILINGS.program_value_name, v4::CEILINGS.program_source_name);
+    let bound = usize::try_from(v5::CEILINGS.program_value_name).expect("name bound fits usize");
+    assert_eq!(v5::CEILINGS.program_value_name, v5::CEILINGS.program_source_name);
     let past = bound.checked_add(1).expect("small name bound");
     let name = [b'a'; 33]; // The schema's 32-byte name plus one byte.
     for (length, admitted) in [(bound, true), (past, false)] {

@@ -29,7 +29,7 @@ fn a_revoked_record_waits_for_erased_and_coalesces_a_sign_out() {
         };
         replace(&mut engine.store, old_keep);
         assert!(accounts.records.kept(old).is_some());
-        let prior = accounts.ids.insert(old, Secret::new(Box::default())).expect("explicit old source id");
+        let prior = accounts.required.insert(old, Box::default()).expect("explicit old source");
         assert!(prior.is_none());
         let mut record = record(fresh, &candidate);
         let records::Next::Store(keep) = accounts.records.keep(fresh, record.clone(), &candidate) else {
@@ -93,7 +93,7 @@ fn a_revoked_record_waits_for_erased_and_coalesces_a_sign_out() {
             panic!("erasure retained the slot");
         };
         assert_eq!(after.replaces, None, "only the acknowledgement cleared the digest");
-        assert!(accounts.ids.contains_key(&old), "only Removed frees the driver's place");
+        assert!(accounts.required.contains_key(&old), "only Removed frees the driver's place");
         assert_eq!(accounts.erasing.contains_key(&old), removing);
         assert_eq!(accounts.above.is_empty(), !removing, "only sign-out asks the driver to remove its account");
         assert!(engine.values.accounts.value(fresh, 2, Time::from_nanos(1)).is_some());
@@ -298,7 +298,10 @@ fn restarted_signed_in_source() -> (crate::Service, Accounts) {
         List::with_capacity(0),
         &fixtures::seeds().installation,
     );
-    assert!(matches!(accounts.providers.insert(1, template), Ok(None)));
+    let Ok(previous) = accounts.providers.insert(1, template) else {
+        panic!("configured provider fits");
+    };
+    assert!(previous.is_none());
     accounts.request(domain::Request::Signing(domain::Signing::Restore {
         source: 9001,
         provider: 1,
@@ -313,15 +316,13 @@ fn restarted_signed_in_source() -> (crate::Service, Accounts) {
 fn a_restart_restores_a_party_signed_in_source_under_its_number_and_lends_a_bearer() {
     let (mut service, mut accounts) = restarted_signed_in_source();
     let engine = fixtures::engine(&mut service);
-    assert!(pump_accounts(&mut accounts, engine).iter().any(|event| matches!(
-        event,
-        domain::FromComponent::Granted {
-            account: 9001,
-            generation: 1,
-            form: domain::Form::Credential(domain::Scheme::Bearer),
-            ..
+    let mut granted = None;
+    for event in &pump_accounts(&mut accounts, engine) {
+        if let domain::FromComponent::Granted { account: 9001, generation: 1, form, .. } = event {
+            granted = Some(*form);
         }
-    )));
+    }
+    assert_eq!(granted, Some(domain::Form::Credential(domain::Scheme::Bearer)));
     let value = engine.values.accounts.value(9001, 1, Time::from_nanos(1)).expect("restored grant");
     assert_eq!(value.token.expose(), jig_protocol_accounts_world::fixtures::TOKEN_FIRST);
     assert_eq!(value.scheme, table::Scheme::Bearer);

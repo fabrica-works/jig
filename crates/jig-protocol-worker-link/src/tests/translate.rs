@@ -2,7 +2,7 @@ use crate::{Request, tests::fixtures, translate};
 use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Queue, Reader, Time, Token};
-fn translated(kind: u16, bytes: &[u8], limits: &wire::v4::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
+fn translated(kind: u16, bytes: &[u8], limits: &wire::v5::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
     let mut parts = List::with_capacity(1);
     let mut values = Queue::with_capacity(4);
     let down =
@@ -47,13 +47,6 @@ fn a_granted_credential_hands_its_scheme_and_token_out_and_the_hub_hears_the_acc
         let crate::GrantValue::Credential { scheme, token } = value else { panic!("credential: {value:?}") };
         assert_eq!((scheme, token.expose()), (expected, fixtures::TOKEN_ONE));
     }
-}
-#[test]
-fn a_granted_withdrawn_value_keeps_its_account_id_apart_from_its_bearer() {
-    let (grant, value) = granted(fixtures::withdrawn_value());
-    assert_eq!(grant.form, host::Form::Withdrawn);
-    let crate::GrantValue::Withdrawn { id, bearer } = value else { panic!("withdrawn: {value:?}") };
-    assert_eq!((id.expose(), bearer.expose()), (fixtures::ACCOUNT_ONE, fixtures::TOKEN_ONE));
 }
 #[test]
 fn a_granted_application_secret_names_the_application_table() {

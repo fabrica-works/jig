@@ -405,19 +405,12 @@ pub fn credential(scheme: engine::Scheme) -> engine::GrantValue {
     engine::GrantValue::Credential { scheme, token: Secret::new(fixtures::TOKEN_ONE.into()) }
 }
 #[must_use]
-pub fn withdrawn() -> engine::GrantValue {
-    engine::GrantValue::Withdrawn {
-        id: Secret::new(fixtures::ACCOUNT_ONE.into()),
-        bearer: Secret::new(fixtures::TOKEN_ONE.into()),
-    }
-}
-#[must_use]
 pub fn application() -> engine::GrantValue {
     engine::GrantValue::Application { secret: Secret::new(fixtures::TOKEN_TWO.into()) }
 }
 #[must_use]
 pub fn values() -> Box<[Option<engine::GrantValue>]> {
-    Box::new([Some(withdrawn()), Some(application())])
+    Box::new([Some(credential(engine::Scheme::Bearer)), Some(application())])
 }
 /// The form a value is lent as.
 #[must_use]
@@ -427,7 +420,6 @@ pub fn form(value: &engine::GrantValue) -> host::Form {
             engine::Scheme::Bearer => host::Scheme::Bearer,
             engine::Scheme::Key => host::Scheme::Key,
         }),
-        engine::GrantValue::Withdrawn { .. } => host::Form::Withdrawn,
         engine::GrantValue::Application { .. } => host::Form::Application,
         engine::GrantValue::Program { name } => host::Form::Program(*name),
     }
@@ -441,7 +433,6 @@ pub fn sent(value: &engine::GrantValue) -> (&'static str, Vec<u8>, Vec<u8>) {
             ("bearer", token.expose().into(), vec![])
         }
         engine::GrantValue::Credential { scheme: engine::Scheme::Key, token } => ("key", token.expose().into(), vec![]),
-        engine::GrantValue::Withdrawn { id, bearer } => ("withdrawn", bearer.expose().into(), id.expose().into()),
         engine::GrantValue::Application { secret } => ("application", secret.expose().into(), vec![]),
         engine::GrantValue::Program { name } => ("program", name.as_bytes().into(), vec![]),
     }
@@ -451,7 +442,6 @@ pub fn received(value: &GrantValue) -> (&'static str, Vec<u8>, Vec<u8>) {
     match value {
         GrantValue::Credential { scheme: Scheme::Bearer, token } => ("bearer", token.expose().into(), vec![]),
         GrantValue::Credential { scheme: Scheme::Key, token } => ("key", token.expose().into(), vec![]),
-        GrantValue::Withdrawn { id, bearer } => ("withdrawn", bearer.expose().into(), id.expose().into()),
         GrantValue::Application { secret } => ("application", secret.expose().into(), vec![]),
     }
 }

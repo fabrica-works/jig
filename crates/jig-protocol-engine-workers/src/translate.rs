@@ -64,7 +64,7 @@ pub(crate) enum Up {
     Limited(wire::Limited),
     AccountRefused(wire::AccountRefused),
 }
-pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v4::Limits) -> Option<Up> {
+pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v5::Limits) -> Option<Up> {
     let mut found = None;
     for rule in wire::KINDS {
         if rule.kind == kind {
@@ -421,7 +421,7 @@ pub(crate) fn down(
     down: host::LinkDown,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v4::Limits,
+    limits: &wire::v5::Limits,
 ) -> Option<Down> {
     match down {
         host::LinkDown::Sources { sources } => {
@@ -494,7 +494,7 @@ fn assignment_record(
     assignment: host::Assignment,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v4::Limits,
+    limits: &wire::v5::Limits,
 ) -> Option<wire::Assignment> {
     let run = assignment.assignment;
     let workspace = match run.workspace {
@@ -576,7 +576,7 @@ fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
     Some(writer.finish())
 }
 /// A grant's form and its value's arm agree, or the grant is not sent.
-fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v4::Limits) -> Option<wire::Grant> {
+fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v5::Limits) -> Option<wire::Grant> {
     let value = match grant.form {
         host::Form::Program(form) => match value {
             crate::GrantValue::Program { name } => {
@@ -587,9 +587,7 @@ fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v4:
                     wire::ProgramValue::new(limits, wire::ProgramValueParts { name: name.as_bytes().into() }).ok()?,
                 )
             }
-            crate::GrantValue::Credential { .. }
-            | crate::GrantValue::Withdrawn { .. }
-            | crate::GrantValue::Application { .. } => return None,
+            crate::GrantValue::Credential { .. } | crate::GrantValue::Application { .. } => return None,
         },
         host::Form::Credential(form) => match value {
             crate::GrantValue::Credential { scheme, token } => {
@@ -604,25 +602,13 @@ fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v4:
                     wire::CredentialValue::new(limits, wire::CredentialValueParts { scheme, bytes: token }).ok()?,
                 )
             }
-            crate::GrantValue::Withdrawn { .. }
-            | crate::GrantValue::Application { .. }
-            | crate::GrantValue::Program { .. } => return None,
-        },
-        host::Form::Withdrawn => match value {
-            crate::GrantValue::Withdrawn { id, bearer } => wire::GrantValue::Withdrawn(
-                wire::WithdrawnValue::new(limits, wire::WithdrawnValueParts { id, bearer }).ok()?,
-            ),
-            crate::GrantValue::Credential { .. }
-            | crate::GrantValue::Application { .. }
-            | crate::GrantValue::Program { .. } => return None,
+            crate::GrantValue::Application { .. } | crate::GrantValue::Program { .. } => return None,
         },
         host::Form::Application => match value {
             crate::GrantValue::Application { secret } => wire::GrantValue::Application(
                 wire::ApplicationValue::new(limits, wire::ApplicationValueParts { secret }).ok()?,
             ),
-            crate::GrantValue::Credential { .. }
-            | crate::GrantValue::Withdrawn { .. }
-            | crate::GrantValue::Program { .. } => return None,
+            crate::GrantValue::Credential { .. } | crate::GrantValue::Program { .. } => return None,
         },
     };
     wire::Grant::new(
@@ -637,7 +623,7 @@ const fn grant_scheme(scheme: host::Scheme) -> crate::Scheme {
         host::Scheme::Key => crate::Scheme::Key,
     }
 }
-fn settled(answer: host::SettledAnswer, limits: &wire::v4::Limits) -> Option<wire::SettledAnswer> {
+fn settled(answer: host::SettledAnswer, limits: &wire::v5::Limits) -> Option<wire::SettledAnswer> {
     match answer {
         host::SettledAnswer::Host { error, body } => {
             Some(wire::SettledAnswer::Host(wire::HostAnswer::new(limits, wire::HostAnswerParts { error, body }).ok()?))
@@ -657,7 +643,7 @@ fn settled(answer: host::SettledAnswer, limits: &wire::v4::Limits) -> Option<wir
     }
 }
 
-pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v4::Limits) -> Down {
+pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v5::Limits) -> Down {
     Down::TurnBusy(
         wire::TurnBusy::new(limits, wire::TurnBusyParts { task: run.raw(), attempt: attempt.raw(), number: turn })
             .expect("fixed turn busy fields fit"),

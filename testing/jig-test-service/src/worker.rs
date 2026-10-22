@@ -70,10 +70,7 @@ impl Worker {
             return Err(problem(index, b"secret", What::Bound));
         }
         let bodies = &agent.limits.bodies;
-        if config.limits.token > bodies.credential_value_bytes
-            || config.limits.token > bodies.withdrawn_value_bearer
-            || jig_protocol_worker_wire::CEILINGS.withdrawn_value_id > bodies.withdrawn_value_id
-        {
+        if config.limits.token > bodies.credential_value_bytes {
             return Err(problem(index, b"limits", What::Bound));
         }
         let mut limits = config.limits.hub;
@@ -150,7 +147,6 @@ impl Worker {
         let value = match value.scheme {
             Scheme::Bearer => link::GrantValue::Credential { scheme: link::Scheme::Bearer, token: value.token },
             Scheme::Key => link::GrantValue::Credential { scheme: link::Scheme::Key, token: value.token },
-            Scheme::Withdrawn { id } => link::GrantValue::Withdrawn { id, bearer: value.token },
         };
         self.link_out.push(link::Request::Value { account, generation, expires, value });
         self.drain_link(self.env.now);
@@ -301,11 +297,6 @@ impl Worker {
                         link::GrantValue::Credential { scheme: link::Scheme::Key, token } => {
                             (&mut self.values, Value { token, scheme: Scheme::Key })
                         }
-                        link::GrantValue::Withdrawn { id, bearer } => {
-                            (&mut self.values, Value { token: bearer, scheme: Scheme::Withdrawn { id } })
-                        }
-                        // An application's secret is kept as a bearer value:
-                        // nothing presents it yet.
                         link::GrantValue::Application { secret } => {
                             (&mut self.application, Value { token: secret, scheme: Scheme::Bearer })
                         }
@@ -658,16 +649,14 @@ fn grant_value(table: &Table, grant: &smith::Grant, now: Time) -> Option<host::V
 fn account(table: &Table, grant: &smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
     match grant.form {
         smith::Form::Program(name) => return Some(smith_protocol_channel::GrantValue::Program(name.as_bytes().into())),
-        smith::Form::Credential(_) | smith::Form::Withdrawn => {}
+        smith::Form::Credential(_) => {}
+        smith::Form::Withdrawn => return None,
     }
     let value = table.value(grant.account, grant.generation, now)?;
     let token = value.token.expose().into();
     Some(match &value.scheme {
         Scheme::Bearer => smith_protocol_channel::GrantValue::Bearer(token),
         Scheme::Key => smith_protocol_channel::GrantValue::Key(token),
-        Scheme::Withdrawn { id } => {
-            smith_protocol_channel::GrantValue::Withdrawn { account_id: id.expose().into(), bearer: token }
-        }
     })
 }
 fn start_values(table: &Table, grants: &[smith::Grant], now: Time) -> Option<host::Values> {

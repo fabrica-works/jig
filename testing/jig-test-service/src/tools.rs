@@ -386,7 +386,6 @@ fn host_form(form: jig_domain_accounts::Form) -> jig_domain_host::Form {
             jig_domain_accounts::Scheme::Bearer => jig_domain_host::Scheme::Bearer,
             jig_domain_accounts::Scheme::Key => jig_domain_host::Scheme::Key,
         }),
-        jig_domain_accounts::Form::Withdrawn => jig_domain_host::Form::Withdrawn,
         jig_domain_accounts::Form::Application => jig_domain_host::Form::Application,
         jig_domain_accounts::Form::Program(name) => jig_domain_host::Form::Program(
             jig_domain_host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"),

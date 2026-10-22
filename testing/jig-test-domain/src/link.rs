@@ -507,7 +507,6 @@ fn host_form(form: fleet::Form) -> host::Form {
             fleet::Scheme::Bearer => host::Scheme::Bearer,
             fleet::Scheme::Key => host::Scheme::Key,
         }),
-        fleet::Form::Withdrawn => host::Form::Withdrawn,
         fleet::Form::Application => host::Form::Application,
         fleet::Form::Program(name) => {
             host::Form::Program(host::SourceName::new(name.as_bytes()).expect("source name follows the same rules"))

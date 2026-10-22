@@ -1,4 +1,4 @@
-family jig-worker-wire 4
+family jig-worker-wire 5
 
 # The worker's credential (protocol/channel.md, 4.1).
 record Credential { name: text 256 secret: secret 1024 payload: u32 }
@@ -104,12 +104,9 @@ record AnsweredCall { name: bytes 64 tool: text 64 answer: SettledAnswer }
 # its scheme, or the application's secret; its arm names whose table it is in.
 enum Scheme { bearer, key }
 record CredentialValue { scheme: Scheme bytes: secret 8192 }
-# Withdrawn: a handed-in record's account id and bearer, for jig's live test
-# only, until no record is handed in (protocol/llm.md, 5.4).
-record WithdrawnValue { id: secret 256 bearer: secret 8192 }
 record ApplicationValue { secret: secret 8192 }
 record ProgramValue { name: text 32 }
-enum GrantValue { credential: CredentialValue, withdrawn: WithdrawnValue, application: ApplicationValue, program: ProgramValue }
+enum GrantValue { credential: CredentialValue, application: ApplicationValue, program: ProgramValue }
 record Grant { number: u32 generation: u64 valid: duration value: GrantValue }
 record Assignment {
     task: u64 attempt: u64

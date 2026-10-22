@@ -285,7 +285,7 @@ fn a_credentials_new_generation_is_granted_on() {
 
 #[test]
 fn a_sign_in_sources_grant_carries_the_form_its_component_announced() {
-    for form in [Form::Credential(Scheme::Bearer), Form::Credential(Scheme::Key), Form::Withdrawn] {
+    for form in [Form::Credential(Scheme::Bearer), Form::Credential(Scheme::Key)] {
         let mut world = World::wanting(&[ANALYST]);
         for generation in [4, 5] {
             let grant = Grant { form, account: ANALYST, generation, valid: Duration::from_secs(100) };

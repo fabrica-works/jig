@@ -337,12 +337,6 @@ fn secrets(grants: &mut Vec<Box<[u8]>>, grant: &jig_protocol_worker_wire::Grant)
     use jig_protocol_worker_wire::GrantValue;
     match grant.value() {
         GrantValue::Credential(value) => grants.push(value.bytes().expose().into()),
-        GrantValue::Withdrawn(value) => {
-            grants.push(value.bearer().expose().into());
-            if !value.id().is_empty() {
-                grants.push(value.id().expose().into());
-            }
-        }
         GrantValue::Application(value) => grants.push(value.secret().expose().into()),
         GrantValue::Program(_) => {}
     }

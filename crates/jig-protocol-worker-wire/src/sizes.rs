@@ -1,5 +1,5 @@
 //! Channel bounds from the owners' numbers (protocol/channel.md, 9 and 11).
-use crate::{Kind, v4};
+use crate::{Kind, v5};
 
 /// Bounds supplied by the domains and the application's protocol layer.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -19,7 +19,6 @@ pub struct Sizes {
     pub result: u32,
     pub detail: u32,
     pub grant: u32,
-    pub account_id: u32,
     pub name: u32,
     pub secret: u32,
     pub model_name: u32,
@@ -55,8 +54,8 @@ pub struct WorkerCap {
 
 /// Map field and count bounds without inspecting any payload or sum.
 #[must_use]
-pub fn limits(sizes: &Sizes) -> Option<v4::Limits> {
-    let limits = v4::Limits {
+pub fn limits(sizes: &Sizes) -> Option<v5::Limits> {
+    let limits = v5::Limits {
         program_source_name: 32,
         sources_sources: sizes.program_sources,
         check_name: 32,
@@ -84,8 +83,8 @@ pub fn limits(sizes: &Sizes) -> Option<v4::Limits> {
         failed_detail: sizes.detail,
         invalid_start_why: sizes.detail,
         // A provider's code and reason are smith's text, within the detail's bound.
-        account_refused_code: sizes.detail.min(v4::CEILINGS.account_refused_code),
-        account_refused_reason: sizes.detail.min(v4::CEILINGS.account_refused_reason),
+        account_refused_code: sizes.detail.min(v5::CEILINGS.account_refused_code),
+        account_refused_reason: sizes.detail.min(v5::CEILINGS.account_refused_reason),
         answer_refused: sizes.inbox,
         message_sender: sizes.sender,
         message_words: sizes.message,
@@ -95,10 +94,8 @@ pub fn limits(sizes: &Sizes) -> Option<v4::Limits> {
         answered_call_name: sizes.call_name,
         answered_call_tool: sizes.tool_name,
         credential_value_bytes: sizes.grant,
-        withdrawn_value_id: sizes.account_id,
-        withdrawn_value_bearer: sizes.grant,
         application_value_secret: sizes.grant,
-        program_value_name: v4::CEILINGS.program_source_name,
+        program_value_name: v5::CEILINGS.program_source_name,
         assignment_charter: sizes.charter,
         assignment_transcript: sizes.transcript,
         assignment_answered: sizes.answered,
@@ -109,7 +106,7 @@ pub fn limits(sizes: &Sizes) -> Option<v4::Limits> {
         relay_text_text: sizes.answer,
         relayed_name: sizes.call_name,
     };
-    v4::check_limits(&limits).ok()?;
+    v5::check_limits(&limits).ok()?;
     Some(limits)
 }
 
@@ -118,34 +115,34 @@ pub fn largest_body(sizes: &Sizes, kind: Kind) -> Option<u32> {
     body(&limits(sizes)?, kind)
 }
 
-fn body(limits: &v4::Limits, kind: Kind) -> Option<u32> {
+fn body(limits: &v5::Limits, kind: Kind) -> Option<u32> {
     let bytes = match kind {
-        Kind::Hello => v4::Hello::worst_case_bytes(limits),
-        Kind::Turn => v4::Turn::worst_case_bytes(limits),
-        Kind::Call => v4::Call::worst_case_bytes(limits),
-        Kind::Answer => v4::Answer::worst_case_bytes(limits),
-        Kind::Fact => v4::Fact::worst_case_bytes(limits),
-        Kind::Unauthorized => v4::Unauthorized::worst_case_bytes(limits),
-        Kind::Limited => v4::Limited::worst_case_bytes(limits),
-        Kind::AccountRefused => v4::AccountRefused::worst_case_bytes(limits),
-        Kind::Assignment => v4::Assignment::worst_case_bytes(limits),
-        Kind::Message => v4::Inbound::worst_case_bytes(limits),
-        Kind::Relayed => v4::Relayed::worst_case_bytes(limits),
-        Kind::TurnKept => v4::TurnKept::worst_case_bytes(limits),
-        Kind::TurnBusy => v4::TurnBusy::worst_case_bytes(limits),
-        Kind::Acknowledge => v4::Acknowledge::worst_case_bytes(limits),
-        Kind::Cancel => v4::Cancel::worst_case_bytes(limits),
-        Kind::Sources => v4::Sources::worst_case_bytes(limits),
-        Kind::Check => v4::Check::worst_case_bytes(limits),
-        Kind::SignOut => v4::SignOut::worst_case_bytes(limits),
-        Kind::Logins => v4::Logins::worst_case_bytes(limits),
-        Kind::SignedOut => v4::SignedOut::worst_case_bytes(limits),
-        Kind::Grant => v4::Granted::worst_case_bytes(limits),
+        Kind::Hello => v5::Hello::worst_case_bytes(limits),
+        Kind::Turn => v5::Turn::worst_case_bytes(limits),
+        Kind::Call => v5::Call::worst_case_bytes(limits),
+        Kind::Answer => v5::Answer::worst_case_bytes(limits),
+        Kind::Fact => v5::Fact::worst_case_bytes(limits),
+        Kind::Unauthorized => v5::Unauthorized::worst_case_bytes(limits),
+        Kind::Limited => v5::Limited::worst_case_bytes(limits),
+        Kind::AccountRefused => v5::AccountRefused::worst_case_bytes(limits),
+        Kind::Assignment => v5::Assignment::worst_case_bytes(limits),
+        Kind::Message => v5::Inbound::worst_case_bytes(limits),
+        Kind::Relayed => v5::Relayed::worst_case_bytes(limits),
+        Kind::TurnKept => v5::TurnKept::worst_case_bytes(limits),
+        Kind::TurnBusy => v5::TurnBusy::worst_case_bytes(limits),
+        Kind::Acknowledge => v5::Acknowledge::worst_case_bytes(limits),
+        Kind::Cancel => v5::Cancel::worst_case_bytes(limits),
+        Kind::Sources => v5::Sources::worst_case_bytes(limits),
+        Kind::Check => v5::Check::worst_case_bytes(limits),
+        Kind::SignOut => v5::SignOut::worst_case_bytes(limits),
+        Kind::Logins => v5::Logins::worst_case_bytes(limits),
+        Kind::SignedOut => v5::SignedOut::worst_case_bytes(limits),
+        Kind::Grant => v5::Granted::worst_case_bytes(limits),
     }?;
     u32::try_from(bytes).ok()
 }
 
-fn frame(limits: &v4::Limits, kind: Kind) -> Option<u32> {
+fn frame(limits: &v5::Limits, kind: Kind) -> Option<u32> {
     body(limits, kind)?.checked_add(8)
 }
 

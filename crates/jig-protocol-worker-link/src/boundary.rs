@@ -18,12 +18,10 @@ pub enum Event {
     CancelRelay { run: Token, attempt: Token, call: Box<[u8]> },
 }
 /// A grant's value: a credential with its scheme, or an application's
-/// secret. `Withdrawn` keeps a provider account id beside a bearer token for
-/// jig's live test only, until JP13 removes it.
+/// secret, or a program source's name.
 #[derive(Debug)]
 pub enum GrantValue {
     Credential { scheme: Scheme, token: Secret },
-    Withdrawn { id: Secret, bearer: Secret },
     Application { secret: Secret },
 }
 /// How a credential is presented (protocol/channel.md, 8).

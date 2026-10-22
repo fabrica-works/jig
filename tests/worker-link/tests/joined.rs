@@ -1,7 +1,7 @@
 #[path = "../src/joined.rs"]
 pub mod joined;
 mod joined_story {
-    use super::joined::{Joined, application, received, sent, values, withdrawn};
+    use super::joined::{Joined, application, credential, received, sent, values};
     use jig_domain_host as host;
     use jig_protocol_engine_workers as engine;
     use jig_protocol_worker_link::{Credential, Request};
@@ -50,7 +50,7 @@ mod joined_story {
         assign(&mut world);
         assert_eq!(world.worker_order, ["value", "value", "down"]);
         assert_eq!(world.values.len(), 2);
-        value(&world.values[0], &withdrawn());
+        value(&world.values[0], &credential(engine::Scheme::Bearer));
         value(&world.values[1], &application());
         let host::LinkDown::Assign { assignment } = downs(&world)[0] else { panic!("assignment") };
         assert_eq!(assignment.assignment.grants, fixtures::assignment().assignment.grants);

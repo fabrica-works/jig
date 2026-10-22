@@ -778,7 +778,7 @@ fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: 
         FromComponent::Granted { account, form, .. } => {
             match form {
                 Form::Application | Form::Program(_) => return,
-                Form::Credential(_) | Form::Withdrawn => {}
+                Form::Credential(_) => {}
             }
             crate::keys::granted(domain, env, account, out)
         }

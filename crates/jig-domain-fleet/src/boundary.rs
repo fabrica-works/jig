@@ -103,8 +103,6 @@ pub struct Grant {
 pub enum Form {
     /// A credential with the scheme its provider takes.
     Credential(Scheme),
-    /// The live test's id-and-bearer arm (D2/JP13).
-    Withdrawn,
     /// An application's credential, held in its own table.
     Application,
     /// A program source lent by its configuration-directory name.
@@ -125,7 +123,7 @@ impl Form {
     #[must_use]
     pub const fn table(self) -> GrantTable {
         match self {
-            Self::Credential(_) | Self::Withdrawn => GrantTable::Accounts,
+            Self::Credential(_) => GrantTable::Accounts,
             Self::Application => GrantTable::Application,
             Self::Program(_) => GrantTable::Name,
         }
@@ -743,7 +741,6 @@ mod tests {
         for (form, table) in [
             (Form::Credential(Scheme::Bearer), GrantTable::Accounts),
             (Form::Credential(Scheme::Key), GrantTable::Accounts),
-            (Form::Withdrawn, GrantTable::Accounts),
             (Form::Application, GrantTable::Application),
             (Form::Program(crate::SourceName::new(b"claude").expect("source name")), GrantTable::Name),
         ] {

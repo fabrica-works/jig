@@ -25,7 +25,6 @@ fn fleet_form(form: accounts::Form) -> fleet::Form {
             accounts::Scheme::Bearer => fleet::Scheme::Bearer,
             accounts::Scheme::Key => fleet::Scheme::Key,
         }),
-        accounts::Form::Withdrawn => fleet::Form::Withdrawn,
         accounts::Form::Application => fleet::Form::Application,
         accounts::Form::Program(name) => fleet::Form::Program(name),
     }

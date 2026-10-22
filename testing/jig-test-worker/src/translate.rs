@@ -7,7 +7,6 @@ pub fn grant(value: host::Grant) -> Option<smith::Grant> {
     let form = match value.form {
         host::Form::Credential(host::Scheme::Bearer) => smith::Form::Credential(smith::Scheme::Bearer),
         host::Form::Credential(host::Scheme::Key) => smith::Form::Credential(smith::Scheme::Key),
-        host::Form::Withdrawn => smith::Form::Withdrawn,
         host::Form::Program(name) => smith::Form::Program(smith::SourceName::new(name.as_bytes())?),
         host::Form::Application => return None,
     };

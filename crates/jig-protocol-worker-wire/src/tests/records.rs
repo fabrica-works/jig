@@ -33,14 +33,14 @@ fn down_terms() -> List<Term> {
     let mut terms = List::with_capacity(11);
     // Independently summed from field widths and the fixture limits.
     for (kind, largest) in [
-        (0x0180, 600),
+        (0x0180, 562),
         (0x0181, 80),
         (0x0182, 74),
         (0x0183, 20),
         (0x0184, 20),
         (0x0185, 16),
         (0x0186, 16),
-        (0x0187, 93),
+        (0x0187, 74),
         (0x0188, 76),
         (0x0189, 36),
         (0x018a, 36),
@@ -145,7 +145,7 @@ fn a_reason_below_256_reads_as_none() {
 #[test]
 fn the_schema_lists_the_hello_from_the_initiator() {
     let schema = hello_schema();
-    let version = schema.version(4).expect("one version");
+    let version = schema.version(5).expect("one version");
     assert_eq!(schema.magic, *b"jigw");
     assert_eq!(version.kinds.len(), 21);
     assert_eq!(
@@ -283,7 +283,7 @@ fn through_bytes<T>(
     value: &T,
     measure: fn(&T) -> u32,
     encode: fn(&T, &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow>,
-    decode: fn(&crate::v4::Limits, &mut Reader<'_>) -> Result<T, crate::v4::Problem>,
+    decode: fn(&crate::v5::Limits, &mut Reader<'_>) -> Result<T, crate::v5::Problem>,
 ) -> T {
     let mut writer = skein_lib::Writer::new(usize::try_from(measure(value)).expect("small notice"));
     encode(value, &mut writer).expect("measured room");
@@ -424,11 +424,10 @@ fn an_assignment_keeps_its_sixteen_byte_identity() {
     assert_eq!(decoded.identity(), &fixtures::IDENTITY_FIRST);
 }
 
-fn every_grant_value() -> [crate::GrantValue; 5] {
+fn every_grant_value() -> [crate::GrantValue; 4] {
     [
         fixtures::credential_value(crate::Scheme::Bearer, fixtures::TOKEN_ONE),
         fixtures::credential_value(crate::Scheme::Key, fixtures::KEY_ONE),
-        fixtures::withdrawn_value(),
         fixtures::application_value(),
         crate::GrantValue::Program(
             crate::ProgramValue::new(&fixtures::LIMITS, crate::ProgramValueParts { name: b"claude".as_slice().into() })
@@ -456,14 +455,6 @@ fn a_credential_grant_keeps_its_scheme_with_its_bytes() {
     }
 }
 
-#[test]
-fn a_withdrawn_grant_keeps_its_account_id_separate_from_its_bearer() {
-    let decoded = grant_through_bytes(&fixtures::grant(fixtures::withdrawn_value(), 5, 9));
-    let crate::GrantValue::Withdrawn(value) = decoded.value() else { panic!("a withdrawn value: {decoded:?}") };
-    assert_eq!(value.bearer().expose(), fixtures::TOKEN_ONE);
-    assert_eq!(value.id().expose(), fixtures::ACCOUNT_ONE);
-}
-
 fn granted_debug(value: crate::GrantValue) -> Box<[u8]> {
     let record = crate::Granted::new(
         &fixtures::LIMITS,
@@ -479,19 +470,6 @@ fn a_granted_record_debug_shows_the_credentials_length_only() {
     assert!(skein_lib::bytes::find(&debug, b"len: 7").is_some());
     assert_eq!(skein_lib::bytes::find(&debug, fixtures::KEY_ONE), None);
     assert_eq!(skein_lib::bytes::find(&debug, b"107, 101, 121, 45, 111, 110, 101"), None);
-}
-
-#[test]
-fn a_granted_record_debug_shows_a_withdrawn_values_lengths_only() {
-    let debug = granted_debug(fixtures::withdrawn_value());
-    for (secret, length, bytes) in [
-        (fixtures::TOKEN_ONE, b"len: 9".as_slice(), b"116, 111, 107, 101, 110, 45, 111, 110, 101".as_slice()),
-        (fixtures::ACCOUNT_ONE, b"len: 11", b"97, 99, 99, 111, 117, 110, 116, 45, 111, 110, 101"),
-    ] {
-        assert!(skein_lib::bytes::find(&debug, length).is_some());
-        assert_eq!(skein_lib::bytes::find(&debug, secret), None);
-        assert_eq!(skein_lib::bytes::find(&debug, bytes), None);
-    }
 }
 
 #[test]
@@ -531,7 +509,7 @@ fn an_assignment_past_its_grant_bound_is_refused() {
 #[test]
 fn the_schema_lists_every_down_kind_from_the_responder() {
     let schema = hello_schema();
-    let version = schema.version(4).expect("one version");
+    let version = schema.version(5).expect("one version");
     assert_eq!(version.kinds.len(), 21);
     for term in &down_terms() {
         assert_eq!(

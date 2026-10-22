@@ -10,10 +10,10 @@ fn the_largest_turn_kept_body_is_twenty_bytes() {
 
 #[test]
 fn the_engine_cap_for_one_slot_is_the_hand_summed_bytes() {
-    // Assignment346, message64, relayed58, kept20, ack16, cancel16, grants2*77;
-    // eight frame headers add64:354+72+66+28+24+24+170=738.
+    // Assignment338, message64, relayed58, kept20, ack16, cancel16, grants2*73;
+    // eight frame headers add64:346+72+66+28+24+24+162=722.
     // Sources84 + two checks44 + two sign-outs44 add260 and five frames.
-    assert_eq!(engine_cap(&SIZES_ONE_SLOT), Some(Cap { bytes: 998, frames: 13 }));
+    assert_eq!(engine_cap(&SIZES_ONE_SLOT), Some(Cap { bytes: 982, frames: 13 }));
 }
 
 #[test]
@@ -43,18 +43,18 @@ fn the_largest_turn_body_matches_a_measured_fullest_turn() {
 fn the_largest_assignment_body_matches_a_measured_fullest_assignment() {
     let assignment = fixtures::fullest_assignment();
     // Fixed32 + workspace29 + save1 + charter20 + transcript20 + calls66
-    // + messages52 + grants126 =346.
-    assert_eq!(assignment.measure(), 346);
-    assert_eq!(largest_body(&SIZES_ONE_SLOT, Kind::Assignment), Some(346));
+    // + messages52 + grants118 =338 (two full program names).
+    assert_eq!(assignment.measure(), 338);
+    assert_eq!(largest_body(&SIZES_ONE_SLOT, Kind::Assignment), Some(338));
 }
 
 #[test]
 fn the_largest_grant_body_holds_a_four_kib_credential() {
-    // The small profile's token bound and the accounts' id bound.
-    let sizes = Sizes { grant: 7934, account_id: 256, ..SIZES_ONE_SLOT };
+    // The small profile's token bound.
+    let sizes = Sizes { grant: 7934, ..SIZES_ONE_SLOT };
     // Task8 + attempt8 + number4 + generation8 + valid8 + arm1, and the
-    // largest arm, withdrawn: id260 + bearer7938 =8235.
-    assert_eq!(largest_body(&sizes, Kind::Grant), Some(8235));
+    // largest arm, credential: scheme1 + token7938 =7976.
+    assert_eq!(largest_body(&sizes, Kind::Grant), Some(7976));
     let granted = fixtures::granted_key(&limits(&sizes).expect("the profile's bounds"), &[b'k'; 4096]);
     // Up to the arm 37 + scheme1 + key4100 =4138.
     assert_eq!(granted.measure(), 4138);
@@ -76,7 +76,6 @@ fn sizes_past_a_ceiling_give_no_codec_limits() {
         ("result", Sizes { result: 67_108_865, ..SIZES_ONE_SLOT }),
         ("detail", Sizes { detail: 4097, ..SIZES_ONE_SLOT }),
         ("grant", Sizes { grant: 8193, ..SIZES_ONE_SLOT }),
-        ("account id", Sizes { account_id: 257, ..SIZES_ONE_SLOT }),
         ("name", Sizes { name: 257, ..SIZES_ONE_SLOT }),
         ("secret", Sizes { secret: 1025, ..SIZES_ONE_SLOT }),
         ("model name", Sizes { model_name: 129, ..SIZES_ONE_SLOT }),

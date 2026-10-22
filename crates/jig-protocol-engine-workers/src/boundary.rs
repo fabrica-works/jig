@@ -11,12 +11,10 @@ pub struct Worker {
     pub digest: Digest,
 }
 /// A grant's value: a credential with its scheme, an application's
-/// secret, or a program source's name. `Withdrawn` keeps a provider account id beside a bearer token for
-/// jig's live test only, until JP13 removes it.
+/// secret, or a program source's name.
 #[derive(Clone, Debug)]
 pub enum GrantValue {
     Credential { scheme: Scheme, token: Secret },
-    Withdrawn { id: Secret, bearer: Secret },
     Application { secret: Secret },
     Program { name: host::SourceName },
 }

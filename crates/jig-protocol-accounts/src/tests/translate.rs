@@ -1,7 +1,7 @@
 use super::fixtures::{self, ACCOUNT_CHAT, ACCOUNT_DELEGATE, TOKEN_FIRST, TOKEN_SECOND};
 use crate::translate::{self, Up};
 use jig_domain_accounts as accounts;
-use skein_lib::{Duration, Secret, Time, bytes};
+use skein_lib::{Duration, Time};
 use skein_oauth as oauth;
 use skein_oauth_accounts as driver;
 
@@ -170,11 +170,9 @@ fn a_record_to_keep_goes_to_the_store_not_the_child() {
 fn each_scheme_names_the_form_it_is_granted_as() {
     use crate::table;
     use jig_domain_accounts::{Form, Scheme};
-    for (scheme, form) in [
-        (table::Scheme::Bearer, Form::Credential(Scheme::Bearer)),
-        (table::Scheme::Key, Form::Credential(Scheme::Key)),
-        (table::Scheme::Withdrawn { id: Secret::new(Box::from(&b"id"[..])) }, Form::Withdrawn),
-    ] {
+    for (scheme, form) in
+        [(table::Scheme::Bearer, Form::Credential(Scheme::Bearer)), (table::Scheme::Key, Form::Credential(Scheme::Key))]
+    {
         assert_eq!(translate::form(&scheme), form);
     }
 }

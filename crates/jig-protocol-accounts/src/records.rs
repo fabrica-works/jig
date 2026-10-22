@@ -4,7 +4,6 @@
 //! The driver starts from the records the store holds; each renewed record
 //! goes to the store stating the digest of the one it replaces, and the
 //! driver hears `Kept` only once the store answers that it is durable.
-use crate::table::ACCOUNT_ID_BYTES;
 use crate::translate::{self, Up};
 use jig_domain_accounts as accounts;
 use skein_lib::{Map, Secret, Time, sha256};
@@ -176,13 +175,7 @@ impl Records {
 
 /// Whether a stored record is `account`'s and fits the driver's limits.
 fn fits(record: &oauth::SavedToken, account: u32, limits: &oauth::Limits) -> bool {
-    let id = match &record.metadata {
-        Some(id) => id.len(),
-        None => 0,
-    };
-    record.key == account
-        && id <= usize::try_from(ACCOUNT_ID_BYTES).expect("u32 fits usize")
-        && oauth::encode_record(record, limits).is_ok()
+    record.key == account && oauth::encode_record(record, limits).is_ok()
 }
 
 /// The bytes the records need: their slots, and the record each may hold

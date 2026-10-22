@@ -10,7 +10,6 @@ fn a_grants_form_maps_one_to_one_into_smiths() {
     for (form, expected) in [
         (host::Form::Credential(host::Scheme::Bearer), Some(smith::Form::Credential(smith::Scheme::Bearer))),
         (host::Form::Credential(host::Scheme::Key), Some(smith::Form::Credential(smith::Scheme::Key))),
-        (host::Form::Withdrawn, Some(smith::Form::Withdrawn)),
         (host::Form::Application, None),
         (
             host::Form::Program(host::SourceName::new(b"claude").expect("source name")),

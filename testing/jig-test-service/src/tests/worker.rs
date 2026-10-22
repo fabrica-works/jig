@@ -83,14 +83,10 @@ fn a_grant_s_value_reaches_smith_s_host_half_in_its_envelope() {
     use jig_protocol_accounts::table::{Scheme, Value};
     use skein_lib::Secret;
     let largest_token = Box::new([b't'; 7934]);
-    let short = Secret::new(b"account".as_slice().into());
-    let largest_id = Secret::new(Box::new([b'i'; 256]));
     for (label, scheme, form, token) in [
         ("bearer", Scheme::Bearer, Form::Credential(GrantScheme::Bearer), b"access".as_slice()),
         ("key", Scheme::Key, Form::Credential(GrantScheme::Key), b"access".as_slice()),
-        ("withdrawn", Scheme::Withdrawn { id: short }, Form::Withdrawn, b"access".as_slice()),
         ("full key", Scheme::Key, Form::Credential(GrantScheme::Key), largest_token.as_slice()),
-        ("full withdrawn", Scheme::Withdrawn { id: largest_id }, Form::Withdrawn, largest_token.as_slice()),
     ] {
         let mut service = fixtures::worker_service();
         let value = Value { token: Secret::new(token.into()), scheme: scheme.clone() };
@@ -109,9 +105,6 @@ fn a_grant_s_value_reaches_smith_s_host_half_in_its_envelope() {
             }
             (Scheme::Key, smith_channel::GrantValue::Credential(value)) => {
                 assert_eq!((value.scheme(), value.bytes()), (&smith_channel::Scheme::Key, &token), "{label}");
-            }
-            (Scheme::Withdrawn { id }, smith_channel::GrantValue::Withdrawn(value)) => {
-                assert_eq!((value.id(), value.bearer()), (id.expose(), &token), "{label}");
             }
             _ => panic!("{label}: the grant's own arm"),
         }
@@ -312,40 +305,29 @@ fn the_engine_s_listener_opens_before_its_workers_start() {
 fn a_worker_refuses_limits_that_cannot_carry_its_account_envelope() {
     let large =
         fixtures::with(fixtures::WORKER_DOCUMENT, b"\"hub.turns\":1", b"\"hub.turns\":1,\"accounts.token\":8192");
-    let id = jig_protocol_worker_wire::CEILINGS.withdrawn_value_id;
-    let bearer = smith_channel::CEILINGS.withdrawn_value_bearer;
     let credential = smith_channel::CEILINGS.credential_value_bytes;
-    for (label, document, id, bearer, credential) in [
-        ("caller credential too small", large.as_ref(), id, bearer, credential - 1),
-        ("caller bearer too small", large.as_ref(), id, bearer - 1, credential),
-        ("caller account id too small", fixtures::WORKER_DOCUMENT, id - 1, bearer, credential),
-    ] {
-        let mut agent = fixtures::agent();
-        agent.limits.bodies.withdrawn_value_id = id;
-        agent.limits.bodies.withdrawn_value_bearer = bearer;
-        agent.limits.bodies.credential_value_bytes = credential;
-        let found = crate::startup(
-            document,
-            &fixtures::worker_files(),
-            Some(&agent),
-            &fixtures::seeds(),
-            None,
-            Some(fixtures::worker_runtime()),
-        )
-        .err()
-        .expect(label);
-        assert_eq!(
-            found.problems.get(0),
-            Some(&jig_protocol_config::Problem {
-                path: jig_protocol_config::Path::root()
-                    .member(b"workers")
-                    .child(jig_protocol_config::Segment::Index(0))
-                    .member(b"limits"),
-                what: jig_protocol_config::What::Bound,
-            }),
-            "{label}"
-        );
-    }
+    let mut agent = fixtures::agent();
+    agent.limits.bodies.credential_value_bytes = credential - 1;
+    let found = crate::startup(
+        &large,
+        &fixtures::worker_files(),
+        Some(&agent),
+        &fixtures::seeds(),
+        None,
+        Some(fixtures::worker_runtime()),
+    )
+    .err()
+    .expect("caller credential too small");
+    assert_eq!(
+        found.problems.get(0),
+        Some(&jig_protocol_config::Problem {
+            path: jig_protocol_config::Path::root()
+                .member(b"workers")
+                .child(jig_protocol_config::Segment::Index(0))
+                .member(b"limits"),
+            what: jig_protocol_config::What::Bound,
+        }),
+    );
 }
 
 #[test]

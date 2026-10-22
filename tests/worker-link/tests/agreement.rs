@@ -1,7 +1,7 @@
 #[path = "../src/joined.rs"]
 pub mod joined;
 mod agreement {
-    use super::joined::{Joined, application, credential, form, received, sent, values, withdrawn};
+    use super::joined::{Joined, application, credential, form, received, sent, values};
     use jig_domain_host as host;
     use jig_protocol_engine_workers as engine;
     use jig_protocol_worker_link::Request;
@@ -124,9 +124,7 @@ mod agreement {
     }
     #[test]
     fn a_grant_crosses_as_a_name_and_a_value() {
-        for sent_value in
-            [credential(engine::Scheme::Bearer), credential(engine::Scheme::Key), withdrawn(), application()]
-        {
+        for sent_value in [credential(engine::Scheme::Bearer), credential(engine::Scheme::Key), application()] {
             let (form, expected) = (form(&sent_value), sent(&sent_value));
             let mut world = world();
             world.engine_down(

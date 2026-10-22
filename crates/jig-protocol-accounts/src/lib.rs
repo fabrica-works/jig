@@ -12,4 +12,3 @@ pub mod table;
 #[cfg(test)]
 mod tests;
 pub mod translate;
-pub use table::ACCOUNT_ID_BYTES;

@@ -18,7 +18,6 @@ pub const SIZES: jig_protocol_worker_wire::sizes::Sizes = jig_protocol_worker_wi
     result: 16,
     detail: 16,
     grant: 16,
-    account_id: 16,
     name: 16,
     secret: 16,
     model_name: 16,
@@ -113,11 +112,10 @@ use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Token, Writer};
 pub const TOKEN_ONE: &[u8] = b"access";
 pub const TOKEN_TWO: &[u8] = b"app-access";
-pub const ACCOUNT_ONE: &[u8] = b"account";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
 #[must_use]
-pub fn codec() -> wire::v4::Limits {
+pub fn codec() -> wire::v5::Limits {
     wire::sizes::limits(&SIZES).expect("small codec limits")
 }
 #[must_use]
@@ -233,12 +231,6 @@ pub fn credential_value(scheme: wire::Scheme) -> wire::GrantValue {
     wire::GrantValue::Credential(wire::CredentialValue::new(&codec(), parts).expect("credential"))
 }
 #[must_use]
-pub fn withdrawn_value() -> wire::GrantValue {
-    let parts =
-        wire::WithdrawnValueParts { id: Secret::new(ACCOUNT_ONE.into()), bearer: Secret::new(TOKEN_ONE.into()) };
-    wire::GrantValue::Withdrawn(wire::WithdrawnValue::new(&codec(), parts).expect("withdrawn"))
-}
-#[must_use]
 pub fn application_value() -> wire::GrantValue {
     let parts = wire::ApplicationValueParts { secret: Secret::new(TOKEN_ONE.into()) };
     wire::GrantValue::Application(wire::ApplicationValue::new(&codec(), parts).expect("application"))
@@ -265,7 +257,7 @@ pub fn assignment_record(transcript: Box<[u8]>) -> wire::Assignment {
         )
         .expect("room");
     let mut grants = List::with_capacity(2);
-    grants.push(grant_record(withdrawn_value())).expect("room");
+    grants.push(grant_record(credential_value(wire::Scheme::Bearer))).expect("room");
     grants.push(grant_record(application_value())).expect("room");
     let mut answered = List::with_capacity(1);
     let answer =
@@ -346,9 +338,11 @@ pub fn down_frames() -> Vec<skein_channel::Frame> {
     let record = wire::Cancel::new(&limits, wire::CancelParts { task: 7, attempt: 2 }).expect("cancel");
     let body = encoded(record.measure(), |writer| record.encode(writer));
     frames.push(frame(0x0186, &body));
-    let record =
-        wire::Granted::new(&limits, wire::GrantedParts { task: 7, attempt: 2, grant: grant_record(withdrawn_value()) })
-            .expect("grant");
+    let record = wire::Granted::new(
+        &limits,
+        wire::GrantedParts { task: 7, attempt: 2, grant: grant_record(credential_value(wire::Scheme::Bearer)) },
+    )
+    .expect("grant");
     let body = encoded(record.measure(), |writer| record.encode(writer));
     frames.push(frame(0x0187, &body));
     frames
@@ -430,7 +424,7 @@ pub fn assignment() -> host::Assignment {
             workspace: Some(host::Workspace { workstream: 3, items: Token::new(10) }),
             save: true,
             charter: b"charter".as_slice().into(),
-            grants: Box::new([grant(host::Form::Withdrawn), grant(host::Form::Application)]),
+            grants: Box::new([grant(host::Form::Credential(host::Scheme::Bearer)), grant(host::Form::Application)]),
         },
         turns: Box::new([Box::from(b"one!".as_slice()), Box::from(b"two!".as_slice())]),
         answered: Box::new([host::AnsweredCall {

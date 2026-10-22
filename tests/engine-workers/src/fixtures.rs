@@ -23,7 +23,6 @@ pub const SIZES: jig_protocol_worker_wire::sizes::Sizes = jig_protocol_worker_wi
     result: 16,
     detail: 16,
     grant: 16,
-    account_id: 16,
     name: 16,
     secret: 16,
     model_name: 16,
@@ -305,7 +304,7 @@ pub fn account_refused_record() -> jig_protocol_worker_wire::AccountRefused {
     .expect("account refused")
 }
 
-fn codec() -> jig_protocol_worker_wire::v4::Limits {
+fn codec() -> jig_protocol_worker_wire::v5::Limits {
     jig_protocol_worker_wire::sizes::limits(&SIZES).expect("small codec")
 }
 fn refused_messages() -> skein_lib::List<jig_protocol_worker_wire::Refused> {
@@ -362,7 +361,6 @@ pub fn answer_frame() -> skein_channel::Frame {
 
 pub const TOKEN_ONE: &[u8] = b"TOKEN_ONE";
 pub const TOKEN_TWO: &[u8] = b"TOKEN_TWO";
-pub const ACCOUNT_ID: &[u8] = b"ID_ONE";
 pub const IDENTITY: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 #[must_use]
 pub fn grant(form: jig_domain_host::Form) -> jig_domain_host::Grant {
@@ -371,10 +369,7 @@ pub fn grant(form: jig_domain_host::Form) -> jig_domain_host::Grant {
 #[must_use]
 pub fn values() -> Box<[Option<jig_protocol_engine_workers::GrantValue>]> {
     Box::new([
-        Some(jig_protocol_engine_workers::GrantValue::Withdrawn {
-            id: Secret::new(Box::from(ACCOUNT_ID)),
-            bearer: Secret::new(Box::from(TOKEN_ONE)),
-        }),
+        Some(credential_value(jig_protocol_engine_workers::Scheme::Bearer)),
         Some(jig_protocol_engine_workers::GrantValue::Application { secret: Secret::new(Box::from(TOKEN_TWO)) }),
     ])
 }
@@ -401,7 +396,7 @@ pub fn assignment() -> jig_domain_host::Assignment {
             workspace: Some(host::Workspace { workstream: 9, items: Token::new(500) }),
             save: true,
             charter: Box::from(b"charter".as_slice()),
-            grants: Box::new([grant(host::Form::Withdrawn), grant(host::Form::Application)]),
+            grants: Box::new([grant(host::Form::Credential(host::Scheme::Bearer)), grant(host::Form::Application)]),
         },
         turns: Box::new([Box::from([0, 127]), Box::from([255, 1, 2])]),
         answered: Box::new([host::AnsweredCall {

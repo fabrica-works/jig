@@ -106,8 +106,9 @@ fn grant_values_reach_the_layer_before_the_assignment() {
     world.play(fixtures::assignment_frame(fixtures::window()));
     assert_eq!(world.order(), ["value", "value", "down"]);
     let expires = world.now().saturating_add(Duration::from_secs(60));
-    let GrantValue::Withdrawn { id, bearer } = value(&world.values()[0], expires) else { panic!("withdrawn") };
-    assert_eq!((id.expose(), bearer.expose()), (fixtures::ACCOUNT_ONE, fixtures::TOKEN_ONE));
+    let GrantValue::Credential { scheme, token } = value(&world.values()[0], expires) else { panic!("credential") };
+    assert_eq!(scheme, &jig_protocol_worker_link::Scheme::Bearer);
+    assert_eq!(token.expose(), fixtures::TOKEN_ONE);
     let GrantValue::Application { secret } = value(&world.values()[1], expires) else { panic!("application") };
     assert_eq!(secret.expose(), fixtures::TOKEN_ONE);
     assert_eq!(assignment(&world).assignment.grants.len(), 2);
@@ -149,7 +150,7 @@ fn a_transcript_piece_that_does_not_split_is_refused_as_invalid() {
     }
 }
 
-fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v4::Limits) {
+fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v5::Limits) {
     let turn = wire::Turn::decode(limits, &mut Reader::new(&records[1].body)).expect("turn");
     assert_eq!(
         (turn.task(), turn.attempt(), turn.number(), turn.spent(), *turn.read(), turn.opens_window(), turn.body()),
@@ -228,7 +229,7 @@ fn check_down_records(world: &World, records: &[&host::LinkDown]) {
             run: Token::new(7),
             attempt: Token::new(2),
             grant: host::Grant {
-                form: host::Form::Withdrawn,
+                form: host::Form::Credential(host::Scheme::Bearer),
                 account: 1,
                 generation: 3,
                 valid: Duration::from_secs(60)

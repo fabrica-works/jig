@@ -31,9 +31,7 @@ impl Values {
         for grant in grants {
             let value = match grant.form {
                 host::Form::Program(name) => Some(GrantValue::Program { name }),
-                host::Form::Credential(_) | host::Form::Withdrawn => {
-                    account_grant(self.accounts.value(grant.account, grant.generation, now))
-                }
+                host::Form::Credential(_) => account_grant(self.accounts.value(grant.account, grant.generation, now)),
                 host::Form::Application => application_grant(self.application.get(&(grant.account, grant.generation))),
             };
             values.push(value).expect("one value slot per grant");
@@ -45,7 +43,6 @@ fn account_value(value: &table::Value) -> GrantValue {
     match &value.scheme {
         table::Scheme::Bearer => GrantValue::Credential { scheme: Scheme::Bearer, token: value.token.clone() },
         table::Scheme::Key => GrantValue::Credential { scheme: Scheme::Key, token: value.token.clone() },
-        table::Scheme::Withdrawn { id } => GrantValue::Withdrawn { id: id.clone(), bearer: value.token.clone() },
     }
 }
 fn application_value(value: &Secret) -> GrantValue {
