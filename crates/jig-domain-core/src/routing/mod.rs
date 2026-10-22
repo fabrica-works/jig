@@ -78,7 +78,7 @@ mod task_routes;
 #[path = "views.rs"]
 mod view_routes;
 mod vocabulary;
-mod watch_marks;
+pub(crate) mod watch_marks;
 
 impl Core {
     /// Retain a numbered connector call until its translated answer arrives.

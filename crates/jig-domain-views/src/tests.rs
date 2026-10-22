@@ -207,7 +207,9 @@ fn closing_waits_for_both_document_and_stream_terminals() {
     ready(&mut domain, 1);
     text(&mut domain, 1, 0, b"abc");
     drive(&mut domain, Event::Unwatch { watcher: Token::new(1) });
+    assert!(domain.is_closing(Token::new(1)));
     assert!(drive(&mut domain, Event::Delivered { watcher: Token::new(1) }).is_empty());
+    assert!(domain.is_closing(Token::new(1)), "stream acknowledgement still outstanding");
     assert_eq!(
         drive(&mut domain, Event::StreamDelivered { watcher: Token::new(1) }).as_ref(),
         &[Request::Ended { watcher: Token::new(1), end: End::Unwatched }]
@@ -322,3 +324,43 @@ fn current_calls_are_bounded_and_paced_with_the_stream() {
 }
 
 mod completion_retry;
+
+#[test]
+fn closing_inspection_covers_each_ack_wait_and_retires_once() {
+    let mut domain = Domain::new(&LIMITS);
+    assert!(!domain.is_closing(Token::new(1)));
+    watch(&mut domain, 1, 1);
+    assert!(!domain.is_closing(Token::new(1)));
+    drive(&mut domain, Event::EndWatch { watcher: Token::new(1), end: End::Stopping });
+    assert!(domain.is_closing(Token::new(1)), "construction is child-held waiting state");
+    assert_eq!(drive(&mut domain, Event::Made { watcher: Token::new(1), outcome: Made::Ready }).len(), 1);
+    assert!(!domain.is_closing(Token::new(1)));
+    domain.reclaim();
+    watch(&mut domain, 2, 1);
+    ready(&mut domain, 2);
+    drive(&mut domain, Event::EndWatch { watcher: Token::new(2), end: End::Stopping });
+    assert!(domain.is_closing(Token::new(2)), "delivery is child-held waiting state");
+    assert_eq!(drive(&mut domain, Event::Delivered { watcher: Token::new(2) }).len(), 1);
+    assert!(!domain.is_closing(Token::new(2)));
+}
+
+#[test]
+fn retained_metadata_is_token_ordered_and_exposes_committed_without_mutation() {
+    let mut domain = Domain::new(&LIMITS);
+    drive(&mut domain, retained_report(9, 0));
+    drive(&mut domain, retained_report(8, 0));
+    let (attempt, turn, committed) = {
+        let mut states = domain.retained_run_states();
+        let (first, retained) = states.next().expect("first retained run");
+        assert_eq!(first.raw(), 8);
+        let metadata = retained.metadata();
+        assert_eq!(states.next().expect("second retained run").0.raw(), 9);
+        assert!(states.next().is_none());
+        metadata
+    };
+    assert_eq!(attempt, turn.expect("writing turn").attempt);
+    assert!(!committed);
+    drive(&mut domain, Event::TurnCommitted { run: Token::new(8), attempt, turn: turn.expect("writing turn").turn });
+    assert!(domain.retained_run_states().next().expect("retained run").1.metadata().2);
+    assert_eq!(domain.runs(), 2);
+}

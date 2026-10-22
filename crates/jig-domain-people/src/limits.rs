@@ -5,7 +5,7 @@
 use crate::domain::{Answered, Pending, SignIn};
 use crate::{Fact, Holding, Identity, IdentityKey, InitialOwner, RequestKey};
 use alloc::boxed::Box;
-use skein_lib::{Deadlines, Duration, Id, List, Map, Queue, Slab, Wall};
+use skein_lib::{Deadlines, Duration, Id, List, Map, Queue, Set, Slab, Wall};
 
 /// Immutable root-configured capacities and payload limits for people's retained state and one-step
 /// outputs; validate via `worst_case` before construction. (domain/people.md, sections 2–5).
@@ -151,8 +151,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                 .checked_mul(List::<crate::ResultRef>::worst_case(limits.inbox_entries.checked_add(1)?)?)?,
         )?
         .checked_add(List::<crate::ResultRef>::worst_case(limits.inbox_entries.checked_add(1)?)?)?
-        .checked_add(Map::<u64, SignIn>::worst_case(limits.sign_ins)?)?
-        .checked_add(Deadlines::<u64>::worst_case(limits.sign_ins)?)?
+        .checked_add(sign_in_worst_case(limits)?)?
         .checked_add(Map::<RequestKey, Answered>::worst_case(limits.requests)?)?
         .checked_add(Deadlines::<RequestKey>::worst_case(limits.requests)?)?
         // Each retained answer owns its longest visit address or configured-host failure list.
@@ -201,4 +200,10 @@ fn host_outcome_bytes(limits: &Limits) -> Option<u64> {
             .ok()?
             .checked_add(u64::from(limits.program_host_name_bytes))?,
     )
+}
+
+fn sign_in_worst_case(limits: &Limits) -> Option<u64> {
+    Map::<u64, SignIn>::worst_case(limits.sign_ins)?
+        .checked_add(Deadlines::<u64>::worst_case(limits.sign_ins)?)?
+        .checked_add(Set::<(Wall, u64)>::worst_case(limits.sign_ins)?)
 }

@@ -27,7 +27,7 @@ use skein_lib::{Env, Id, List, Queue, Token, Wall};
 
 /// One opaque live run's current bounded writing, watched or not.
 #[derive(Debug)]
-pub(crate) struct Run {
+pub struct RetainedRun {
     attempt: u64,
     turn: Option<TurnName>,
     from: u32,
@@ -37,6 +37,14 @@ pub(crate) struct Run {
     revision: u64,
     committed: bool,
     cut: bool,
+}
+
+impl RetainedRun {
+    /// Pure attempt, optional writing position and committed mark.
+    #[must_use]
+    pub fn metadata(&self) -> (u64, Option<TurnName>, bool) {
+        (self.attempt, self.turn, self.committed)
+    }
 }
 
 /// A stream terminal advances only this named turn's position.
@@ -179,8 +187,8 @@ fn timed(mut call: Call, previous: Option<&Call>, wall: Wall) -> Call {
     call
 }
 
-fn empty(attempt: u64) -> Run {
-    Run {
+fn empty(attempt: u64) -> RetainedRun {
+    RetainedRun {
         attempt,
         turn: None,
         from: 0,
@@ -279,7 +287,7 @@ pub(crate) fn offer_one(domain: &mut Domain, id: Id<Watcher>, out: &mut Queue<Re
         offer(watch, run, out);
     }
 }
-fn offer(watch: &mut Watcher, run: &Run, out: &mut Queue<Request>) {
+fn offer(watch: &mut Watcher, run: &RetainedRun, out: &mut Queue<Request>) {
     if run.committed {
         return;
     }

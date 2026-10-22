@@ -243,7 +243,7 @@ pub(crate) fn history(
     }
     let Some(state) = core.projections.get_mut(&root) else { return };
     let saved = milestone.clone();
-    let mut milestones = List::with_capacity(crate::routing::room_max(limits).expect("valid feed room").writes);
+    let mut milestones = List::with_capacity(core.room_max.writes);
     for old in &state.milestones {
         if old.identity == milestone.identity {
             return;
@@ -257,28 +257,50 @@ pub(crate) fn history(
     write(out, header(state));
 }
 
+fn eligible(core: &Core, number: u64, state: &Projection) -> bool {
+    let untracked = match core.tasks.task(number) {
+        Some(task) => task.tracked.is_none(),
+        None => false,
+    };
+    if untracked && !state.pending.is_empty() {
+        return false;
+    }
+    untracked
+        || state.changed
+        || (!state.milestones.is_empty() && state.fed_at != Some(core.counters.deployment().commits))
+}
+
+pub(crate) fn owed(core: &Core) -> bool {
+    for (number, state) in &core.projections {
+        if eligible(core, *number, state) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Complete a composed root decision's projection handoffs. Repeated calls
 /// retain subsequent changes but never feed a goal twice under one commit.
 pub fn finish_decision(core: &mut Core, env: &Env<Limits>) -> Requests {
-    let room = crate::routing::room_max(&env.limits).expect("valid projection room").writes;
+    if !owed(core) {
+        return crate::routing::finish_watches(core, env);
+    }
+    let room = core.room_max.writes;
     let mut out = Queue::with_capacity(room.checked_add(1).expect("feed mark"));
     let commit = core.counters.deployment().commits;
-    let mut goals = List::with_capacity(env.limits.tasks.tasks);
+    let mut goals = List::with_capacity(core.projections.len());
     for (number, _) in &core.projections {
         goals.push(*number).expect("bounded tracked goals");
     }
     for number in &goals {
+        if !eligible(core, *number, core.projections.get(number).expect("retained projection")) {
+            continue;
+        }
         let untracked = match core.tasks.task(*number) {
             Some(task) => task.tracked.is_none(),
             None => false,
         };
         let state = core.projections.get_mut(number).expect("retained feed state");
-        if untracked && !state.pending.is_empty() {
-            continue;
-        }
-        if !state.changed && (state.milestones.is_empty() || state.fed_at == Some(commit)) && !untracked {
-            continue;
-        }
         let feed = if state.fed_at == Some(commit) {
             None
         } else {
@@ -541,7 +563,7 @@ fn restore_milestone(core: &mut Core, limits: &Limits, goal: u64, milestone: Pro
         return false;
     }
     let Some(state) = core.projections.get_mut(&goal) else { return false };
-    let mut milestones = List::with_capacity(crate::routing::room_max(limits).expect("valid feed room").writes);
+    let mut milestones = List::with_capacity(core.room_max.writes);
     for old in &state.milestones {
         if old.identity == milestone.identity || milestones.push(old.clone()).is_err() {
             return false;

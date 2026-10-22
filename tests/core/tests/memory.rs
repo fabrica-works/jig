@@ -76,3 +76,58 @@ fn memory_scenario_family() {
     room_and_memory_refuse_unrepresentable_or_missing_limits();
     both_worlds_check_the_counted_heap_at_every_iteration();
 }
+
+#[test]
+fn settled_finishing_queries_allocate_nothing_and_empty_closure_prices_one_output() {
+    let limits = world::limits().core;
+    let meter = Meter::new();
+    meter.start();
+    let mut domain = core::Core::new(world::config(192).core, &limits).expect("fixture core");
+    domain.counters = core::Counters::new(domain.counters.deployment());
+    let setup = meter.end();
+    let bound = core::worst_case(&limits).expect("validated core heap bound");
+    meter.check(setup, bound, &limits);
+    let held = meter.held();
+    meter.start();
+    for _ in 0..100 {
+        assert!(!domain.finish_owed());
+    }
+    let queries = meter.end();
+    assert_eq!((queries.held(), queries.peak()), (held, held));
+    meter.check(queries, bound, &limits);
+    meter.start();
+    let core::Requests::Out(mut out) =
+        core::finish_decision(&mut domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits });
+    let closed = meter.end();
+    assert!(matches!(out.pop(), Some(core::Request::Decided)));
+    assert!(out.is_empty());
+    let one_output = skein_lib::Queue::<core::Request>::worst_case(1).expect("one output fits");
+    assert_eq!(closed.peak() - held, one_output);
+    drop(out);
+    meter.check(closed, bound, &limits);
+    meter.start();
+    let mut quiet = skein_lib::Queue::with_capacity(0);
+    jig_domain_views::step(
+        &mut domain.views,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.views },
+        jig_domain_views::Event::Text {
+            run: skein_lib::Token::new(41),
+            turn: jig_domain_views::TurnName { attempt: 1, turn: 1, retry: 0 },
+            offset: 0,
+            text: Box::new([b'x']),
+            call: None,
+        },
+        &mut quiet,
+    );
+    let retained = meter.end();
+    assert!(quiet.is_empty());
+    meter.check(retained, bound, &limits);
+    let held = meter.held();
+    meter.start();
+    for _ in 0..100 {
+        assert!(domain.finish_owed());
+    }
+    let queries = meter.end();
+    assert_eq!((queries.held(), queries.peak()), (held, held), "retained metadata inspection also allocates nothing");
+    meter.check(queries, bound, &limits);
+}

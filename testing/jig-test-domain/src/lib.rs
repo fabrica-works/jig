@@ -456,7 +456,9 @@ impl Domain {
     /// still wait for a host whose next hello supplies its capacity.
     #[must_use]
     pub fn quiescent(&self) -> bool {
-        self.journal.idle() && self.now.is_empty() && (!self.ready() || !self.core.due_ready())
+        self.journal.idle()
+            && self.now.is_empty()
+            && (!self.ready() || (!self.core.due_ready() && !self.core.finish_owed()))
     }
 }
 
@@ -582,6 +584,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         | Work::AdoptDone
         | Work::Timer(_)
         | Work::WriterRead { .. }
+        | Work::Finish
         | Work::ResumeFleet
         | Work::Connector { .. }
         | Work::ConnectorResume { .. }
@@ -601,6 +604,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
     };
     let Some(mut decision) = domain.journal.decision(&room) else { return };
     domain.decision_wrote = false;
+    let mut finish_only = false;
     let mut work = Queue::with_capacity(env.limits.routes);
     work.push(first);
     for _ in 0..env.limits.routes {
@@ -743,6 +747,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     core::step(&mut domain.core, &Env { now: env.now, wall: env.wall, limits: env.limits.core }, event);
                 route_core(domain, env, &mut decision, requests, &mut work);
             }
+            Work::Finish => finish_only = true,
             Work::ResumeFleet => {
                 let requests = core::resume_fleet(
                     &mut domain.core,
@@ -787,6 +792,9 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         }
     }
     assert!(work.is_empty(), "synchronous routes fit configured room");
+    if finish_only {
+        assert!(!domain.decision_wrote && !domain.core.counters.dirty(), "stopping continuation makes no commit");
+    }
     if domain.decision_wrote || domain.core.counters.dirty() {
         let header = domain.core.counters.next_commit();
         write(
@@ -904,7 +912,14 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
         let now = domain.now.pop().expect("bounded now count");
         out.push(now);
     }
+    continue_ready(domain, env);
+}
+
+fn continue_ready(domain: &mut Domain, env: &Env<Limits>) {
     if domain.stopping() {
+        if domain.core.finish_owed() {
+            decide(domain, env, Work::Finish);
+        }
         return;
     }
     if resume_restart_outbox(domain, env) {
@@ -919,7 +934,40 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
             decide(domain, env, Work::Core(core::Event::Activate { context, ready: true }));
             return;
         }
-        decide(domain, env, Work::ResumeFleet);
+        if domain.core.fleet.is_ready() || domain.core.finish_owed() || timers_due(domain, env) {
+            decide(domain, env, Work::ResumeFleet);
+        }
+    }
+}
+
+fn wall_due(env: &Env<Limits>, expiry: Wall) -> bool {
+    let remaining = expiry.as_nanos().saturating_sub(env.wall.as_nanos());
+    env.now.saturating_add(skein_lib::Duration::from_nanos(remaining)) <= env.now
+}
+
+fn timers_due(domain: &Domain, env: &Env<Limits>) -> bool {
+    for (_, due) in domain.core_deadlines() {
+        if let Some(due) = due
+            && due <= env.now
+        {
+            return true;
+        }
+    }
+    if let Some(expiry) = domain.core.people.next_wall_expiry()
+        && wall_due(env, expiry)
+    {
+        return true;
+    }
+    for (_, due) in domain.connector_deadlines() {
+        if let Some(due) = due
+            && wall_due(env, due)
+        {
+            return true;
+        }
+    }
+    match domain.effect_deadline() {
+        Some(due) => wall_due(env, due),
+        None => false,
     }
 }
 

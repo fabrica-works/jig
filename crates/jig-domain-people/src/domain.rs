@@ -19,7 +19,7 @@ use crate::{
     Whom,
 };
 use alloc::boxed::Box;
-use skein_lib::{Deadlines, Env, Id, List, Map, Queue, ReplyTo, Slab, Time, Token, Wall};
+use skein_lib::{Deadlines, Env, Id, List, Map, Queue, ReplyTo, Set, Slab, Time, Token, Wall};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) struct SignIn {
@@ -95,6 +95,7 @@ pub struct Domain {
     identities: Map<IdentityKey, u64>,
     sign_ins: Map<u64, SignIn>,
     alarms: Deadlines<u64>,
+    expiries: Set<(Wall, u64)>,
     roles: Map<u32, Box<[Holding]>>,
     /// The deployment's first owners, who decide its LLM accounts (accounts.md, 3.2) for as long
     /// as it runs; their first sign-ins seed their roles only while `seeding`.
@@ -164,6 +165,7 @@ impl Domain {
             identities: Map::with_capacity(limits.people),
             sign_ins: Map::with_capacity(limits.sign_ins),
             alarms: Deadlines::with_capacity(limits.sign_ins),
+            expiries: Set::with_capacity(limits.sign_ins),
             roles: Map::with_capacity(limits.projects),
             owners,
             seeding: true,
@@ -188,6 +190,21 @@ impl Domain {
             (None, Some(right)) => Some(right),
             (None, None) => None,
         }
+    }
+
+    /// Earliest saved wall expiry; translate beside the original monotonic
+    /// deadline at the caller's current injected clocks (people.md, section 3).
+    #[must_use]
+    pub fn next_wall_expiry(&self) -> Option<Wall> {
+        let (expires, _) = self.expiries.first()?;
+        Some(*expires)
+    }
+
+    /// Timeless table membership only; makes no claim of clock validity.
+    /// Authentication must use `person` with the current clocks.
+    #[must_use]
+    pub fn sign_in_person(&self, sign_in: u64) -> Option<u64> {
+        Some(self.sign_ins.get(&sign_in)?.person)
     }
 
     /// Pure scheduler query returning whether any armed expiry is at or before supplied `now`; no
@@ -488,8 +505,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     }
 }
 
-/// One expiration per fire; other expirations stay due for later iterations. Expire at most one due
-/// sign-in using `env.now`, emitting its `Erase`; no work before ready. Caller reserves
+/// One expiration per fire; other expirations stay due for later iterations. Expire at most one
+/// sign-in due by either injected clock, emitting its `Erase`; no work before ready. Caller reserves
 /// `max_out(&env.limits)` free slots and calls again in later iterations while due; parent owns
 /// durability and secret cleanup.
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
@@ -501,6 +518,10 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         assert!(removed.is_some(), "retained answer has its expiry alarm");
         out.push(Request::Erase { key: Key::Answer(key) });
     } else if let Some(number) = domain.alarms.expire(env.now) {
+        end_signin(domain, number, out);
+    } else if let Some(&(expires, number)) = domain.expiries.first()
+        && expires <= env.wall
+    {
         end_signin(domain, number, out);
     }
 }
@@ -934,12 +955,14 @@ fn deadline(env: &Env<Limits>, expires: Wall) -> Time {
 }
 
 fn arm(domain: &mut Domain, env: &Env<Limits>, number: u64, expires: Wall) {
+    assert!(domain.expiries.insert((expires, number)).is_ok(), "one saved expiry per sign-in");
     let armed = domain.alarms.arm(number, deadline(env, expires));
     assert!(armed.is_ok(), "one alarm per admitted sign-in");
 }
 
 fn end_signin(domain: &mut Domain, number: u64, out: &mut Queue<Request>) {
-    if domain.sign_ins.remove(&number).is_some() {
+    if let Some(signin) = domain.sign_ins.remove(&number) {
+        domain.expiries.remove(&(signin.expires, number));
         domain.alarms.cancel(number);
         out.push(Request::Erase { key: Key::SignIn(number) });
         fact(domain, Fact::SignedOut { sign_in: number });
@@ -1656,6 +1679,7 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
         Stored::SignIn { number, person, expires } => {
             let saved = domain.sign_ins.insert(number, SignIn { person, expires, due: deadline(env, expires) });
             assert!(saved == Ok(None), "restored sign-in admitted");
+            assert!(domain.expiries.insert((expires, number)).is_ok(), "restored expiry admitted");
         }
         Stored::Roles { project, holdings } => {
             let saved = domain.roles.insert(project, holdings);

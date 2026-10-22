@@ -138,3 +138,63 @@ mod tests {
         assert!(domain.journal.takes(&JournalRoom { writes: 1, held: 0 }), "commit answer frees the journal");
     }
 }
+
+#[cfg(test)]
+mod expiry_tests {
+    use crate::{Event, tests::fixtures};
+    use jig_domain_core as core;
+    use jig_domain_people as people;
+    use skein_lib::{Env, Queue, Time, Wall};
+
+    #[test]
+    fn refused_wall_expiry_timer_keeps_membership_and_both_deadlines_due() {
+        let mut env = fixtures::env();
+        let mut domain = fixtures::domain();
+        let expiry = Wall::from_nanos(10);
+        let mut ignored = Queue::with_capacity(people::max_out(&env.limits.core.people));
+        for record in [
+            people::Stored::Person {
+                number: 1,
+                identity: people::Identity {
+                    key: people::IdentityKey { provider: 0, subject: Box::new([1]) },
+                    login: Box::new([]),
+                    name: Box::new([]),
+                },
+            },
+            people::Stored::SignIn { number: 1, person: 1, expires: expiry },
+        ] {
+            people::step(
+                &mut domain.core.people,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.core.people },
+                people::Event::Restore { record },
+                &mut ignored,
+            );
+        }
+        people::step(
+            &mut domain.core.people,
+            &Env { now: env.now, wall: env.wall, limits: env.limits.core.people },
+            people::Event::Restored,
+            &mut ignored,
+        );
+        let elapsed = domain.core.people.next_deadline();
+        assert!(domain.core.people.ready());
+        fixtures::fill_journal(&mut domain, &env);
+        for _ in 0..env.limits.journal.commits {
+            domain.core.counters.next_commit();
+        }
+        env.now = Time::from_nanos(2);
+        env.wall = expiry;
+        assert!(super::try_step(&mut domain, &env, Event::Timer(core::Timer::People)).is_err());
+        assert_eq!(domain.core.people.sign_in_person(1), Some(1));
+        assert_eq!(domain.core.people.next_wall_expiry(), Some(expiry));
+        assert_eq!(domain.core.people.next_deadline(), elapsed);
+        assert!(crate::timers_due(&domain, &env));
+        super::try_step(&mut domain, &env, Event::Committed { number: 1, fill: 0 })
+            .expect("admitted timer or durable terminal");
+        super::try_step(&mut domain, &env, Event::Timer(core::Timer::People))
+            .expect("admitted timer or durable terminal");
+        assert_eq!(domain.core.people.sign_in_person(1), None);
+        assert_eq!(domain.core.people.next_wall_expiry(), None);
+        assert_eq!(domain.core.people.next_deadline(), None);
+    }
+}

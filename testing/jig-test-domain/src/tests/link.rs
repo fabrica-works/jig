@@ -309,3 +309,207 @@ fn program_source_lifecycle_routes_without_run_payloads() {
     assert_eq!(result, fleet::SignOutResult::SignedOut);
     assert_eq!(domain.payloads.len(), before);
 }
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "one admitted projection and Stop decision plus its ordered terminals")]
+fn stopping_continues_a_projection_deferred_watch_without_another_commit() {
+    use skein_lib::{Env, Wall};
+    let (mut domain, env, watcher) = settled_frame_watch(Wall::from_nanos(u64::MAX));
+    let mut out = Queue::with_capacity(env.limits.journal.held);
+    let mut policy_out = Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+    jig_domain_authority::step(
+        &mut domain.core.authority,
+        jig_domain_authority::Event::Policy {
+            project: 1,
+            policy: jig_domain_authority::Policy {
+                ceiling: fixtures::authority(),
+                projections: Box::new([]),
+                escalation_role: None,
+                period_spend: 100,
+                roles: Box::new([]),
+                requirements: Box::new([]),
+            },
+        },
+        &mut policy_out,
+    );
+    assert_eq!(policy_out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
+    let goal = core::fresh(&mut domain.core.counters, core::Family::Task).expect("admitted fixture state");
+    // Queue a real goal creation and Stop in one admitted decision, with
+    // exactly one projection pass before acceptance.
+    let room = JournalRoom { writes: env.limits.journal.writes, held: env.limits.journal.held };
+    let mut decision = domain.journal.decision(&room).expect("admitted fixture state");
+    let core_env = Env { now: env.now, wall: env.wall, limits: env.limits.core };
+    let mut work = fixtures::work();
+    for event in [
+        tasks::Event::Restored,
+        tasks::Event::OpenPeriod {
+            reply_to: skein_lib::ReplyTo::new(Token::new(u64::MAX - 2)),
+            project: 1,
+            period: 1,
+            budget: 100,
+        },
+        tasks::Event::Make {
+            reply_to: skein_lib::ReplyTo::new(Token::new(u64::MAX - 3)),
+            creator: tasks::Party::Deployment { project: 1 },
+            batch: Box::new([tasks::New {
+                number: goal,
+                project: 1,
+                label: 0,
+                flags: tasks::Flags::PLAIN,
+                executor: tasks::Executor::Agent { charter: 1 },
+                llm: None,
+                spec: tasks::Spec {
+                    words: b"queued goal change".as_slice().into(),
+                    parameters: Box::new([]),
+                    inputs: Box::new([]),
+                },
+                contract: tasks::Contract::Report { words: 128 },
+                deadline: tasks::Deadline::Named,
+                authority: fixtures::run().authority,
+                numbers: tasks::Numbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
+                funder: tasks::Funder::Period { project: 1, period: 1 },
+                dependencies: Box::new([]),
+                holdings: Box::new([]),
+                wake: tasks::WakePolicy::DEFAULT,
+                recurring: None,
+                tracked: Some(0),
+            }]),
+        },
+    ] {
+        let requests = core::step(&mut domain.core, &core_env, core::Event::Tasks(event));
+        crate::routes::route_core(&mut domain, &env, &mut decision, requests, &mut work);
+    }
+    assert!(domain.core.tasks.task(goal).is_some(), "the goal is live before Stop");
+    let requests = core::step(&mut domain.core, &core_env, core::Event::Stopping);
+    crate::routes::route_core(&mut domain, &env, &mut decision, requests, &mut work);
+    for _ in 0..env.limits.routes {
+        let Some(next) = work.pop() else { break };
+        let crate::Work::Core(event) = next else { panic!("only the goal's core continuation") };
+        let requests = core::step(&mut domain.core, &core_env, event);
+        crate::routes::route_core(&mut domain, &env, &mut decision, requests, &mut work);
+    }
+    assert!(work.is_empty(), "ordinary handoffs finish before the projection pass");
+    let requests = core::finish_decision(&mut domain.core, &core_env);
+    let core::Requests::Out(ref outputs) = requests;
+    let mut feeds = 0_u32;
+    for request in outputs {
+        if let core::Request::Ask { ask: core::Ask::ProjectGoal { .. }, .. } = request {
+            feeds = feeds.checked_add(1).expect("bounded connectors");
+        }
+        if let core::Request::Held(held) = request
+            && let core::Held::WatchEnded { .. } | core::Held::Drained = held.as_ref()
+        {
+            panic!("projection output must defer watch and drain terminals");
+        }
+    }
+    assert_eq!(feeds, 2, "one projection per connector defers watches");
+    crate::routes::route_core(&mut domain, &env, &mut decision, requests, &mut fixtures::work());
+    let header = domain.core.counters.next_commit();
+    crate::write(
+        &mut domain,
+        &mut decision,
+        crate::Write::Save(crate::Record::Core(core::Record::Core(core::CoreRecord::Deployment(header)))),
+    );
+    domain.journal.accept(decision);
+    crate::release(&mut domain, &env, &mut out);
+    let Request::Commit { number, .. } = out.pop().expect("projection commit") else { panic!("commit first") };
+    assert!(out.is_empty(), "nothing leaves ahead of the projection commit");
+    crate::step(&mut domain, &env, crate::Event::Committed { number, fill: 0 });
+    let mut endings = 0_u32;
+    let mut drained = 0_u32;
+    for _ in 0_u32..3 {
+        crate::release(&mut domain, &env, &mut out);
+        while let Some(request) = out.pop() {
+            match request {
+                Request::Commit { .. } => panic!("stopping continuation must make zero new commits"),
+                Request::Deliver(Delivery::Core(core::Held::WatchEnded { watcher: got, why })) => {
+                    assert_eq!((got, why), (watcher, jig_domain_views::End::Stopping));
+                    endings = endings.checked_add(1).expect("bounded endings");
+                }
+                Request::Deliver(Delivery::Core(core::Held::Drained)) => {
+                    drained = drained.checked_add(1).expect("one drain");
+                }
+                Request::Deliver(Delivery::Projection { .. }) => {}
+                other @ (Request::ReadResult { .. }
+                | Request::Busy { .. }
+                | Request::Restart(_)
+                | Request::Deliver(_)
+                | Request::Now(_)
+                | Request::Stop) => panic!("unexpected continuation output: {other:?}"),
+            }
+        }
+    }
+    assert_eq!((endings, drained), (1, 1));
+}
+
+fn settled_frame_watch(expiry: skein_lib::Wall) -> (crate::Domain, skein_lib::Env<crate::Limits>, Token) {
+    use jig_domain_people as people;
+    use skein_lib::Env;
+    let mut domain = fixtures::domain();
+    let env = fixtures::env();
+    let people_env = Env { now: env.now, wall: env.wall, limits: env.limits.core.people };
+    let mut ignored = Queue::with_capacity(people::max_out(&people_env.limits));
+    for record in [
+        people::Stored::Person {
+            number: 1,
+            identity: people::Identity {
+                key: people::IdentityKey { provider: 0, subject: Box::new([1]) },
+                login: b"owner".as_slice().into(),
+                name: b"Owner".as_slice().into(),
+            },
+        },
+        people::Stored::SignIn { number: 1, person: 1, expires: expiry },
+    ] {
+        people::step(&mut domain.core.people, &people_env, people::Event::Restore { record }, &mut ignored);
+    }
+    people::step(&mut domain.core.people, &people_env, people::Event::Restored, &mut ignored);
+    let watcher = Token::new(901);
+    crate::step(
+        &mut domain,
+        &env,
+        crate::Event::Core(core::Event::Watch {
+            watcher,
+            sign_in: 1,
+            subject: core::documents::Watched::Frame,
+            window: core::documents::Window { rows: 1, after: None },
+        }),
+    );
+    let mut out = Queue::with_capacity(env.limits.journal.held);
+    crate::release(&mut domain, &env, &mut out);
+    while let Some(request) = out.pop() {
+        if let Request::Commit { number, .. } = request {
+            crate::step(&mut domain, &env, crate::Event::Committed { number, fill: 0 });
+        }
+    }
+    crate::release(&mut domain, &env, &mut out);
+    while out.pop().is_some() {}
+    crate::step(&mut domain, &env, crate::Event::Core(core::Event::Delivered { watcher }));
+    (domain, env, watcher)
+}
+
+#[test]
+fn direct_resume_observes_wall_expiry_without_firing_or_reordering_the_people_timer() {
+    let expiry = skein_lib::Wall::from_nanos(10);
+    let (mut domain, mut env, watcher) = settled_frame_watch(expiry);
+    assert!(!domain.core.finish_owed());
+    let commits = domain.core.counters.deployment().commits;
+    env.wall = expiry;
+    assert!(!domain.core.finish_owed(), "expiry belongs to a due timer, not a clocked finishing query");
+    assert!(crate::timers_due(&domain, &env));
+    let mut out = Queue::with_capacity(env.limits.journal.held);
+    crate::release(&mut domain, &env, &mut out);
+    crate::release(&mut domain, &env, &mut out);
+    let Request::Deliver(Delivery::Core(core::Held::WatchEnded { watcher: got, why })) =
+        out.pop().expect("admitted fixture state")
+    else {
+        panic!("current-clock expiry still closes the settled watch")
+    };
+    assert_eq!((got, why), (watcher, jig_domain_views::End::SignedOut));
+    assert!(out.is_empty());
+    assert_eq!(domain.core.counters.deployment().commits, commits, "Resume does not fire a writing timer");
+    assert_eq!(domain.core.people.sign_in_person(1), Some(1), "timer event retains its order");
+    assert_eq!(domain.core.people.next_wall_expiry(), Some(expiry));
+    crate::step(&mut domain, &env, crate::Event::Timer(core::Timer::People));
+    assert_eq!(domain.core.people.sign_in_person(1), None);
+    assert_eq!(domain.core.counters.deployment().commits, commits.checked_add(1).expect("one timer commit"));
+}

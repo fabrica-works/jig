@@ -3322,3 +3322,212 @@ fn configured_worker_name(length: u32) -> Box<[u8]> {
 mod result_reads;
 
 mod amendment_reads;
+
+#[test]
+fn finishing_owes_header_changed_marks_and_first_drain_but_not_future_alarms() {
+    let (mut core, limits) = watch_core();
+    assert!(core.finish_owed(), "bootstrap header is owed");
+    core.counters.next_commit();
+    assert!(!core.finish_owed(), "future sign-in alarms are independent of finishing");
+    assert!(core.people.next_deadline().unwrap() > Time::ZERO);
+    assert_decided_only(finish_watch_outputs(&mut core, &limits).as_ref());
+    let watcher = Token::new(30);
+    watch_outputs(&mut core, &limits, Event::Watch { watcher, sign_in: 10, subject: Watched::Frame, window: window() });
+    watch_outputs(&mut core, &limits, Event::Delivered { watcher });
+    assert!(!core.finish_owed());
+    core.touch_party(1);
+    assert!(core.finish_owed());
+    assert!(!core.quiescent(true), "broader idle includes the same finishing derivation");
+    let out = finish_watch_outputs(&mut core, &limits);
+    let [Request::Held(_), Request::Decided] = out.as_ref() else { panic!("one changed delivery") };
+    assert!(!core.finish_owed(), "an inflight delivery is a child-held wait");
+    watch_outputs(&mut core, &limits, Event::Stopping);
+    assert!(core.finish_owed());
+    assert_eq!(finish_watch_outputs(&mut core, &limits).len(), 1, "ending awaits the delivery terminal");
+    assert!(core.views.is_closing(watcher));
+    assert!(!core.finish_owed(), "closing must not repeatedly owe an ending");
+    let ended = watch_outputs(&mut core, &limits, Event::Delivered { watcher });
+    assert_one_watch_ending(&ended, views::End::Stopping);
+    assert!(core.finish_owed(), "empty bindings still owe the first drain");
+    let drained = finish_watch_outputs(&mut core, &limits);
+    let [Request::Held(held), Request::Decided] = drained.as_ref() else { panic!("one held drain") };
+    let Held::Drained = held.as_ref() else { panic!("drained terminal") };
+    assert!(!core.finish_owed());
+    assert_decided_only(finish_watch_outputs(&mut core, &limits).as_ref());
+}
+
+#[test]
+fn retained_writing_reconciles_public_proof_changes_even_without_watchers() {
+    for change in 0_u8..4 {
+        let (mut core, limits) = watch_core();
+        core.counters.next_commit();
+        run_text_outputs(&mut core, &limits, 7, 1, 0, b"unwatched");
+        assert_eq!(core.views.runs(), 1);
+        assert!(!core.finish_owed(), "current provisional writing waits on its host");
+        match change {
+            0 => core.proofs.get_mut(&1).unwrap().turn = Some(TurnProof { turn: 1, cumulative: 0, read: None }),
+            1 => core.proofs.get_mut(&1).unwrap().attempt = 8,
+            2 => {
+                core.proofs.remove(&1);
+            }
+            3 => {
+                core.proofs.get_mut(&1).unwrap().terminal =
+                    Some(TerminalRecord { task: 1, attempt: 7, cumulative: 0, end: tasks::End::Parked });
+            }
+            _ => unreachable!(),
+        }
+        assert!(core.finish_owed());
+        assert_decided_only(finish_watch_outputs(&mut core, &limits).as_ref());
+        assert!(!core.finish_owed());
+        assert_eq!(core.views.runs(), u32::from(change == 0));
+        if change == 0 {
+            assert!(core.views.retained_run_states().next().unwrap().1.metadata().2);
+            assert_decided_only(finish_watch_outputs(&mut core, &limits).as_ref());
+        }
+    }
+}
+
+#[test]
+fn finishing_inspects_membership_role_and_query_visibility_without_clocks() {
+    for change in 0_u8..5 {
+        let (mut core, limits) = watch_core();
+        core.counters.next_commit();
+        let watcher = Token::new(30);
+        let subject = if change == 3 {
+            Watched::Query {
+                query: TaskQuery {
+                    project: Some(1),
+                    requester: None,
+                    root: None,
+                    parent: None,
+                    label: None,
+                    phase: None,
+                    executor: None,
+                    tracked: None,
+                    order: QueryOrder::Priority,
+                },
+            }
+        } else {
+            Watched::Task { task: 1 }
+        };
+        watch_outputs(&mut core, &limits, Event::Watch { watcher, sign_in: 10, subject, window: window() });
+        watch_outputs(&mut core, &limits, Event::Delivered { watcher });
+        assert!(!core.finish_owed());
+        match change {
+            0 => {
+                core.view_subjects.get_mut(&watcher).unwrap().sign_in = 999;
+            }
+            1 => {
+                core.view_subjects.get_mut(&watcher).unwrap().party = 2;
+            }
+            2 | 3 => {
+                let mut ignored = Queue::with_capacity(people::max_out(&limits.people));
+                people::step(
+                    &mut core.people,
+                    &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people },
+                    people::Event::Roles { project: 1, holdings: Box::new([]) },
+                    &mut ignored,
+                );
+            }
+            4 => core.tasks = fixtures::fresh_tasks(&core, &limits),
+            _ => unreachable!(),
+        }
+        assert!(core.finish_owed());
+        let ended = finish_watch_outputs(&mut core, &limits);
+        let expected = match change {
+            0 | 1 => views::End::SignedOut,
+            2 | 3 => views::End::NotAllowed,
+            4 => views::End::Gone,
+            _ => unreachable!(),
+        };
+        assert_one_watch_ending(&ended, expected);
+        assert!(!core.finish_owed());
+    }
+}
+
+#[test]
+fn projection_readiness_shares_generation_restore_and_pending_connector_rules() {
+    let (mut core, limits) = make_tree();
+    core.counters.next_commit();
+    assert!(core.finish_owed());
+    finish_watch_outputs(&mut core, &limits);
+    assert!(!core.finish_owed());
+    let commit = core.counters.deployment().commits;
+    let state = core.projections.get_mut(&1).unwrap();
+    state.milestones = Box::new([ProjectionMilestone {
+        identity: MilestoneId::Lifecycle { task: 1, position: 1 },
+        phase: Some(tasks::Phase::Waiting),
+        change: None,
+        words: Box::new([]),
+    }]);
+    state.fed_at = Some(commit);
+    assert!(!core.finish_owed(), "same-generation unread milestones wait");
+    assert_decided_only(finish_watch_outputs(&mut core, &limits).as_ref());
+    core.counters.next_commit();
+    assert!(core.finish_owed(), "public commit generation makes the milestone eligible");
+    finish_watch_outputs(&mut core, &limits);
+    assert!(!core.finish_owed());
+    core.counters.next_commit(); // accept the preceding projection decision before a new input
+    let mut amendment = fixtures::unchanged(b"untrack");
+    amendment.tracked = Some(tasks::Tracking::Untracked);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Amend {
+            places: Box::new([]),
+            funder: None,
+            reply_to: ReplyTo::new(Token::new(5)),
+            by: tasks::Party::Person(1),
+            task: 1,
+            message: 21,
+            stop_run: false,
+            amendment,
+        },
+    );
+    assert!(core.tasks.task(1).unwrap().tracked.is_none());
+    assert!(core.finish_owed());
+    finish_watch_outputs(&mut core, &limits);
+    assert!(!core.projections.get(&1).unwrap().pending.is_empty());
+    assert!(!core.finish_owed(), "an untracked goal waits on its closing connectors first");
+    core.projections.get_mut(&1).unwrap().changed = true;
+    assert!(!core.finish_owed(), "pending connectors take precedence over changed");
+
+    // The durable projection header is independently restored and still owes
+    // its changed pass; no private dirty flag can stand in for this state.
+    let (mut restored, restored_limits) = self::core();
+    fresh(&mut restored.counters, Family::Task).unwrap();
+    restored.counters.next_commit();
+    let row = ProjectionRecord::Goal {
+        goal: ProjectionGoal {
+            number: 1,
+            project: 1,
+            priority: 0,
+            words: b"restored".as_slice().into(),
+            phase: tasks::Phase::Waiting,
+        },
+        pending: Box::new([]),
+        changed: true,
+        fed_at: None,
+    };
+    assert_eq!(restored.restore_core(CoreRecord::Projection(row), &restored_limits), Restored::Live);
+    assert!(restored.finish_owed());
+    finish_watch_outputs(&mut restored, &restored_limits);
+    assert!(!restored.finish_owed());
+}
+
+fn assert_decided_only(out: &[Request]) {
+    let [Request::Decided] = out else { panic!("only Decided") };
+}
+
+fn assert_one_watch_ending(out: &[Request], expected: views::End) {
+    let mut endings = 0_u32;
+    for request in out {
+        if let Request::Held(held) = request
+            && let Held::WatchEnded { why, .. } = held.as_ref()
+        {
+            assert_eq!(*why, expected);
+            endings = endings.checked_add(1).expect("bounded watch endings");
+        }
+    }
+    assert_eq!(endings, 1);
+}

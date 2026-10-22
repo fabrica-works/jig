@@ -16,4 +16,4 @@ pub use boundary::{Call, CallIdentity, End, Event, Follow, Made, Refusal, Reques
 pub use domain::{Domain, fire, max_out, step};
 pub use facts::Fact;
 pub use limits::{Limits, worst_case};
-pub use text::{current_call, has_current_call, position, retained_attempt, revision, writing};
+pub use text::{RetainedRun, current_call, has_current_call, position, retained_attempt, revision, writing};

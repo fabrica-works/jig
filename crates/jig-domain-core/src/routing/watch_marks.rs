@@ -10,7 +10,7 @@ use jig_domain_people as people;
 use jig_domain_people::ApplicationScope;
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
-use skein_lib::{Env, List, Queue, Set};
+use skein_lib::{Env, List, Queue, Set, Token};
 
 impl Core {
     /// Connector settlement changes the chips nested in watched documents.
@@ -361,33 +361,92 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
     }
 }
 
+#[derive(Debug)]
+pub(crate) enum Reconciliation {
+    Ended { run: Token },
+    Committed { run: Token, attempt: u64, turn: u32 },
+}
+
+fn reconcile(core: &Core, token: Token, retained: &views::RetainedRun) -> Option<Reconciliation> {
+    let (attempt, position, committed) = retained.metadata();
+    match core.proofs.get(&token.raw()) {
+        Some(proof) if proof.terminal.is_none() && attempt == proof.attempt => match position {
+            Some(writing) if writing.attempt != proof.attempt => Some(Reconciliation::Ended { run: token }),
+            Some(writing) => match proof.turn {
+                Some(kept) if writing.turn <= kept.turn && !committed => {
+                    Some(Reconciliation::Committed { run: token, attempt: proof.attempt, turn: kept.turn })
+                }
+                Some(_) | None => None,
+            },
+            None => None,
+        },
+        Some(_) | None => Some(Reconciliation::Ended { run: token }),
+    }
+}
+
+pub(crate) fn retention_owed(core: &Core) -> bool {
+    for (token, retained) in core.views.retained_run_states() {
+        if reconcile(core, *token, retained).is_some() {
+            return true;
+        }
+    }
+    false
+}
+
+fn timeless_ending(core: &Core, binding: &crate::WatchBinding) -> Option<views::End> {
+    if core.stopping {
+        Some(views::End::Stopping)
+    } else if core.people.sign_in_person(binding.sign_in) != Some(binding.party) {
+        Some(views::End::SignedOut)
+    } else {
+        visibility_end(core, binding)
+    }
+}
+
+pub(crate) fn endings_owed(core: &Core) -> bool {
+    for (watcher, binding) in &core.view_subjects {
+        if !core.views.is_closing(*watcher) && timeless_ending(core, binding).is_some() {
+            return true;
+        }
+    }
+    false
+}
+
+fn ending(core: &Core, binding: &crate::WatchBinding, env: &Env<Limits>) -> Option<views::End> {
+    if core.stopping {
+        Some(views::End::Stopping)
+    } else if core.people.person(binding.sign_in, env.now, env.wall) != Some(binding.party) {
+        Some(views::End::SignedOut)
+    } else {
+        timeless_ending(core, binding)
+    }
+}
+
 pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
-    let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded watch finish").held);
+    let reconcile_runs = retention_owed(core);
+    if core.changed_views.is_empty() && !reconcile_runs {
+        return end_invalid(core, env);
+    }
+    let mut out = Queue::with_capacity(core.room_max.held);
     append(end_invalid(core, env), &mut out);
     // Retained runs are live independently of watches (QUESTIONS.md, item 41).
     // A committed turn stops being provisional; only an ended attempt frees
     // its retained-run admission. Both are fenced by the core's durable proof.
-    for token in &core.views.retained_runs() {
-        let position = views::position(&core.views, *token);
-        let attempt = views::retained_attempt(&core.views, *token);
-        let event = match core.proofs.get(&token.raw()) {
-            Some(proof) if proof.terminal.is_none() && attempt != Some(proof.attempt) => {
-                Some(views::Event::RunEnded { run: *token })
+    if reconcile_runs {
+        let mut pending = List::with_capacity(core.views.runs());
+        for (token, retained) in core.views.retained_run_states() {
+            if let Some(event) = reconcile(core, *token, retained) {
+                pending.push(event).expect("one reconciliation per retained run");
             }
-            Some(proof) if proof.terminal.is_none() => match position {
-                Some((writing, _)) if writing.attempt != proof.attempt => Some(views::Event::RunEnded { run: *token }),
-                Some((writing, _)) => match proof.turn {
-                    Some(kept) if writing.turn <= kept.turn => {
-                        Some(views::Event::TurnCommitted { run: *token, attempt: proof.attempt, turn: kept.turn })
-                    }
-                    Some(_) | None => None,
-                },
-                None => None,
-            },
-            Some(_) | None => Some(views::Event::RunEnded { run: *token }),
-        };
-        if let Some(event) = event {
-            let mut quiet = Queue::with_capacity(1);
+        }
+        for event in &pending {
+            let event = match event {
+                Reconciliation::Ended { run } => views::Event::RunEnded { run: *run },
+                Reconciliation::Committed { run, attempt, turn } => {
+                    views::Event::TurnCommitted { run: *run, attempt: *attempt, turn: *turn }
+                }
+            };
+            let mut quiet = Queue::with_capacity(0);
             views::step(
                 &mut core.views,
                 &Env { now: env.now, wall: env.wall, limits: env.limits.views },
@@ -408,22 +467,29 @@ pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
 }
 
 pub(super) fn end_invalid(core: &mut Core, env: &Env<Limits>) -> Requests {
-    let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded admission endings").held);
+    let mut any = core.draining == Some(true) && core.view_subjects.is_empty();
+    for (watcher, binding) in &core.view_subjects {
+        if !core.views.is_closing(*watcher) && ending(core, binding, env).is_some() {
+            any = true;
+            break;
+        }
+    }
+    if !any {
+        let mut out = Queue::with_capacity(1);
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
+    let mut out = Queue::with_capacity(core.room_max.held);
     let mut watches = List::with_capacity(core.view_subjects.len());
     for (watcher, binding) in &core.view_subjects {
-        watches.push((*watcher, binding.clone())).expect("bounded watch snapshot");
-    }
-    for (watcher, binding) in watches.into_boxed() {
-        let ending = if core.stopping {
-            Some(views::End::Stopping)
-        } else if core.people.person(binding.sign_in, env.now, env.wall) == Some(binding.party) {
-            visibility_end(core, &binding)
-        } else {
-            Some(views::End::SignedOut)
-        };
-        if let Some(end) = ending {
-            append(super::view_routes::route_view(core, env, views::Event::EndWatch { watcher, end }), &mut out);
+        if !core.views.is_closing(*watcher)
+            && let Some(end) = ending(core, binding, env)
+        {
+            watches.push((*watcher, end)).expect("bounded watch endings");
         }
+    }
+    for &(watcher, end) in &watches {
+        append(super::view_routes::route_view(core, env, views::Event::EndWatch { watcher, end }), &mut out);
     }
     crate::stopping::drained(core, &mut out);
     out.push(Request::Decided);

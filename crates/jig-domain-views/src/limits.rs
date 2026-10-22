@@ -37,7 +37,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     Slab::<Watcher>::worst_case(slots(limits)?)?
-        .checked_add(Map::<Token, crate::text::Run>::worst_case(limits.runs)?)?
+        .checked_add(Map::<Token, crate::RetainedRun>::worst_case(limits.runs)?)?
         .checked_add(u64::from(limits.runs).checked_mul(u64::from(limits.text_bytes).checked_mul(2)?)?)?
         .checked_add(u64::from(limits.text_bytes).checked_mul(3)?)?
         .checked_add(Map::<Token, Id<Watcher>>::worst_case(limits.watchers)?)?

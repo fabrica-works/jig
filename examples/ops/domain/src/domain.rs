@@ -194,7 +194,8 @@ impl Domain {
     /// The iterate adapter may park once the journal and immediate work settle.
     #[must_use]
     pub fn quiescent(&self) -> bool {
-        self.journal.idle() && (!self.ready() || (!self.host.is_ready() && !self.core.due_ready()))
+        self.journal.idle()
+            && (!self.ready() || (!self.host.is_ready() && !self.core.due_ready() && !self.core.finish_owed()))
     }
 
     /// The protocol timer adapter wakes the root at this hub retry deadline.
@@ -227,6 +228,7 @@ pub(crate) enum Work {
     Event(Event),
     Core(core::Event),
     ResumeFleet,
+    Finish,
     Infrastructure(infrastructure::Event),
     Observability(observability::Event),
     Host(host::Event),
@@ -285,6 +287,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         ) => skein_lib::JournalRoom { writes: 0, held: 0 },
         Work::Event(_)
         | Work::Core(_)
+        | Work::Finish
         | Work::ResumeFleet
         | Work::Infrastructure(_)
         | Work::Observability(_)
@@ -298,6 +301,18 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         return;
     };
     domain.wrote = false;
+    let finish_only = match &first {
+        Work::Finish => true,
+        Work::Event(_)
+        | Work::Core(_)
+        | Work::ResumeFleet
+        | Work::Infrastructure(_)
+        | Work::Observability(_)
+        | Work::Host(_)
+        | Work::Restart(_)
+        | Work::AdoptClaims
+        | Work::AdoptDone => false,
+    };
     let mut work = Queue::with_capacity(env.limits.routes);
     work.push(first);
     for _ in 0..env.limits.routes {
@@ -317,6 +332,9 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         crate::route::work(domain, env, &mut decision, next, &mut work);
     }
     assert!(work.is_empty(), "complete synchronous route fits its admission");
+    if finish_only {
+        assert!(!domain.wrote && !domain.core.counters.dirty(), "stopping continuation makes no commit");
+    }
     // The cold load must read the durable header before numbering another
     // commit. Copy this guard with the core's restart script.
     if domain.wrote || (domain.core.counters.dirty() && domain.core.restart_step() != Some(core::RestartStep::LoadCore))
@@ -364,12 +382,56 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Output>) 
     for _ in 0..ready.len() {
         out.push(ready.pop().expect("journal release count"));
     }
+    if domain.core.stopping() {
+        if domain.core.finish_owed() {
+            decide(domain, env, Work::Finish);
+        }
+        return;
+    }
     if domain.journal.idle() && domain.ready() {
         if let Some(context) = domain.core.take_due() {
             decide(domain, env, Work::Core(core::Event::Activate { context, ready: true }));
-        } else {
+        } else if domain.host.is_ready()
+            || domain.core.fleet.is_ready()
+            || domain.core.finish_owed()
+            || timers_due(domain, env)
+        {
             decide(domain, env, Work::ResumeFleet);
         }
+    }
+}
+
+fn wall_due(env: &Env<Limits>, expiry: skein_lib::Wall) -> bool {
+    let remaining = expiry.as_nanos().saturating_sub(env.wall.as_nanos());
+    env.now.saturating_add(skein_lib::Duration::from_nanos(remaining)) <= env.now
+}
+
+fn timers_due(domain: &Domain, env: &Env<Limits>) -> bool {
+    for due in [
+        domain.core.people.next_deadline(),
+        domain.core.tasks.next_deadline(),
+        domain.core.fleet.next_deadline(),
+        domain.core.brief.next_deadline(),
+        domain.core.accounts.next_deadline(),
+        domain.core.views.next_deadline(),
+        observability::next_deadline(&domain.observability),
+        infrastructure::next_deadline(&domain.infrastructure),
+        domain.next_turn_deadline(),
+    ] {
+        if let Some(due) = due
+            && due <= env.now
+        {
+            return true;
+        }
+    }
+    if let Some(expiry) = domain.core.people.next_wall_expiry()
+        && wall_due(env, expiry)
+    {
+        return true;
+    }
+    match domain.core.effect_deadline() {
+        Some(due) => wall_due(env, due),
+        None => false,
     }
 }
 

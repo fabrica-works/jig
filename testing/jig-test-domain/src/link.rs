@@ -460,6 +460,7 @@ pub(super) enum Work {
     Timer(core::Timer),
     Core(core::Event),
     ResumeFleet,
+    Finish,
     Connector {
         number: u16,
         event: connector::Event,

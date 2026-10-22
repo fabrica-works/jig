@@ -1861,3 +1861,79 @@ fn restoration_cannot_open_the_one_person_host_exception() {
     let domain = Domain::new(&LIMITS, Box::new([]), 2);
     assert_eq!(domain.persons(), u32::MAX);
 }
+
+#[test]
+fn wall_expiry_and_original_elapsed_expiry_each_end_one_signin_per_fire() {
+    let mut test = Test::new(LIMITS);
+    test.signin(1, 10, identity(0, 1));
+    test.signin(2, 11, identity(0, 2));
+    let expiry = Wall::from_nanos(Duration::from_secs(60).as_nanos());
+    assert_eq!(test.d.next_wall_expiry(), Some(expiry));
+    assert_eq!(test.d.sign_in_person(10), Some(1));
+    let original = test.d.next_deadline().unwrap();
+    test.env.now = Time::from_nanos(1);
+    test.env.wall = expiry;
+    assert_eq!(test.d.person(10, test.env.now, test.env.wall), None);
+    assert_eq!(test.d.sign_in_person(10), Some(1), "membership makes no validity claim");
+    let mut out = Queue::with_capacity(max_out(&LIMITS));
+    fire(&mut test.d, &test.env, &mut out);
+    assert_signin_erased(&mut out, 10);
+    assert!(out.is_empty());
+    assert_eq!(test.d.sign_in_person(10), None);
+    assert_eq!(test.d.sign_in_person(11), Some(2));
+    assert_eq!(test.d.next_wall_expiry(), Some(expiry), "other due session remains indexed");
+    fire(&mut test.d, &test.env, &mut out);
+    assert_signin_erased(&mut out, 11);
+    assert_eq!(test.d.next_wall_expiry(), None);
+    assert_eq!(test.d.next_deadline(), None);
+    fire(&mut test.d, &test.env, &mut out);
+    assert!(out.is_empty());
+
+    test.env.now = Time::from_nanos(2);
+    test.env.wall = Wall::from_nanos(Duration::from_secs(30).as_nanos());
+    test.signin(1, 12, identity(0, 1));
+    let due = test.d.next_deadline().unwrap();
+    assert_eq!(due, original.saturating_add(Duration::from_nanos(2)));
+    test.env.now = due;
+    test.env.wall = Wall::EPOCH;
+    fire(&mut test.d, &test.env, &mut out);
+    assert_signin_erased(&mut out, 12);
+    assert!(out.is_empty(), "backward wall never extends the original elapsed expiry");
+    assert_eq!(test.d.next_wall_expiry(), None);
+}
+
+#[test]
+fn restored_expiries_and_removing_the_earliest_keep_both_indexes_exact() {
+    let mut test = Test::new(LIMITS);
+    test.d = Domain::new(&LIMITS, Box::new([]), 2);
+    test.send(Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } });
+    for (number, expires) in [(11, 90), (10, 60), (12, 120)] {
+        test.send(Event::Restore {
+            record: Stored::SignIn {
+                number,
+                person: 1,
+                expires: Wall::from_nanos(Duration::from_secs(expires).as_nanos()),
+            },
+        });
+    }
+    test.env.now = Time::from_nanos(Duration::from_secs(5).as_nanos());
+    test.env.wall = Wall::from_nanos(Duration::from_secs(30).as_nanos());
+    test.send(Event::Restored);
+    assert_eq!(test.d.next_wall_expiry(), Some(Wall::from_nanos(Duration::from_secs(60).as_nanos())));
+    let to = test.to();
+    test.send(Event::SignOut { reply_to: to, sign_in: 10 });
+    assert_eq!(test.d.next_wall_expiry(), Some(Wall::from_nanos(Duration::from_secs(90).as_nanos())));
+    assert_eq!(test.d.next_deadline(), Some(Time::from_nanos(Duration::from_secs(65).as_nanos())));
+    test.env.wall = Wall::from_nanos(Duration::from_secs(91).as_nanos());
+    let mut out = Queue::with_capacity(max_out(&LIMITS));
+    fire(&mut test.d, &test.env, &mut out);
+    assert_signin_erased(&mut out, 11);
+    assert!(out.is_empty());
+    assert_eq!(test.d.next_wall_expiry(), Some(Wall::from_nanos(Duration::from_secs(120).as_nanos())));
+    assert_eq!(test.d.sign_in_person(12), Some(1));
+}
+
+fn assert_signin_erased(out: &mut Queue<Request>, expected: u64) {
+    let Some(Request::Erase { key: Key::SignIn(number) }) = out.pop() else { panic!("one sign-in erased") };
+    assert_eq!(number, expected);
+}

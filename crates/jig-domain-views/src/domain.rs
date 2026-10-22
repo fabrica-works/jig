@@ -9,7 +9,7 @@ use skein_lib::{Env, Id, List, Map, Queue, Slab, Time, Token};
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) watchers: Slab<Watcher>,
-    pub(crate) runs: Map<Token, crate::text::Run>,
+    pub(crate) runs: Map<Token, crate::RetainedRun>,
     pub(crate) names: Map<Token, Id<Watcher>>,
     pub(crate) facts: Facts,
 }
@@ -43,6 +43,23 @@ impl Domain {
             tokens.push(*token).expect("retained run count");
         }
         tokens
+    }
+    /// Retained states in token order. The return type names the container
+    /// only because the programming model permits no application iterator type.
+    pub fn retained_run_states(&self) -> alloc::collections::btree_map::Iter<'_, Token, crate::RetainedRun> {
+        self.runs.iter()
+    }
+    /// Whether an admitted watch awaits construction, delivery or stream
+    /// acknowledgement after its ending has already been requested.
+    #[must_use]
+    pub fn is_closing(&self, watcher: Token) -> bool {
+        let Some(id) = self.names.get(&watcher) else { return false };
+        match self.watchers.get(*id).expect("named watch").state {
+            watch::State::ClosingMake { .. }
+            | watch::State::ClosingDelivery { .. }
+            | watch::State::ClosingStream { .. } => true,
+            watch::State::Idle | watch::State::Making { .. } | watch::State::Sending { .. } => false,
+        }
     }
     /// Whether an opaque run has any admitted follower.
     #[must_use]

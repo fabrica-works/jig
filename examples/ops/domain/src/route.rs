@@ -29,6 +29,7 @@ pub(crate) fn work(
                 core::step(&mut domain.core, &Env { now: env.now, wall: env.wall, limits: env.limits.core }, event);
             core_out(domain, env, decision, requests, work);
         }
+        Work::Finish => {}
         Work::ResumeFleet => {
             let requests =
                 core::resume_fleet(&mut domain.core, &Env { now: env.now, wall: env.wall, limits: env.limits.core });

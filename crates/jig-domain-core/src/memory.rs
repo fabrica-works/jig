@@ -282,8 +282,15 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(Map::<skein_lib::Token, crate::WatchBinding>::worst_case(limits.views.watchers)?)?;
     total = total.checked_add(Slab::<crate::WatchedSubject>::worst_case(limits.views.watchers)?)?;
     total = total.checked_add(Set::<Id<crate::WatchedSubject>>::worst_case(limits.views.watchers)?.checked_mul(2)?)?;
-    total = total.checked_add(List::<(skein_lib::Token, crate::WatchBinding)>::worst_case(limits.views.watchers)?)?;
+    total = total.checked_add(List::<(skein_lib::Token, jig_domain_views::End)>::worst_case(limits.views.watchers)?)?;
     total = total.checked_add(List::<u64>::worst_case(limits.views.watchers)?)?;
+    // Views prices its token-only retained_runs snapshot. Finishing replaces
+    // that scratch with reconciliation actions; the snapshots never coexist.
+    total =
+        total.checked_add(
+            List::<crate::routing::watch_marks::Reconciliation>::worst_case(limits.views.runs)?
+                .checked_sub(List::<skein_lib::Token>::worst_case(limits.views.runs)?)?,
+        )?;
     total = total.checked_add(List::<u64>::worst_case(limits.tasks.depth.checked_add(1)?)?)?;
     total = total.checked_add(List::<u64>::worst_case(limits.documents.chips)?)?;
     total = total

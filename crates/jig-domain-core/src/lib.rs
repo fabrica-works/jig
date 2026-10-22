@@ -245,11 +245,13 @@ pub(crate) struct WatchedSubject {
 /// One delegation waiting for the task child's durable creation reply.
 pub type Delegating = (CallKey, Box<[tasks::Stub]>, Option<people::Given>);
 
-/// The eight child domains of the core; routing owns durable live state.
-/// added here as the root's boundary is drawn.
+/// The engine's children, routing and durable live state (domain/engine.md,
+/// section 3). Configuration limits stay immutable (programming-model.md,
+/// section 10.1); route room is cached only after validating those limits.
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
 pub struct Core {
+    room_max: skein_lib::JournalRoom,
     pub(crate) run_now: skein_lib::Time,
     pub(crate) run_wall: Wall,
     /// Last reported store map bytes (protocol/store.md, 11.2).
@@ -556,7 +558,9 @@ impl Core {
             );
         }
         let fleet_needs = fleet_needs::configured(&config, limits);
+        let room_max = room_max(limits).expect("validated immutable core limits");
         Ok(Core {
+            room_max,
             fill: 0,
             workers_in_process: config.workers_in_process,
             stopping: false,
@@ -696,7 +700,22 @@ impl Core {
         }
     }
 
-    /// Pure idle fence for core work; a host can still hold a live attempt.
+    /// Pure, allocation-free finishing derivation (domain/root.md, section 3).
+    /// Child-held waits and future alarms alone owe no finishing. Before
+    /// omitting a closure the root must also check its current-clock timers.
+    #[must_use]
+    pub fn finish_owed(&self) -> bool {
+        self.counters.dirty()
+            || (self.draining == Some(true) && self.view_subjects.is_empty())
+            || !self.changed_views.is_empty()
+            || projections::owed(self)
+            || routing::watch_marks::retention_owed(self)
+            || routing::watch_marks::endings_owed(self)
+    }
+
+    /// Idle fence including journal, routing and finishing (domain/root.md,
+    /// section 3). A host may still hold a live attempt. False can mean a child
+    /// awaits input; use `finish_owed` for closure after checking due timers.
     #[must_use]
     pub fn quiescent(&self, journal_idle: bool) -> bool {
         self.counters.quiescent(journal_idle)
@@ -736,6 +755,7 @@ impl Core {
             && self.fleet.calls() == 0
             && self.fleet.next_deadline().is_none()
             && !self.accounts.waiting()
+            && !self.finish_owed()
     }
 
     /// Restore one current claim only when it matches the live task's
