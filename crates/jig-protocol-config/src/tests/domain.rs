@@ -264,6 +264,16 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
 }
 #[test]
 fn memory_below_the_components_sum_is_refused() {
+    const BEFORE_FINISHING_OVER: u64 = 18_729_868_387;
+    // Finishing (domain/root.md, section 3; domain/people.md, section 3):
+    // people's sign_in_worst_case adds Set<(Wall, u64)> at 8 sign-ins: 576 bytes.
+    // Core's Reconciliation scratch replaces the views' Token snapshot:
+    // 24 - 8 = 16 bytes per retained run. Ending scratch replaces (Token,
+    // WatchBinding) with (Token, End): 88 - 16 = 72 fewer bytes per watcher.
+    // The small profile has 4 runs and 4 watchers: 576 + 64 - 288 = 352.
+    // The 32-byte set header and 8-byte room cache are inline, outside this heap sum.
+    const RECONCILIATION_GROWTH_PER_RUN: u64 = 24 - 8;
+    const ENDING_SAVING_PER_WATCHER: u64 = 88 - 16;
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
     // Worker program sources add 6,723,936 bytes: the hub's and the fleet's source records
@@ -385,7 +395,12 @@ fn memory_below_the_components_sum_is_refused() {
     // 18,729,231,011 + 176 + 349,184 = 18,729,580,371 (one byte is supplied).
     // Question positions' ordering scratch and the core's bounded activity
     // cache, pruning keys and census keys add 288,016 bytes at this profile.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_729_868_387 });
+    let limits = crate::profile(crate::Profile::Small).core;
+    let wall_expiry_index = skein_lib::Set::<(skein_lib::Wall, u64)>::worst_case(limits.people.sign_ins).unwrap();
+    let reconciliation_growth = u64::from(limits.views.runs) * RECONCILIATION_GROWTH_PER_RUN;
+    let ending_saving = u64::from(limits.views.watchers) * ENDING_SAVING_PER_WATCHER;
+    let over = BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving;
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {
