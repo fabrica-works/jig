@@ -28,7 +28,7 @@ pub fn check(directory: &Path, credential: Option<&[u8]>) {
     assert!(prompts > 0, "everything capture includes an actual provider prompt");
 }
 /// A failed live run's trace in words, before it is erased: its prompts and each failure's
-/// class, status, code, field, phase, state and exit. No content, detail or evidence.
+/// [`NAMED`] fields, its detail's words and its completion's. No content, credential or header.
 pub fn failures(directory: &Path) -> String {
     let Ok(bytes) = fs::read(directory.join("agent-trace.jsonl")) else {
         return "live agent trace: absent".to_owned();
@@ -48,11 +48,7 @@ fn failed(value: &serde_json::Value, failures: &mut Vec<serde_json::Value>) {
         serde_json::Value::Object(fields) => {
             for (name, value) in fields {
                 if name == "failure" && value.is_object() {
-                    let named = ["class", "status", "code", "field", "phase", "state", "exit"]
-                        .into_iter()
-                        .filter_map(|name| value.get(name).map(|value| (name.to_owned(), value.clone())))
-                        .collect();
-                    failures.push(serde_json::Value::Object(named));
+                    failures.push(named(value));
                 } else {
                     failed(value, failures);
                 }
@@ -64,6 +60,42 @@ fn failed(value: &serde_json::Value, failures: &mut Vec<serde_json::Value>) {
         | serde_json::Value::Number(_)
         | serde_json::Value::String(_) => {}
     }
+}
+/// The fields of a failure a sitting prints: a start's refusal names its `which`, a provider's
+/// answer its status and code, the client's its evidence and limit.
+const NAMED: [&str; 14] = [
+    "class", "which", "reason", "evidence", "status", "code", "field", "phase", "limit", "state", "exit", "attempts",
+    "bound", "used",
+];
+fn named(failure: &serde_json::Value) -> serde_json::Value {
+    let mut named: serde_json::Map<String, serde_json::Value> =
+        NAMED.into_iter().filter_map(|name| failure.get(name).map(|value| (name.to_owned(), value.clone()))).collect();
+    if let Some(detail) = failure.get("detail").and_then(serde_json::Value::as_str) {
+        named.insert("words".to_owned(), words(detail).into());
+    }
+    if let Some(completion) = failure.get("completion").filter(|completion| completion.is_object()) {
+        named.insert("completion".to_owned(), self::named(completion));
+    }
+    serde_json::Value::Object(named)
+}
+/// A failure's detail, the provider's words or the client's, at most 240 characters, with each
+/// run of 16 or more token characters cut: a token, a key or a masked key never prints.
+fn words(detail: &str) -> String {
+    let (mut words, mut run) = (String::new(), String::new());
+    for character in detail.chars() {
+        if character.is_ascii_alphanumeric() || "+/=_.-".contains(character) {
+            run.push(character);
+        } else {
+            cut(&mut words, &mut run);
+            words.push(character);
+        }
+    }
+    cut(&mut words, &mut run);
+    words.chars().take(240).collect()
+}
+fn cut(words: &mut String, run: &mut String) {
+    words.push_str(if run.len() >= 16 { "[cut]" } else { run.as_str() });
+    run.clear();
 }
 fn fields(value: &serde_json::Value, credential: Option<&[u8]>) {
     match value {
