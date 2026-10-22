@@ -111,6 +111,7 @@ pub fn charter(charter: Charter, brief: Box<[Section]>, resumed: bool) -> Option
     }
     let outcome = outcome(charter.contract)?;
     Some(run::Charter {
+        mode: run::Mode::Finite,
         resume: charter.resumes && resumed,
         waiting: charter.waiting,
         instructions: charter.instructions,

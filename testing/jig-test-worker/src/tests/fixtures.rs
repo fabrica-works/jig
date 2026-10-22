@@ -58,12 +58,12 @@ pub fn limits() -> Limits {
     Limits { hub, agent, bounds, stop_bound: Duration::from_secs(20), workstreams: Box::new([1]) }
 }
 
-// Smith's smallest v3 golden, used by its agent-process world's charter fixture.
-const SMALLEST: [u8; 120] = [
-    0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+// Smith's smallest v4 golden, used by its agent-process world's charter fixture.
+const SMALLEST: [u8; 121] = [
+    0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0,
 ];
 
 pub fn charter_bytes() -> Box<[u8]> {

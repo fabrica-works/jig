@@ -27,6 +27,6 @@ pub use result::{Field, RunResult, Unreadable, result};
 
 /// The encoding ceilings already owned by this kit (protocol/channel.md, 6.1).
 #[must_use]
-pub const fn limits() -> smith_charter::v3::Limits {
-    smith_charter::v3::CEILINGS
+pub const fn limits() -> smith_charter::v4::Limits {
+    smith_charter::v4::CEILINGS
 }

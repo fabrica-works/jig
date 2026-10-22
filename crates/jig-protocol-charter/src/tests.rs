@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 use skein_lib::{Duration, Reader};
-use smith_charter::v3 as wire;
+use smith_charter::v4 as wire;
 
 use crate::{
     Budget, Charter, Contract, EndpointName, Model, Prices, Reserve, Section, TextRule, Tool, ToolEffect, charter,

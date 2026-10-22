@@ -4,7 +4,7 @@
 
 use alloc::boxed::Box;
 use skein_lib::{List, Writer};
-use smith_charter::v3 as wire;
+use smith_charter::v4 as wire;
 use smith_domain_run as run;
 
 /// One configured endpoint name and its domain-visible identities.
@@ -214,6 +214,7 @@ pub fn encode(source: run::Charter, names: &[EndpointName], limits: &wire::Limit
             models,
             waiting: source.waiting,
             resume: source.resume,
+            mode: wire::Mode::Finite,
         },
     )
     .ok()?;
