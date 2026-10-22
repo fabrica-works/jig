@@ -367,7 +367,7 @@ fn a_refused_later_program_grant_leaves_no_value_queued() {
 
 #[test]
 fn the_hosts_endpoint_cap_is_the_worker_wires_ceiling() {
-    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v4::CEILINGS.bounds_program_endpoints);
+    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v6::CEILINGS.bounds_program_endpoints);
 }
 
 fn hello_with_program_endpoints(count: u32) -> host::Hello {

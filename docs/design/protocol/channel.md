@@ -138,7 +138,7 @@ The opening is skein's (skein's `channel.md`, section 5): `Open` from the
 worker, `Accept` or `Refuse` from the engine, then each side's `Terms`.
 
 - **The magic** names jig's channel; the schema gives its four bytes.
-- **One version at a time.** jig's worker channel speaks version 5,
+- **One version at a time.** jig's worker channel speaks version 6,
   whose `GrantValue` is a credential, an application's credential or a
   program source's name (tags 0 to 2: section 8), with no other form,
   and which keeps the kind numbers. A worker of another version is

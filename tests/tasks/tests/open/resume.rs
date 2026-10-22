@@ -216,6 +216,7 @@ fn amend(w: &mut World, task: u64, dependencies: &[u64]) {
     let call = reply_to.into_token();
     let message = w.record(task).last_message + 1;
     w.send(Event::Amend {
+        places: Box::new([]),
         reply_to: ReplyTo::new(call),
         by: Party::Person(PERSON),
         task,

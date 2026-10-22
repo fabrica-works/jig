@@ -247,6 +247,10 @@ requires. Existing variant tags, client version 11, worker version 4 and
 all store families stay fixed. Nothing in this data slice changes status
 or person-facing words (`../client/domain/contract.md`, 5.1).
 
+Open uses client v12 with worker wire v6, tasks store v7 and people store
+v7; core store remains v4. Its ending authority and refusal status travel
+in these families; the worker's GrantValue retains tags 0 to 2.
+
 Client v12 carries `resolved_default: Option<LlmChoice>` beside each
 effective template's configured LLM intent in `me`
 (`../client/domain/contract.md`, 5.1). The schema, generated codecs,

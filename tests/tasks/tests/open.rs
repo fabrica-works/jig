@@ -260,6 +260,7 @@ fn an_open_raw_finish_while_narrowing_goes_due() {
     let reply_to = w.to();
     let call = reply_to.into_token().raw();
     w.send(Event::Amend {
+        places: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
         funder: None,
         by: Party::Person(1),

@@ -5,7 +5,7 @@ use skein_channel::{Direction, Role, Term};
 use skein_lib::{Duration, List, Reader};
 
 // Existing hello 178 + list count 4 + the independent 64 endpoint identities.
-const HELLO_MAX: u32 = 178 + 4 + crate::v4::CEILINGS.bounds_program_endpoints * 4;
+const HELLO_MAX: u32 = 178 + 4 + crate::v6::CEILINGS.bounds_program_endpoints * 4;
 fn hello_schema() -> skein_channel::Schema {
     crate::schema(&fixtures::LIMITS).expect("small schema")
 }
@@ -168,8 +168,8 @@ fn a_hello_past_the_endpoint_ceiling_is_refused_at_its_bound() {
         (at_cap, Ok(ENDPOINT_CAP)),
         (
             past_cap,
-            Err(crate::v4::Problem {
-                path: crate::v4::Path::BoundsProgramEndpoints,
+            Err(crate::v6::Problem {
+                path: crate::v6::Path::BoundsProgramEndpoints,
                 reason: skein_codec::Reason::Bound,
             }),
         ),

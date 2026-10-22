@@ -385,7 +385,7 @@ fn the_census_restores_unread_ended_replies_beside_the_result() {
     let tasks::Stored::Ended(mut owner) = ended_census_chat() else { panic!("ended census fixture") };
     // Durable records for a kept conversation: RunBegan at 1, these two
     // turns at 2/3, then RunEnded at 4 and the settled owner at time 100.
-    owner.flags = tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::Kept };
+    owner.flags = tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::Kept, ..tasks::Flags::PLAIN };
     owner.phase =
         tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: Box::new(*b"final report") }));
     owner.last_reply = FINAL_REPLY;

@@ -222,6 +222,9 @@ secrets' store (section 9).
   and from the generated ones with small total functions, exhaustive both
   ways, so a domain change to a durable field breaks a translation's
   build the day it happens.
+Open's ending authority is carried in tasks v7 and people v7. Core's
+schema remains v4. These are the versions the format row requires.
+
 - **Each record carries its family's version,** as every generated record
   does (skein's `codec.md`, section 5), which is what an upgrade will
   need.
