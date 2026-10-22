@@ -17,7 +17,7 @@ pub(crate) struct HandleState {
 pub struct Domain {
     pub(crate) handles: Map<Handle, HandleState>,
     pub(crate) watches: Map<u64, Watch>,
-    pub(crate) reads: Map<Handle, Token>,
+    pub(crate) reads: Map<Handle, crate::reads::PendingRead>,
     pub(crate) next: u64,
     pub(crate) rng: Rng,
     pub(crate) scratch: List<Handle>,

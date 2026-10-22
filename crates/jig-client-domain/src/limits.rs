@@ -52,6 +52,8 @@ pub fn max_out(limits: &Limits) -> u32 {
         .expect("validated handles")
         .checked_add(limits.watches)
         .expect("validated output bound")
+        .checked_add(limits.reads)
+        .expect("validated read output")
         .checked_add(limits.requests.out)
         .expect("validated table output")
         .checked_add(limits.requests.requests.checked_mul(2).expect("validated request count"))
@@ -77,6 +79,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .handles
         .checked_mul(2)?
         .checked_add(limits.watches)?
+        .checked_add(limits.reads)?
         .checked_add(limits.requests.out)?
         .checked_add(limits.requests.requests.checked_mul(2)?)?
         .checked_add(1)?;
@@ -87,7 +90,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<crate::domain::Owner>::worst_case(owners)?)?
         .checked_add(List::<u16>::worst_case(owners)?)?
         .checked_add(List::<skein_lib::Token>::worst_case(limits.requests.requests)?)?
-        .checked_add(Map::<Handle, skein_lib::Token>::worst_case(limits.reads)?)?;
+        .checked_add(Map::<Handle, crate::reads::PendingRead>::worst_case(limits.reads)?)?;
     let own = own
         .checked_add(List::<Handle>::worst_case(limits.handles)?)?
         .checked_add(List::<u64>::worst_case(limits.watches)?)?;

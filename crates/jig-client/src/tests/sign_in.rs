@@ -52,6 +52,7 @@ fn signed_out_ends_each_handle_once_and_parks_each_request() {
         let read = c.exchange();
         c.signed_out_by(terminal, &fixtures::SigningExchanges { request, read, opening, watch });
         assert_eq!(fixtures::ended(c.requests()).as_slice(), &[(TASK, Why::SignedOut)], "{terminal:?}");
+        assert_eq!(fixtures::pages(c.requests()).as_slice(), &[(ME, signed_out_page())], "{terminal:?}");
         assert_eq!(c.machine.link().state, Link::SignedOut, "{terminal:?}");
         assert_eq!(c.machine.link().party, None, "{terminal:?}");
         assert_eq!(c.machine.link().credential, None, "{terminal:?}");
@@ -251,4 +252,199 @@ fn service_answer() -> Box<[u8]> {
     )
     .unwrap();
     fixtures::answer(&w::KeyedAnswer::FinalAnswer(owned))
+}
+
+fn signed_out_page() -> Readout {
+    Readout::Jig(contract::ReadResult::None(contract::ReadNone::SignedOut))
+}
+fn unknown_page() -> Readout {
+    Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown))
+}
+fn assert_no_read_exchange(c: &Client) {
+    for request in c.requests() {
+        if let Request::Exchange { message: Message::Read(_), .. } = request {
+            panic!("unexpected read replay: {request:?}");
+        }
+    }
+}
+fn assert_read_credential(c: &Client, expected: Option<&skein_lib::Secret>) {
+    let [Request::Exchange { credential, message: Message::Read(_), .. }] = c.requests() else {
+        panic!("one read exchange: {:?}", c.requests());
+    };
+    assert_eq!(credential.as_ref(), expected);
+}
+fn replacement_survives_old_terminals(c: &mut Client, old: &[skein_lib::Token]) {
+    assert_no_read_exchange(c);
+    c.stream(fixtures::hello(jig_client_protocol_wire::VERSION));
+    let watch = c.opened_watch();
+    assert_no_read_exchange(c);
+    assert!(fixtures::pages(c.requests()).is_empty());
+    c.stream(fixtures::frame(watch));
+    assert_no_read_exchange(c);
+    c.step(Event::Stored);
+    assert_no_read_exchange(c);
+    let replacement = c.read(TASK);
+    assert!(!old.contains(&replacement));
+    assert_read_credential(c, c.machine.link().credential);
+    for exchange in old {
+        c.step(Event::Reply { exchange: *exchange, message: fixtures::unknown_read() });
+        assert!(c.requests().is_empty());
+        c.step(Event::Lost { exchange: *exchange });
+        assert!(c.requests().is_empty());
+    }
+    c.step(Event::Reply { exchange: replacement, message: fixtures::unknown_read() });
+    assert_eq!(c.requests(), &[Request::Told { told: Told::Page { handle: TASK, page: unknown_page() } }]);
+    c.step(Event::Lost { exchange: replacement });
+    assert!(c.requests().is_empty());
+}
+
+#[test]
+fn held_and_transport_installation_end_reads_even_before_first_sign_in() {
+    for start in [Client::new, Client::signed_in] {
+        for with in [With::Held(fixtures::credential(&NEW_CREDENTIAL)), With::Transport] {
+            let mut c = start();
+            let reads = [c.read(TASK), c.read(ME)];
+            let expected_credential = match &with {
+                With::Held(credential) => Some(credential.clone()),
+                With::Transport => None,
+                With::Link(_) | With::Service(_) => unreachable!("immediate installation"),
+            };
+            c.step(Event::SignIn { with });
+            assert_eq!(fixtures::pages(c.requests()).as_slice(), &[(TASK, signed_out_page()), (ME, signed_out_page())]);
+            assert_eq!(c.machine.link().credential, expected_credential.as_ref());
+            replacement_survives_old_terminals(&mut c, &reads);
+        }
+    }
+}
+
+fn exchanging_sign_ins() -> [With; 2] {
+    [With::Link(fixtures::credential(&CREDENTIAL)), With::Service(fixtures::credential(&SERVICE_CREDENTIAL))]
+}
+fn reads_across_sign_in_exchange(with: With) -> (Client, skein_lib::Token, [skein_lib::Token; 2]) {
+    let mut c = Client::signed_in();
+    let before = c.read(TASK);
+    c.step(Event::SignIn { with });
+    let signing = c.exchange();
+    let during = c.read(ME);
+    assert_read_credential(&c, Some(&fixtures::credential(&CREDENTIAL)));
+    (c, signing, [before, during])
+}
+
+#[test]
+fn successful_exchange_cancels_reads_from_before_and_during_sign_in() {
+    for with in exchanging_sign_ins() {
+        let (mut c, signing, reads) = reads_across_sign_in_exchange(with);
+        c.step(Event::Reply { exchange: signing, message: fixtures::signed_in(&NEW_CREDENTIAL) });
+        assert_eq!(fixtures::pages(c.requests()).as_slice(), &[(TASK, signed_out_page()), (ME, signed_out_page())]);
+        assert_eq!(c.machine.link().credential, Some(&fixtures::credential(&NEW_CREDENTIAL)));
+        replacement_survives_old_terminals(&mut c, &reads);
+    }
+}
+
+#[test]
+fn read_responses_before_successful_installation_are_the_only_pages() {
+    for with in exchanging_sign_ins() {
+        let (mut c, signing, reads) = reads_across_sign_in_exchange(with);
+        for (handle, exchange) in [TASK, ME].into_iter().zip(reads) {
+            c.step(Event::Reply { exchange, message: fixtures::unknown_read() });
+            assert_eq!(c.requests(), &[Request::Told { told: Told::Page { handle, page: unknown_page() } }]);
+        }
+        c.step(Event::Reply { exchange: signing, message: fixtures::signed_in(&NEW_CREDENTIAL) });
+        assert!(fixtures::pages(c.requests()).is_empty());
+        assert_no_read_exchange(&c);
+        assert_eq!(c.machine.link().credential, Some(&fixtures::credential(&NEW_CREDENTIAL)));
+    }
+}
+
+#[test]
+fn sign_in_without_installation_leaves_old_reads_eligible() {
+    // Malformed, refused, not ready, and lost all install no credential.
+    for with in exchanging_sign_ins() {
+        for result in [
+            Some(Box::<[u8]>::from([])),
+            Some(fixtures::sign_in_answer(&w::SignInAnswer::Refused)),
+            Some(fixtures::sign_in_answer(&w::SignInAnswer::NotReady)),
+            None,
+        ] {
+            let (mut c, signing, reads) = reads_across_sign_in_exchange(match &with {
+                With::Link(secret) => With::Link(secret.clone()),
+                With::Service(credential) => With::Service(credential.clone()),
+                With::Held(_) | With::Transport => unreachable!("exchange sign-in"),
+            });
+            let event = match result {
+                Some(message) => Event::Reply { exchange: signing, message },
+                None => Event::Lost { exchange: signing },
+            };
+            c.step(event);
+            assert!(fixtures::pages(c.requests()).is_empty());
+            assert_eq!(c.machine.link().credential, Some(&fixtures::credential(&CREDENTIAL)));
+            for (handle, exchange) in [TASK, ME].into_iter().zip(reads) {
+                c.step(Event::Reply { exchange, message: fixtures::unknown_read() });
+                assert_eq!(c.requests(), &[Request::Told { told: Told::Page { handle, page: unknown_page() } }]);
+            }
+        }
+    }
+}
+
+#[test]
+fn a_signed_out_read_visibly_ends_itself_and_other_reads_once() {
+    let mut c = Client::signed_in();
+    let request = c.read(TASK);
+    let read = c.read(ME);
+    c.step(Event::Reply { exchange: read, message: fixtures::read_none(w::ReadNone::SignedOut) });
+    assert_eq!(fixtures::pages(c.requests()).as_slice(), &[(TASK, signed_out_page()), (ME, signed_out_page())]);
+    assert_eq!(c.machine.link().state, Link::SignedOut);
+    for exchange in [request, read] {
+        c.step(Event::Reply { exchange, message: fixtures::unknown_read() });
+        assert!(c.requests().is_empty());
+        c.step(Event::Lost { exchange });
+        assert!(c.requests().is_empty());
+    }
+}
+
+// Exceeds the domain fixture's output allowance without a reads term, with no watch handles.
+const INDEPENDENT_READS: u32 = 64;
+#[test]
+fn independent_read_room_and_pages_fit_the_composed_queues() {
+    let limits = Limits {
+        domain: DomainLimits { handles: 0, watches: 1, reads: INDEPENDENT_READS, ..fixtures::domain_limits() },
+        exchanges: INDEPENDENT_READS,
+    };
+    let mut c = Client::with_limits(limits, skein_lib::List::with_capacity(0), max_out(&limits));
+    let mut expected = skein_lib::List::with_capacity(INDEPENDENT_READS);
+    for number in 0..u64::from(INDEPENDENT_READS) {
+        let handle = Handle { asker: Asker::JIG, number };
+        c.read(handle);
+        expected.push((handle, signed_out_page())).unwrap();
+    }
+    let extra = Handle { asker: Asker::JIG, number: u64::from(INDEPENDENT_READS) };
+    c.step(Event::Read { handle: extra, read: Readable::Jig(contract::Read::Project { project: PROJECT }) });
+    assert_eq!(fixtures::pages(c.requests()).as_slice(), &[(extra, Readout::Limit)]);
+    c.step(Event::SignIn { with: With::Held(fixtures::credential(&NEW_CREDENTIAL)) });
+    assert_eq!(fixtures::pages(c.requests()).as_slice(), expected.as_slice());
+    assert!(u32::try_from(c.requests().len()).unwrap() <= max_out(&limits));
+    assert_no_read_exchange(&c);
+    c.read(TASK);
+    assert_read_credential(&c, Some(&fixtures::credential(&NEW_CREDENTIAL)));
+}
+
+#[test]
+fn overflowing_read_outputs_are_refused_before_construction() {
+    let limits = Limits { domain: DomainLimits { reads: u32::MAX, ..fixtures::domain_limits() }, ..fixtures::limits() };
+    assert_eq!(worst_case(&limits), None);
+    assert_eq!(crate::Client::new(&limits, 7).expect_err("read output overflow"), Unusable::Limits);
+    assert_eq!(crate::Client::unlinked(&limits, 7).expect_err("read output overflow"), Unusable::Limits);
+}
+
+#[test]
+fn read_room_prices_the_composed_cancellation_buffers() {
+    let full = fixtures::limits();
+    let empty = Limits { domain: DomainLimits { reads: 0, ..full.domain }, ..full };
+    let domain_growth = jig_client_domain::worst_case(&full.domain)
+        .unwrap()
+        .checked_sub(jig_client_domain::worst_case(&empty.domain).unwrap())
+        .unwrap();
+    let composed_growth = worst_case(&full).unwrap().checked_sub(worst_case(&empty).unwrap()).unwrap();
+    assert!(max_out(&full) > max_out(&empty));
+    assert!(composed_growth > domain_growth);
 }

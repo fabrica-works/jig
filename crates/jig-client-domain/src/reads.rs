@@ -5,6 +5,12 @@ use crate::{
 };
 use skein_lib::{Env, Queue, Token};
 
+#[derive(Debug)]
+pub(crate) struct PendingRead {
+    pub token: Token,
+    pub family: Option<u16>,
+}
+
 impl Domain {
     pub(crate) fn read(&mut self, env: &Env<Limits>, handle: Handle, what: Readable, out: &mut Queue<Request>) {
         self.reads.remove(&handle);
@@ -29,14 +35,31 @@ impl Domain {
             return;
         }
         let read = self.token();
-        self.reads.insert(handle, read).expect("read admitted");
+        let family = match &what {
+            Readable::Family { record, .. } => Some(record.family),
+            Readable::Jig(_) => None,
+        };
+        self.reads.insert(handle, PendingRead { token: read, family }).expect("read admitted");
         down(out, Down::Read { read, what });
+    }
+
+    pub(crate) fn end_reads(&mut self, out: &mut Queue<Request>) {
+        for _ in 0..self.reads.len() {
+            let (handle, _) = (&self.reads).into_iter().next().expect("pending read");
+            let handle = *handle;
+            let pending = self.reads.remove(&handle).expect("pending read exists");
+            let page = match pending.family {
+                Some(family) => Readout::Family { family, record: None },
+                None => Readout::Jig(crate::contract::ReadResult::None(crate::contract::ReadNone::SignedOut)),
+            };
+            tell(out, Told::Page { handle, page });
+        }
     }
 
     pub(crate) fn read_done(&mut self, read: Token, page: Readout, out: &mut Queue<Request>) {
         let mut owner = None;
         for (handle, pending) in &self.reads {
-            if *pending == read {
+            if pending.token == read {
                 owner = Some(*handle);
             }
         }

@@ -44,15 +44,13 @@ impl Domain {
             let key = *key;
             self.watches.remove(&key);
         }
-        while let Some((key, _)) = (&self.reads).into_iter().next() {
-            let key = *key;
-            self.reads.remove(&key);
-        }
+        self.end_reads(out);
         self.table.link(false);
         self.table.confirmed(None);
         self.set_link(Link::SignedOut, out);
     }
     pub(crate) fn signed_in(&mut self, out: &mut Queue<Request>) {
+        self.end_reads(out);
         if self.link != Link::SignedOut {
             self.signed_out(out);
         }

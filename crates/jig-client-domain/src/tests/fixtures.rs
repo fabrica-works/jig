@@ -72,17 +72,20 @@ pub(crate) struct Client {
 }
 impl Client {
     pub(crate) fn new(limits: Limits) -> Self {
-        let mut client = Self {
+        let mut client = Self::unsigned(limits);
+        client.step(Event::Up { up: Up::SignedIn });
+        client.told();
+        client.downs();
+        client
+    }
+    pub(crate) fn unsigned(limits: Limits) -> Self {
+        Self {
             domain: Domain::new(&limits, 7),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(max_out(&limits)),
             downs: List::with_capacity(max_out(&limits)),
             told: List::with_capacity(max_out(&limits)),
-        };
-        client.step(Event::Up { up: Up::SignedIn });
-        client.told();
-        client.downs();
-        client
+        }
     }
     pub(crate) fn started() -> Self {
         let mut client = Self::new(limits());

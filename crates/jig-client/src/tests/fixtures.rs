@@ -178,6 +178,10 @@ impl Client {
         }
         panic!("one exchange")
     }
+    pub fn read(&mut self, handle: Handle) -> Token {
+        self.step(Event::Read { handle, read: Readable::Jig(contract::Read::Project { project: PROJECT }) });
+        self.exchange()
+    }
 }
 
 pub fn keyed_count(requests: &[Request]) -> usize {
@@ -190,9 +194,11 @@ pub fn keyed_count(requests: &[Request]) -> usize {
     count
 }
 pub fn unknown_read() -> Box<[u8]> {
-    let value = w::ReadAnswer::None(
-        w::ReadAnswerNone::new(&w::CEILINGS, w::ReadAnswerNoneParts { value: w::ReadNone::Unknown }).unwrap(),
-    );
+    read_none(w::ReadNone::Unknown)
+}
+pub fn read_none(why: w::ReadNone) -> Box<[u8]> {
+    let value =
+        w::ReadAnswer::None(w::ReadAnswerNone::new(&w::CEILINGS, w::ReadAnswerNoneParts { value: why }).unwrap());
     let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut out).unwrap();
     out.finish()
@@ -271,6 +277,15 @@ pub fn ended(requests: &[Request]) -> List<(Handle, Why)> {
     }
     ended
 }
+pub fn pages(requests: &[Request]) -> List<(Handle, Readout)> {
+    let mut pages = List::with_capacity(max_out(&limits()));
+    for request in requests {
+        if let Request::Told { told: Told::Page { handle, page } } = request {
+            pages.push((*handle, page.clone())).unwrap();
+        }
+    }
+    pages
+}
 #[derive(Clone, Copy, Debug)]
 pub enum SigningTerminal {
     Request,
@@ -296,15 +311,7 @@ impl Client {
     pub fn signed_out_by(&mut self, terminal: SigningTerminal, exchanges: &SigningExchanges) {
         let (exchange, message) = match terminal {
             SigningTerminal::Request => (exchanges.request, answer(&w::KeyedAnswer::SignedOut)),
-            SigningTerminal::Read => {
-                let record = w::ReadAnswer::None(
-                    w::ReadAnswerNone::new(&w::CEILINGS, w::ReadAnswerNoneParts { value: w::ReadNone::SignedOut })
-                        .unwrap(),
-                );
-                let mut out = Writer::new(usize::try_from(record.measure()).unwrap());
-                record.encode(&mut out).unwrap();
-                (exchanges.read, out.finish())
-            }
+            SigningTerminal::Read => (exchanges.read, read_none(w::ReadNone::SignedOut)),
             SigningTerminal::Watch => {
                 let record = w::OpenAnswer::Refused(
                     w::OpenAnswerRefused::new(

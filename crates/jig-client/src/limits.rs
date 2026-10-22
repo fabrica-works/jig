@@ -20,10 +20,11 @@ pub fn max_out(limits: &Limits) -> u32 {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let domain = jig_client_domain::worst_case(&limits.domain)?;
     let link = jig_client_protocol_link::Limits::new(limits.domain, limits.exchanges).ok()?;
     let bound = jig_client_protocol_link::limits::max_out(&link)?
         .checked_mul(jig_client_domain::max_out(&limits.domain).checked_add(2)?)?;
-    jig_client_domain::worst_case(&limits.domain)?
+    domain
         .checked_add(jig_client_protocol_link::worst_case(&link)?)?
         .checked_add(Queue::<jig_client_domain::Request>::worst_case(bound)?)?
         .checked_add(Queue::<jig_client_protocol_link::Request>::worst_case(bound)?)?
