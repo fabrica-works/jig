@@ -1,6 +1,6 @@
 use jig_domain_tasks::{
-    Accepted, Active, Amendment, Control, End, Event, Funder, Hold, HoldKind, Holding, Key, Kind, Line, Name, Party,
-    Phase, Refusal, Status, Stored, Taken, TaskResult,
+    Accepted, Active, Amendment, Control, DependencyPlace, End, Ending, Event, Funder, Hold, HoldKind, Holding, Key,
+    Kind, Line, Name, Party, Phase, Refusal, Status, Stored, Taken, TaskResult,
 };
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::{ReplyTo, Rng, Token};
@@ -207,13 +207,40 @@ fn draw(world: &World, random: &mut Rng) -> Operation {
     }
 }
 
+// The places core would load: each newly added dependency's stored ended row.
+fn places(world: &World, task: u64, dependencies: &[u64]) -> Box<[DependencyPlace]> {
+    let mut places = Vec::new();
+    for dependency in dependencies {
+        if world.record(task).dependencies.contains(dependency) {
+            continue;
+        }
+        let Some(Stored::Ended(row)) = world.records.get(&Key::Ended(*dependency)) else { continue };
+        let status = match row.phase {
+            Phase::Ended(Ending::Done(_)) => Status::Done,
+            Phase::Ended(Ending::Failed { .. }) => Status::Failed,
+            Phase::Ended(Ending::Cancelled { .. }) => Status::Cancelled,
+            Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } => panic!("ended row"),
+        };
+        places.push(DependencyPlace {
+            number: row.number,
+            project: row.project,
+            requester: row.requester,
+            root: row.root,
+            depth: row.depth,
+            status,
+        });
+    }
+    places.into()
+}
+
 fn amend(world: &mut World, task: u64, dependencies: &[u64], seen: &mut BTreeSet<Reached>) {
     let before = world.record(task).clone();
+    let places = places(world, task, dependencies);
     let reply_to = world.to();
     let call = reply_to.into_token().raw();
     let reply_to = ReplyTo::new(Token::new(call));
     world.send(Event::Amend {
-        places: Box::new([]),
+        places,
         reply_to,
         by: PERSON,
         task,
@@ -342,9 +369,11 @@ fn compound(world: &mut World, operations: Vec<jig_domain_tasks::Operation>, see
                 let members = problem.blocked_by.as_ref().expect("circle names its members");
                 assert!(!members.is_empty(), "circle names at least one member");
                 seen.insert(Reached::Circle);
-            } else if let Refusal::DependencyEnded { how: Status::Failed | Status::Cancelled } = problem.why {
-                let dependencies = problem.blocked_by.as_ref().expect("ended dependency is named");
-                assert_eq!(dependencies.len(), 1);
+            } else if problem.why == Refusal::Unknown {
+                // A compound carries no loaded places (tasks.md 7): an earlier
+                // operation's dropped dependency re-added once it has ended is unknown.
+                let dependency = problem.task.expect("unknown dependency is named");
+                assert!(!live(world).contains(&dependency), "only an ended dependency is unknown: {problem:?}");
             } else {
                 assert!(
                     matches!(problem.why, Refusal::State | Refusal::Read),
