@@ -8,14 +8,14 @@ use crate::{
     },
 };
 use alloc::boxed::Box;
-use skein_lib::List;
+use skein_lib::{List, Wall};
 
 /// A thread line, oldest first. Other activity remains available whole.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Line<'a> {
-    Words { by: Option<&'a Party>, words: &'a [u8], state: Words },
-    Turn { name: TurnName, turn: &'a Turn },
-    Undecoded { name: TurnName, why: TurnProblem },
+    Words { by: Option<&'a Party>, words: &'a [u8], state: Words, at: Option<Wall> },
+    Turn { name: TurnName, turn: &'a Turn, at: Wall },
+    Undecoded { name: TurnName, why: TurnProblem, at: Wall },
     Provisional { name: ProvisionalTurnName, text: &'a [u8], cut: bool },
     RunBegan { attempt: u64 },
     RunEnded { attempt: u64 },
@@ -181,13 +181,16 @@ impl Thread {
             let at = self.lines.rows.len().saturating_sub(offset).saturating_sub(1);
             let row = self.lines.rows.get(at).expect("reverse row exists");
             let line = match &row.event {
-                Activity::Words { by, message, words } => {
-                    Line::Words { by: Some(by), words: words.bytes(), state: self.words.state(*message) }
-                }
+                Activity::Words { by, message, words } => Line::Words {
+                    by: Some(by),
+                    words: words.bytes(),
+                    state: self.words.state(*message),
+                    at: Some(row.at),
+                },
                 Activity::Turn { name, turn }
                 | Activity::Owner { decoded: Some(ArchivedTurn { name, turn, .. }), .. } => match turn {
-                    TurnRead::Decoded(turn) => Line::Turn { name: *name, turn },
-                    TurnRead::Undecodable { why } => Line::Undecoded { name: *name, why: *why },
+                    TurnRead::Decoded(turn) => Line::Turn { name: *name, turn, at: row.at },
+                    TurnRead::Undecodable { why } => Line::Undecoded { name: *name, why: *why, at: row.at },
                 },
                 Activity::RunBegan { attempt, .. } => Line::RunBegan { attempt: *attempt },
                 Activity::RunEnded { attempt, .. } => Line::RunEnded { attempt: *attempt },
@@ -210,7 +213,7 @@ impl Thread {
             }
             if !held {
                 lines
-                    .push(Line::Words { by: row.by.as_ref(), words: row.words.bytes(), state: row.state })
+                    .push(Line::Words { by: row.by.as_ref(), words: row.words.bytes(), state: row.state, at: None })
                     .expect("word projection fits");
             }
         }

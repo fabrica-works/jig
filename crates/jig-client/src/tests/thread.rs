@@ -57,6 +57,9 @@ const ATTEMPT: u64 = 1;
 const TURN: u32 = 1;
 const MESSAGE: u64 = 41;
 const FIRST_MESSAGE: u64 = 40;
+const TURN_AT: Wall = Wall::from_nanos(17);
+const FIRST_WORDS_AT: Wall = Wall::from_nanos(11);
+const SECOND_WORDS_AT: Wall = Wall::from_nanos(13);
 fn run() -> RunState {
     RunState { task: fixtures::SUBJECT_TASK, attempt: Some(ATTEMPT), committed_turn: 0, writing: None, call: None }
 }
@@ -77,7 +80,7 @@ fn commit(thread: &mut Thread, turn: TurnRead) {
     page.rows
         .push(ActivityLine {
             position: 1,
-            at: Wall::EPOCH,
+            at: TURN_AT,
             event: Activity::Turn { name: TurnName { attempt: ATTEMPT, number: TURN }, turn },
         })
         .unwrap();
@@ -103,7 +106,7 @@ fn a_committed_turn_replaces_its_provisional_text() {
     assert_eq!(
         lines.as_slice(),
         &[
-            Line::Turn { name: TurnName { attempt: ATTEMPT, number: TURN }, turn: &turn },
+            Line::Turn { name: TurnName { attempt: ATTEMPT, number: TURN }, turn: &turn, at: TURN_AT },
             Line::Provisional { name: provisional(TURN + 1, b"").turn, text: b"second", cut: false }
         ]
     );
@@ -117,7 +120,8 @@ fn a_turn_that_does_not_decode_stays_a_line_saying_why() {
         lines.as_slice(),
         &[Line::Undecoded {
             name: TurnName { attempt: ATTEMPT, number: TURN },
-            why: TurnProblem::Version { found: 99 }
+            why: TurnProblem::Version { found: 99 },
+            at: TURN_AT
         }]
     );
 }
@@ -125,6 +129,11 @@ fn a_turn_that_does_not_decode_stays_a_line_saying_why() {
 fn words_sent_in_a_compound_are_numbered_by_their_place() {
     let mut thread = model();
     assert!(thread.sending(fixtures::STOP, fixtures::PARTY, text(b"second operation"), 1));
+    let by = thread.words.rows.get(0).unwrap().by.as_ref();
+    assert_eq!(
+        thread.lines().as_slice(),
+        &[Line::Words { by, words: b"second operation", state: Words::BeingSent, at: None }]
+    );
     thread.answered(
         fixtures::STOP,
         &Answer::Done(Outcome::Owner(OwnerOutcome::Compound {
@@ -134,6 +143,11 @@ fn words_sent_in_a_compound_are_numbered_by_their_place() {
         })),
     );
     assert_eq!(thread.words.rows.get(0).unwrap().state, Words::Sent { message: MESSAGE });
+    let by = thread.words.rows.get(0).unwrap().by.as_ref();
+    assert_eq!(
+        thread.lines().as_slice(),
+        &[Line::Words { by, words: b"second operation", state: Words::Sent { message: MESSAGE }, at: None }]
+    );
 }
 
 #[test]
@@ -173,6 +187,24 @@ fn words_keep_the_submitted_snapshot_and_restore_sent_messages_until_read() {
     assert_eq!(reload.words.rows.len(), 2);
     assert_eq!(reload.words.rows.get(0).unwrap().request, None);
     assert_eq!(reload.words.rows.get(0).unwrap().state, Words::Sent { message: 2 });
+    let author = party(7);
+    assert_eq!(
+        reload.lines().as_slice(),
+        &[
+            Line::Words {
+                by: Some(&author),
+                words: b"first",
+                state: Words::Sent { message: 1 },
+                at: Some(FIRST_WORDS_AT)
+            },
+            Line::Words {
+                by: Some(&author),
+                words: b"second",
+                state: Words::Sent { message: 2 },
+                at: Some(SECOND_WORDS_AT)
+            }
+        ]
+    );
     assert!(reload.moved(3).is_some());
     let mut committed = ActivityLine {
         position: 3,
@@ -194,10 +226,10 @@ fn words_keep_the_submitted_snapshot_and_restore_sent_messages_until_read() {
 }
 fn words_page() -> ActivityPage {
     let mut rows = List::with_capacity(2);
-    for (message, words) in [(2, b"second".as_slice()), (1, b"first".as_slice())] {
+    for (message, words, at) in [(2, b"second".as_slice(), SECOND_WORDS_AT), (1, b"first".as_slice(), FIRST_WORDS_AT)] {
         rows.push(ActivityLine {
             position: message,
-            at: Wall::EPOCH,
+            at,
             event: Activity::Words { by: party(7), message, words: text(words) },
         })
         .unwrap();

@@ -643,6 +643,9 @@ for any presentation of a chat or of any agent task's activity.
   3.4). It merges, in order, committed turns, the
   party's words, work summaries, proposals and provisional text, across
   windows and gaps. It sends nothing and reads nothing itself.
+- **A committed line keeps its wall time** from the task's activity,
+  including a turn that does not decode. A person's pending words have
+  no committed time until their activity arrives.
 - **Committed, read in pages from the end.** A task's activity is a list
   the engine keeps in the order it committed: the words parties wrote to
   it, each run's beginning and end, its turns, the results and news it
