@@ -236,6 +236,110 @@ mod tests {
         value
     }
     #[test]
+    fn a_task_page_past_one_page_carries_its_store_cursor_out_and_back() {
+        use jig_domain_tasks as tasks;
+        use skein_lib::Wall;
+        const PARENT: u64 = 7;
+        const DELEGATES: [u64; 2] = [11, 12];
+        const READ: Token = Token::new(9041);
+        // An application text bound that holds a task-query cursor: this one takes 47 bytes, measured below.
+        let limits = Limits { text: 64, ..crate::test::limits().client.domain };
+        let query = client::TaskQuery {
+            project: None,
+            requester: None,
+            root: None,
+            parent: Some(PARENT),
+            label: None,
+            phase: Some(client::PhaseClass::Ended),
+            executor: None,
+            tracked: None,
+            order: client::QueryOrder::Ended,
+        };
+        let core_query = documents::TaskQuery {
+            project: None,
+            requester: None,
+            root: None,
+            parent: Some(PARENT),
+            label: None,
+            phase: Some(documents::PhaseClass::Ended),
+            executor: None,
+            tracked: None,
+            order: documents::QueryOrder::Ended,
+        };
+        let original = client::Read::Tasks { query, live: None, ended: None };
+        assert_eq!(
+            wire::reads::read(&original, limits.text),
+            Ok(reads::Read::Tasks { query: core_query, live: None, ended: None })
+        );
+        let retained = reads::Cursor::Store {
+            scope: reads::Scope::Tasks { query: core_query },
+            after: Some(reads::Position::Owner(jig_domain_core::Key::Tasks(tasks::Key::EndedDelegate {
+                requester: PARENT,
+                task: DELEGATES[1],
+            }))),
+        };
+        let mut rows = List::with_capacity(limits.rows);
+        for number in DELEGATES {
+            let mut row = wire::rows::tests::task_source();
+            row.chip.number = number;
+            row.chip.details.resources = List::with_capacity(0);
+            row.chip.details.live_delegates = 0;
+            row.requester = tasks::Party::Task(PARENT);
+            row.ended_at = Some(Wall::EPOCH);
+            row.phases = documents::PhaseCounts::ZERO;
+            rows.push(row).expect("one full ended page");
+        }
+        let answer = reads::Answer::Tasks(Box::new(reads::TaskPage {
+            live: List::with_capacity(0),
+            live_next: None,
+            ended: reads::EndedGroup::Rows { rows, next: Some(retained.clone()), cut: false },
+        }));
+        let mut transport = transport();
+        let to = transport.reply_to(Reply::Read { client: ClientId(0), read: READ, what: original }).into_token();
+        let Incoming::Callback {
+            client: actual_client,
+            event:
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual_read,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::Tasks(page))),
+                                },
+                        },
+                },
+        } = read(&mut transport, to, &answer, &limits).expect("whole task page within the text bound")
+        else {
+            panic!("task page callback");
+        };
+        assert_eq!(actual_client, ClientId(0));
+        assert_eq!(actual_read, READ);
+        assert!(page.live.is_empty());
+        assert_eq!(page.live_after, None);
+        let client::EndedGroup::Rows { rows, after: Some(cursor), cut } = page.ended else {
+            panic!("ended rows with a continuation");
+        };
+        assert_eq!(rows.len(), limits.rows);
+        for (row, number) in rows.iter().zip(DELEGATES) {
+            assert_eq!(row.chip.task, number);
+            assert_eq!(row.requester, client::OwnerRequester::Task(PARENT));
+            assert_eq!(row.chip.phase, client::Phase::Ended);
+            assert_eq!(row.ended_at, Some(Wall::EPOCH));
+        }
+        assert!(!cut);
+        let length = u32::try_from(cursor.value.bytes().len()).expect("bounded cursor length");
+        assert_eq!(length, 47);
+        assert!(length <= limits.text);
+        assert_eq!(
+            wire::reads::read(&client::Read::Tasks { query, live: None, ended: Some(cursor) }, limits.text),
+            Ok(reads::Read::Tasks { query: core_query, live: None, ended: Some(retained) })
+        );
+        assert!(transport.reply(to).is_none());
+    }
+
+    #[test]
     fn proposal_reads_keep_the_original_maker_kind_and_whole_pending_value_before_route_consumption() {
         let mut transport = transport();
         let native = Token::new(u64::MAX);

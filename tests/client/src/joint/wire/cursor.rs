@@ -115,6 +115,12 @@ impl Writer {
     fn u64(&mut self, value: u64) -> Option<()> {
         self.put(&value.to_le_bytes())
     }
+    fn optional_u32(&mut self, value: Option<u32>) -> Option<()> {
+        put_option(self, &value, put_u32)
+    }
+    fn optional_u64(&mut self, value: Option<u64>) -> Option<()> {
+        put_option(self, &value, put_u64)
+    }
     fn boolean(&mut self, value: bool) -> Option<()> {
         self.byte(u8::from(value))
     }
@@ -143,6 +149,22 @@ impl Reader<'_> {
     }
     fn u64(&mut self) -> Option<u64> {
         Some(u64::from_le_bytes(self.take()?))
+    }
+    #[expect(clippy::option_option, reason = "outer absence is malformed; inner absence is an owner's absent field")]
+    fn optional_u32(&mut self) -> Option<Option<u32>> {
+        match self.byte()? {
+            0 => Some(None),
+            1 => Some(Some(self.u32()?)),
+            _ => None,
+        }
+    }
+    #[expect(clippy::option_option, reason = "outer absence is malformed; inner absence is an owner's absent field")]
+    fn optional_u64(&mut self) -> Option<Option<u64>> {
+        match self.byte()? {
+            0 => Some(None),
+            1 => Some(Some(self.u64()?)),
+            _ => None,
+        }
     }
     fn boolean(&mut self) -> Option<bool> {
         match self.byte()? {
@@ -298,7 +320,10 @@ fn put_scope(w: &mut Writer, value: &reads::Scope) -> Option<()> {
             put_group(w, group)?;
             put_filter(w, filter)?;
         }
-        reads::Scope::Tasks { .. } => return None,
+        reads::Scope::Tasks { query } => {
+            w.byte(17)?;
+            put_query(w, query)?;
+        }
         reads::Scope::Notes { project } => {
             w.byte(14)?;
             w.u32(*project)?;
@@ -332,6 +357,7 @@ fn take_scope(r: &mut Reader<'_>) -> Option<reads::Scope> {
         14 => reads::Scope::Notes { project: r.u32()? },
         15 => reads::Scope::ScopedNotes { scope: take_note_scope(r)?, description: take_option(r, take_blob)? },
         16 => reads::Scope::Spend { project: r.u32()? },
+        17 => reads::Scope::Tasks { query: take_query(r)? },
         _ => return None,
     })
 }
@@ -943,9 +969,182 @@ fn take_pattern(r: &mut Reader<'_>) -> Option<notes::Pattern> {
     Some(notes::Pattern { segments: segments.into_boxed_slice(), last: take_last(r)? })
 }
 
+#[expect(clippy::manual_map, reason = "step code matches the optional query keys")]
+fn put_query(w: &mut Writer, query: &documents::TaskQuery) -> Option<()> {
+    use documents::{ExecutorKind as E, PhaseClass as P, QueryOrder as O};
+    w.optional_u32(query.project)?;
+    match query.requester {
+        None => w.byte(0)?,
+        Some(jig_domain_tasks::Party::Person(v)) => {
+            w.byte(1)?;
+            w.u64(v)?;
+        }
+        Some(jig_domain_tasks::Party::Task(v)) => {
+            w.byte(2)?;
+            w.u64(v)?;
+        }
+        Some(jig_domain_tasks::Party::Deployment { .. }) => return None,
+    }
+    w.optional_u64(query.root)?;
+    w.optional_u64(query.parent)?;
+    w.optional_u32(query.label)?;
+    w.optional_u32(match query.phase {
+        Some(v) => Some(match v {
+            P::Working => 0,
+            P::Waiting => 1,
+            P::Held => 2,
+            P::Closing => 3,
+            P::Ended => 4,
+        }),
+        None => None,
+    })?;
+    w.optional_u32(match query.executor {
+        Some(v) => Some(match v {
+            E::Agent => 0,
+            E::Procedure => 1,
+            E::Person => 2,
+        }),
+        None => None,
+    })?;
+    w.optional_u32(match query.tracked {
+        Some(v) => Some(u32::from(v)),
+        None => None,
+    })?;
+    w.u32(match query.order {
+        O::Number => 0,
+        O::Changed => 1,
+        O::Activity => 2,
+        O::Priority => 3,
+        O::Ended => 4,
+    })
+}
+fn take_query(r: &mut Reader<'_>) -> Option<documents::TaskQuery> {
+    use documents::{ExecutorKind as E, PhaseClass as P, QueryOrder as O};
+    let project = r.optional_u32()?;
+    let requester = match r.byte()? {
+        0 => None,
+        1 => Some(jig_domain_tasks::Party::Person(r.u64()?)),
+        2 => Some(jig_domain_tasks::Party::Task(r.u64()?)),
+        _ => return None,
+    };
+    Some(documents::TaskQuery {
+        project,
+        requester,
+        root: r.optional_u64()?,
+        parent: r.optional_u64()?,
+        label: r.optional_u32()?,
+        phase: match r.optional_u32()? {
+            None => None,
+            Some(0) => Some(P::Working),
+            Some(1) => Some(P::Waiting),
+            Some(2) => Some(P::Held),
+            Some(3) => Some(P::Closing),
+            Some(4) => Some(P::Ended),
+            Some(_) => return None,
+        },
+        executor: match r.optional_u32()? {
+            None => None,
+            Some(0) => Some(E::Agent),
+            Some(1) => Some(E::Procedure),
+            Some(2) => Some(E::Person),
+            Some(_) => return None,
+        },
+        tracked: match r.optional_u32()? {
+            None => None,
+            Some(0) => Some(false),
+            Some(1) => Some(true),
+            Some(_) => return None,
+        },
+        order: match r.u32()? {
+            0 => O::Number,
+            1 => O::Changed,
+            2 => O::Activity,
+            3 => O::Priority,
+            4 => O::Ended,
+            _ => return None,
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn task_query_cursors_keep_the_whole_query_and_its_ended_position_across_reload() {
+        use documents::{ExecutorKind as E, PhaseClass as P, QueryOrder as O, TaskQuery};
+        const CURSOR_BYTES: u32 = 1024;
+        let full = TaskQuery {
+            project: Some(u32::MAX),
+            requester: Some(tasks::Party::Person(u64::MAX)),
+            root: Some(u64::MAX),
+            parent: Some(u64::MAX),
+            label: Some(u32::MAX),
+            phase: Some(P::Ended),
+            executor: Some(E::Person),
+            tracked: Some(true),
+            order: O::Ended,
+        };
+        let empty = TaskQuery {
+            project: None,
+            requester: None,
+            root: None,
+            parent: None,
+            label: None,
+            phase: None,
+            executor: None,
+            tracked: None,
+            order: O::Number,
+        };
+        let cursor = |query| reads::Cursor::Store {
+            scope: reads::Scope::Tasks { query },
+            after: Some(reads::Position::Owner(Key::Tasks(tasks::Key::EndedDelegate {
+                requester: u64::MAX,
+                task: u64::MAX,
+            }))),
+        };
+        let complete = encode(&cursor(full), CURSOR_BYTES).expect("complete query fits");
+        for query in [
+            full,
+            empty,
+            TaskQuery { project: Some(0), ..full },
+            TaskQuery { requester: Some(tasks::Party::Task(u64::MAX)), ..full },
+            TaskQuery { root: Some(0), ..full },
+            TaskQuery { parent: Some(0), ..full },
+            TaskQuery { label: Some(0), ..full },
+            TaskQuery { phase: Some(P::Working), ..full },
+            TaskQuery { phase: Some(P::Waiting), ..full },
+            TaskQuery { phase: Some(P::Held), ..full },
+            TaskQuery { phase: Some(P::Closing), ..full },
+            TaskQuery { executor: Some(E::Agent), ..full },
+            TaskQuery { executor: Some(E::Procedure), ..full },
+            TaskQuery { tracked: Some(false), ..full },
+            TaskQuery { order: O::Number, ..full },
+            TaskQuery { order: O::Changed, ..full },
+            TaskQuery { order: O::Activity, ..full },
+            TaskQuery { order: O::Priority, ..full },
+        ] {
+            let retained = cursor(query);
+            let encoded = encode(&retained, CURSOR_BYTES).expect("complete cursor fits");
+            let length = u32::try_from(encoded.value.bytes().len()).expect("bounded length");
+            assert_eq!(encode(&retained, length).expect("exact bound"), encoded);
+            assert_eq!(encode(&retained, length - 1), Err(TooLarge));
+            assert_eq!(encoded == complete, query == full, "every query key has its own encoding");
+            let saved = encoded.value.into_bytes();
+            let restored = Cursor::new(saved, length).expect("saved whole bytes");
+            assert_eq!(decode(&restored, length), Some(retained.clone()));
+            assert_eq!(decode(&restored, length - 1), None);
+            assert!(belongs_to(&retained, &reads::Scope::Tasks { query }));
+            assert_eq!(belongs_to(&retained, &reads::Scope::Tasks { query: full }), query == full);
+        }
+        assert_eq!(
+            encode(
+                &cursor(TaskQuery { requester: Some(tasks::Party::Deployment { project: u32::MAX }), ..full }),
+                CURSOR_BYTES
+            ),
+            Err(TooLarge)
+        );
+    }
 
     #[test]
     fn opaque_note_cursors_keep_literal_segments_terminal_bytes_and_whole_bounds_across_reload() {
