@@ -53,7 +53,7 @@ fn arbitrary(seed: u64, check: fn(&[u8])) {
 fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
     let version = match family {
         "core" => "v4",
-        "tasks" | "people" => "v6",
+        "tasks" | "people" => "v7",
         "component" => "v2",
         _ => "v1",
     };
