@@ -25,6 +25,7 @@ pub fn domain_limits() -> DomainLimits {
         rows: 2,
         segments: 4,
         text: 32,
+        turn_text: 32,
         projects: 2,
         fields: 4,
         delegates: 2,
@@ -119,6 +120,7 @@ impl Client {
                 kept: 1,
                 parts: 1,
                 requests: skein_lib::RequestLimits { requests: 1, out: 2, ..limits.domain.requests },
+                turn_text: limits.domain.turn_text,
                 ..limits.domain
             },
             exchanges: 5,

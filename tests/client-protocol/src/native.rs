@@ -121,6 +121,8 @@ impl NativeClient {
         shell.adopt(root, user, seed);
         let mut limits = jig_client_world::test::limits();
         limits.client.domain.text = 512;
+        limits.client.domain.turn_text = 512;
+        limits.client.domain.turn_bytes = 512;
         let (root, view) = jig_client_world::test::linked_with(&limits, seed);
         let patches = Queue::with_capacity(Test::patch_limit(&view));
         let complete = Queue::with_capacity(shell.operations() + 10);

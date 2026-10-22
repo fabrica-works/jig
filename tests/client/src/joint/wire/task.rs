@@ -300,11 +300,15 @@ pub(crate) mod tests {
         assert!(super::super::documents::task_read(&source, &limits, &[]).is_ok());
         assert!(super::super::documents::task_delivery(&source, &limits, &[]).is_ok());
         assert_eq!(
-            super::super::documents::task_delivery(&source, &Limits { document_bytes: 0, ..limits }, &[]),
+            super::super::documents::task_delivery(
+                &source,
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits },
+                &[]
+            ),
             Err(Invalid::Payload)
         );
         assert_eq!(
-            document(&source, &Limits { rows: 3, ..limits }, &[]),
+            document(&source, &Limits { rows: 3, turn_text: limits.turn_text, ..limits }, &[]),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
         let mut changed = source.clone();
@@ -320,8 +324,12 @@ pub(crate) mod tests {
         let mut upper = limits.document_bytes;
         while lower < upper {
             let middle = lower + (upper - lower) / 2;
-            if super::super::documents::task_delivery(&source, &Limits { document_bytes: middle, ..limits }, &[])
-                .is_ok()
+            if super::super::documents::task_delivery(
+                &source,
+                &Limits { document_bytes: middle, turn_text: limits.turn_text, ..limits },
+                &[],
+            )
+            .is_ok()
             {
                 upper = middle;
             } else {
@@ -329,10 +337,19 @@ pub(crate) mod tests {
             }
         }
         assert!(
-            super::super::documents::task_delivery(&source, &Limits { document_bytes: lower, ..limits }, &[]).is_ok()
+            super::super::documents::task_delivery(
+                &source,
+                &Limits { document_bytes: lower, turn_text: limits.turn_text, ..limits },
+                &[]
+            )
+            .is_ok()
         );
         assert_eq!(
-            super::super::documents::task_delivery(&source, &Limits { document_bytes: lower - 1, ..limits }, &[]),
+            super::super::documents::task_delivery(
+                &source,
+                &Limits { document_bytes: lower - 1, turn_text: limits.turn_text, ..limits },
+                &[]
+            ),
             Err(Invalid::Payload)
         );
         assert_eq!(source, original);

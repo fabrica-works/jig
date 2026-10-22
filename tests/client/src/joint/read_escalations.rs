@@ -18,7 +18,7 @@ fn escalation_read_retains_original_reply_until_whole_identity_and_reserved_enve
     assert!(transport.reply(to).is_some());
     let whole = reads::Answer::Document(Box::new(documents::Document::Escalation(source)));
     assert_eq!(
-        read(&mut transport, to, &whole, &Limits { document_bytes: 0, ..limits }).err(),
+        read(&mut transport, to, &whole, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }).err(),
         Some(Invalid::Document(wire::documents::Invalid::Payload))
     );
     assert!(transport.reply(to).is_some());

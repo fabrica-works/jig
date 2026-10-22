@@ -152,7 +152,7 @@ mod tests {
     }
     #[test]
     fn host_names_stay_whole_below_the_display_bound() {
-        let limits = Limits { text: 1, ..limits() };
+        let limits = Limits { text: 1, turn_text: 1, ..limits() };
         let value = hosts(&host(b"configured-worker"), &limits).expect("independent name bound");
         assert_eq!(value.get(0).expect("host").name.as_ref(), b"configured-worker");
     }

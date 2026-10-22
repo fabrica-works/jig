@@ -29,7 +29,14 @@ pub(super) fn offers(
             sign_in: value.sign_in,
             key: value.key,
             programs: owner::list(&value.programs, limits, |value| {
-                llm::name(value, &Limits { text: wire.provider_offer_programs_item, ..*limits })
+                llm::name(
+                    value,
+                    &Limits {
+                        text: wire.provider_offer_programs_item,
+                        turn_text: wire.provider_offer_programs_item,
+                        ..*limits
+                    },
+                )
             })?,
             programs_cut: value.programs_cut,
             none: value.none,
@@ -209,13 +216,16 @@ mod tests {
     fn provider_allocations_obey_the_receiving_bounds() {
         let values = crate::test::list([offer()]);
         let limits = super::super::deployment::tests::limits();
-        assert!(offers(&values, &Limits { rows: 1, ..limits }).is_ok());
-        assert_eq!(offers(&values, &Limits { rows: 0, ..limits }), Err(owner::Invalid::TooLarge));
-        assert_eq!(offers(&values, &Limits { text: 6, ..limits }), Err(owner::Invalid::TooLarge));
+        assert!(offers(&values, &Limits { rows: 1, turn_text: limits.turn_text, ..limits }).is_ok());
+        assert_eq!(
+            offers(&values, &Limits { rows: 0, turn_text: limits.turn_text, ..limits }),
+            Err(owner::Invalid::TooLarge)
+        );
+        assert_eq!(offers(&values, &Limits { text: 6, turn_text: 6, ..limits }), Err(owner::Invalid::TooLarge));
         let mut oversized = offer();
         oversized.programs = List::with_capacity(2);
         assert_eq!(
-            offers(&crate::test::list([oversized]), &Limits { rows: 1, ..limits }),
+            offers(&crate::test::list([oversized]), &Limits { rows: 1, turn_text: limits.turn_text, ..limits }),
             Err(owner::Invalid::TooLarge)
         );
     }

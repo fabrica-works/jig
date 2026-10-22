@@ -262,9 +262,15 @@ mod tests {
         };
         let models = [jig_core_world::world::scripted_model()];
         let limits = super::super::deployment::tests::limits();
-        assert!(choice(Some(&source), &models, &Limits { rows: 1, ..limits }).is_ok());
-        assert_eq!(choice(Some(&source), &models, &Limits { rows: 0, ..limits }), Err(owner::Invalid::TooLarge));
-        assert_eq!(choice(Some(&source), &models, &Limits { text: 3, ..limits }), Err(owner::Invalid::TooLarge));
+        assert!(choice(Some(&source), &models, &Limits { rows: 1, turn_text: limits.turn_text, ..limits }).is_ok());
+        assert_eq!(
+            choice(Some(&source), &models, &Limits { rows: 0, turn_text: limits.turn_text, ..limits }),
+            Err(owner::Invalid::TooLarge)
+        );
+        assert_eq!(
+            choice(Some(&source), &models, &Limits { text: 3, turn_text: 3, ..limits }),
+            Err(owner::Invalid::TooLarge)
+        );
     }
 
     #[test]
@@ -273,10 +279,21 @@ mod tests {
         let providers = jig_domain_accounts::Providers::none();
         let limits = super::super::deployment::tests::limits();
         assert!(
-            models(jig_domain_authority::Models::ALL, &configured, &providers, &Limits { rows: 2, ..limits }).is_ok()
+            models(
+                jig_domain_authority::Models::ALL,
+                &configured,
+                &providers,
+                &Limits { rows: 2, turn_text: limits.turn_text, ..limits }
+            )
+            .is_ok()
         );
         assert_eq!(
-            models(jig_domain_authority::Models::ALL, &configured, &providers, &Limits { rows: 1, ..limits }),
+            models(
+                jig_domain_authority::Models::ALL,
+                &configured,
+                &providers,
+                &Limits { rows: 1, turn_text: limits.turn_text, ..limits }
+            ),
             Err(owner::Invalid::TooLarge)
         );
     }

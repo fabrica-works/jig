@@ -24,7 +24,11 @@ fn readable(number: u32, words: &[u8]) -> ActivityLine {
 #[must_use]
 pub fn world(seed: u64) -> World<Test, Scripted> {
     let mut world = chat_ready(seed);
-    let limits = jig_client::DomainLimits { rows: limits().jig.rows, ..limits().client.domain };
+    let limits = jig_client::DomainLimits {
+        rows: limits().jig.rows,
+        turn_text: limits().client.domain.turn_text,
+        ..limits().client.domain
+    };
     let source = jig_domain_tasks::ActivityLine {
         task: 9,
         position: 2,

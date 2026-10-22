@@ -325,16 +325,19 @@ mod programs {
     #[test]
     fn host_answers_hold_at_the_native_budget() {
         let bytes = List::<client::AccountHostFailure>::worst_case(1).expect("host list") + 17;
-        let limits = Limits { document_bytes: bytes.div_ceil(2), ..limits() };
+        let limits = Limits { document_bytes: bytes.div_ceil(2), turn_text: limits().turn_text, ..limits() };
         assert!(outcome(&failed(), &limits).is_ok());
         assert_eq!(
-            outcome(&failed(), &Limits { document_bytes: limits.document_bytes - 1, ..limits }),
+            outcome(
+                &failed(),
+                &Limits { document_bytes: limits.document_bytes - 1, turn_text: limits.turn_text, ..limits }
+            ),
             Err(owner::Invalid::TooLarge)
         );
     }
     #[test]
     fn host_answers_keep_whole_configured_names() {
-        let value = outcome(&failed(), &Limits { text: 1, ..limits() }).expect("independent name bound");
+        let value = outcome(&failed(), &Limits { text: 1, turn_text: 1, ..limits() }).expect("independent name bound");
         let Outcome::Owner(client::OwnerOutcome::AccountSignedOut { failed_hosts, .. }) = value else {
             panic!("host answer")
         };

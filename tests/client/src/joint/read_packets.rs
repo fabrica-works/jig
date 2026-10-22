@@ -252,7 +252,8 @@ mod tests {
         source.proposer = documents::Proposer::Task(u64::MAX);
         let whole = reads::Answer::Document(Box::new(documents::Document::Proposal(Box::new(source))));
         assert_eq!(
-            read(&mut transport, to, &whole, &Limits { document_bytes: 0, ..limits }).err(),
+            read(&mut transport, to, &whole, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits })
+                .err(),
             Some(Invalid::Document(wire::documents::Invalid::Payload))
         );
         assert!(transport.reply(to).is_some());
@@ -295,7 +296,8 @@ mod tests {
                 what: client::Read::PersonTask { task: source.task.number },
             })
             .into_token();
-        let limits = Limits { rows: 8, ..wire::rows::tests::limits() };
+        let limits =
+            Limits { rows: 8, turn_text: wire::rows::tests::limits().turn_text, ..wire::rows::tests::limits() };
         source.task.number = 0;
         let wrong = reads::Answer::Document(Box::new(documents::Document::PersonTask(Box::new(source.clone()))));
         assert_eq!(read(&mut transport, to, &wrong, &limits).err(), Some(Invalid::OwnerRoute));
@@ -303,7 +305,8 @@ mod tests {
         source.task.number = u64::MAX;
         let whole = reads::Answer::Document(Box::new(documents::Document::PersonTask(Box::new(source))));
         assert_eq!(
-            read(&mut transport, to, &whole, &Limits { document_bytes: 0, ..limits }).err(),
+            read(&mut transport, to, &whole, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits })
+                .err(),
             Some(Invalid::Document(wire::documents::Invalid::Payload))
         );
         assert!(transport.reply(to).is_some());
@@ -350,7 +353,8 @@ mod tests {
         source.chip.number = u64::MAX;
         let whole = reads::Answer::Document(Box::new(documents::Document::Task(Box::new(source))));
         assert_eq!(
-            read(&mut transport, to, &whole, &Limits { document_bytes: 0, ..limits }).err(),
+            read(&mut transport, to, &whole, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits })
+                .err(),
             Some(Invalid::Document(wire::documents::Invalid::Payload))
         );
         assert!(transport.reply(to).is_some());
@@ -395,7 +399,8 @@ mod tests {
         source.from = jig_domain_tasks::Party::Deployment { project: 0 };
         let source = reads::Answer::Document(Box::new(documents::Document::Question(source)));
         assert_eq!(
-            read(&mut transport, to, &source, &Limits { document_bytes: 0, ..limits }).err(),
+            read(&mut transport, to, &source, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits })
+                .err(),
             Some(Invalid::Document(wire::documents::Invalid::Payload))
         );
         assert!(transport.reply(to).is_some());
@@ -469,7 +474,8 @@ mod tests {
         });
         let source = reads::Answer::Page(Box::new(page));
         assert_eq!(
-            read(&mut transport, to, &source, &Limits { document_bytes: 100, ..limits }).err(),
+            read(&mut transport, to, &source, &Limits { document_bytes: 100, turn_text: limits.turn_text, ..limits })
+                .err(),
             Some(Invalid::Page(wire::pages::Invalid::Payload))
         );
         assert!(transport.reply(to).is_some());
@@ -525,7 +531,13 @@ mod tests {
             .reply_to(Reply::Read { client: ClientId(0), read: native, what: client::Read::Result { task: u64::MAX } })
             .into_token();
         let mut source = wire::results::tests::document();
-        let limits = Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 8,
+            text: 200,
+            turn_text: 200,
+            document_bytes: 100_000,
+            ..crate::test::limits().client.domain
+        };
         source.task.number = 0;
         let wrong = reads::Answer::Document(Box::new(documents::Document::Result(Box::new(source.clone()))));
         assert_eq!(read(&mut transport, to, &wrong, &limits).err(), Some(Invalid::OwnerRoute));
@@ -533,7 +545,8 @@ mod tests {
         source.task.number = u64::MAX;
         let source = reads::Answer::Document(Box::new(documents::Document::Result(Box::new(source))));
         assert_eq!(
-            read(&mut transport, to, &source, &Limits { document_bytes: 0, ..limits }).err(),
+            read(&mut transport, to, &source, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits })
+                .err(),
             Some(Invalid::Document(wire::documents::Invalid::Payload))
         );
         assert!(transport.reply(to).is_some());
@@ -620,7 +633,11 @@ mod tests {
             next: None,
             cut: false,
         }));
-        let limits = Limits { rows: 2, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 2,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         assert!(matches!(
             read(&mut transport, to, &answer, &limits),
             Err(Invalid::Page(wire::pages::Invalid::Owner(_)))
@@ -642,7 +659,8 @@ mod tests {
                         },
                 },
             ..
-        } = read(&mut transport, to, &answer, &Limits { rows: 3, ..limits }).expect("whole reserved collection")
+        } = read(&mut transport, to, &answer, &Limits { rows: 3, turn_text: limits.turn_text, ..limits })
+            .expect("whole reserved collection")
         else {
             panic!("actual whole page");
         };
@@ -657,7 +675,13 @@ mod tests {
     fn a_scoped_note_page_consumes_only_its_original_read_after_exact_query_and_whole_admission() {
         let mut transport = transport();
         let native = Token::new(u64::MAX);
-        let limits = Limits { rows: 2, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 2,
+            text: 200,
+            turn_text: 200,
+            document_bytes: 100_000,
+            ..crate::test::limits().client.domain
+        };
         let query = client::Read::Notes {
             scope: client::NoteScope::Project(u32::MAX),
             description: Some(client::Text::new(Box::new([]), limits.text).expect("explicit empty search")),
@@ -694,7 +718,7 @@ mod tests {
                 &mut transport,
                 to,
                 &reads::Answer::Page(Box::new(page.clone())),
-                &Limits { document_bytes: 0, ..limits }
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }
             ),
             Err(Invalid::Page(wire::pages::Invalid::Payload))
         ));

@@ -422,6 +422,7 @@ dependencies = [
  "jig-protocol-transcript",
  "skein-codec",
  "skein-lib",
+ "smith-transcript",
 ]
 
 [[package]]

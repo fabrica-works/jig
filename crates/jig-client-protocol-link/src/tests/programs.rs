@@ -115,6 +115,7 @@ fn configured_host_names_stay_whole_below_the_text_limit() {
     row.encode(&mut bytes).expect("row");
     let mut limits = fixtures::limits();
     limits.client.text = 1;
+    limits.client.turn_text = 1;
     let mut room = 4096;
     let rows = decode::hosts(&bytes.finish(), &limits, &mut room).expect("whole name");
     assert_eq!(rows.get(0).expect("host").name.as_ref(), b"configured-worker");

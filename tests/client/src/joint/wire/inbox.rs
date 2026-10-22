@@ -105,7 +105,7 @@ pub(crate) mod tests {
     use jig_domain_people as people;
     use skein_lib::Wall;
     pub(crate) fn limits() -> Limits {
-        Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
+        Limits { rows: 8, text: 200, turn_text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
     pub(crate) fn source() -> documents::Inbox {
         let objects = [
@@ -205,8 +205,14 @@ pub(crate) mod tests {
         }
         source = self::source();
         let original = source.clone();
-        assert_eq!(document(&source, &Limits { rows: 7, ..limits() }), Err(owner::Invalid::TooLarge));
-        assert_eq!(document(&source, &Limits { document_bytes: 95, ..limits() }), Err(owner::Invalid::TooLarge));
+        assert_eq!(
+            document(&source, &Limits { rows: 7, turn_text: limits().turn_text, ..limits() }),
+            Err(owner::Invalid::TooLarge)
+        );
+        assert_eq!(
+            document(&source, &Limits { document_bytes: 95, turn_text: limits().turn_text, ..limits() }),
+            Err(owner::Invalid::TooLarge)
+        );
         assert_eq!(source, original);
         let client::Delivery::OwnerInbox(value) =
             super::super::documents::inbox_delivery(&source, &limits()).expect("whole admitted source")
@@ -215,7 +221,10 @@ pub(crate) mod tests {
         };
         assert_eq!(value.selection.as_ref().expect("context").get(0).expect("row").goals.capacity(), 12);
         assert_eq!(
-            super::super::documents::inbox_delivery(&source, &Limits { document_bytes: 100, ..limits() }),
+            super::super::documents::inbox_delivery(
+                &source,
+                &Limits { document_bytes: 100, turn_text: limits().turn_text, ..limits() }
+            ),
             Err(super::super::documents::Invalid::Payload)
         );
         source.cached_updates = documents::Count::Known(0);

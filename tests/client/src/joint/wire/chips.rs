@@ -374,7 +374,7 @@ pub(super) mod tests {
 
     #[test]
     fn supplied_hold_account_and_resource_or_outbox_origin_survive_independently() {
-        let limits = Limits { rows: 2, text: 4, ..crate::test::limits().client.domain };
+        let limits = Limits { rows: 2, text: 4, turn_text: 4, ..crate::test::limits().client.domain };
         let account =
             tasks::Part { connector: u16::MAX, kind: tasks::PartKind::Hold, key: tasks::PartKey::Number(u64::MAX) };
         let mut path = List::with_capacity(2);
@@ -415,8 +415,8 @@ pub(super) mod tests {
                 assert_eq!(native.hold_wait_since, Some(Wall::from_nanos(37)));
                 let mut chip = source_chip();
                 chip.details.hold = Some(source);
-                let metadata =
-                    details(&chip.details, &Limits { rows: 4, text: 4, ..limits }).expect("whole chip details");
+                let metadata = details(&chip.details, &Limits { rows: 4, text: 4, turn_text: 4, ..limits })
+                    .expect("whole chip details");
                 assert_eq!(metadata.hold, Some(native));
             }
         }
@@ -425,7 +425,7 @@ pub(super) mod tests {
     #[test]
     fn whole_chip_keeps_mandatory_metadata_unknown_ending_title_loss_and_sparse_observation_independent() {
         let mut source = source_chip();
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
+        let limits = Limits { rows: 4, text: 3, turn_text: 3, ..crate::test::limits().client.domain };
         for connectors in [None, Some(List::with_capacity(4))] {
             source.details.closing_connectors = connectors;
             let before = source.clone();
@@ -503,13 +503,13 @@ pub(super) mod tests {
         );
         let mut source = source_chip();
         source.details.retry = None;
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
+        let limits = Limits { rows: 4, text: 3, turn_text: 3, ..crate::test::limits().client.domain };
         assert!(details(&source.details, &limits).expect("complete supplied metadata").retry.is_none());
     }
 
     #[test]
     fn chip_phase_and_preserved_hold_keep_named_lifecycle_address_revision_and_separate_failure_counters() {
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
+        let limits = Limits { rows: 4, text: 3, turn_text: 3, ..crate::test::limits().client.domain };
         let mut dependencies = List::with_capacity(4);
         dependencies.push(u64::MAX).expect("declared room");
         assert_eq!(
@@ -578,9 +578,12 @@ pub(super) mod tests {
     fn chip_receiver_refuses_reserved_rows_raw_tool_bytes_and_inconsistent_executor_facts_without_trimming() {
         let source = source_chip();
         let before = source.clone();
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
-        assert_eq!(chip(&source, &Limits { rows: 3, ..limits }), Err(owner::Invalid::TooLarge));
-        assert_eq!(chip(&source, &Limits { text: 1, ..limits }), Err(owner::Invalid::TooLarge));
+        let limits = Limits { rows: 4, text: 3, turn_text: 3, ..crate::test::limits().client.domain };
+        assert_eq!(
+            chip(&source, &Limits { rows: 3, turn_text: limits.turn_text, ..limits }),
+            Err(owner::Invalid::TooLarge)
+        );
+        assert_eq!(chip(&source, &Limits { text: 1, turn_text: 1, ..limits }), Err(owner::Invalid::TooLarge));
         let mut mismatch = source.clone();
         mismatch.executor = documents::ExecutorKind::Agent;
         assert_eq!(chip(&mismatch, &limits), Err(owner::Invalid::Executor));
@@ -591,18 +594,28 @@ pub(super) mod tests {
         let mut source = List::with_capacity(4);
         source.push(source_chip()).expect("supplied whole Chip fits reserved row");
         let before = source.clone();
-        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 4,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         let value = super::super::documents::chips_delivery(&source, &limits).expect("whole envelope fits");
         let client::Delivery::Chips(value) = value else { panic!("named Chip envelope") };
         assert_eq!(value.capacity(), 4);
         assert_eq!(value.len(), 1);
         assert_eq!(value.as_slice()[0], chip(&source.as_slice()[0], &limits).expect("whole exact Chip"));
         assert_eq!(
-            super::super::documents::chips_delivery(&source, &Limits { document_bytes: 0, ..limits }),
+            super::super::documents::chips_delivery(
+                &source,
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }
+            ),
             Err(super::super::documents::Invalid::Payload)
         );
         assert_eq!(
-            super::super::documents::chips_delivery(&source, &Limits { rows: 3, ..limits }),
+            super::super::documents::chips_delivery(
+                &source,
+                &Limits { rows: 3, turn_text: limits.turn_text, ..limits }
+            ),
             Err(super::super::documents::Invalid::Owner(owner::Invalid::TooLarge))
         );
         assert_eq!(source, before);

@@ -17,10 +17,10 @@ fn deployment_read_keeps_original_query_client_and_token_until_whole_owner_admis
         .into_token();
     assert_eq!(read(&mut transport, wrong, &answer, &limits).err(), Some(Invalid::OwnerRoute));
     assert_eq!(
-        read(&mut transport, to, &answer, &Limits { document_bytes: 0, ..limits }).err(),
+        read(&mut transport, to, &answer, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }).err(),
         Some(Invalid::Document(wire::documents::Invalid::Payload))
     );
-    assert!(read(&mut transport, to, &answer, &Limits { rows: 7, ..limits }).is_err());
+    assert!(read(&mut transport, to, &answer, &Limits { rows: 7, turn_text: limits.turn_text, ..limits }).is_err());
     assert!(transport.reply(to).is_some() && transport.reply(wrong).is_some());
     let Incoming::Callback {
         client: actual_client,
@@ -62,12 +62,23 @@ fn deployment_watch_keeps_original_subject_and_ack_until_whole_delivery_admissio
         Some(super::super::packets::Invalid::OwnerRoute)
     );
     assert_eq!(
-        super::super::packets::document(&mut transport, watcher, &document, &Limits { document_bytes: 0, ..limits })
-            .err(),
+        super::super::packets::document(
+            &mut transport,
+            watcher,
+            &document,
+            &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }
+        )
+        .err(),
         Some(super::super::packets::Invalid::Document(wire::documents::Invalid::Payload))
     );
     assert!(
-        super::super::packets::document(&mut transport, watcher, &document, &Limits { rows: 7, ..limits }).is_err()
+        super::super::packets::document(
+            &mut transport,
+            watcher,
+            &document,
+            &Limits { rows: 7, turn_text: limits.turn_text, ..limits }
+        )
+        .is_err()
     );
     assert!(transport.taken(ClientId(0), native).is_none());
     let Incoming::Callback {

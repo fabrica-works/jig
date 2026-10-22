@@ -33,7 +33,8 @@ fn selectors_and_cut_authorities_round_trip_without_becoming_replacements() {
 #[test]
 fn malformed_and_one_past_model_sets_are_refused_and_exact_bounds_fit() {
     let base = fixtures::limits();
-    let limits = Limits::new(jig_client_domain::Limits { text: 4096, ..base.client }, base.exchanges).unwrap();
+    let limits =
+        Limits::new(jig_client_domain::Limits { text: 4096, turn_text: 4096, ..base.client }, base.exchanges).unwrap();
     let mut authority = fixtures::read_value_owner_authority();
     for bad in [names(&[b""]), names(&[b"same", b"same"]), names(&[b"\xff"]), names(&[&[b'x'; 4097]])] {
         authority.models = Some(bad);

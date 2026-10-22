@@ -92,7 +92,8 @@ pub(crate) fn archive(record: w::ArchivedTurn, limits: &Limits) -> Result<c::Arc
 }
 
 pub(crate) fn decode(value: &[u8], limits: &Limits, bytes: u32) -> c::TurnRead {
-    let turn = c::TurnLimits { messages: limits.client.rows, blocks: limits.client.rows, text: limits.client.text };
+    let turn =
+        c::TurnLimits { messages: limits.client.rows, blocks: limits.client.rows, text: limits.client.turn_text };
     let source_bytes = u64::try_from(value.len()).expect("payload length fits u64");
     let limits = jig_protocol_transcript::Limits::new(bytes, turn);
     let why = match jig_protocol_transcript::decode(&limits, value) {

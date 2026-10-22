@@ -643,6 +643,9 @@ for any presentation of a chat or of any agent task's activity.
   it used and spent. A call to the engine carries, as its objects and
   parts, what the core wrote beside the turn under its name
   (`../../domain/engine.md`, 7.2), never what its answer's words say.
+  The committed turn shares one `turn_text` budget across its texts, calls'
+  names, inputs and outcomes, and results' summaries (section 14); a
+  receiving cut is marked on the decoded turn.
   Neither the application nor the helpers link smith.
 - **A job is a call's outcome,** worded like any other call's. A call
   that answered `running` reads "started as job N", never "is running":
@@ -854,6 +857,11 @@ Each is configured and part of the worst case:
 - the family owners the application declares, each once, with its
   version (8.2): no more than a hello's ranges hold beside jig's
   (`../../protocol/client.md`, section 9).
+
+`DomainLimits.turn_text` is one committed turn's shared text budget in the
+transcript: its texts, its calls' names, inputs and outcomes, and its
+results' summaries. It is at least the receiving field bound `text` and
+at most `turn_bytes`; limits outside those bounds are refused.
 
 `worst_case` sums the containers' own and the bytes each entity may hold
 (programming-model.md, 6.3). Each held document is priced at twice its

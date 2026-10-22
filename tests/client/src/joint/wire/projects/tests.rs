@@ -4,7 +4,7 @@ use jig_domain_core::acts;
 use skein_lib::{Duration, List, Wall};
 
 pub(crate) fn limits() -> Limits {
-    Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
+    Limits { rows: 8, text: 200, turn_text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
 }
 
 fn grant_source() -> documents::GrantLine {
@@ -416,7 +416,7 @@ fn project_read_admits_the_complete_boxed_envelope_at_the_exact_byte_boundary_wi
         let middle = lower + (upper - lower) / 2;
         if super::super::documents::project_read(
             &source,
-            &Limits { document_bytes: middle, ..limits },
+            &Limits { document_bytes: middle, turn_text: limits.turn_text, ..limits },
             &[jig_core_world::world::scripted_model()],
         )
         .is_ok()
@@ -430,7 +430,7 @@ fn project_read_admits_the_complete_boxed_envelope_at_the_exact_byte_boundary_wi
     assert_eq!(
         super::super::documents::project_read(
             &source,
-            &Limits { document_bytes: lower, ..limits },
+            &Limits { document_bytes: lower, turn_text: limits.turn_text, ..limits },
             &[jig_core_world::world::scripted_model()]
         ),
         Ok(read)
@@ -438,7 +438,7 @@ fn project_read_admits_the_complete_boxed_envelope_at_the_exact_byte_boundary_wi
     assert_eq!(
         super::super::documents::project_read(
             &source,
-            &Limits { document_bytes: lower - 1, ..limits },
+            &Limits { document_bytes: lower - 1, turn_text: limits.turn_text, ..limits },
             &[jig_core_world::world::scripted_model()]
         )
         .err(),

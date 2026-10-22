@@ -78,6 +78,8 @@ fn answers(world: &mut World<Test, Joint>) -> usize {
 fn receiving() -> jig_client_test_domain::Limits {
     let mut limits = crate::test::limits();
     limits.client.domain.text = 128;
+    limits.client.domain.turn_text = 128;
+    limits.client.domain.turn_bytes = 128;
     limits.jig.text = 128;
     limits.first.text = 128;
     limits

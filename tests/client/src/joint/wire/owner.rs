@@ -201,11 +201,11 @@ pub fn part(value: &tasks::Part, limits: &Limits) -> Result<client::OwnerPart, I
         },
         key: match &value.key {
             tasks::PartKey::Number(number) => client::OwnerPartKey::Number(*number),
-            tasks::PartKey::Path(segments) => {
-                client::OwnerPartKey::Path(list(segments, &Limits { rows: limits.segments, ..*limits }, |value| {
-                    bytes(value, limits)
-                })?)
-            }
+            tasks::PartKey::Path(segments) => client::OwnerPartKey::Path(list(
+                segments,
+                &Limits { rows: limits.segments, turn_text: limits.turn_text, ..*limits },
+                |value| bytes(value, limits),
+            )?),
         },
     })
 }
@@ -216,7 +216,9 @@ pub(super) fn pattern(
     limits: &Limits,
 ) -> Result<client::OwnerPattern, Invalid> {
     Ok(client::OwnerPattern {
-        segments: list(segments, &Limits { rows: limits.segments, ..*limits }, |value| bytes(value, limits))?,
+        segments: list(segments, &Limits { rows: limits.segments, turn_text: limits.turn_text, ..*limits }, |value| {
+            bytes(value, limits)
+        })?,
         last: match last {
             documents::PatternEnd::Exact(value) => client::OwnerPatternEnd::Exact(bytes(value, limits)?),
             documents::PatternEnd::Open(value) => client::OwnerPatternEnd::Open(bytes(value, limits)?),
@@ -231,7 +233,7 @@ pub fn authority(
     limits: &Limits,
     models: &[jig_domain_core::Model],
 ) -> Result<client::OwnerAuthorityDocument, Invalid> {
-    let limits = &Limits { rows: crate::test::AUTHORITY_ENTRIES, ..*limits };
+    let limits = &Limits { rows: crate::test::AUTHORITY_ENTRIES, turn_text: limits.turn_text, ..*limits };
     Ok(client::OwnerAuthorityDocument {
         authority: client::OwnerAuthority {
             models: Some(self::models(value.models, models)?),
@@ -467,7 +469,7 @@ pub(super) mod tests {
 
     #[test]
     fn amendment_snapshots_keep_absent_empty_and_cut_instructions_without_reconstructing_an_override_or_revision() {
-        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits { text: 3, turn_text: 3, rows: 4, ..crate::test::limits().client.domain };
         let contexts = [
             None,
             Some(documents::Text { bytes: Box::new([]), cut: false }),
@@ -512,7 +514,7 @@ pub(super) mod tests {
 
     #[test]
     fn amendment_snapshot_independent_loss_and_reserved_capacity_refuse_whole_values_without_trimming() {
-        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits { text: 3, turn_text: 3, rows: 4, ..crate::test::limits().client.domain };
         for (spec_loss, dependency_loss) in [(false, false), (true, false), (false, true)] {
             let mut source = amendment_source();
             source.spec.cut = spec_loss;
@@ -526,11 +528,15 @@ pub(super) mod tests {
         }
         let source = amendment_source();
         assert_eq!(
-            amendment(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+            amendment(
+                &source,
+                &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(Invalid::TooLarge)
         );
         assert_eq!(
-            amendment(&source, &Limits { text: 2, ..limits }, &[jig_core_world::world::scripted_model()]),
+            amendment(&source, &Limits { text: 2, turn_text: 2, ..limits }, &[jig_core_world::world::scripted_model()]),
             Err(Invalid::TooLarge)
         );
         assert_eq!(source.dependencies.capacity(), 4);
@@ -609,7 +615,7 @@ pub(super) mod tests {
             inputs,
             cut: false,
         };
-        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits { text: 3, turn_text: 3, rows: 4, ..crate::test::limits().client.domain };
         let actual = specification(&value, &limits).expect("the complete supplied fixture is admitted");
         assert_eq!(actual.specification.inputs.capacity(), 3);
         assert_eq!(actual.specification.inputs.as_slice(), &[u64::MAX, 0]);
@@ -625,7 +631,7 @@ pub(super) mod tests {
         assert_eq!(value.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(value.cut);
         assert!(actual.whole().is_none());
-        assert_eq!(specification(&value_source(), &Limits { text: 2, ..limits }), Err(Invalid::TooLarge));
+        assert_eq!(specification(&value_source(), &Limits { text: 2, turn_text: 2, ..limits }), Err(Invalid::TooLarge));
     }
 
     fn value_source() -> documents::SpecLine {
@@ -651,20 +657,23 @@ pub(super) mod tests {
             segments.push(b"a/b".as_slice().into()).expect("the complete supplied fixture is admitted");
             segments.push(Box::new([255, 0])).expect("the complete supplied fixture is admitted");
             let source = tasks::Part { connector: u16::MAX, kind, key: tasks::PartKey::Path(segments) };
-            let limits = Limits { rows: 3, segments: 3, text: 3, ..crate::test::limits().client.domain };
+            let limits = Limits { rows: 3, segments: 3, text: 3, turn_text: 3, ..crate::test::limits().client.domain };
             let actual = part(&source, &limits).expect("the complete supplied fixture is admitted");
             assert_eq!(actual.connector, u16::MAX);
             let client::OwnerPartKey::Path(path) = actual.key else { panic!("literal segments stay a path") };
             assert_eq!(path.capacity(), 3);
             assert_eq!(path.get(0).expect("the complete supplied row is retained").as_ref(), b"a/b");
             assert_eq!(path.get(1).expect("the complete supplied row is retained").as_ref(), &[255, 0]);
-            assert_eq!(part(&source, &Limits { rows: 2, segments: 2, ..limits }), Err(Invalid::TooLarge));
-            assert_eq!(part(&source, &Limits { text: 2, ..limits }), Err(Invalid::TooLarge));
+            assert_eq!(
+                part(&source, &Limits { rows: 2, segments: 2, turn_text: limits.turn_text, ..limits }),
+                Err(Invalid::TooLarge)
+            );
+            assert_eq!(part(&source, &Limits { text: 2, turn_text: 2, ..limits }), Err(Invalid::TooLarge));
         }
     }
     #[test]
     fn owner_authority_and_verdict_wire_keep_opaque_patterns_machine_names_and_projection_cuts() {
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
+        let limits = Limits { rows: 4, text: 3, turn_text: 3, ..crate::test::limits().client.domain };
         let mut segments: List<Box<[u8]>> = List::with_capacity(3);
         segments.push(b"a/b".as_slice().into()).expect("the complete supplied fixture is admitted");
         segments.push(Box::new([255, 0])).expect("the complete supplied fixture is admitted");
@@ -733,7 +742,11 @@ pub(super) mod tests {
             let mut oversized = source.clone();
             oversized.note_resources = List::with_capacity(crate::test::AUTHORITY_ENTRIES + 1);
             assert_eq!(
-                authority(&oversized, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+                authority(
+                    &oversized,
+                    &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                    &[jig_core_world::world::scripted_model()]
+                ),
                 Err(Invalid::TooLarge)
             );
         }
@@ -800,7 +813,11 @@ pub(super) mod tests {
         assert!(!value.questions);
         assert!(value.answers);
         assert!(!value.timers);
-        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 4,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         let mut source = List::with_capacity(4);
         source
             .push(tasks::Subscription {
@@ -838,7 +855,10 @@ pub(super) mod tests {
             actual.entries.get(2).expect("the complete supplied row is retained").kind,
             client::SubscriptionKind::Topic { connector: u16::MAX, topic: u64::MAX }
         );
-        assert_eq!(subscriptions(&source, &Limits { rows: 3, ..limits }), Err(Invalid::TooLarge));
+        assert_eq!(
+            subscriptions(&source, &Limits { rows: 3, turn_text: limits.turn_text, ..limits }),
+            Err(Invalid::TooLarge)
+        );
     }
 
     #[test]
@@ -886,7 +906,7 @@ pub(super) mod tests {
             retention: skein_lib::Duration::from_nanos(u64::MAX),
             cut: true,
         };
-        let limits = Limits { projects: 7, rows: 7, text: 2, ..crate::test::limits().client.domain };
+        let limits = Limits { projects: 7, rows: 7, text: 2, turn_text: 2, ..crate::test::limits().client.domain };
         let translated = frame(&source, &limits, &[], &jig_domain_accounts::Providers::none())
             .expect("the complete supplied fixture is admitted");
         assert_eq!(translated.party.number, u64::MAX);
@@ -913,11 +933,16 @@ pub(super) mod tests {
             assert_eq!(row.pool, None);
         }
         assert_eq!(
-            frame(&source, &Limits { projects: 6, ..limits }, &[], &jig_domain_accounts::Providers::none()),
+            frame(
+                &source,
+                &Limits { projects: 6, turn_text: limits.turn_text, ..limits },
+                &[],
+                &jig_domain_accounts::Providers::none()
+            ),
             Err(Invalid::TooLarge)
         );
         assert_eq!(
-            frame(&source, &Limits { text: 1, ..limits }, &[], &jig_domain_accounts::Providers::none()),
+            frame(&source, &Limits { text: 1, turn_text: 1, ..limits }, &[], &jig_domain_accounts::Providers::none()),
             Err(Invalid::TooLarge)
         );
         let mut known = source;

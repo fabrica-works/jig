@@ -12,7 +12,11 @@ fn retained(source: reads::Page, what: &client::Read, wrong: client::Read) {
     let source = reads::Answer::Page(Box::new(source));
     assert_eq!(read(&mut transport, other, &source, &l).err(), Some(Invalid::Page(wire::pages::Invalid::Identity)));
     assert!(transport.reply(other).is_some());
-    for limits in [Limits { document_bytes: 0, ..l }, Limits { rows: 7, ..l }, Limits { text: 1, ..l }] {
+    for limits in [
+        Limits { document_bytes: 0, turn_text: l.turn_text, ..l },
+        Limits { rows: 7, turn_text: l.turn_text, ..l },
+        Limits { text: 1, turn_text: 1, ..l },
+    ] {
         assert!(read(&mut transport, to, &source, &limits).is_err());
         assert!(transport.reply(to).is_some());
         assert!(transport.reply(other).is_some());

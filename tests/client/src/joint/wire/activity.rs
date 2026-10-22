@@ -303,7 +303,7 @@ pub(crate) mod tests {
     use super::*;
     use skein_lib::Wall;
     fn limits() -> Limits {
-        Limits { text: 100, rows: 4, document_bytes: 100_000, ..crate::test::limits().client.domain }
+        Limits { text: 100, turn_text: 100, rows: 4, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
     fn source(line: tasks::Line) -> tasks::ActivityLine {
         tasks::ActivityLine { task: u64::MAX, position: 7, at: Wall::from_nanos(9), line }
@@ -445,7 +445,15 @@ pub(crate) mod tests {
         );
         let decoded = with_archive(&original, &archive, &codec, &limits).expect("actual fetched record");
         assert_archive_metadata(&original, &decoded);
-        assert!(with_archive(&original, &archive, &codec, &Limits { document_bytes: 1, ..limits }).is_err());
+        assert!(
+            with_archive(
+                &original,
+                &archive,
+                &codec,
+                &Limits { document_bytes: 1, turn_text: limits.turn_text, ..limits }
+            )
+            .is_err()
+        );
         let unread = with_archive(
             &original,
             &jig_domain_core::TurnRecord { transcript: Box::from([255, 255]), ..archive.clone() },

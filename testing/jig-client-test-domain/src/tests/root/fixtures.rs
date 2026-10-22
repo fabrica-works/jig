@@ -81,6 +81,7 @@ pub(super) fn limits() -> Limits {
                 rows: 2,
                 segments: 4,
                 text: 32,
+                turn_text: 32,
                 projects: 2,
                 fields: 4,
                 delegates: 2,

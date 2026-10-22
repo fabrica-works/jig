@@ -110,7 +110,7 @@ pub(crate) mod tests {
     use skein_lib::Wall;
 
     pub(crate) fn limits() -> Limits {
-        Limits { rows: 8, text: 1024, document_bytes: 100_000, ..crate::test::limits().client.domain }
+        Limits { rows: 8, text: 1024, turn_text: 1024, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
     fn page(scope: reads::Scope) -> reads::Page {
         let key = match scope {
@@ -296,8 +296,11 @@ pub(crate) mod tests {
     fn whole_bounds(source: &reads::Page, translate: fn(&reads::Page, &Limits) -> Result<client::ReadValue, Invalid>) {
         let original = source.clone();
         let l = limits();
-        assert_eq!(translate(source, &Limits { rows: 7, ..l }), Err(Invalid::Owner(owner::Invalid::TooLarge)));
-        assert_eq!(translate(source, &Limits { text: 1, ..l }), Err(Invalid::Cursor));
+        assert_eq!(
+            translate(source, &Limits { rows: 7, turn_text: l.turn_text, ..l }),
+            Err(Invalid::Owner(owner::Invalid::TooLarge))
+        );
+        assert_eq!(translate(source, &Limits { text: 1, turn_text: 1, ..l }), Err(Invalid::Cursor));
         let mut wrong = source.clone();
         wrong.before = Some(reads::Cursor::Store { scope: reads::Scope::Activity { task: 0 }, after: None });
         assert_eq!(translate(&wrong, &l), Err(Invalid::Identity));
@@ -315,20 +318,29 @@ pub(crate) mod tests {
         });
         assert_eq!(translate(&wrong, &l), Err(Invalid::Identity));
         let (mut refused, mut accepted) = (0, l.document_bytes);
-        assert_eq!(translate(source, &Limits { document_bytes: 0, ..l }), Err(Invalid::Payload));
+        assert_eq!(
+            translate(source, &Limits { document_bytes: 0, turn_text: l.turn_text, ..l }),
+            Err(Invalid::Payload)
+        );
         while accepted - refused > 1 {
             let bytes = refused + (accepted - refused) / 2;
-            if translate(source, &Limits { document_bytes: bytes, ..l }).is_ok() {
+            if translate(source, &Limits { document_bytes: bytes, turn_text: l.turn_text, ..l }).is_ok() {
                 accepted = bytes;
             } else {
                 refused = bytes;
             }
         }
-        assert!(translate(source, &Limits { document_bytes: accepted, ..l }).is_ok());
-        assert_eq!(translate(source, &Limits { document_bytes: refused, ..l }), Err(Invalid::Payload));
+        assert!(translate(source, &Limits { document_bytes: accepted, turn_text: l.turn_text, ..l }).is_ok());
+        assert_eq!(
+            translate(source, &Limits { document_bytes: refused, turn_text: l.turn_text, ..l }),
+            Err(Invalid::Payload)
+        );
         let mut empty = source.clone();
         empty.rows = List::with_capacity(8);
-        assert_eq!(translate(&empty, &Limits { rows: 7, ..l }), Err(Invalid::Owner(owner::Invalid::TooLarge)));
+        assert_eq!(
+            translate(&empty, &Limits { rows: 7, turn_text: l.turn_text, ..l }),
+            Err(Invalid::Owner(owner::Invalid::TooLarge))
+        );
         assert!(translate(&empty, &l).is_ok());
         assert_eq!(source, &original);
     }
@@ -339,7 +351,7 @@ pub(crate) mod tests {
         source.before = None;
         source.next = None;
         assert_eq!(
-            ended(u64::MAX, &source, &Limits { text: 1, ..limits() }),
+            ended(u64::MAX, &source, &Limits { text: 1, turn_text: 1, ..limits() }),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
         let reads::PageRow::EndedDelegate(last) = source.rows.get_mut(3).expect("last whole delegate") else {

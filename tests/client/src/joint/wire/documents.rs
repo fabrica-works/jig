@@ -447,10 +447,13 @@ pub(crate) mod tests {
         assert_eq!(tree_delivery(0, 4, &source, &limits), Err(Invalid::Identity));
         assert_eq!(tree_delivery(u64::MAX, 3, &source, &limits), Err(Invalid::Identity));
         assert_eq!(
-            tree_delivery(u64::MAX, 4, &source, &Limits { rows: 3, ..limits }),
+            tree_delivery(u64::MAX, 4, &source, &Limits { rows: 3, turn_text: limits.turn_text, ..limits }),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
-        assert_eq!(tree_delivery(u64::MAX, 4, &source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
+        assert_eq!(
+            tree_delivery(u64::MAX, 4, &source, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }),
+            Err(Invalid::Payload)
+        );
         assert_eq!(source, before);
         source.next = None;
         source.rows.clear();
@@ -544,17 +547,25 @@ pub(crate) mod tests {
             assert_eq!(
                 question_read(
                     &source,
-                    &Limits { document_bytes: 0, ..limits },
+                    &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits },
                     &[jig_core_world::world::scripted_model()]
                 ),
                 Err(Invalid::Payload)
             );
             assert_eq!(
-                question_read(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+                question_read(
+                    &source,
+                    &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                    &[jig_core_world::world::scripted_model()]
+                ),
                 Err(Invalid::Owner(owner::Invalid::TooLarge))
             );
             assert_eq!(
-                question_read(&source, &Limits { text: 1, ..limits }, &[jig_core_world::world::scripted_model()]),
+                question_read(
+                    &source,
+                    &Limits { text: 1, turn_text: 1, ..limits },
+                    &[jig_core_world::world::scripted_model()]
+                ),
                 Err(Invalid::Owner(owner::Invalid::TooLarge))
             );
         }
@@ -627,10 +638,13 @@ pub(crate) mod tests {
             Err(Invalid::Identity)
         );
         assert_eq!(
-            tasks_delivery(&query, &source, &Limits { rows: 2, ..limits }),
+            tasks_delivery(&query, &source, &Limits { rows: 2, turn_text: limits.turn_text, ..limits }),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
-        assert_eq!(tasks_delivery(&query, &source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
+        assert_eq!(
+            tasks_delivery(&query, &source, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }),
+            Err(Invalid::Payload)
+        );
         assert_eq!(source, before);
         let empty = documents::Lines { lines: List::with_capacity(3), next: None, ..source };
         let client::Delivery::Tasks(value) = tasks_delivery(&query, &empty, &limits).expect("empty Ended") else {
@@ -642,7 +656,13 @@ pub(crate) mod tests {
 
     #[test]
     fn complete_result_documents_keep_whole_terminal_payload_optional_clocks_metadata_and_offers() {
-        let limits = Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 8,
+            text: 200,
+            turn_text: 200,
+            document_bytes: 100_000,
+            ..crate::test::limits().client.domain
+        };
         for terminal in [
             documents::Ending::Done(documents::ResultValue::Report(documents::Text {
                 bytes: Box::from(UTF8_TEXTS[0]),
@@ -707,13 +727,17 @@ pub(crate) mod tests {
                 assert_eq!(
                     result_read(
                         &source,
-                        &Limits { document_bytes: 0, ..limits },
+                        &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits },
                         &[jig_core_world::world::scripted_model()]
                     ),
                     Err(Invalid::Payload)
                 );
                 assert_eq!(
-                    result_read(&source, &Limits { rows: 7, ..limits }, &[jig_core_world::world::scripted_model()]),
+                    result_read(
+                        &source,
+                        &Limits { rows: 7, turn_text: limits.turn_text, ..limits },
+                        &[jig_core_world::world::scripted_model()]
+                    ),
                     Err(Invalid::Owner(owner::Invalid::TooLarge))
                 );
                 assert_eq!(source, before);
@@ -761,7 +785,12 @@ pub(crate) mod tests {
         let source = frame();
         let before = source.clone();
         // This fixture deliberately reserves three unfilled offer rows.
-        let limits = Limits { projects: 3, rows: 3, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            projects: 3,
+            rows: 3,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         let read =
             frame_read(&source, &limits, &[], &jig_domain_accounts::Providers::none()).expect("whole frame read fits");
         let client::ReadValue::Me(read) = read else { panic!("actual Me read envelope") };
@@ -775,13 +804,18 @@ pub(crate) mod tests {
         assert_eq!(read.projects.capacity(), 2);
         assert_eq!(read.needs_total, 17);
         assert_eq!(
-            frame_read(&source, &Limits { document_bytes: 0, ..limits }, &[], &jig_domain_accounts::Providers::none()),
+            frame_read(
+                &source,
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits },
+                &[],
+                &jig_domain_accounts::Providers::none()
+            ),
             Err(Invalid::Payload)
         );
         assert_eq!(
             frame_delivery(
                 &source,
-                &Limits { document_bytes: 0, ..limits },
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits },
                 &[],
                 &jig_domain_accounts::Providers::none()
             ),
@@ -817,9 +851,12 @@ pub(crate) mod tests {
             assert_eq!(retained.input.bytes(), b"");
             assert!(retained.cut);
             assert_eq!(retained.began, began);
-            assert_eq!(run_delivery(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
             assert_eq!(
-                run_delivery(&source, &Limits { text: 2, ..limits }),
+                run_delivery(&source, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }),
+                Err(Invalid::Payload)
+            );
+            assert_eq!(
+                run_delivery(&source, &Limits { text: 2, turn_text: 2, ..limits }),
                 Err(Invalid::Owner(owner::Invalid::TooLarge))
             );
             assert_eq!(source, before);

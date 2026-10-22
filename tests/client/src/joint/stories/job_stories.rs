@@ -124,6 +124,7 @@ fn in_call(words: &[u8], tool: &[u8]) -> Find {
 fn receiving() -> jig_client_test_domain::Limits {
     let mut receiving = crate::test::limits();
     receiving.client.domain.text = 256;
+    receiving.client.domain.turn_text = 256;
     receiving.client.domain.turn_bytes = 256;
     receiving
 }

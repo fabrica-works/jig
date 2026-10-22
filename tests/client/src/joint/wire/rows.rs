@@ -20,7 +20,13 @@ pub fn phases(value: documents::PhaseCounts) -> client::OwnerPhaseCounts {
 pub(crate) mod tests {
     use super::*;
     pub(crate) fn limits() -> jig_client::DomainLimits {
-        jig_client::DomainLimits { rows: 4, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
+        jig_client::DomainLimits {
+            rows: 4,
+            text: 200,
+            turn_text: 200,
+            document_bytes: 100_000,
+            ..crate::test::limits().client.domain
+        }
     }
     pub(crate) fn phase_source() -> documents::PhaseCounts {
         documents::PhaseCounts {

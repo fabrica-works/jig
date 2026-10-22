@@ -69,6 +69,7 @@ impl Session {
     pub(super) fn transcript_text_limit(&mut self, bytes: u32) {
         self.codec.turn.text = bytes;
         self.limits.client.domain.text = bytes;
+        self.limits.client.domain.turn_text = bytes;
         self.limits.client.domain.turn_bytes = bytes;
     }
 
@@ -932,6 +933,8 @@ mod tests {
         limits.client.domain.rows = 32;
         limits.client.domain.projects = 64;
         limits.client.domain.text = 4096;
+        limits.client.domain.turn_text = 4096;
+        limits.client.domain.turn_bytes = 4096;
         limits.client.domain.document_bytes = 1_048_576;
         limits.jig.rows = 32;
         limits.jig.projects = 64;

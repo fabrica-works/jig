@@ -24,6 +24,7 @@ pub fn client_limits() -> jig_client_protocol_link::Limits {
         kept: 4,
         projects: 2,
         text: 32,
+        turn_text: 32,
         segments: 4,
         rows: 2,
         backoff: jig_client_domain::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },

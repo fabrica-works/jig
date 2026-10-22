@@ -21,6 +21,8 @@ pub fn limits() -> client::Limits {
     limits.client.domain.watches = 64;
     limits.client.domain.reads = 64;
     limits.client.domain.text = 4096;
+    limits.client.domain.turn_text = 4096;
+    limits.client.domain.turn_bytes = 4096;
     limits.client.domain.document_bytes = 262_144;
     limits.client.domain.rows = 32;
     limits.client.domain.projects = 7;

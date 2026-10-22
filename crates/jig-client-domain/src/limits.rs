@@ -32,6 +32,10 @@ pub struct Limits {
     pub segments: u32,
     pub authority: u32,
     pub text: u32,
+    /// A committed turn's shared text budget in the transcript: its texts, its
+    /// calls' names, inputs and outcomes, and its results' summaries. At least
+    /// `text` and at most `turn_bytes`.
+    pub turn_text: u32,
     pub projects: u32,
     pub fields: u32,
     pub delegates: u32,
@@ -57,6 +61,9 @@ pub fn max_out(limits: &Limits) -> u32 {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    if limits.turn_text < limits.text || limits.turn_text > limits.turn_bytes {
+        return None;
+    }
     if limits.watches == 0 || limits.backoff.first == Duration::ZERO || limits.backoff.first > limits.backoff.most {
         return None;
     }

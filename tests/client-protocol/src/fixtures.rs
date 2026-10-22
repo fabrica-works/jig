@@ -159,6 +159,7 @@ pub fn domain_limits() -> jig_client_domain::Limits {
         rows: jig.rows,
         segments: jig.segments,
         text: jig.text,
+        turn_text: jig.text,
         projects: jig.projects,
         fields: jig.fields,
         delegates: jig.delegates,

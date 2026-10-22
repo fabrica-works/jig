@@ -73,6 +73,7 @@ impl Fixture {
             rows: limits.rows,
             segments: limits.segments,
             text: limits.text,
+            turn_text: limits.text,
             projects: limits.projects,
             fields: limits.fields,
             delegates: limits.delegates,

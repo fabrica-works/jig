@@ -85,7 +85,11 @@ pub(crate) mod tests {
     fn person_work_keeps_missing_and_whole_shown_results_in_source_order_without_clock_or_scope_inference() {
         let source = source();
         let original = source.clone();
-        let limits = Limits { rows: 8, ..super::super::rows::tests::limits() };
+        let limits = Limits {
+            rows: 8,
+            turn_text: super::super::rows::tests::limits().turn_text,
+            ..super::super::rows::tests::limits()
+        };
         let actual =
             document(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole pending person work");
         assert_eq!(actual.revision.value, u64::MAX);
@@ -118,7 +122,11 @@ pub(crate) mod tests {
 
     #[test]
     fn person_work_preserves_absent_and_present_zero_wait_facts_and_all_requester_address_kinds() {
-        let limits = Limits { rows: 8, ..super::super::rows::tests::limits() };
+        let limits = Limits {
+            rows: 8,
+            turn_text: super::super::rows::tests::limits().turn_text,
+            ..super::super::rows::tests::limits()
+        };
         for requester in
             [tasks::Party::Task(u64::MAX), tasks::Party::Person(0), tasks::Party::Deployment { project: u32::MAX }]
         {
@@ -150,7 +158,11 @@ pub(crate) mod tests {
     fn person_work_read_prices_whole_reserved_results_and_refuses_one_under_without_shortening() {
         let source = source();
         let original = source.clone();
-        let limits = Limits { rows: 8, ..super::super::rows::tests::limits() };
+        let limits = Limits {
+            rows: 8,
+            turn_text: super::super::rows::tests::limits().turn_text,
+            ..super::super::rows::tests::limits()
+        };
         let value =
             super::super::documents::person_task_read(&source, &limits, &[jig_core_world::world::scripted_model()])
                 .expect("whole read");
@@ -168,7 +180,7 @@ pub(crate) mod tests {
         assert_eq!(
             super::super::documents::person_task_read(
                 &source,
-                &Limits { document_bytes: bytes, ..limits },
+                &Limits { document_bytes: bytes, turn_text: limits.turn_text, ..limits },
                 &[jig_core_world::world::scripted_model()]
             ),
             Ok(value)
@@ -176,17 +188,21 @@ pub(crate) mod tests {
         assert_eq!(
             super::super::documents::person_task_read(
                 &source,
-                &Limits { document_bytes: bytes - 1, ..limits },
+                &Limits { document_bytes: bytes - 1, turn_text: limits.turn_text, ..limits },
                 &[jig_core_world::world::scripted_model()]
             ),
             Err(super::super::documents::Invalid::Payload)
         );
         assert_eq!(
-            document(&source, &Limits { rows: 7, ..limits }, &[jig_core_world::world::scripted_model()]),
+            document(
+                &source,
+                &Limits { rows: 7, turn_text: limits.turn_text, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(owner::Invalid::TooLarge)
         );
         assert_eq!(
-            document(&source, &Limits { text: 1, ..limits }, &[jig_core_world::world::scripted_model()]),
+            document(&source, &Limits { text: 1, turn_text: 1, ..limits }, &[jig_core_world::world::scripted_model()]),
             Err(owner::Invalid::TooLarge)
         );
         assert_eq!(source, original);

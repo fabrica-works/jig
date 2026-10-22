@@ -84,8 +84,12 @@ pub(crate) mod tests {
         let mut upper = limits.document_bytes;
         while lower < upper {
             let middle = lower + (upper - lower) / 2;
-            if super::super::documents::escalation_read(&source, &Limits { document_bytes: middle, ..limits }, &[])
-                .is_ok()
+            if super::super::documents::escalation_read(
+                &source,
+                &Limits { document_bytes: middle, turn_text: limits.turn_text, ..limits },
+                &[],
+            )
+            .is_ok()
             {
                 upper = middle;
             } else {
@@ -95,15 +99,27 @@ pub(crate) mod tests {
         let exact = lower;
         assert!(exact > 0);
         assert_eq!(
-            super::super::documents::escalation_read(&source, &Limits { document_bytes: exact, ..limits }, &[]),
+            super::super::documents::escalation_read(
+                &source,
+                &Limits { document_bytes: exact, turn_text: limits.turn_text, ..limits },
+                &[]
+            ),
             Ok(read.clone())
         );
         assert_eq!(
-            super::super::documents::escalation_read(&source, &Limits { document_bytes: exact - 1, ..limits }, &[]),
+            super::super::documents::escalation_read(
+                &source,
+                &Limits { document_bytes: exact - 1, turn_text: limits.turn_text, ..limits },
+                &[]
+            ),
             Err(Invalid::Payload)
         );
         assert_eq!(
-            super::super::documents::escalation_read(&source, &Limits { rows: 3, ..limits }, &[]),
+            super::super::documents::escalation_read(
+                &source,
+                &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                &[]
+            ),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
         for outer in [false, true] {

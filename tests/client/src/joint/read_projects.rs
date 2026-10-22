@@ -23,11 +23,11 @@ fn project_read_retains_original_project_client_and_token_until_whole_native_adm
     source.number = u32::MAX;
     let whole = reads::Answer::Document(Box::new(documents::Document::Project(Box::new(source))));
     assert_eq!(
-        read(&mut transport, to, &whole, &Limits { document_bytes: 0, ..limits }).err(),
+        read(&mut transport, to, &whole, &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }).err(),
         Some(Invalid::Document(wire::documents::Invalid::Payload))
     );
     assert!(transport.reply(to).is_some());
-    assert!(read(&mut transport, to, &whole, &Limits { rows: 7, ..limits }).is_err());
+    assert!(read(&mut transport, to, &whole, &Limits { rows: 7, turn_text: limits.turn_text, ..limits }).is_err());
     assert!(transport.reply(to).is_some());
     let Incoming::Callback {
         client: actual_client,

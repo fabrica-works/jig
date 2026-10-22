@@ -157,7 +157,7 @@ pub(crate) mod tests {
             words: text(UTF8_TEXTS[0], true),
         };
         let before = source.clone();
-        let limits = Limits { text: 2, rows: 1, ..crate::test::limits().client.domain };
+        let limits = Limits { text: 2, turn_text: 2, rows: 1, ..crate::test::limits().client.domain };
         let actual = value(&source, &limits).expect("whole exact payload fits");
         let client::ResultValue::OwnerVerdict { verdict, words, fields } = actual else {
             panic!("the actual payload has no chip or proposal arrays")
@@ -168,21 +168,24 @@ pub(crate) mod tests {
         assert_eq!(fields.capacity(), 1);
         assert_eq!(&*fields.get(0).expect("supplied machine field").name, &[255, 0]);
         assert_eq!(&*fields.get(0).expect("supplied machine field").value, &[b'/', 255]);
-        assert_eq!(value(&source, &Limits { text: 1, ..limits }), Err(owner::Invalid::TooLarge));
-        assert_eq!(value(&source, &Limits { rows: 0, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(value(&source, &Limits { text: 1, turn_text: 1, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(
+            value(&source, &Limits { rows: 0, turn_text: limits.turn_text, ..limits }),
+            Err(owner::Invalid::TooLarge)
+        );
         assert_eq!(source, before);
     }
 
     #[test]
     fn approved_result_state_and_optional_empty_explanation_are_copied_independently_from_failure_words() {
-        let limits = Limits { text: 2, ..crate::test::limits().client.domain };
+        let limits = Limits { text: 2, turn_text: 2, ..crate::test::limits().client.domain };
         for words in [None, Some(text(b"", false)), Some(text(UTF8_TEXTS[1], true))] {
             let source = documents::ResultValue::Approved { state: Box::from([0, 255]), words: words.clone() };
             let actual = value(&source, &limits).expect("whole approval");
             let client::ResultValue::Approved { state, words: actual } = actual else { panic!("exact approved state") };
             assert_eq!(&*state, &[0, 255]);
             assert_eq!(actual.as_ref().map(|w| (w.bytes.bytes(), w.cut)), words.as_ref().map(|w| (&*w.bytes, w.cut)));
-            assert_eq!(value(&source, &Limits { text: 1, ..limits }), Err(owner::Invalid::TooLarge));
+            assert_eq!(value(&source, &Limits { text: 1, turn_text: 1, ..limits }), Err(owner::Invalid::TooLarge));
         }
         assert_eq!(
             value(&documents::ResultValue::Failure(text(b"", true)), &limits),
@@ -245,7 +248,11 @@ pub(crate) mod tests {
 
     #[test]
     fn result_metadata_keeps_exact_links_optional_clock_status_chooser_and_closed_proposal_maker_independent() {
-        let limits = Limits { rows: 8, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 8,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         for chooser in [None, Some(0), Some(u64::MAX)] {
             for proposer in
                 [None, Some(documents::Proposer::Task(u64::MAX)), Some(documents::Proposer::Party(u64::MAX))]
@@ -322,16 +329,23 @@ pub(crate) mod tests {
     fn result_metadata_refuses_reserved_rows_and_whole_linked_text_without_reconstructing_missing_followups() {
         let source = document();
         let before = source.clone();
-        let limits = Limits { rows: 8, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 8,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         let copied = details(&source, &limits).expect("supplied metadata fits");
         assert_eq!(copied.followups, None);
         assert_eq!(copied.chosen_by, None);
         assert_eq!(copied.proposal, None);
-        assert_eq!(details(&source, &Limits { rows: 7, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(
+            details(&source, &Limits { rows: 7, turn_text: limits.turn_text, ..limits }),
+            Err(owner::Invalid::TooLarge)
+        );
         let mut with_link = source.clone();
         with_link.delegates.push(documents::TaskLink::Live(source.task.clone())).expect("whole linked chip");
         let retained = with_link.clone();
-        assert_eq!(details(&with_link, &Limits { text: 1, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(details(&with_link, &Limits { text: 1, turn_text: 1, ..limits }), Err(owner::Invalid::TooLarge));
         assert_eq!(with_link, retained);
         assert_eq!(source, before);
     }

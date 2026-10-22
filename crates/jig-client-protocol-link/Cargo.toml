@@ -17,3 +17,4 @@ workspace = true
 
 [dev-dependencies]
 jig-client-test-records = {path = "../../testing/jig-client-test-records"}
+smith-transcript.workspace = true

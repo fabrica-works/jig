@@ -78,16 +78,20 @@ pub fn bounds(
         }),
         acts::Bounds::Amend { budget_left, grants, implications, authority, ceiling } => client::Bounds::Amend {
             budget_left: *budget_left,
-            grants: owner::list(grants, &Limits { rows: crate::test::AUTHORITY_ENTRIES, ..*limits }, |grant| {
-                Ok(client::OwnerGrant {
-                    connector: grant.connector,
-                    kind: grant.kind,
-                    pattern: owner::pattern(&grant.segments, &grant.last, limits)?,
-                })
-            })?,
+            grants: owner::list(
+                grants,
+                &Limits { rows: crate::test::AUTHORITY_ENTRIES, turn_text: limits.turn_text, ..*limits },
+                |grant| {
+                    Ok(client::OwnerGrant {
+                        connector: grant.connector,
+                        kind: grant.kind,
+                        pattern: owner::pattern(&grant.segments, &grant.last, limits)?,
+                    })
+                },
+            )?,
             implications: owner::list(
                 implications,
-                &Limits { rows: crate::test::AUTHORITY_ENTRIES, ..*limits },
+                &Limits { rows: crate::test::AUTHORITY_ENTRIES, turn_text: limits.turn_text, ..*limits },
                 |pair| {
                     Ok(client::OwnerKindImplication {
                         connector: pair.connector,
@@ -179,7 +183,11 @@ mod tests {
 
     #[test]
     fn goal_offer_keeps_whole_closed_executor_choices_and_independent_direct_hard_and_pool_bounds() {
-        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 4,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         let mut charters = List::with_capacity(4);
         charters.push(u32::MAX).expect("supplied charter");
         let mut procedures = List::with_capacity(4);
@@ -230,7 +238,11 @@ mod tests {
         assert_eq!(roles.capacity(), 4);
         assert_eq!(roles.as_slice(), &[0, u32::MAX]);
         assert_eq!(
-            admission(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+            admission(
+                &source,
+                &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(owner::Invalid::TooLarge)
         );
         assert_eq!(source, before);
@@ -303,7 +315,11 @@ mod tests {
             ceiling: Box::new(ceiling),
         };
         let before = source.clone();
-        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 4,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         let actual = bounds(&source, &limits, &[jig_core_world::world::scripted_model()])
             .expect("whole supplied bounded amendment");
         let client::Bounds::Amend { budget_left, grants, implications, authority, ceiling } = actual else {
@@ -326,7 +342,11 @@ mod tests {
         let acts::Bounds::Amend { implications, .. } = &mut oversized else { panic!("amendment") };
         *implications = List::with_capacity(crate::test::AUTHORITY_ENTRIES + 1);
         assert_eq!(
-            bounds(&oversized, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+            bounds(
+                &oversized,
+                &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(owner::Invalid::TooLarge)
         );
         assert_eq!(source, before);

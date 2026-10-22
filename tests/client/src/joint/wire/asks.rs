@@ -639,7 +639,8 @@ mod tests {
         inputs.push(0).expect("room");
         let selected = client::Specification { words: text(b""), parameters, inputs: inputs.clone() };
         let source = super::super::owner::tests::amendment_source();
-        let limits = jig_client::DomainLimits { rows: 4, text: 128, ..crate::test::limits().client.domain };
+        let limits =
+            jig_client::DomainLimits { rows: 4, text: 128, turn_text: 128, ..crate::test::limits().client.domain };
         let authority =
             super::super::owner::authority(&source.authority, &limits, &[jig_core_world::world::scripted_model()])
                 .expect("whole authority")

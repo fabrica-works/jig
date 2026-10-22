@@ -3,7 +3,7 @@ use super::*;
 use skein_lib::{Duration, List, Wall};
 
 pub(crate) fn limits() -> Limits {
-    Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
+    Limits { rows: 8, text: 200, turn_text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
 }
 
 fn rows<T>(capacity: u32, values: impl IntoIterator<Item = T>) -> List<T> {
@@ -301,7 +301,7 @@ fn deployment_whole_read_and_watch_admit_their_own_complete_boxed_envelope_byte_
     let delivery = super::super::documents::deployment_delivery(&source, &limits).expect("supplied fixture value");
     for watch in [false, true] {
         let accepted = |bytes| {
-            let limits = Limits { document_bytes: bytes, ..limits };
+            let limits = Limits { document_bytes: bytes, turn_text: limits.turn_text, ..limits };
             if watch {
                 super::super::documents::deployment_delivery(&source, &limits).is_ok()
             } else {
@@ -319,7 +319,7 @@ fn deployment_whole_read_and_watch_admit_their_own_complete_boxed_envelope_byte_
             }
         }
         assert!(lower > 0 && accepted(lower) && !accepted(lower - 1));
-        let exact = Limits { document_bytes: lower, ..limits };
+        let exact = Limits { document_bytes: lower, turn_text: limits.turn_text, ..limits };
         if watch {
             assert_eq!(super::super::documents::deployment_delivery(&source, &exact), Ok(delivery.clone()));
         } else {

@@ -240,8 +240,12 @@ pub(crate) mod tests {
                     assert_eq!(values.capacity(), 4);
                     assert!(values.is_empty());
                     assert_eq!(
-                        action(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()])
-                            .err(),
+                        action(
+                            &source,
+                            &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                            &[jig_core_world::world::scripted_model()]
+                        )
+                        .err(),
                         Some(owner::Invalid::TooLarge)
                     );
                 }
@@ -316,21 +320,26 @@ pub(crate) mod tests {
             .expect("independent whole payload pricing")
             .checked_add(u64::try_from(size_of::<client::ReadValue>()).expect("read envelope"))
             .expect("whole read bytes");
-        let exact = Limits { document_bytes: bytes, ..limits };
+        let exact = Limits { document_bytes: bytes, turn_text: limits.turn_text, ..limits };
         assert!(
             super::super::documents::proposal_read(&source, &exact, &[jig_core_world::world::scripted_model()]).is_ok()
         );
         assert_eq!(
             super::super::documents::proposal_read(
                 &source,
-                &Limits { document_bytes: bytes - 1, ..exact },
+                &Limits { document_bytes: bytes - 1, turn_text: exact.turn_text, ..exact },
                 &[jig_core_world::world::scripted_model()]
             )
             .err(),
             Some(super::super::documents::Invalid::Payload)
         );
         assert_eq!(
-            document(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]).err(),
+            document(
+                &source,
+                &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            )
+            .err(),
             Some(owner::Invalid::TooLarge)
         );
         assert_eq!(source, before);

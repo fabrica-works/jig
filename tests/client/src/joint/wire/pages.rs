@@ -207,7 +207,7 @@ mod tests {
     use jig_domain_tasks as tasks;
     use skein_lib::Wall;
     fn limits() -> Limits {
-        Limits { text: 200, rows: 4, document_bytes: 100_000, ..crate::test::limits().client.domain }
+        Limits { text: 200, turn_text: 200, rows: 4, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
 
     #[test]
@@ -254,7 +254,13 @@ mod tests {
             matches!(copied.rows.get(1), Some(client::HistoryRow::Change(value)) if value.revision == 0 && value.at.is_none())
         );
         assert_eq!(
-            history_page(task, false, &page, &Limits { rows: 5, ..limits }, &[jig_core_world::world::scripted_model()]),
+            history_page(
+                task,
+                false,
+                &page,
+                &Limits { rows: 5, turn_text: limits.turn_text, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
         assert_eq!(
@@ -262,7 +268,7 @@ mod tests {
                 task,
                 false,
                 &page,
-                &Limits { document_bytes: 0, ..limits },
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits },
                 &[jig_core_world::world::scripted_model()]
             ),
             Err(Invalid::Payload)
@@ -558,7 +564,7 @@ mod tests {
                 &scope,
                 Some(&empty),
                 &source,
-                &Limits { rows: 2, ..limits() },
+                &Limits { rows: 2, turn_text: limits().turn_text, ..limits() },
                 &[jig_core_world::world::scripted_model()]
             ),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
@@ -568,7 +574,7 @@ mod tests {
                 &scope,
                 Some(&empty),
                 &source,
-                &Limits { document_bytes: 0, ..limits() },
+                &Limits { document_bytes: 0, turn_text: limits().turn_text, ..limits() },
                 &[jig_core_world::world::scripted_model()]
             ),
             Err(Invalid::Payload)

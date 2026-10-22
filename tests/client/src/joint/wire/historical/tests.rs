@@ -2,7 +2,7 @@ use super::*;
 use skein_lib::{List, Wall};
 
 pub(crate) fn limits() -> Limits {
-    Limits { rows: 8, text: 200, document_bytes: 1_000_000, ..crate::test::limits().client.domain }
+    Limits { rows: 8, text: 200, turn_text: 200, document_bytes: 1_000_000, ..crate::test::limits().client.domain }
 }
 fn raw_goal() -> tasks::New {
     tasks::New {
@@ -226,7 +226,7 @@ fn historical_unadmitted_recurrence_is_refused_before_copying_any_raw_goal_field
         batch: Box::new([]),
         overlap: tasks::RecurringOverlap::Wait,
     }));
-    let l = Limits { text: 0, rows: 0, ..limits() };
+    let l = Limits { text: 0, turn_text: 0, rows: 0, ..limits() };
     assert_eq!(read(&query, &source, &l, &[]), Err(Invalid::Recurrence));
 }
 
@@ -340,16 +340,27 @@ fn historical_whole_six_boxed_envelopes_have_exact_receiving_byte_boundaries() {
         let mut high = limits().document_bytes;
         while low < high {
             let at = low + (high - low) / 2;
-            if read(&query, &source, &Limits { document_bytes: at, ..limits() }, &[]).is_ok() {
+            if read(&query, &source, &Limits { document_bytes: at, turn_text: limits().turn_text, ..limits() }, &[])
+                .is_ok()
+            {
                 high = at;
             } else {
                 low = at + 1;
             }
         }
         assert!(low > 0);
-        assert_eq!(read(&query, &source, &Limits { document_bytes: low - 1, ..limits() }, &[]), Err(Invalid::Payload));
-        assert!(read(&query, &source, &Limits { document_bytes: low, ..limits() }, &[]).is_ok());
-        assert!(read(&query, &source, &Limits { document_bytes: low + 1, ..limits() }, &[]).is_ok());
+        assert_eq!(
+            read(&query, &source, &Limits { document_bytes: low - 1, turn_text: limits().turn_text, ..limits() }, &[]),
+            Err(Invalid::Payload)
+        );
+        assert!(
+            read(&query, &source, &Limits { document_bytes: low, turn_text: limits().turn_text, ..limits() }, &[])
+                .is_ok()
+        );
+        assert!(
+            read(&query, &source, &Limits { document_bytes: low + 1, turn_text: limits().turn_text, ..limits() }, &[])
+                .is_ok()
+        );
     }
 }
 

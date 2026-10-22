@@ -39,10 +39,14 @@ const INVALID_OWNERS: [&[jig_client_domain::Spoken]; 2] = [&TOO_MANY_OWNERS, &DU
 fn owner_declarations_fit_one_hello_without_duplicates() {
     let bounds = fixtures::limits();
     for owners in INVALID_OWNERS {
-        let client = jig_client_domain::Limits { owners, ..bounds.client };
+        let client = jig_client_domain::Limits { owners, turn_text: bounds.client.turn_text, ..bounds.client };
         assert_eq!(Limits::new(client, bounds.exchanges), Err(Unusable::Limits), "{owners:?}");
     }
-    let client = jig_client_domain::Limits { owners: &TOO_MANY_OWNERS[..15], ..bounds.client };
+    let client = jig_client_domain::Limits {
+        owners: &TOO_MANY_OWNERS[..15],
+        turn_text: bounds.client.turn_text,
+        ..bounds.client
+    };
     assert_eq!(Limits::new(client, bounds.exchanges).expect("fifteen distinct owners").client.owners.len(), 15);
 }
 
@@ -58,3 +62,4 @@ mod accounts;
 mod authority_models;
 
 mod programs;
+mod turn_text;

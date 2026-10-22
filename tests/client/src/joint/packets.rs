@@ -504,7 +504,11 @@ mod tests {
         let mut transport = transport();
         transport.signed_in(ClientId(1), u64::MAX, u64::MAX);
         let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
-        let limits = jig_client::DomainLimits { document_bytes: 0, ..crate::test::limits().client.domain };
+        let limits = jig_client::DomainLimits {
+            document_bytes: 0,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         let source = people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         assert!(matches!(people_reply(&mut transport, to, source.clone(), &limits), Err(Invalid::Payload)));
         assert!(transport.reply(to).is_some(), "failed whole admission leaves the original exchange intact");
@@ -532,7 +536,12 @@ mod tests {
         let limits = wire::rows::tests::limits();
         assert!(matches!(document(&mut transport, wrong, &source, &limits), Err(Invalid::OwnerRoute)));
         assert!(matches!(
-            document(&mut transport, owner, &source, &Limits { document_bytes: 0, ..limits }),
+            document(
+                &mut transport,
+                owner,
+                &source,
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }
+            ),
             Err(Invalid::Document(wire::documents::Invalid::Payload))
         ));
         assert!(transport.taken(ClientId(0), native).is_none());
@@ -588,7 +597,12 @@ mod tests {
             Err(Invalid::Document(wire::documents::Invalid::Identity))
         ));
         assert!(matches!(
-            document(&mut transport, original, &source, &Limits { document_bytes: 0, ..limits }),
+            document(
+                &mut transport,
+                original,
+                &source,
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }
+            ),
             Err(Invalid::Document(wire::documents::Invalid::Payload))
         ));
         assert!(transport.taken(ClientId(0), native).is_none());
@@ -633,7 +647,12 @@ mod tests {
         let source = jig_domain_core::documents::Document::Inbox(source);
         assert!(matches!(document(&mut transport, small, &source, &limits), Err(Invalid::OwnerRoute)));
         assert!(matches!(
-            document(&mut transport, owner, &source, &Limits { document_bytes: 100, ..limits }),
+            document(
+                &mut transport,
+                owner,
+                &source,
+                &Limits { document_bytes: 100, turn_text: limits.turn_text, ..limits }
+            ),
             Err(Invalid::Document(wire::documents::Invalid::Payload))
         ));
         assert!(transport.taken(ClientId(0), native).is_none());
@@ -691,13 +710,22 @@ mod tests {
             lines: skein_lib::List::with_capacity(3),
             next: None,
         });
-        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 4,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         assert!(matches!(
             document(&mut transport, sibling, &source, &limits),
             Err(Invalid::Document(wire::documents::Invalid::Identity))
         ));
         assert!(matches!(
-            document(&mut transport, watcher, &source, &Limits { document_bytes: 0, ..limits }),
+            document(
+                &mut transport,
+                watcher,
+                &source,
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }
+            ),
             Err(Invalid::Document(wire::documents::Invalid::Payload))
         ));
         assert!(transport.taken(ClientId(0), native).is_none());
@@ -807,7 +835,12 @@ mod tests {
         let limits = crate::test::limits().client.domain;
         assert!(matches!(document(&mut transport, watcher, &run(32), &limits), Err(Invalid::OwnerRoute)));
         assert!(matches!(
-            document(&mut transport, watcher, &run(31), &Limits { document_bytes: 0, ..limits }),
+            document(
+                &mut transport,
+                watcher,
+                &run(31),
+                &Limits { document_bytes: 0, turn_text: limits.turn_text, ..limits }
+            ),
             Err(Invalid::Document(wire::documents::Invalid::Payload))
         ));
         assert!(transport.watch(watcher).is_some());

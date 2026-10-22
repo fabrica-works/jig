@@ -93,7 +93,11 @@ mod tests {
 
     #[test]
     fn whole_note_keeps_stored_author_attempt_optional_clock_and_independent_text_reference_and_scope_facts() {
-        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 4,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         for (writer, expected) in [
             (notes::Author::Party { party: 0 }, client::NoteAuthor::Party { party: 0 }),
             (notes::Author::Party { party: u64::MAX }, client::NoteAuthor::Party { party: u64::MAX }),
@@ -156,13 +160,21 @@ mod tests {
     fn note_receiver_preserves_whole_allocated_bounds_and_each_supplied_scope_without_a_page_fallback() {
         let source = document();
         let before = source.clone();
-        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
+        let limits = Limits {
+            rows: 4,
+            turn_text: crate::test::limits().client.domain.turn_text,
+            ..crate::test::limits().client.domain
+        };
         assert_eq!(
-            note(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+            note(
+                &source,
+                &Limits { rows: 3, turn_text: limits.turn_text, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(owner::Invalid::TooLarge)
         );
         assert_eq!(
-            note(&source, &Limits { text: 2, ..limits }, &[jig_core_world::world::scripted_model()]),
+            note(&source, &Limits { text: 2, turn_text: 2, ..limits }, &[jig_core_world::world::scripted_model()]),
             Err(owner::Invalid::TooLarge)
         );
         assert_eq!(source, before);

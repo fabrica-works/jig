@@ -224,7 +224,7 @@ pub(super) mod tests {
     use super::*;
     use skein_lib::{List, Wall};
     pub(crate) fn limits() -> Limits {
-        Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
+        Limits { rows: 8, text: 200, turn_text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
     pub(crate) fn source() -> documents::HistoryLine {
         let before = owner::tests::amendment_source();
@@ -295,7 +295,7 @@ pub(super) mod tests {
             matches!(copied.proposal.expect("proposal").state, client::OwnerProposalHistoryState::Rejected { by: client::OwnerRequester::Person(u64::MAX), reason } if reason.cut && reason.bytes.bytes().is_empty())
         );
         assert_eq!(
-            line(&source, &Limits { text: 1, ..limits() }, &[jig_core_world::world::scripted_model()]),
+            line(&source, &Limits { text: 1, turn_text: 1, ..limits() }, &[jig_core_world::world::scripted_model()]),
             Err(owner::Invalid::TooLarge)
         );
     }
@@ -336,7 +336,7 @@ pub(super) mod tests {
         assert_eq!(
             action(
                 &documents::RetainedAction::Batch(batch),
-                &Limits { rows: 5, ..limits() },
+                &Limits { rows: 5, turn_text: limits().turn_text, ..limits() },
                 &[jig_core_world::world::scripted_model()]
             ),
             Err(owner::Invalid::TooLarge)
