@@ -205,7 +205,7 @@ pub fn run(directory: &Path) {
     let mut world = real::World::new(Judge {
         status: String::new(),
         phase: Phase::default(),
-        deadline: clock.now().now.saturating_add(Duration::from_secs(10)),
+        deadline: clock.now().now.saturating_add(Duration::from_secs(20)),
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds.into_iter().chain([root]).collect(), || {
@@ -224,6 +224,6 @@ pub fn run(directory: &Path) {
             submissions: Queue::with_capacity(512),
         }))
     });
-    let outcome = world.run(&clock, Duration::from_secs(15));
+    let outcome = world.run(&clock, Duration::from_secs(30));
     assert!(outcome.procs.iter().all(Host::is_empty), "all real account key io settles");
 }

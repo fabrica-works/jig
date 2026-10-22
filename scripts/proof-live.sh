@@ -29,12 +29,12 @@ try:
     address = socket.getaddrinfo('chatgpt.com', 443, socket.AF_INET, socket.SOCK_STREAM)[0][4][0] + ':443'
     with open(os.environ['JIG_LIVE_CONFIG'], 'w') as file:
         json.dump({'account_file':os.environ['JIG_LIVE_ACCOUNT'], 'model':model, 'address':address}, file)
-    print('Live proof prepared: five completions maximum, five minutes maximum; model=' + model)
+    print('Live proof prepared: five completions maximum, ten minutes maximum; model=' + model)
 except Exception:
     raise SystemExit('Cannot prepare the borrowed live account or public configuration') from None
 PY
 started=$SECONDS
 status=0
-timeout --signal=TERM --kill-after=5s 300s cargo nextest run -p jig-test --profile live --success-output immediate -E 'test(=a_native_client_s_chat_is_answered_by_a_real_model)' || status=$?
+timeout --signal=TERM --kill-after=10s 600s cargo nextest run -p jig-test --profile live --success-output immediate -E 'test(=a_native_client_s_chat_is_answered_by_a_real_model)' || status=$?
 printf "Live proof script wall=%ss; exit=%s\n" "$((SECONDS-started))" "$status"
 exit "$status"

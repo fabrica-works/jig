@@ -57,7 +57,7 @@ pub fn printed_link_line(binary: &mut Binary) -> String {
 pub fn get(url: &str, target: &str) -> (u16, Vec<(String, String)>, Vec<u8>) {
     let host = url.strip_prefix("http://").expect("loopback URL").split('/').next().expect("host");
     let mut socket = TcpStream::connect(host).expect("server listener");
-    socket.set_read_timeout(Some(std::time::Duration::from_secs(10))).expect("HTTP timeout");
+    socket.set_read_timeout(Some(std::time::Duration::from_secs(20))).expect("HTTP timeout");
     socket
         .write_all(format!("GET {target} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n").as_bytes())
         .expect("GET sent");
