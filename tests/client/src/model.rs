@@ -1,5 +1,5 @@
 //! A platform tree changed only by patches (skein's ui.md, 7).
-use skein_ui::{Made, NodeId, Patch, Tree};
+use skein_ui::{Attribute, Made, NodeId, Patch, Tree};
 #[derive(Debug)]
 struct Entry {
     node: Made,
@@ -86,7 +86,7 @@ fn apply(rows: &mut Vec<Entry>, patch: Patch) {
         }
         Patch::Attribute { node, attribute } => {
             let at = position(rows, node);
-            rows[at].node.attribute = attribute;
+            rows[at].node.attribute = Attribute::clone(&attribute);
         }
         Patch::Value { node, value } => {
             let at = position(rows, node);
