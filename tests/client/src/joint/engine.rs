@@ -343,13 +343,14 @@ mod tests {
 
         // A caller can reuse a retired opaque destination. Ownership follows
         // the live route table, never that destination's old person or range.
+        // An unknown Stop retains an ordinary answer without changing a task.
         driver.world.peers.as_mut().expect("ordinary peers").parties.push(Party::new(
             1,
             Role::Owner,
             1,
             Box::new([
                 Act::SignIn { provider: 0, subject },
-                Act::Request { key: [91; 16], ask: parties::Ask::SeeResults { through: 0 } },
+                Act::Request { key: [91; 16], ask: parties::Ask::Stop { task: parties::Task::Number(u64::MAX) } },
             ]),
         ));
         assert!(driver.poll(now, wall).is_empty(), "both foreign replies resume the scripted ledger");
@@ -363,7 +364,7 @@ mod tests {
             party.replies[0],
             (1, parties::Reply::SignedIn { person, sign_in: party.sign_in.expect("separate session") })
         );
-        assert_eq!(party.replies[1], (2, parties::Reply::Done));
+        assert_eq!(party.replies[1], (2, parties::Reply::Refused(parties::Refusal::Unknown)));
         assert_eq!(peers.requests.len(), 2);
         assert!(matches!(peers.requests[1], parties::Up::Request { to: 2, key, .. } if key == [91; 16]));
         assert_eq!(driver.world.people_answers.len(), 2);
