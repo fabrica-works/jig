@@ -1,6 +1,6 @@
 # The store
 
-Provisional, 2026-10-12, revised 2026-10-21. What lies beneath the
+Provisional, 2026-10-12, revised 2026-10-22. What lies beneath the
 engine's store vocabulary: skein's key-value store, embedded in the
 engine's process, holds every record jig's core and the application
 keep, transcripts are files beside it, and secrets are in a second
@@ -437,9 +437,10 @@ root for one step at a time, and the root asks the store:
 A party's read (`../client/domain/contract.md`, section 6) names a
 scope, a position, a direction and its bounds. The component serves each
 scope as intervals over jig's families, and joins each row in the same
-step by point reads: its owner task, live or ended; its requester
-ancestry, within the domain's depth limit; its links; the record it
-relates to.
+step by point reads, those its scope's rows carry: its owner task, live
+or ended; its requester ancestry, within the domain's depth limit; its
+links; the record it relates to. A task's activity joins its owner
+alone, once a page, and each turn's line its turn (below).
 
 | Scope | Served from |
 |---|---|
@@ -448,7 +449,7 @@ relates to.
 | an escalation | its decision, by the revision its task's record names, with the hold's milestone |
 | a question, a reply | the task's activity line, by its position, with the line that answers a question, where its answer was heard (below), or the turn a reply was (from the transcript, 8.3) |
 | a turn | the task's transcript (8.3) |
-| a task's activity, newest first | the activity family, read backwards (7.4); each turn's line with its turn, from the transcript (8.3) |
+| a task's activity, newest first | the activity family, read backwards (7.4); each turn's line with its turn, from the transcript (8.3); its owner task joined once for the page, and no row's ancestry or links, since an activity line names its task alone |
 | a task's history, or a subtree's | the history and milestone families; a subtree's by the index of its delegates, task by task: the task's own rows, then each delegate's in that index's order, each task's rows in its own history's order |
 | a task's ended delegates | the index of ended delegates by requester |
 | an inbox group | the index of the party's inbox, by time: what needs them oldest first, updates newest first; a group, and the filter, select within it |
@@ -477,12 +478,16 @@ relates to.
   row whose owner is gone, 7.4) or leaves them out (an inbox group, a
   description's filter, a task query's filter beyond its index's
   prefix) goes on past them; a page that reached its bound
-  and returned none is cut, not ended, and the client reads on from its
-  position. A subtree's history is in its scope's order, task by task,
+  and returned none is cut, not ended, whichever its scope and whichever
+  bound it reached (rows, bytes or joins), and carries the position it
+  reached, so the client reads on from the row it did not take. A
+  subtree's history is in its scope's order, task by task,
   its position the task and the row.
 - **Joins are point reads** in the same step, priced within the read's
   bounds: a page's rows times the joins each may need. A turn's is read
-  from its transcript, and answers once its frame is read.
+  from its transcript, and answers once its frame is read. An activity
+  page's joins are its owner's, once, and one for each turn, so its
+  first row needs at most the owner's and a turn's.
 - **A page of a task's activity carries its turns.** Each turn's line
   comes with its turn: its spend, the last message it read, its time,
   and smith's bytes. A turn and its line commit together, so a page's

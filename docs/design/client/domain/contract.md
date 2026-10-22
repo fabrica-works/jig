@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-21. jig's API: what crosses
+Provisional, 2026-10-09, revised 2026-10-22. jig's API: what crosses
 between a party's client and the engine, at the level of the two
 domains. It says who the party is; the plumbing operations a party asks,
 alone or several in one compound request, each keyed and answered once
@@ -963,6 +963,19 @@ new `me` watch, including after restart.
   its room full. Busy is the room full for now, and the client opens the watch
   again after a backoff (client.md, 8.1), as a request refused busy is
   sent again (section 4).
+- **A window past the engine's bounds is clamped,** at admission, never
+  refused: the watch keeps the window the engine's rows admit, and each
+  delivery is its document within it, saying there is more as its
+  subject's document does (a tree's folded counts and its cursor; a task
+  query's and an inbox's cursor; 5.3). An application's window is
+  clamped likewise before its connector is asked, and so is a live
+  read's window. So busy is never a window's answer.
+- **A document the engine cannot make within its bounds** for any window
+  (a whole value past them, which its bounds are derived to rule out,
+  5.3) is refused as unknown at admission, never as busy, since opening
+  again would not mend it: the client ends the handle (client.md, 8.1).
+  A delivery that cannot be made ends the watch, as its subject gone.
+  An answer of its own is open (section 11).
 - **An application's subject names its owner, its scope and its
   window,** as an application's read does: its owner by its number, the
   scope a project, the deployment, or the party's own (7.5). The core
@@ -1219,4 +1232,5 @@ designs (`../../protocol/client.md`):
 - **A document past its bounds:** what a read or a watch is answered
   when the engine cannot make its document within the client's bounds:
   bounds derived so that it cannot happen, as a path's segments are, or
-  an answer of its own.
+  an answer of its own. Until it is settled, a watch's is refused as
+  unknown and a delivery's ends its watch (7.2).

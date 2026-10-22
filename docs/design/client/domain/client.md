@@ -1,6 +1,6 @@
 # The client
 
-Provisional, 2026-10-09, revised 2026-10-19. `jig-client`: the client an
+Provisional, 2026-10-09, revised 2026-10-22. `jig-client`: the client an
 application holds, as a component, to reach jig's engine. It holds the
 link, the watches the application names by handle and the latest
 document of each, the application's keyed requests in skein-lib's
@@ -412,6 +412,11 @@ handles, as every presentation does (sections 7 and 8).
   page: its size, its order and where it starts, by cursor. The
   application gives it; the engine bounds it in bytes and rows, never in
   rows sized for one client's screen (contract.md, 5.3, 6.1 and 7.5).
+  A window past the engine's rows is answered within them, never
+  refused: the document or the page holds the rows the bound admits and
+  says there are more, by its cursor for the next and, for a tree, by
+  its folded counts (contract.md, 7.2). So an application asks for the
+  window it can show, and never needs the deployment's bounds first.
   Keeping rows across pages, as a list slides while a person scrolls, is
   the presentation's.
 - **One read in flight per handle.** A `Read` on a handle whose read is
