@@ -1,6 +1,6 @@
 use crate::{Holder, Key, Kind, Refusal, Stored, Use};
 use alloc::boxed::Box;
-use skein_lib::{Duration, Time, Token};
+use skein_lib::{Duration, Time, Token, Wall};
 
 /// Maximum address bytes in an account sign-in answer.
 pub const ADDRESS: u32 = 2_048;
@@ -349,6 +349,14 @@ pub enum Request {
     Closed,
 }
 
+/// A source-owned deadline (domain/accounts.md, 3.5; domain/engine.md, 5.4).
+/// Scheduling uses `at`; documents and stored resets retain `wall` exactly.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Deadline {
+    pub at: Time,
+    pub wall: Wall,
+}
+
 /// Secret-free source state (domain/engine.md, section 12; domain/accounts.md, 3.5):
 /// limited until a time, or, with none, until its holder resumes it; refused until its
 /// holder acts.
@@ -356,8 +364,8 @@ pub enum Request {
 pub enum State {
     Asking,
     Granted,
-    Later { until: Time },
-    Limited { until: Option<Time> },
+    Later { until: Deadline },
+    Limited { until: Option<Deadline> },
     Refused,
     NeedsSignIn,
     Misconfigured,
@@ -376,7 +384,7 @@ pub struct Fact {
     pub generation: Option<u64>,
     pub usable: bool,
     pub expiring: bool,
-    pub spent_until: Option<Time>,
+    pub spent_until: Option<Deadline>,
     pub attention: bool,
 }
 

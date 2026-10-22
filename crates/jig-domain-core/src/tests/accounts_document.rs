@@ -280,7 +280,7 @@ fn another_partys_accounts_subject_is_not_allowed() {
 }
 
 #[test]
-fn a_later_state_is_a_wall_time_only_with_a_clock() {
+fn a_later_state_keeps_its_source_wall_with_any_clock() {
     let (mut core, env) = fixture(own_records());
     drop(step(
         &mut core,
@@ -292,7 +292,7 @@ fn a_later_state_is_a_wall_time_only_with_a_clock() {
     ));
     assert_eq!(
         document(&core, &env, ALICE).accounts.get(0).unwrap().sources.get(0).unwrap().state,
-        AccountState::Later { until: None }
+        AccountState::Later { until: Some(Wall::from_nanos(5)) }
     );
     let Document::Accounts(clock) = make_with_clock(
         &core,
@@ -307,7 +307,7 @@ fn a_later_state_is_a_wall_time_only_with_a_clock() {
     };
     assert_eq!(
         clock.accounts.get(0).unwrap().sources.get(0).unwrap().state,
-        AccountState::Later { until: Some(Wall::from_nanos(105)) }
+        AccountState::Later { until: Some(Wall::from_nanos(5)) }
     );
 }
 

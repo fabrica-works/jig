@@ -193,7 +193,12 @@ fn a_kept_limit_means_the_same_after_a_restart() {
         key(4, 2, Held::Refused),
     ]);
     let until = Time::ZERO.saturating_add(Duration::from_secs(60));
-    assert_eq!(world.domain.source(2).expect("kept").state, State::Limited { until: Some(until) });
+    assert_eq!(
+        world.domain.source(2).expect("kept").state,
+        State::Limited {
+            until: Some(jig_domain_accounts::Deadline { at: until, wall: Wall::from_nanos(1_060_000_000_000) })
+        }
+    );
     assert_eq!(world.domain.source(3).expect("kept").state, State::Asking, "a reset passed while down lifts it");
     assert_eq!(world.domain.source(4).expect("kept").state, State::Refused);
     assert!(world.domain.source(4).expect("kept").attention);
@@ -318,7 +323,15 @@ fn each_record_restores_to_the_same_model() {
     );
     assert_eq!(again.domain.next_number(), world.domain.next_number());
     assert_eq!(again.domain.source_views().as_slice(), world.domain.source_views().as_slice());
-    assert_eq!(again.domain.source(21).expect("kept").state, State::Limited { until: reset });
+    assert_eq!(
+        again.domain.source(21).expect("kept").state,
+        State::Limited {
+            until: Some(jig_domain_accounts::Deadline {
+                at: Time::from_nanos(90_000_000_000),
+                wall: Wall::from_nanos(1_090_000_000_000)
+            })
+        }
+    );
     for number in [7, 20, 23] {
         let (was, is) = (world.domain.account(number).expect("kept"), again.domain.account(number).expect("restored"));
         assert_eq!(
@@ -363,4 +376,51 @@ fn a_record_breaking_a_rule_is_counted_and_dropped() {
     again.restore(records);
     assert_eq!(again.domain.unrestored(), 1);
     assert_eq!(again.domain.account(9).expect("restored").sources().len(), 1);
+}
+
+#[test]
+fn saving_again_and_restoring_preserve_the_exact_source_wall() {
+    let mut world = fresh();
+    let records = [account(1, 1, ALICE, b"alice"), source(1, 2, 0, Kind::SignIn), source(1, 3, 1, Kind::Key)];
+    let mut store: BTreeMap<_, _> = records.iter().map(|record| (record.key(), record.clone())).collect();
+    world.restore(records.to_vec());
+    commit(&mut store, world.step(Event::Want));
+    world.now = Time::from_nanos(10);
+    world.wall = Wall::from_nanos(100);
+    commit(&mut store, world.step(Event::Limited { account: 2, reset: Some(Time::from_nanos(30)) }));
+    let key = Key::Source { account: 1, number: 2 };
+    let expected = Some(Held::Limited { reset: Some(Wall::from_nanos(120)) });
+    for (now, wall, place) in [(12, 1_000, 1), (15, 50, 0)] {
+        world.now = Time::from_nanos(now);
+        world.wall = Wall::from_nanos(wall);
+        let requests = world.step(Event::Change {
+            request: skein_lib::Token::new(50),
+            holder: ALICE,
+            change: jig_domain_accounts::Change::MoveSource { account: 1, source: 2, place },
+        });
+        assert!(requests.iter().any(|request| matches!(request, Request::Save { record: Stored::Source { number: 2, held, .. } } if *held == expected)), "an actual later save keeps the original wall");
+        commit(&mut store, requests);
+        let Stored::Source { held, .. } = &store[&key] else { panic!("source record") };
+        assert_eq!(*held, expected);
+        let fact = world.domain.source(2).expect("limited source");
+        assert_eq!(
+            fact.spent_until,
+            Some(jig_domain_accounts::Deadline { at: Time::from_nanos(30), wall: Wall::from_nanos(120) })
+        );
+    }
+    let mut restored = fresh();
+    restored.now = Time::from_nanos(5_000);
+    restored.wall = Wall::from_nanos(110);
+    restored.restore(store.values().cloned().collect());
+    restored.step(Event::Want);
+    let deadline = jig_domain_accounts::Deadline { at: Time::from_nanos(5_010), wall: Wall::from_nanos(120) };
+    assert_eq!(restored.domain.source(2).expect("restored source").state, State::Limited { until: Some(deadline) });
+    assert_eq!(restored.domain.next_deadline(), Some(deadline.at));
+    let mut past = fresh();
+    past.now = Time::from_nanos(9_000);
+    past.wall = Wall::from_nanos(120);
+    past.restore(store.values().cloned().collect());
+    assert_eq!(past.domain.source(2).expect("expired source").state, State::Asking);
+    assert_eq!(past.domain.source(2).expect("expired source").spent_until, None);
+    assert_eq!(past.domain.next_deadline(), None);
 }

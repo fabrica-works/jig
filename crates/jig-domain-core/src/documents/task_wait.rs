@@ -84,23 +84,21 @@ pub(super) fn waiting(core: &Core, row: &tasks::TaskRecord) -> Option<TaskRunWai
                 accounts::WaitWhy::Refreshing => TaskWaitWhy::Refreshing,
                 accounts::WaitWhy::Host => TaskWaitWhy::Host,
                 accounts::WaitWhy::Empty => TaskWaitWhy::Empty,
-                accounts::WaitWhy::Source(state) => TaskWaitWhy::Source(source_state(core, state)),
+                accounts::WaitWhy::Source(state) => TaskWaitWhy::Source(source_state(state)),
             },
         }),
     }
 }
 
-fn source_state(core: &Core, state: accounts::State) -> TaskSourceState {
-    let clock = Some(super::DocumentClock { now: core.run_now, wall: core.run_wall });
+#[expect(clippy::manual_map, reason = "step code has no closures (programming-model.md, section 10)")]
+fn source_state(state: accounts::State) -> TaskSourceState {
     match state {
         accounts::State::Asking => TaskSourceState::Asking,
         accounts::State::Granted => TaskSourceState::Granted,
-        accounts::State::Later { until } => {
-            TaskSourceState::Later { until: super::deployment::wall_deadline(clock, until) }
-        }
+        accounts::State::Later { until } => TaskSourceState::Later { until: Some(until.wall) },
         accounts::State::Limited { until } => TaskSourceState::Limited {
             until: match until {
-                Some(until) => super::deployment::wall_deadline(clock, until),
+                Some(until) => Some(until.wall),
                 None => None,
             },
         },

@@ -1,7 +1,7 @@
 use crate::signing::UnderWay;
 use crate::{
-    Ended, Event, Fact, Failure, Form, FromComponent, Grant, Held, Holder, Kind, Limits, Pending, Providers, Request,
-    Signing, State, Stored, ToComponent, Turned, Use,
+    Deadline, Ended, Event, Fact, Failure, Form, FromComponent, Grant, Held, Holder, Kind, Limits, Pending, Providers,
+    Request, Signing, State, Stored, ToComponent, Turned, Use,
 };
 use alloc::boxed::Box;
 use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Wall};
@@ -116,7 +116,7 @@ impl Source {
 /// What runs' agents noticed, over whatever the component says (domain/accounts.md, 3.5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Hold {
-    Limited { until: Option<Time> },
+    Limited { until: Option<Deadline> },
     Refused,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -680,6 +680,15 @@ fn unauthorized(domain: &mut Domain, env: &Env<Limits>, source: u32, generation:
     entry.state = State::NeedsSignIn;
     changed(domain, env, source, before, out);
 }
+/// Capture the wall from the same step and the actual armed deadline, including saturation.
+fn deadline(env: &Env<Limits>, at: Time) -> Deadline {
+    let wall = if at >= env.now {
+        Wall::from_nanos(env.wall.as_nanos().saturating_add(at.saturating_since(env.now).as_nanos()))
+    } else {
+        Wall::from_nanos(env.wall.as_nanos().saturating_sub(env.now.saturating_since(at).as_nanos()))
+    };
+    Deadline { at, wall }
+}
 /// Limited until the later of its resets; a limit with none holds until resumed.
 #[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches without closures")]
 fn limited(domain: &mut Domain, env: &Env<Limits>, source: u32, reset: Option<Time>, out: &mut Queue<Request>) {
@@ -689,14 +698,18 @@ fn limited(domain: &mut Domain, env: &Env<Limits>, source: u32, reset: Option<Ti
         Some(Hold::Refused) => return,
         Some(Hold::Limited { until: None }) => None,
         Some(Hold::Limited { until: Some(old) }) => match reset {
-            Some(new) => Some(old.max(new)),
+            Some(new) if new > old.at => Some(deadline(env, new)),
+            Some(_) => Some(old),
             None => None,
         },
-        None => reset,
+        None => match reset {
+            Some(at) => Some(deadline(env, at)),
+            None => None,
+        },
     };
     entry.hold = Some(Hold::Limited { until });
     entry.hold_attention |= match until {
-        Some(until) => until.saturating_since(env.now) >= env.limits.spent_attention,
+        Some(until) => until.at.saturating_since(env.now) >= env.limits.spent_attention,
         None => true,
     };
     changed(domain, env, source, before, out);
@@ -826,7 +839,7 @@ fn failed(entry: &mut Source, env: &Env<Limits>, failure: Failure) {
             let until = env.now.saturating_add(delay);
             entry.retry = Some(until);
             entry.backoff = entry.backoff.saturating_mul(2).min(env.limits.backoff_max);
-            State::Later { until }
+            State::Later { until: deadline(env, until) }
         }
         Failure::SignInAgain | Failure::MissingScope { .. } => {
             entry.grant = None;
@@ -938,7 +951,7 @@ pub(crate) fn changed(
 }
 /// A source's record: its place in its account's order, and a limit's reset on the wall clock,
 /// so that it means the same after a restart (engine.md, 5.4).
-pub(crate) fn stored(domain: &Domain, env: &Env<Limits>, number: u32) -> Stored {
+pub(crate) fn stored(domain: &Domain, _env: &Env<Limits>, number: u32) -> Stored {
     let entry = domain.sources.get(&number).expect("a kept source");
     let account = domain.accounts.get(&entry.account).expect("a source's account is kept");
     let mut place = None;
@@ -948,10 +961,7 @@ pub(crate) fn stored(domain: &Domain, env: &Env<Limits>, number: u32) -> Stored 
         }
     }
     let held = match entry.hold {
-        Some(Hold::Limited { until: Some(until) }) => {
-            let left = until.saturating_since(env.now).as_nanos();
-            Some(Held::Limited { reset: Some(Wall::from_nanos(env.wall.as_nanos().saturating_add(left))) })
-        }
+        Some(Hold::Limited { until: Some(until) }) => Some(Held::Limited { reset: Some(until.wall) }),
         Some(Hold::Limited { until: None }) => Some(Held::Limited { reset: None }),
         Some(Hold::Refused) => Some(Held::Refused),
         None => None,
@@ -971,7 +981,7 @@ pub(crate) fn stored(domain: &Domain, env: &Env<Limits>, number: u32) -> Stored 
 pub(crate) fn settle(domain: &mut Domain, env: &Env<Limits>, source: u32) -> Fact {
     let entry = domain.sources.get_mut(&source).expect("event keeps its source");
     if let Some(Hold::Limited { until: Some(until) }) = entry.hold
-        && until <= env.now
+        && until.at <= env.now
     {
         entry.hold = None;
         entry.hold_attention = false;
@@ -996,8 +1006,8 @@ pub(crate) fn settle(domain: &mut Domain, env: &Env<Limits>, source: u32) -> Fac
         }
     };
     let reset = match entry.hold {
-        Some(Hold::Limited { until }) => until,
-        Some(Hold::Refused) | None => None,
+        Some(Hold::Limited { until: Some(until) }) => Some(until.at),
+        Some(Hold::Limited { until: None } | Hold::Refused) | None => None,
     };
     for at in [expiry, reset].into_iter().flatten() {
         if at > env.now {
@@ -1031,7 +1041,7 @@ pub(crate) fn program_grant(domain: &mut Domain, source: u32, out: &mut Queue<Re
         return;
     }
     match entry.hold {
-        Some(Hold::Limited { until: Some(until) }) if until <= domain.now => {}
+        Some(Hold::Limited { until: Some(until) }) if until.at <= domain.now => {}
         Some(Hold::Limited { .. } | Hold::Refused) => return,
         None => {}
     }

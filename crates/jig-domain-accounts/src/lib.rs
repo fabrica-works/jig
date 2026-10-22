@@ -20,9 +20,9 @@ mod restore;
 mod selection;
 mod signing;
 pub use boundary::{
-    ADDRESS, Answer, Change, End, Ended, Event, Fact, Failure, Form, FromComponent, Grant, GrantTable, KeyFailure,
-    Pending, Place, Program, ProgramFailure, ProgramHost, ProgramResult, Request, Scheme, Signing, State, ToComponent,
-    Turned, Unread,
+    ADDRESS, Answer, Change, Deadline, End, Ended, Event, Fact, Failure, Form, FromComponent, Grant, GrantTable,
+    KeyFailure, Pending, Place, Program, ProgramFailure, ProgramHost, ProgramResult, Request, Scheme, Signing, State,
+    ToComponent, Turned, Unread,
 };
 pub use checks::{Bound, Refusal, SignIn, room_for_sign_in};
 pub use domain::{Account, Domain, fire, max_out, step};

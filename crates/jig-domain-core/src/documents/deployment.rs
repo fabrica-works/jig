@@ -168,12 +168,12 @@ pub(super) fn wall_deadline(clock: Option<DocumentClock>, at: Time) -> Option<Wa
         Some(Wall::from_nanos(clock.wall.as_nanos().saturating_sub(clock.now.saturating_since(at).as_nanos())))
     }
 }
-pub(super) fn account_state(state: accounts::State, clock: Option<DocumentClock>) -> AccountState {
+pub(super) fn account_state(state: accounts::State) -> AccountState {
     match state {
         accounts::State::Asking => AccountState::Asking,
         accounts::State::Granted => AccountState::Granted,
         accounts::State::Later { until } | accounts::State::Limited { until: Some(until) } => {
-            AccountState::Later { until: wall_deadline(clock, until) }
+            AccountState::Later { until: Some(until.wall) }
         }
         accounts::State::Limited { until: None } => AccountState::Later { until: None },
         accounts::State::Refused | accounts::State::NeedsSignIn => AccountState::SignInAgain,
@@ -338,7 +338,7 @@ pub(super) fn deployment(
             cut = true;
             continue;
         }
-        let sources = super::accounts::source_lines(core, limits, account, clock);
+        let sources = super::accounts::source_lines(core, limits, account);
         let mut runs = List::with_capacity(limits.documents.lines);
         let mut waiting = List::with_capacity(limits.documents.lines);
         let mut account_cut = sources.len() < account.sources().len();
@@ -395,12 +395,12 @@ pub(super) fn deployment(
                 holder: account.holder(),
                 sources,
                 generation: value.generation,
-                state: account_state(value.state, clock),
+                state: account_state(value.state),
                 usable: value.usable,
                 expiring: value.expiring,
                 attention: value.attention,
                 spent_until: match value.spent_until {
-                    Some(at) => wall_deadline(clock, at),
+                    Some(until) => Some(until.wall),
                     None => None,
                 },
                 runs,
@@ -511,7 +511,7 @@ pub(super) fn deployment(
     })
 }
 /// Construct a document with the decision caller's injected clock. Other
-/// subjects need no clock; deployment's grace/cooldown facts become wall times.
+/// subjects use their owners' wall facts; fleet grace is projected with this clock.
 pub fn make_with_clock(
     core: &Core,
     limits: &Limits,
@@ -521,14 +521,9 @@ pub fn make_with_clock(
     clock: DocumentClock,
 ) -> Result<super::Document, Missing> {
     match subject {
-        super::Subject::Accounts { party: owner } => Ok(super::Document::Accounts(Box::new(super::accounts::make(
-            core,
-            limits,
-            party,
-            *owner,
-            window,
-            Some(clock),
-        )?))),
+        super::Subject::Accounts { party: owner } => {
+            Ok(super::Document::Accounts(Box::new(super::accounts::make(core, limits, party, *owner, window)?)))
+        }
         super::Subject::Deployment => {
             core.people.identity(party).ok_or(Missing::Unknown)?;
             if super::document_worst_case(&limits.documents).is_none() || window.rows > limits.documents.rows {

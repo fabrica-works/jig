@@ -176,3 +176,148 @@ fn joint_scheduler_resamples_the_effect_wall_after_correction_and_consumes_the_r
     world.fire_due(Time::from_nanos(elapsed.as_nanos() + 601), deadline);
     assert_eq!(world.answers.len(), 1, "the original reply right is consumed once");
 }
+
+fn read(world: &mut World, number: u64, value: core::reads::Read) {
+    world.send(root::Event::Core(core::Event::Read {
+        reply: ReplyTo::new(Token::new(number)),
+        sign_in: world.sign_in.expect("signed in"),
+        read: value,
+    }));
+}
+fn check_source_documents(world: &World, reset: Wall) {
+    let documents: Vec<_> = world
+        .client_peer
+        .as_ref()
+        .expect("client peer")
+        .delivered
+        .iter()
+        .filter_map(|(_, delivery)| {
+            let root::Delivery::Core(core::Held::Read { answer: core::reads::Answer::Document(document), .. }) =
+                delivery
+            else {
+                return None;
+            };
+            Some(document.as_ref())
+        })
+        .collect();
+    let deployment = documents
+        .iter()
+        .find_map(|document| {
+            let core::documents::Document::Deployment(document) = document else { return None };
+            Some(document.as_ref())
+        })
+        .expect("actual deployment read");
+    let account = deployment.accounts.get(0).expect("deployment account");
+    let state = core::documents::AccountState::Later { until: Some(reset) };
+    assert_eq!(account.state, state);
+    assert_eq!(account.spent_until, Some(reset));
+    let source = account.sources.get(0).expect("deployment source");
+    assert_eq!(source.state, state);
+    assert_eq!(source.spent_until, Some(reset));
+    let task = documents
+        .iter()
+        .find_map(|document| {
+            let core::documents::Document::Task(document) = document else { return None };
+            Some(document.as_ref())
+        })
+        .expect("actual task read");
+    assert_eq!(
+        task.run_wait,
+        Some(core::documents::TaskRunWait::Account {
+            account: Some(0),
+            source: Some(1),
+            why: core::documents::TaskWaitWhy::Source(core::documents::TaskSourceState::Limited { until: Some(reset) }),
+        }),
+        "task read at {:?}",
+        world.clocks()
+    );
+}
+
+fn ready_worker(world: &mut World) {
+    world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
+        worker: 0,
+        channel: Token::new(7),
+        hello: jig_domain_fleet::Hello {
+            bounds: jig_core_world::fixtures::bounds(),
+            stop_bound: skein_lib::Duration::from_millis(100),
+            slots: 1,
+            workstreams: Box::new([]),
+            hosting: Box::new([]),
+        },
+    })));
+}
+
+#[test]
+fn source_wall_survives_held_reads_and_a_new_restore_origin() {
+    use jig_domain_accounts as accounts;
+    use jig_domain_tasks as tasks;
+    let seed = 8456;
+    let (configuration, mut limits) = jig_core_world::effects::fixture(seed, false);
+    limits.core.people.projects = 2;
+    jig_core_world::peers::journal(&mut limits);
+    let mut world = World::configured(seed, false, configuration, limits);
+    let assigned = world.assigned.as_ref().expect("assigned chat");
+    let (task, attempt) = (assigned.task, assigned.attempt);
+    let sign_in = world.sign_in.expect("signed in");
+    let person = world
+        .store
+        .rows
+        .values()
+        .find_map(|record| {
+            let root::Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. })) = record else {
+                return None;
+            };
+            (*number == sign_in).then_some(*person)
+        })
+        .expect("durable sign-in");
+    world.send(root::Event::Core(core::Event::People(people::Event::Roles {
+        project: 0,
+        holdings: Box::new([people::Holding { person, role: people::Role::Owner }]),
+    })));
+    world.client_peer = Some(jig_core_world::client_peer::ClientPeer::default());
+    world.set_clock(Time::from_nanos(1_000_000_000), Wall::from_nanos(10_000_000_000));
+    world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
+    world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Limited {
+        channel: Token::new(7),
+        run: Token::new(task),
+        attempt: Token::new(attempt),
+        account: 1,
+        reset: Some(skein_lib::Duration::from_secs(30)),
+    })));
+    world.end(tasks::End::Failed(tasks::Class::Run), 1);
+    let prerequisite = world.store.applied;
+    world.set_clock(Time::from_nanos(2_000_000_000), Wall::from_nanos(20_000_000_000));
+    read(&mut world, 9002, core::reads::Read::Deployment);
+    world.set_clock(Time::from_nanos(3_000_000_000), Wall::from_nanos(5_000_000_000));
+    assert!(
+        world.client_peer.as_ref().expect("client peer").delivered.is_empty(),
+        "reads cannot cross the held completion"
+    );
+    world.release_commits();
+    read(&mut world, 9003, core::reads::Read::Task { task });
+    let reset = Wall::from_nanos(40_000_000_000);
+    check_source_documents(&world, reset);
+    assert!(
+        world.client_peer.as_ref().expect("client peer").delivered.iter().all(|(commit, _)| *commit >= prerequisite)
+    );
+    let key = root::Key::Core(core::Key::Accounts(accounts::Key::Source { account: 0, number: 1 }));
+    let root::Record::Core(core::Record::Accounts(accounts::Stored::Source { held, .. })) = &world.store.rows[&key]
+    else {
+        panic!("source record")
+    };
+    assert_eq!(*held, Some(accounts::Held::Limited { reset: Some(reset) }));
+    world.set_clock(Time::from_nanos(4_000_000_000), Wall::from_nanos(15_000_000_000));
+    world.restart_with(jig_core_world::effects::fixture(seed, false).0);
+    let deadline = accounts::Deadline { at: Time::from_nanos(29_000_000_000), wall: reset };
+    assert_eq!(world.domain.accounts().source(1).expect("restored source").spent_until, Some(deadline));
+    ready_worker(&mut world);
+    world.client_peer = Some(jig_core_world::client_peer::ClientPeer::default());
+    read(&mut world, 9004, core::reads::Read::Deployment);
+    world.set_clock(Time::from_nanos(5_000_000_000), Wall::from_nanos(30_000_000_000));
+    read(&mut world, 9005, core::reads::Read::Task { task });
+    check_source_documents(&world, reset);
+    world.fire_due(Time::from_nanos(28_999_999_999), Wall::from_nanos(35_000_000_000));
+    assert_eq!(world.domain.accounts().source(1).expect("not due").spent_until, Some(deadline));
+    world.fire_due(deadline.at, Wall::from_nanos(35_000_000_000));
+    assert_eq!(world.domain.accounts().source(1).expect("due").spent_until, None);
+}

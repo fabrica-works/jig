@@ -263,7 +263,12 @@ fn explicit_zero_reset_lifts_but_later_notices_never_shorten_a_limit() {
         Selection::Wait {
             account: OWN,
             source: Some(FIRST),
-            why: WaitWhy::Source(State::Limited { until: Some(reset) })
+            why: WaitWhy::Source(State::Limited {
+                until: Some(jig_domain_accounts::Deadline {
+                    at: reset,
+                    wall: skein_lib::Wall::from_nanos(50_000_000_000)
+                })
+            })
         }
     );
 }

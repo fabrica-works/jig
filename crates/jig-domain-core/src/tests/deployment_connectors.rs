@@ -239,14 +239,17 @@ fn an_account_waiting_to_ask_again_carries_the_wall_it_asks_at() {
     };
     assert_eq!(
         value.accounts.get(0).unwrap().state,
-        AccountState::Later { until: Some(Wall::from_nanos(2_020_000_000_000)) }
+        AccountState::Later { until: Some(Wall::from_nanos(1_030_000_000_000)) }
     );
 }
 
 #[test]
-fn an_account_waiting_to_ask_again_has_no_wall_without_a_document_clock() {
+fn an_account_waiting_to_ask_again_keeps_its_wall_without_a_clock() {
     let (core, limits) = waiting_account();
-    assert_eq!(deployment(&core, &limits).accounts.get(0).unwrap().state, AccountState::Later { until: None });
+    assert_eq!(
+        deployment(&core, &limits).accounts.get(0).unwrap().state,
+        AccountState::Later { until: Some(Wall::from_nanos(1_030_000_000_000)) }
+    );
 }
 
 fn program_facts() -> (Core, Env<Limits>) {

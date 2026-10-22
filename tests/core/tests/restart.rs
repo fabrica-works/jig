@@ -346,12 +346,18 @@ fn a_restart_restores_people_before_live_tasks_and_core_rows() {
 fn a_limited_source_keeps_its_reset_across_a_restart() {
     let mut world = World::new(121, false);
     account(&mut world);
-    let reset = world.clocks().0.saturating_add(Duration::from_secs(300));
+    let (now, wall) = world.clocks();
+    let reset = now.saturating_add(Duration::from_secs(300));
     world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Limited {
         account: 1,
         reset: Some(reset),
     })));
-    let limited = jig_domain_accounts::State::Limited { until: Some(reset) };
+    let limited = jig_domain_accounts::State::Limited {
+        until: Some(jig_domain_accounts::Deadline {
+            at: reset,
+            wall: skein_lib::Wall::from_nanos(wall.as_nanos() + Duration::from_secs(300).as_nanos()),
+        }),
+    };
     assert_eq!(world.domain.accounts().source(1).expect("the configured source").state, limited);
     let row = root::Key::Core(core::Key::Accounts(jig_domain_accounts::Key::Source { account: 0, number: 1 }));
     assert!(world.store.rows.contains_key(&row), "the hold is committed with the decision that limits it");

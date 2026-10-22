@@ -18,7 +18,7 @@
 //! Closing chips name the connectors they wait on (QUESTIONS 29). Effect
 //! descriptions, prices and counts remain in each connector's panel. Recurring wall
 //! schedules still require their schedule owner. `make_with_clock` projects
-//! host grace and account cooldowns from monotonic deadlines.
+//! host grace from monotonic deadlines; account deadlines carry their source wall.
 
 use jig_domain_people::ApplicationScope;
 
@@ -388,7 +388,7 @@ pub fn make(
             Ok(Document::Inbox(inbox_deployment::inbox(core, limits, party, window)?))
         }
         Subject::Accounts { party: owner } => {
-            Ok(Document::Accounts(Box::new(accounts::make(core, limits, party, *owner, window, None)?)))
+            Ok(Document::Accounts(Box::new(accounts::make(core, limits, party, *owner, window)?)))
         }
         Subject::Deployment => Ok(Document::Deployment(Box::new(deployment::deployment(core, limits, party, None)?))),
         Subject::Proposal { proposer, number } => {

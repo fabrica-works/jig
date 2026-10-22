@@ -4,7 +4,7 @@
 //! taken or not, so that no number is given twice.
 use crate::domain::{Account, Domain, Hold, Source, settle};
 use crate::records::{program_name, within};
-use crate::{DISPLAY, Fact, Held, Kind, Limits, SUBJECT, Stored};
+use crate::{DISPLAY, Deadline, Fact, Held, Kind, Limits, SUBJECT, Stored};
 use skein_lib::{Duration, Env, List, Map, Queue, Wall};
 
 pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored) {
@@ -154,7 +154,10 @@ fn hold(entry: &mut Source, env: &Env<Limits>, kept: Option<Held>) {
         Some(Held::Limited { reset: None }) => (Hold::Limited { until: None }, true),
         Some(Held::Limited { reset: Some(reset) }) => {
             let Some(left) = left(env.wall, reset) else { return };
-            (Hold::Limited { until: Some(env.now.saturating_add(left)) }, left >= env.limits.spent_attention)
+            (
+                Hold::Limited { until: Some(Deadline { at: env.now.saturating_add(left), wall: reset }) },
+                left >= env.limits.spent_attention,
+            )
         }
     };
     entry.hold = Some(hold);

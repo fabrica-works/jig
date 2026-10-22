@@ -1,5 +1,5 @@
 //! The party's accounts (`client/domain/contract.md`, 5.1; `domain/accounts.md`, sections 3 and 5).
-use super::deployment::{AccountState, DocumentClock, account_state, wall_deadline};
+use super::deployment::{AccountState, account_state};
 use super::inbox_deployment::line_bound;
 use super::{DocumentLimits, Missing, Text, Window};
 use crate::{Core, Limits};
@@ -65,17 +65,12 @@ pub struct Accounts {
 }
 
 #[expect(clippy::manual_map, reason = "step code uses exhaustive options without closures")]
-pub(super) fn source_lines(
-    core: &Core,
-    limits: &Limits,
-    account: &accounts::Account,
-    clock: Option<DocumentClock>,
-) -> List<SourceLine> {
+pub(super) fn source_lines(core: &Core, limits: &Limits, account: &accounts::Account) -> List<SourceLine> {
     let mut sources = List::with_capacity(limits.documents.lines);
     for (place, number) in account.sources().iter().take(line_bound(limits)) {
         let fact = core.accounts.source(*number).expect("an account's sources are kept");
         let spent_until = match fact.spent_until {
-            Some(at) => wall_deadline(clock, at),
+            Some(until) => Some(until.wall),
             None => None,
         };
         sources
@@ -87,7 +82,7 @@ pub(super) fn source_lines(
                 place: *place,
                 number: *number,
                 kind: fact.kind,
-                state: account_state(fact.state, clock),
+                state: account_state(fact.state),
                 usable: fact.usable,
                 expiring: fact.expiring,
                 attention: fact.attention,
@@ -99,14 +94,7 @@ pub(super) fn source_lines(
 }
 
 #[expect(clippy::manual_map, reason = "step code has no closures (programming-model.md, section 10)")]
-pub(super) fn make(
-    core: &Core,
-    limits: &Limits,
-    party: u64,
-    owner: u64,
-    window: &Window,
-    clock: Option<DocumentClock>,
-) -> Result<Accounts, Missing> {
+pub(super) fn make(core: &Core, limits: &Limits, party: u64, owner: u64, window: &Window) -> Result<Accounts, Missing> {
     core.people.identity(party).ok_or(Missing::Unknown)?;
     if super::document_worst_case(&limits.documents).is_none() || window.rows > limits.documents.rows {
         return Err(Missing::TooLarge);
@@ -126,7 +114,7 @@ pub(super) fn make(
             cut = true;
             continue;
         }
-        let sources = source_lines(core, limits, account, clock);
+        let sources = source_lines(core, limits, account);
         accounts
             .push(AccountLine {
                 number,

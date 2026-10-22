@@ -84,7 +84,7 @@ fn a_grant_is_usable_until_its_token_lapses() {
 fn later_asks_again_after_the_drivers_delay() {
     let mut world = granted();
     assert_eq!(failed(&mut world, Failure::Later { after: Some(Duration::from_secs(12)) }), vec![]);
-    assert_eq!(world.views()[0].state, State::Later { until: Time::ZERO.saturating_add(Duration::from_secs(12)) });
+    assert_eq!(world.views()[0].state, State::Later { until: deadline(12) });
     assert_eq!(world.fire_at(11), vec![]);
     assert_eq!(world.fire_at(12), vec![want()]);
 }
@@ -168,7 +168,7 @@ fn a_limit_with_a_reset_ends_at_it_and_asks_nothing() {
     let mut world = granted();
     assert_eq!(world.step(Event::Limited { account: ANALYST, reset: Some(at(30)) }), vec![kept(Some(until(30)))]);
     assert!(!world.domain.usable(1_000 + ANALYST));
-    assert_eq!(world.views()[0].state, State::Limited { until: Some(at(30)) });
+    assert_eq!(world.views()[0].state, State::Limited { until: Some(deadline(30)) });
     assert!(world.views()[0].attention);
     assert_eq!(world.fire_at(29), vec![]);
     assert!(!world.domain.usable(1_000 + ANALYST));
@@ -232,7 +232,7 @@ fn a_failed_runs_limited_account_marks_it_limited() {
     let mut world = granted();
     let failed = Event::RunFailed { account: ANALYST, turned: Turned::Limited { reset: Some(at(12)) } };
     assert_eq!(world.step(failed), vec![kept(Some(until(12)))]);
-    assert_eq!(world.views()[0].state, State::Limited { until: Some(at(12)) });
+    assert_eq!(world.views()[0].state, State::Limited { until: Some(deadline(12)) });
     assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.fire_at(12), vec![kept(None)]);
     assert!(world.domain.usable(1_000 + ANALYST));
@@ -319,4 +319,93 @@ fn a_component_grant_in_the_application_form_is_ignored() {
     assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.domain.grant(1_000 + ANALYST, world.now), None);
     assert_eq!(world.views()[0].state, State::Asking);
+}
+
+/// The literal pair expected while these fixtures' two clocks start together.
+fn deadline(seconds: u64) -> jig_domain_accounts::Deadline {
+    jig_domain_accounts::Deadline { at: at(seconds), wall: Wall::from_nanos(seconds * 1_000_000_000) }
+}
+fn source_deadline(world: &World) -> Option<jig_domain_accounts::Deadline> {
+    let fact = world.domain.source(ANALYST).expect("analyst source");
+    let State::Limited { until } = fact.state else { panic!("limited source: {fact:?}") };
+    assert_eq!(fact.spent_until, until);
+    until
+}
+
+#[test]
+fn limit_merge_keeps_the_old_pair_on_ties() {
+    let mut world = granted();
+    world.now = at(10);
+    world.wall = Wall::from_nanos(100_000_000_000);
+    assert_eq!(world.step(Event::Limited { account: ANALYST, reset: Some(at(30)) }), vec![kept(Some(until(120)))]);
+    let old = jig_domain_accounts::Deadline { at: at(30), wall: Wall::from_nanos(120_000_000_000) };
+    world.now = at(12);
+    world.wall = Wall::from_nanos(1_000_000_000_000);
+    for reset in [at(20), at(30)] {
+        assert!(world.step(Event::Limited { account: ANALYST, reset: Some(reset) }).is_empty());
+        assert_eq!(source_deadline(&world), Some(old));
+        assert_eq!(world.domain.next_deadline(), Some(old.at));
+    }
+    assert_eq!(world.step(Event::Limited { account: ANALYST, reset: Some(at(40)) }), vec![kept(Some(until(1_028)))]);
+    let later = jig_domain_accounts::Deadline { at: at(40), wall: Wall::from_nanos(1_028_000_000_000) };
+    assert_eq!(source_deadline(&world), Some(later));
+    assert_eq!(world.domain.next_deadline(), Some(later.at));
+    assert!(world.fire_at(39).is_empty());
+    assert_eq!(source_deadline(&world), Some(later));
+    assert_eq!(world.fire_at(40), vec![kept(None)]);
+    assert_eq!(world.domain.source(ANALYST).expect("unlimited source").state, State::Granted);
+}
+
+#[test]
+fn no_reset_overrides_a_timed_limit_until_resume() {
+    let mut world = granted();
+    world.step(Event::Limited { account: ANALYST, reset: Some(at(30)) });
+    world.wall = Wall::from_nanos(1_000_000_000_000);
+    assert_eq!(
+        world.step(Event::Limited { account: ANALYST, reset: None }),
+        vec![kept(Some(Held::Limited { reset: None }))]
+    );
+    assert_eq!(source_deadline(&world), None);
+    assert!(world.step(Event::Limited { account: ANALYST, reset: Some(at(40)) }).is_empty());
+    assert!(world.fire_at(40).is_empty());
+    assert_eq!(source_deadline(&world), None);
+    world.step(Event::Change {
+        request: skein_lib::Token::new(0),
+        holder: jig_domain_accounts::Holder::Deployment,
+        change: jig_domain_accounts::Change::Resume { source: ANALYST },
+    });
+    assert_eq!(world.domain.source(ANALYST).expect("resumed source").state, State::Granted);
+}
+
+#[test]
+fn retry_keeps_its_wall_while_its_monotonic_timer_fires() {
+    let mut world = granted();
+    world.now = at(10);
+    world.wall = Wall::from_nanos(100_000_000_000);
+    failed(&mut world, Failure::Later { after: Some(Duration::from_secs(20)) });
+    let state =
+        State::Later { until: jig_domain_accounts::Deadline { at: at(30), wall: Wall::from_nanos(120_000_000_000) } };
+    world.now = at(12);
+    world.wall = Wall::from_nanos(1_000_000_000_000);
+    assert_eq!(world.domain.source(ANALYST).expect("retrying source").state, state);
+    assert_eq!(world.domain.next_deadline(), Some(at(30)));
+    assert!(world.fire_at(29).is_empty());
+    assert_eq!(world.domain.source(ANALYST).expect("retrying source").state, state);
+    assert_eq!(world.fire_at(30), vec![want()]);
+    assert_eq!(world.domain.source(ANALYST).expect("asking source").state, State::Asking);
+}
+
+#[test]
+fn retry_wall_uses_the_actual_armed_monotonic_deadline() {
+    for (now, wall, delay, due, reset) in
+        [(10, 100, 0, 10, 100), (10, u64::MAX - 5, 20, 30, u64::MAX), (u64::MAX - 10, 100, 20, u64::MAX, 110)]
+    {
+        let mut world = granted();
+        world.now = Time::from_nanos(now);
+        world.wall = Wall::from_nanos(wall);
+        failed(&mut world, Failure::Later { after: Some(Duration::from_nanos(delay)) });
+        let deadline = jig_domain_accounts::Deadline { at: Time::from_nanos(due), wall: Wall::from_nanos(reset) };
+        assert_eq!(world.domain.source(ANALYST).expect("retrying source").state, State::Later { until: deadline });
+        assert_eq!(world.domain.next_deadline(), Some(deadline.at));
+    }
 }

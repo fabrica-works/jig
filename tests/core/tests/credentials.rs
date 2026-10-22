@@ -8,7 +8,7 @@ use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_test_domain as root;
-use skein_lib::{Duration, Token};
+use skein_lib::{Duration, Time, Token, Wall};
 
 fn configured(seed: u64) -> World {
     let (config, limits) = world::with_workspace_credential(seed);
@@ -757,4 +757,39 @@ fn an_adopted_program_run_is_sent_its_grant_again() {
         (Token::new(task), fleet::Form::Program(fleet::SourceName::new(b"personal").expect("source name")), 1, 2)
     );
     assert!(grant.valid > accounts::KEY_VALID);
+}
+
+#[test]
+fn source_limit_wall_survives_a_corrected_accounts_watch_clock() {
+    let (mut world, account, source) = own_key_run(182);
+    let now = Time::from_nanos(1_000_000_000);
+    world.set_clock(now, Wall::from_nanos(10_000_000_000));
+    world.send(root::Event::Core(core::Event::Account(accounts::Event::Limited {
+        account: source,
+        reset: Some(Time::from_nanos(31_000_000_000)),
+    })));
+    world.set_clock(Time::from_nanos(2_000_000_000), Wall::from_nanos(20_000_000_000));
+    world.client_peer = Some(jig_core_world::client_peer::ClientPeer::default());
+    let sign_in = world.sign_in.expect("signed in");
+    watch(&mut world, sign_in, OWN_WATCH, core::documents::Watched::Accounts);
+    let doc = accounts_document(&world, OWN_WATCH);
+    let line = doc.accounts.iter().find(|line| line.number == account).expect("own account");
+    let line = line.sources.iter().find(|line| line.number == source).expect("limited source");
+    let reset = Some(Wall::from_nanos(40_000_000_000));
+    assert_eq!(line.state, core::documents::AccountState::Later { until: reset });
+    assert_eq!(line.spent_until, reset);
+    world.set_clock(Time::from_nanos(3_000_000_000), Wall::from_nanos(15_000_000_000));
+    world.restart_with(signing_configuration(182).0);
+    assert_eq!(
+        world.domain.accounts().source(source).expect("restored own source").spent_until,
+        Some(accounts::Deadline { at: Time::from_nanos(28_000_000_000), wall: Wall::from_nanos(40_000_000_000) })
+    );
+    world.set_clock(Time::from_nanos(4_000_000_000), Wall::from_nanos(5_000_000_000));
+    world.client_peer = Some(jig_core_world::client_peer::ClientPeer::default());
+    watch(&mut world, sign_in, OWN_WATCH, core::documents::Watched::Accounts);
+    let doc = accounts_document(&world, OWN_WATCH);
+    let line = doc.accounts.iter().find(|line| line.number == account).expect("restored own account");
+    let line = line.sources.iter().find(|line| line.number == source).expect("restored own source");
+    assert_eq!(line.state, core::documents::AccountState::Later { until: reset });
+    assert_eq!(line.spent_until, reset);
 }
