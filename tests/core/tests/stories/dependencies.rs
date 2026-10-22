@@ -447,3 +447,24 @@ fn a_person_adds_an_ended_dependency_from_its_stored_row() {
     );
     assert_met(&world, target, dependency, tasks::Party::Person(person));
 }
+
+#[test]
+fn a_members_ended_dependency_outside_their_tree_is_refused_unchanged() {
+    let (mut world, kept, inside, outside, member_sign_in, owner_sign_in) = members_dependency_world(886);
+    // The fleet's three slots hold the parent, kept and inside: inside's end lets the owner's task run.
+    let run = running(&world, inside);
+    finish(&mut world, run, b"inside done");
+    let tasks::Party::Person(owner) = live_row(&world, outside).requester else { panic!("owner's task") };
+    let run = running(&world, outside);
+    finish(&mut world, run, b"outside done");
+    let ended = |key| world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(key)));
+    assert!(!ended(tasks::Key::Live(outside)) && ended(tasks::Key::Ended(outside)), "the owner's task has ended");
+    let before = live_row(&world, kept).clone();
+    person_amend(&mut world, member_sign_in, 211, kept, &[outside]);
+    jig_core_world::fixtures::refusal(&world, people::Refusal::Unknown);
+    assert_eq!(live_row(&world, kept), &before, "a refused ended dependency leaves the task unchanged");
+
+    // The owner reaches the whole project, so the same done row is met.
+    person_amend(&mut world, owner_sign_in, 212, kept, &[outside]);
+    assert_met(&world, kept, outside, tasks::Party::Person(owner));
+}
