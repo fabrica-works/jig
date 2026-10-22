@@ -209,7 +209,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 | `Answer` | a question, by its task and message, with the words; or a person task, by its revision, with the answer its contract asks (a choice, words, or the state an approval approves) or that it cannot be done | an answer to the question; the person task's result |
 | `Take`, `HandBack` | a person task addressed to a role the party holds | held by them, or back to the role |
 | `Seen` | how far the party has read: their results, or one conversation's turns | their durable read position advanced to `max(old, through)`; after completion a retry checks current subject and authority and may return `Unknown` after forget or `Role` after authority loss, never recreating history or replaying a new completed answer (3.1; `../../domain/people.md`, section 6) |
-| the project's own | notes, by the revision recalled; the policy, its templates' overrides among them (3.6); roles; a party's pool; services, a service's credential answered once; as `../../domain/people.md`, 5.1 and 5.2 | the note or the project changed |
+| the project's own | notes, by the revision recalled; its name (`../../domain/core.md`, 6.1); the policy, its templates' overrides among them (3.6); roles; a party's pool; services, a service's credential answered once; as `../../domain/people.md`, 5.1 and 5.2 | the note or the project changed |
 | adopting a resource | the application's own request (3.3), its form the application's; the engine's root makes the people request on the party's behalf | the project changed |
 | the party's LLM accounts | as `../../domain/accounts.md`, section 5 has them: signing in with an LLM provider; signing a source out; adding or replacing a key, carrying its value (3.1), of at most the bytes `me` states (5.1), and removing one; declaring a program's login under a name; checking a program source's login; an account's place among the holder's and its sources' order; its uses; resuming a limited source; removing an account, which signs each of its sources out and erases its keys. The party's own accounts, or, for an owner, the deployment's | an account made, renewed or changed. A sign-in is answered done with the address to open in a browser on the engine's machine, and ends on the `accounts` watch (7.1), made, renewed or refused; a sign-out's answer says whether the provider confirmed revocation, and names each host that did not sign a program's login out; a program's login declared is answered with the source's name, by which the application's own command signs the program in on each host |
 
@@ -496,7 +496,9 @@ served is held, kept and unsent, for its owner's version (client.md,
 - **jig's documents:**
   - *`me`:* the signed-in party's own document, always about whoever the
     credential belongs to: the party (number, kind, login and name);
-    their projects, each with its name, their role there and their pool;
+    their projects, each with its number and its name, which every
+    project has and no other project of the deployment shares
+    (`../../domain/core.md`, 6.1), their role there and their pool;
     what waits for them, counted exactly (questions, proposals,
     escalations, person tasks), and their updates unread, counted up to
     a limit; their read position over results; each project's merged
@@ -1029,22 +1031,22 @@ new `me` watch, including after restart.
   the subject is in that scope and what the party may see of it, and
   answers unknown or not allowed otherwise. The engine's root only
   routes.
-- **What marks a watch changed:** each decision's commit names the tasks,
-  projects and parties it touched. A task touched marks the watches of
-  that task, of every tree along its lineage, of chips naming it, and of
-  every task query whose keys it matched before the decision or matches
-  after it, so a task that leaves a query's set changes it too; a
-  party's entries, role or pool touched mark their inbox and their `me`;
-  a project's policy changed marks the `me` of every party with a role
-  in it; an account's source, state, order or uses touched, a program's
-  login reported on a host, or a sign-in or a check begun or ended,
-  marks the `accounts` of the parties it concerns and the
-  `deployment`'s, and the affected parties' `me` when template default
-  eligibility changes. Membership and effective-executor changes also
-  invalidate affected `resolved_default` previews (5.1). Matching a
+- **What marks a watch changed:** each decision's commit names the
+  tasks, projects and parties it touched. A task touched marks the
+  watches of that task, of every tree along its lineage, of chips naming
+  it, and of every task query whose keys it matched before the decision
+  or matches after it, so a task that leaves a query's set changes it
+  too; a party's entries, role or pool touched mark their inbox and
+  their `me`; a project's name or policy changed marks the `me` of every
+  party with a role in it; an account's source, state, order or uses
+  touched, a program's login reported on a host, or a sign-in or a check
+  begun or ended, marks the `accounts` of the parties it concerns and
+  the `deployment`'s, and the affected parties' `me` when template
+  default eligibility changes. Membership and effective-executor changes
+  also invalidate affected `resolved_default` previews (5.1). Matching a
   task against the open queries is bounded by the watches the engine
-  allows, each a fixed set of keys. A connector marks
-  its own subjects, through the root, as its state changes.
+  allows, each a fixed set of keys. A connector marks its own subjects,
+  through the root, as its state changes.
 
 ### 7.3 A run's live text
 

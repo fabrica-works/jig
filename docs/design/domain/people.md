@@ -161,7 +161,7 @@ Each project has its roles, and its policy says what each may do
 
 | Role | May |
 |---|---|
-| owner | everything a maintainer may; change the project's policy and roles; adopt resources; make services |
+| owner | everything a maintainer may; rename the project; change the project's policy and roles; adopt resources; make services |
 | maintainer | create and steer any task in the project; order its goals; decide any proposal within the project's ceiling; release, cancel, stop |
 | member | create tasks, chats and goals among them, within the authority and allotment their role gives; steer and cancel what they started; answer what is addressed to them |
 | observer | read and watch |
@@ -243,7 +243,7 @@ The operations as the client sends them are
 | `Take`, `HandBack` | a person task addressed to a role they hold | held by them, so no other answers it; or back to the role (section 8) |
 | `Seen` | the party themselves | their read position moved over results, or over one conversation's turns (section 6) |
 | a compound request | one project; each operation's own needs; within operations per request | its operations made in one decision, or none of them (below) |
-| adopt a resource, as a home or not; change the policy, roles or services | owner | the project changed (5.2) |
+| adopt a resource, as a home or not; rename the project; change the policy, roles or services | owner; a name no other project holds, in shape (core.md, 6.1) | the project changed (5.2) |
 | edit or delete a note | the note's scope within their role | the note revised (engine.md, section 10) |
 | set a party's pool | owner | the pool opened or resized in the current period, what was spent and reserved kept |
 | an account request: sign in, sign out, add, replace or remove a key, declare or check a program's login, order, uses, resume, remove an account | the account's holder, not a role: a person for their own, a first owner for the deployment's (authority.md, 8.4) | accounts.md, section 5: the account's sources, states and uses changed; a value never committed |
@@ -376,10 +376,12 @@ The operations as the client sends them are
 
 ### 5.2 The project itself
 
-A project, its resources and roles, its homes and its policy are records
-in the store that owners change through requests like any other. A
-policy change applies to every decision after it, the decisions of tasks
-already made included: a narrowing makes their grants beyond it
+A project, its name, its resources and roles, its homes and its policy
+are records in the store that owners change through requests like any
+other. A rename reaches every client through `me`
+(`../client/domain/contract.md`, 5.1) and changes nothing else (core.md,
+6.1). A policy change applies to every decision after it, the decisions
+of tasks already made included: a narrowing makes their grants beyond it
 unusable, and a widening does not widen them. What was committed before
 it is made, and pending proposals are judged against it when accepted
 (authority.md, section 6, effective authority). An owner who wants work

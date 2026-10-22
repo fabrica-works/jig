@@ -270,6 +270,10 @@ not own.
 
 A project is a body of work people steer, kept in the store:
 
+- **its number,** by which the store, addresses and every request name
+  it, never changed;
+- **its name,** by which people know it, unique in the deployment
+  (below);
 - **its resources,** each adopted from a connector with a role: *owned*
   or adopted to write into; a *fork* of what others own, where the
   application owns its copy and takes part upstream; or *context*, read
@@ -284,6 +288,29 @@ A project is a body of work people steer, kept in the store:
 - **its notes** (engine.md, section 10).
 
 Every task belongs to one project, which its delegates inherit.
+
+A project's name:
+
+- **Every project has one,** and no two projects of a deployment have
+  the same: two names are the same when they are equal under Unicode's
+  simple case folding, so "Tally" and "tally" collide. A client can
+  then show a person's projects apart, and take a project by its name
+  as surely as by its number.
+- **Its shape:** UTF-8 text of 1 to 64 bytes, with no control character
+  and no white space at either end, and never decimal digits alone, so
+  that a name is never mistaken for a number.
+- **Given, where none is chosen:** a project seeded with no name is
+  named "Project N", N its number (`../protocol/configuration.md`,
+  section 3). A seed's names, configured and given, are checked
+  together, and a collision refuses the start. The store keeps the
+  name with the project's policy (`../protocol/store.md`, 4.4).
+- **Renamed by an owner** (people.md, 5.1): the engine refuses a name
+  another project holds, or one out of shape. A rename changes nothing
+  else: the number, the addresses and the tasks stay.
+- **Not a resource's:** a name is the project's own, never read from a
+  resource or a home, which may be renamed, replaced or adopted
+  elsewhere. An application may offer a resource's name as a
+  suggestion; the name chosen is then the project's.
 
 ### 6.2 Goals
 

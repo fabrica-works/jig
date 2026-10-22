@@ -113,7 +113,7 @@ system.
 | decision | what one event changes and asks for, gathered into one commit |
 | hand-off | a question the core asks a connector within one decision, through the root |
 | the door | the journal's way out for outputs that decide nothing and show nothing durable (engine.md, 4.2) |
-| project | resources with roles, homes, a policy, parties' roles, notes (core.md, 6.1) |
+| project | a number, a name unique in the deployment, resources with roles, homes, a policy, parties' roles, notes (core.md, 6.1) |
 | task | a unit of work someone asked for (core.md, 3.1) |
 | goal | a tracked task: a priority, projections, goals' topics, a notes scope (core.md, 6.2); jig's goal template gives its defaults |
 | plan | the subtree of tasks one task delegated (core.md, 7.1) |
