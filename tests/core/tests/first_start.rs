@@ -265,7 +265,7 @@ fn with_no_project_configured_the_first_owner_owns_the_deployment() {
     configuration.core.projects.clear();
     // Configuration carries a deployment bootstrap entry when there is no project.
     for owner in &mut configuration.core.owners {
-        owner.project = u32::try_from(people::DEPLOYMENT).expect("deployment roster number");
+        owner.project = people::DEPLOYMENT;
     }
     let mut world = World::first_start(configuration, world::limits());
     world.client_peer = Some(ClientPeer::default());

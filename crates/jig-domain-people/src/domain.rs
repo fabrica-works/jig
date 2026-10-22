@@ -313,7 +313,7 @@ impl Domain {
         let mut result = List::with_capacity(self.roles.capacity());
         for (project, holdings) in &self.roles {
             for holding in holdings {
-                if u64::from(*project) != crate::DEPLOYMENT && holding.person == party {
+                if *project != crate::DEPLOYMENT && holding.person == party {
                     result.push(ProjectRole { project: *project, role: holding.role }).expect("one role per project");
                 }
             }

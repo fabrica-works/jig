@@ -37,10 +37,7 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
     people::step(
         &mut core.people,
         &Env { now: env.now, wall: env.wall, limits: env.limits.people },
-        people::Event::Roles {
-            project: u32::try_from(people::DEPLOYMENT).expect("deployment roster number"),
-            holdings: holdings.into_boxed(),
-        },
+        people::Event::Roles { project: people::DEPLOYMENT, holdings: holdings.into_boxed() },
         &mut child,
     );
     for _ in 0..child.len() {

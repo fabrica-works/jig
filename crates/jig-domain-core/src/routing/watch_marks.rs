@@ -549,11 +549,7 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
             Err(_) => Some(views::End::NotAllowed),
         },
         Subject::Deployment => {
-            if core
-                .people
-                .role(binding.party, u32::try_from(people::DEPLOYMENT).expect("deployment roster number"))
-                .is_some()
-            {
+            if core.people.role(binding.party, people::DEPLOYMENT).is_some() {
                 None
             } else {
                 Some(views::End::NotAllowed)

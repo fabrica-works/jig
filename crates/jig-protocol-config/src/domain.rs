@@ -124,10 +124,7 @@ pub(crate) fn owners(
             // initial_owners still bounds retained entries, not distinct identities.
             if engine.projects.is_empty()
                 && owners
-                    .push(InitialOwner {
-                        project: u32::try_from(jig_domain_people::DEPLOYMENT).expect("deployment roster number"),
-                        identity: identity.clone(),
-                    })
+                    .push(InitialOwner { project: jig_domain_people::DEPLOYMENT, identity: identity.clone() })
                     .is_err()
             {
                 problems.push(path.clone(), What::Bound);

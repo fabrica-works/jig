@@ -142,7 +142,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         kind: core.people.kind(party).ok_or(Missing::Unknown)?,
         login: text(&identity.login, limits.documents.text_bytes),
         name: text(&identity.name, limits.documents.text_bytes),
-        deployment_role: core.people.role(party, u32::try_from(people::DEPLOYMENT).expect("deployment roster number")),
+        deployment_role: core.people.role(party, people::DEPLOYMENT),
         cut: projects.len() < roles.len(),
         projects,
         needs: counts.needs,

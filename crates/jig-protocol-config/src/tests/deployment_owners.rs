@@ -14,9 +14,6 @@ use jig_domain_core::{Core, CoreRecord, Event, Record, Request, Requests, Restar
 use jig_domain_people as people;
 use skein_lib::{Env, ReplyTo, Time, Token, Wall};
 
-fn deployment() -> u32 {
-    u32::try_from(people::DEPLOYMENT).expect("deployment roster number")
-}
 const PROJECT: u32 = 1;
 const SECOND_PROJECT: u32 = 2;
 const OWNER: u64 = 1;
@@ -57,7 +54,10 @@ fn rows() -> [Row; 6] {
             document: ENGINE_SMALL.into(),
             restart: false,
             sign_in: false,
-            roles: vec![(OWNER, deployment(), Some(people::Role::Owner)), (OWNER, PROJECT, Some(people::Role::Owner))],
+            roles: vec![
+                (OWNER, people::DEPLOYMENT, Some(people::Role::Owner)),
+                (OWNER, PROJECT, Some(people::Role::Owner)),
+            ],
             deployment_saves: ONE_SAVE,
             deployment_policy: 0,
             deployment_owners: &[OWNER],
@@ -68,7 +68,7 @@ fn rows() -> [Row; 6] {
             restart: false,
             sign_in: false,
             roles: vec![
-                (OWNER, deployment(), Some(people::Role::Owner)),
+                (OWNER, people::DEPLOYMENT, Some(people::Role::Owner)),
                 (OWNER, PROJECT, Some(people::Role::Owner)),
                 (OWNER, SECOND_PROJECT, Some(people::Role::Owner)),
             ],
@@ -82,8 +82,8 @@ fn rows() -> [Row; 6] {
             restart: false,
             sign_in: false,
             roles: vec![
-                (OWNER, deployment(), Some(people::Role::Owner)),
-                (SECOND_PERSON, deployment(), Some(people::Role::Owner)),
+                (OWNER, people::DEPLOYMENT, Some(people::Role::Owner)),
+                (SECOND_PERSON, people::DEPLOYMENT, Some(people::Role::Owner)),
             ],
             deployment_saves: ONE_SAVE,
             deployment_policy: 0,
@@ -94,7 +94,7 @@ fn rows() -> [Row; 6] {
             document: super::fixtures::without_projects(ENGINE_SMALL),
             restart: false,
             sign_in: false,
-            roles: vec![(OWNER, deployment(), Some(people::Role::Owner))],
+            roles: vec![(OWNER, people::DEPLOYMENT, Some(people::Role::Owner))],
             deployment_saves: ONE_SAVE,
             deployment_policy: 0,
             deployment_owners: &[OWNER],
@@ -104,7 +104,7 @@ fn rows() -> [Row; 6] {
             document: ENGINE_SMALL.into(),
             restart: false,
             sign_in: true,
-            roles: vec![(SECOND_PERSON, deployment(), None)],
+            roles: vec![(SECOND_PERSON, people::DEPLOYMENT, None)],
             deployment_saves: ONE_SAVE,
             deployment_policy: 0,
             deployment_owners: &[OWNER],
@@ -114,7 +114,7 @@ fn rows() -> [Row; 6] {
             document: ENGINE_SMALL.into(),
             restart: true,
             sign_in: false,
-            roles: vec![(OWNER, deployment(), Some(people::Role::Owner))],
+            roles: vec![(OWNER, people::DEPLOYMENT, Some(people::Role::Owner))],
             deployment_saves: 0,
             deployment_policy: 0,
             deployment_owners: &[],
@@ -186,9 +186,7 @@ fn first_owners_hold_the_deployments_roles_across_start_and_restart() {
         let rosters: Vec<_> = records
             .iter()
             .filter_map(|record| match record {
-                Record::People(people::Stored::Roles { project, holdings })
-                    if u64::from(*project) == people::DEPLOYMENT =>
-                {
+                Record::People(people::Stored::Roles { project, holdings }) if *project == people::DEPLOYMENT => {
                     Some(holdings.as_ref())
                 }
                 Record::Core(_) | Record::People(_) | Record::Tasks(_) | Record::Accounts(_) | Record::Notes(_) => None,
@@ -202,7 +200,7 @@ fn first_owners_hold_the_deployments_roles_across_start_and_restart() {
         let mut policies = 0;
         for record in &records {
             if let Record::People(people::Stored::Policy { project, .. }) = record
-                && u64::from(*project) == people::DEPLOYMENT
+                && *project == people::DEPLOYMENT
             {
                 policies += 1;
             }

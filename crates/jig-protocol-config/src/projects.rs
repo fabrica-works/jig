@@ -67,7 +67,7 @@ pub(crate) fn projects(
             && let Some((policy, templates)) = policy
             && let Some(roles) = roles
         {
-            if u64::from(number) == jig_domain_people::DEPLOYMENT {
+            if number == jig_domain_people::DEPLOYMENT {
                 problems.push(path.member(b"number"), What::Bound);
                 continue;
             }

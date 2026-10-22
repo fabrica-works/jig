@@ -414,9 +414,7 @@ pub(crate) fn row_visible(core: &Core, party: u64, row: &Row) -> bool {
             tasks::Funder::Task(_) | tasks::Funder::Recurring { .. } => false,
         },
         Record::Notes(notes::Record::Entry(entry)) => match &entry.scope {
-            notes::Scope::Deployment => {
-                core.people.role(party, u32::try_from(people::DEPLOYMENT).expect("deployment roster number")).is_some()
-            }
+            notes::Scope::Deployment => core.people.role(party, people::DEPLOYMENT).is_some(),
             notes::Scope::Project { project }
             | notes::Scope::Goal { project, .. }
             | notes::Scope::Resources { project, .. } => core.people.role(party, *project).is_some(),

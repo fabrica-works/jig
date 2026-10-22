@@ -29,7 +29,7 @@ pub(super) fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
     limits.accounts.holder_accounts = 2;
     let mut config = config(73);
     config.owners = Box::new([people::InitialOwner {
-        project: u32::try_from(people::DEPLOYMENT).expect("deployment roster number"),
+        project: people::DEPLOYMENT,
         identity: people::IdentityKey { provider: 0, subject: ALICE.to_be_bytes().into() },
     }]);
     config.settings.llm_providers = accounts::Providers {

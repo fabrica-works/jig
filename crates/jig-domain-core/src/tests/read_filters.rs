@@ -150,10 +150,7 @@ fn scoped_note_reads_bound_the_query_before_retaining_it_and_recheck_the_role() 
     people::step(
         &mut core.people,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people },
-        people::Event::Roles {
-            project: u32::try_from(people::DEPLOYMENT).expect("deployment roster number"),
-            holdings: Box::new([]),
-        },
+        people::Event::Roles { project: people::DEPLOYMENT, holdings: Box::new([]) },
         &mut out,
     );
     assert_eq!(
