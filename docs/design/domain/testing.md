@@ -1,6 +1,6 @@
 # Testing the domain
 
-Provisional, 2026-10-07, revised 2026-10-18. How jig's domain is tested,
+Provisional, 2026-10-07, revised 2026-10-22. How jig's domain is tested,
 and how it tests an application's: the worlds of jig's own parts, the
 core's world, and the conformance world every application runs its
 domain on, with the referee that holds it to jig's promises. It applies
@@ -58,7 +58,15 @@ referee in the loop, the heap counted at every iteration
 - **people:** sign-ins and credentials minted, roles, requests,
   inboxes; operations alone and in compound requests, made whole or not
   at all; read positions over conversations, live and ended, across a
-  restart (people.md, section 11).
+  restart (people.md, section 11). Existing request step tests and the
+  people world fill completed-answer capacity: new `Seen` progresses
+  without saving an `Answer` on success or any routed refusal, while a
+  new ordinary key is busy. Ordinary reservations exclude `Seen` flights
+  exactly, but the existing pending, flight and waiter bounds still
+  apply. Duplicate waiters each get one terminal; pending conflicts,
+  retained replay and conflicts, legacy `Seen` answers restored through
+  original expiry, and reprocessing to a maximum watermark are checked
+  without a new harness, tier or budget (people.md, 5.1 and section 6).
 - **fleet:** hosts of both kinds, placement, fencing, graces, adoption.
 - **brief:** sections planned, gathered, cut by size, a required one
   missing; connectors' sections as sizes and tokens only.
@@ -126,6 +134,16 @@ and above the actual configured project count; they seed the whole set
 and keep it across restart. Invalid programmatic configuration is
 `Core::new`'s precondition, never an invalid world constructor or a
 catch-panic scenario (engine.md, section 14).
+
+Existing inbox and ended-mark fixtures control the current subject,
+role and requester and the interleaving of ended-record and position
+loads with overlapping marks and forget. A completed `Seen` retried
+after mark and forget answers `Unknown`, writes nothing and never
+recreates history; lost authority can answer `Role`. Holding the journal
+commit proves no external success leaves early. Crashing and restoring
+recovers only committed read positions or committed absence, with the
+mark and any consequent forget atomic (people.md, section 6). These
+proofs stay in the existing step and world tiers and budgets.
 
 ## 5. The conformance world
 

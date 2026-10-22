@@ -29,14 +29,16 @@ still open is listed in section 18.
   handle. The client keeps the latest document of each watch, and says
   when it changed; the application reads it when it likes. Several
   handles on one subject share one watch on the engine (section 8).
-- **Keyed requests, through skein-lib's request table.** Each request (an
-  operation, a compound request, or a family's request as bytes) is kept
-  in the small store before it is sent, sent again under its key until
-  its answer is durable, and answered to the application once
-  (section 6).
-- **Work kept across a restart.** The small store holds the requests not
-  yet answered, and nothing else of the client's. At start, each is
-  restored and told to the application as kept (section 11).
+- **Keyed requests, through skein-lib's request table.** Ordinary
+  requests (an operation, a compound request, or a family's request as
+  bytes) are kept in the small store before sending. Top-level `Seen`
+  stays in memory only. Both use the table's keys, joins, conflicts,
+  names, retries and one answer while the client lives (section 6).
+- **Work kept across a restart.** The small store holds kept requests
+  not yet answered. At start, each is restored and told to the
+  application as kept. New unanswered `Seen` is silently lost on closing,
+  reload or crash; the next opening checks and sends the forward-only
+  watermark again (section 11).
 - **The link is the client's to judge,** from the stream and its own
   watch of `me`: signed out, starting, live, offline, or out of date
   (8.2).
@@ -268,8 +270,9 @@ handles, as every presentation does (sections 7 and 8).
   - a family's request: its owner's number, its scope, its version and
     its record's bytes (contract.md, 3.3).
 
-  The client reads none of it but its owner, its version and its size
-  (4.3).
+  The client reads a family's request only by its owner, version and size
+  (4.3); its domain recognizes top-level jig `Seen` to decide whether to
+  keep it (below).
 - **The key is the application's name for a request:** its asker, and a
   number the asker draws from its seed, fresh for each request it means.
   A second `Send` under a key the client holds is joined to the first
@@ -289,22 +292,22 @@ handles, as every presentation does (sections 7 and 8).
     record of another asker) is answered held at once: nothing is kept
     and nothing is sent. The key stays held until its holder's record is
     erased; the application asks again then. Within the engine's
-    retention the engine answers the same name and ask with its first
-    answer: a request sent again within the retention gets its answer
-    again (contract.md, 3.1).
+    retention an ordinary deciding request gets its original answer
+    again. A new `Seen` retains no engine answer after completion and
+    is processed against current state on retry (contract.md, 3.1).
   - *Never loud.* A name comes from outside the application (an agent's
     key), so a name held is never the application's mistake. The same
     application key with the same request is still joined, and with
     another request is still a key conflict, loud.
-  - *Not joined.* The table keeps one asker per entry, and the engine
-    already answers a repeated name with its first answer.
+  - *Not joined.* The table keeps one asker per named entry, `Seen`
+    included.
 - **Through skein-lib's request table** (skein's `lib.md`, section 12),
   which the client holds. It is the client's only way out for a keyed
-  request that is kept, as the journal is the engine's root's
+  request without a carried value, as the journal is the engine's root's
   (`../../README.md`, 6.2); a request carrying a value (below) is the
   one request that does not go through it. It:
-  - *keeps it before sending it:* the request's record leaves in a
-    `Save`, and its first `Exchange` only once the transport says
+  - *keeps ordinary requests before sending:* the request's record leaves
+    in a `Save`, and its first `Exchange` only once the transport says
     `Stored` (section 11);
   - *sends it again under its key,* after a backoff drawn from the seed,
     while its answer is busy, not ready, or lost with the link live; and
@@ -318,6 +321,18 @@ handles, as every presentation does (sections 7 and 8).
   - *is bounded:* requests held, and their bytes, a family's included. A
     `Send` past them is answered at once, refused by the client's limit,
     and never queued.
+- **`Seen` stays in memory.** The client domain takes the table's `Save`
+  for a top-level `Ask::Jig(Seen)` without emitting `Down::Save`. It
+  creates no small-store record and uses no value-carrying path. The
+  generic table and its other outputs remain the same: application and
+  engine keys, joins and conflicts, optional caller names and held names,
+  progress, retry after busy, not ready or lost, parking, confirmed-party
+  checks, retention's unknown outcome, and one answer while the client
+  lives. It counts against the same request and byte limits. The engine
+  retains no new completed `Seen` answer on success or routed refusal;
+  after completion a retry checks current subject and authority and may
+  answer `Unknown` after forget or `Role` after authority loss
+  (contract.md, 3.1 and 3.2).
 - **A request carrying a value,** such as an LLM account's key added or
   replaced (contract.md, 3.2), or an application's request's credential,
   is sent once and never kept, so that no value is ever in the small
@@ -697,18 +712,18 @@ for any presentation of a chat or of any agent task's activity.
 ## 11. The small store
 
 - **What the client keeps across its own restart:** the requests not yet
-  answered, but a request carrying a value (section 6), as the request
-  table's records, each with the key the engine knows it by, its party,
-  the application's key, the request (jig's record, or a family's bytes
-  under its owner's number and version), and the wall time of its first
+  answered, except new top-level `Seen` and requests carrying a value
+  (section 6), as the request table's records, each with the key the
+  engine knows it by, its party, the application's key, the request (jig's record, or a family's
+  bytes under its owner's number and version), and the wall time of its first
   sending; and the name of its stream, which the client that follows
   sends gone before it opens its own
   (`../../protocol/client.md`, sections 4 and 10). Nothing else of the
   client's: everything shown is read again. A presentation's own records
   (the reference UI's drafts and its place) are the application's, which
   it keeps beside the client's (root.md, section 8; view.md, 18.8).
-- **Kept before sent.** A request's record leaves in a `Save`, and the
-  client gives the request's first `Exchange` only once the transport
+- **Kept requests before sent.** An ordinary request's record leaves in a
+  `Save`, and the client gives its first `Exchange` only once the transport
   says `Stored`. `NotStored` (a quota full, a disk failing) retires the
   requests the write carried, unsent, each answered *not kept*, by its
   key (skein's `lib.md`, 12, not kept): parked, or with its `Exchange`
@@ -719,9 +734,27 @@ for any presentation of a chat or of any agent task's activity.
   whole in each write, so a request whose record a later write carries
   again is decided by that later write, and one whose record the write
   did not carry is sent once its own write is stored. So a restart never
-  loses a request the engine may have made. A request carrying a value
-  is the one never kept: it is sent once, and its caller asks again
-  (section 6).
+  loses an ordinary kept request the engine may have made. A request
+  carrying a value is sent once without a record, and its caller asks
+  again (section 6).
+- **New `Seen` has no save of its own.** Closing, reload or crash silently
+  loses an unanswered in-memory mark, with no `Kept`, `Dropped` or not
+  kept notice from its own store. The next opening checks and sends the
+  watermark again; repeating a forward-only read position is safe. Its
+  exchange still waits behind writes already given. A failed mixed
+  write retires only the ordinary requests whose records it carried as
+  not kept; a `Seen` exchange held behind it is lost and follows its
+  normal retry. Consuming the table's save creates no tracked store
+  write and changes no store acknowledgement protocol.
+- **Every terminal still erases.** The table's terminal `Erase` remains
+  for new `Seen` too: erasing an absent key is harmless, and its store
+  acknowledgement still completes normally. Legacy stored pending
+  `Seen` records decode and restore under the usual rules, reported
+  `Kept`, never saved again, and erased at their normal terminal. They
+  may still cause a closing warning until erased; no migration or eager
+  drop is needed. These client records are distinct from the engine's
+  legacy completed `Seen` answers, retained until their original expiry
+  (contract.md, 3.1).
 - **Restored at `Start { kept }`,** before any other event: each
   request's record admitted to the table under its key, parked until
   the link is live, its party confirmed and the retention known; and
@@ -749,11 +782,13 @@ for any presentation of a chat or of any agent task's activity.
 - **Where it lives is the host's:** a browser tab's session storage, a
   file written whole and synced, a world's memory. A host whose store is
   copied (a browser tab duplicated) sends the same keys from both
-  copies, which the engine makes once, while each copy draws new keys
-  from a seed of its own; the copy sends the original's stream gone,
-  once, which the original takes as a drop (8.2).
-- **It is never the truth.** A request kept is answered by the engine by
-  its key, made once whatever the client did before.
+  copies, whose ordinary deciding acts the engine makes once, while each
+  copy draws new keys from a seed of its own; the copy sends the original's
+  stream gone, once, which the original takes as a drop (8.2).
+- **It is never the truth.** An ordinary deciding request kept is
+  answered by the engine by its key, made once whatever the client did
+  before. A restored legacy `Seen` follows the engine's replay exception
+  (contract.md, 3.1).
 
 ## 12. Signing in
 

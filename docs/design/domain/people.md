@@ -1,6 +1,6 @@
 # Parties
 
-Provisional, 2026-10-07, revised 2026-10-21. How people, and the
+Provisional, 2026-10-07, revised 2026-10-22. How people, and the
 services that act like them, take part: who they are and the credentials
 they sign in with, what their role in a project lets them do, the
 operations they ask of the engine and what waits for them, the
@@ -31,8 +31,10 @@ is still open is listed in section 12.
   message a task, amend, cancel with or without a grace, release, stop,
   move a task to oneself, decide, answer, take and hand back, mark seen:
   each is checked against the party's role as an agent's call is against
-  its task's authority, committed, and answered once durable, keyed so
-  that a request sent twice is made once. A compound request holds
+  its task's authority, committed, and answered once durable. Ordinary
+  deciding acts retain their original answers under their keys for the
+  advertised retention; `Seen` retains no new answer and advances a read
+  position only forward (5.1 and section 6). A compound request holds
   several, committed all or none.
 - **Proposing is explicit.** A request beyond the party's authority is
   refused, naming what it lacked and whether a proposal could be
@@ -196,6 +198,32 @@ the same rules (authority.md, 8.1 and 8.4). Every request is keyed by
 its client (a double click makes one request), checked against the
 party's role, committed, and answered once durable (engine.md, 5.2). A
 task is in a party's tree when they requested it, or a task above it.
+
+Ordinary deciding requests reserve a place for their original answer at
+admission and retain it for the advertised retention, success and
+permanent routed refusal alike. This capacity is shared engine-wide,
+not per party. Unexpired answers are never evicted for another key.
+Busy and not ready are not saved. After authentication and validation,
+retained-key replay or conflict and pending-key joins or conflicts are
+checked before a new request needs room. An identical pending request
+joins its waiters; a different ask under that key conflicts.
+
+A new top-level `Seen` uses the same keyed transport and pending checks,
+but bypasses completed-answer capacity and saves no `Answer`, on success
+or routed refusal. It still needs the existing bounded pending, flight,
+waiter, load, journal and output room. Ordinary admission counts retained
+answers plus only the ordinary flights that reserve answers, excluding
+`Seen`; a bounded scan of pending flights suffices, with no new counter
+or limit. Each admitted ordinary flight thus retains its reserved place
+through saving its answer.
+
+After a new `Seen` completes, its key is free. A retry is processed
+against the current subject and authority, and a different ask under the
+freed key is a new request. Legacy retained `Seen` answers still restore,
+replay or conflict until their original expiry, occupying their old
+answer places without early erasure or reclassification. New `Seen`
+requests can progress while those places are full.
+
 The operations as the client sends them are
 `../client/domain/contract.md`, 3.2:
 
@@ -377,11 +405,19 @@ entry naming the task or proposal it is and its project:
   proposal is pending, its person task is active, its question is
   unanswered, or its result unread. The only state of the inbox's own is
   each party's read positions, one over results and one per conversation
-  over its turns, moved by their `Seen` (5.1), never by a read. A question
-  waits for the person until it is answered, not until its task has read
-  it. The asked task keeps each question it heard and its first answer
-  (`../protocol/store.md`, 15.7). The person's inbox, a question's live
-  document and an answer's admission read those lines, so a task's run
+  over its turns, moved by their `Seen` (5.1), never by a read. Each mark
+  durably advances its position to `max(old, through)`. Processing checks
+  the current subject and authority each time: a retry after completion
+  may answer `Unknown` after history was forgotten, or `Role` after
+  authority was lost, even after earlier success. It never recreates
+  forgotten history or promises the earlier processing's answer. Each
+  admitted caller and joined waiter gets one terminal reply, held behind
+  the same commit barrier. Restart restores committed positions or their
+  committed absence; new completed marks leave no retained answers.
+  A question waits for the person until it is answered, not until its
+  task has read it. The asked task keeps each question it heard and its
+  first answer (`../protocol/store.md`, 15.7). The person's inbox, a question's
+  live document and an answer's admission read those lines, so a task's run
   reading a question leaves it open for its person. The task answering
   it itself closes it as the person's answer does.
 - **A conversation** is a task its creator flagged so (tasks.md,
@@ -584,10 +620,11 @@ grace; a compound request is refused at its second operation, and
 nothing of it is made; a conversation ends, and its read position is
 read back from the store after a restart; a task forgotten once read is
 erased with its read position; an observer is refused a request; a
-service creates a goal its role allows; a request sent twice is made
-once across a restart; roles are seeded from an adopted resource's
-parties; an application's server mints a credential for an identity it
-verified, and a mint naming a provider not of kind application, the
+service creates a goal its role allows; an ordinary deciding request
+sent twice is made once across a restart; roles are seeded from an
+adopted resource's parties; an application's server mints a credential
+for an identity it verified, and a mint naming a provider not of kind
+application, the
 deployment's among them, is refused; a person task given a dependency by
 its requester, its answer refused naming it, then answered once the
 dependency is done; a member's amendment adding a dependency beyond

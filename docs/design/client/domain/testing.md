@@ -1,6 +1,6 @@
 # Testing the client
 
-Provisional, 2026-10-09, revised 2026-10-18. How jig's client is tested
+Provisional, 2026-10-09, revised 2026-10-22. How jig's client is tested
 through its surface, and how a presentation on it is tested: the
 client's world with a scripted engine, the joint world with the engine's
 domain, their referee and their faults; jig's check, which an
@@ -32,8 +32,9 @@ section 15). What is still open is listed in section 10.
   application's whole engine domain on jig's conformance world.
 - **The referee watches what the application was told and what the
   engine made durable,** never the client's state: nothing reported
-  answered before it was durable, nothing made twice, nothing sent lost
-  (6.1). Where there is a tree, it watches what the person saw as well
+  answered before it was durable, ordinary deciding acts made once, and
+  kept work surviving restart, with `Seen`'s exceptions explicit (6.1).
+  Where there is a tree, it watches what the person saw as well
   (6.3).
 - **jig's check is checked, never mandated.** In any application's
   worlds, it finds a decision whose revision was not in a document the
@@ -211,16 +212,22 @@ In every world, whatever stands in front of the client:
 
 - **Nothing reported done before it was durable:** no answer to a
   request is reported before the commit that answers it is durable.
-- **Made once:** every request an application sent is made once by the
+- **Ordinary deciding requests made once:** each is made once by the
   engine, whatever the faults: drops, restarts, a request sent twice
-  under one key, reloads.
-- **Nothing sent lost:** every request the client was given is
-  answered, reported unknown past the engine's retention, or kept across
-  a restart and reported kept; every word sent and reported answered is
-  in its task's activity, or its task ended.
-- **Kept before sent, for its party:** no request is sent before its
-  record is stored, nor for a party `me` has not confirmed (client.md,
-  sections 6 and 11).
+  under one key, reloads. New `Seen` retains no completed engine answer:
+  a retry after completion checks current subject and authority and
+  advances the durable watermark only forward (contract.md, 3.1).
+- **Kept work survives restart:** every kept request is answered,
+  reported unknown past the engine's retention, or restored and reported
+  kept; every word sent and reported answered is in its task's activity,
+  or its task ended. New unanswered `Seen` is silently lost on closing,
+  reload or crash, and the next opening checks and sends the watermark
+  again. While the client lives it keeps the same pending lifecycle and
+  one answer. A request carrying a value follows client.md, section 6.
+- **Kept requests stored before sent, for their party:** no kept request
+  is sent before its record is stored, and no request is sent for a
+  party `me` has not confirmed. `Seen` has no save of its own but still
+  waits behind writes already given (client.md, sections 6 and 11).
 - **Documents of what was committed:** every document the client
   delivered for a handle reflects only commits the engine made durable,
   and none after a newer one of the same subject reflects an older
@@ -236,6 +243,21 @@ In every world, whatever stands in front of the client:
   closed, none of a stream it dropped, none whose opening it lost.
 - **Bounded:** the client within its limits, the heap within its worst
   case.
+
+Existing client-domain request step tests cover `Seen`'s consumed table
+save with no `Down::Save`, parked-to-live sending, retries under the same
+engine key, application-key joins and conflicts, and named `Send` held
+while its name is held. Existing composed-client store tests contrast
+`Seen` alone, which needs no own `Stored` before its exchange, with
+ordinary and mixed requests: kept requests wait for `Stored`, failed
+writes answer only the ordinary records they carried as not kept, and
+held `Seen` exchanges are lost and retry. Final answers and retention's
+unknown outcome still erase; acknowledging an absent-key `Seen` erase
+then a later ordinary save must allow that request to send, with no
+tracked write left waiting. Legacy stored pending `Seen` records decode,
+restore as kept, never save again, and erase normally at terminal; the
+existing link codec's legacy `Seen` record fixture remains readable.
+These proofs use the existing tiers, harnesses and budgets.
 
 ### 6.2 jig's check
 

@@ -1,6 +1,6 @@
 # jig's design
 
-Provisional, 2026-10-06, revised 2026-10-19. What jig is, how an
+Provisional, 2026-10-06, revised 2026-10-22. What jig is, how an
 application is built around it, and what keeps the application's wiring
 from breaking what jig promises. This document comes first. The documents
 it lists in section 12 go deeper into each part. The mechanics are those
@@ -642,9 +642,11 @@ the engine     the application's root around jig's core, and jig's clients' comp
 - **The same rails as the engine's,** made for a client:
   - **the request table is the barrier:** every keyed request, jig's and
     the application's alike, leaves through skein-lib's request table,
-    which has its host keep it in the small store before it is sent, and
-    sends it again under its key until its answer is durable, as the
-    journal keeps the engine's outputs;
+    which has its host keep ordinary requests in the small store before
+    sending, and retries under the same key until answered. Top-level
+    `Seen` uses that table in memory only, is silently lost on closing,
+    reload or crash, and is checked and sent again on the next opening
+    (`client/domain/client.md`, section 6);
   - **views are level-triggered:** a watch delivers its subject's current
     document whenever it changed, one delivery in flight, so nothing is
     queued and nothing missed;
@@ -653,8 +655,11 @@ the engine     the application's root around jig's core, and jig's clients' comp
     shows (`domain/core.md`, section 5);
   - **the promises stay below the API,** whatever presents them: a
     decision names the revision it saw, and a moved revision is refused;
-    a request is made once, and answered once durable; a document
-    reflects only committed state, and leaves after the commit it
+    an ordinary deciding request is made once, and every request is
+    answered once durable; `Seen` advances a read position only forward
+    without retaining a new engine answer (`client/domain/contract.md`,
+    3.1); a document reflects only committed state, and leaves after the
+    commit it
     reflects; admission and authority are the engine's; a credential is
     its party's.
 - **What is the application's:** confirming a deciding act with its

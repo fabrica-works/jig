@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-21. What carries jig's API
+Provisional, 2026-10-10, revised 2026-10-22. What carries jig's API
 (`../client/domain/contract.md`) as messages and bytes, whatever the
 transport: jig's messages; the clients' component's messages toward the
 application's transport and server, and the client's link toward its
@@ -67,9 +67,10 @@ is still open is listed in section 15.
   not served answered so, typed, naming the owner and the ranges, in an
   envelope every version reads (section 9).
 - **The small store is the client's records,** the request table's and
-  its own, per owner, versioned, each request's stored before it leaves,
-  but for a request carrying a value, which is sent once and never
-  stored (section 5). The application keeps its own (section 10).
+  its own, per owner, versioned, each kept request's stored before it
+  leaves. New top-level `Seen` stays in memory, and a request carrying a
+  value is sent once and never stored (section 5). The application keeps
+  its own (section 10).
 - **Shells are the application's.** jig ships a native shell,
   `jig-client-shell-native`, and its browser parts,
   `jig-client-shell-web` (section 12).
@@ -702,8 +703,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   name of the client's stream (section 4), under a key of its own, which
   no request's key can be (a request's is 16 bytes); nothing else of the
   client's, and never a credential, an answer or a request carrying a
-  value (section 5). Each is encoded with
-  jig's wire, with its store version.
+  value (section 5). New top-level `Seen` has no stored record. Each
+  kept record is encoded with jig's wire, with its store version.
 - **The stream's name** is saved at each hello, in a write of its own,
   and replaces the last; nothing waits for it, and a write of it not
   stored retires nothing. It is not a credential: ending a stream takes
@@ -714,14 +715,25 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   keeps (where the person was, their drafts; the reference UI's places
   and drafts among them) it keeps itself, where it likes. The client's
   `Save` carries only the client's records.
-- **Stored before sent.** The transport answers each `Save` and `Erase`
-  `Stored` or `NotStored`. A request's exchange never leaves before its
-  record is stored: the client sends it only once its `Save` is answered
-  `Stored`. `NotStored` (a quota full, a disk failing) is each request
+- **Kept requests stored before sent.** The transport answers each `Save`
+  and `Erase` `Stored` or `NotStored`. A kept request's exchange never
+  leaves before its record is stored: the client sends it only once its
+  `Save` is answered `Stored`. `NotStored` (a quota full, a disk failing)
+  is each request
   whose record that write was the last to carry not sent, parked or not,
   answered *not kept* (`../client/domain/client.md`, section 11). A
   request carrying a value is never stored, and leaves at once, once
   (section 5).
+- **`Seen` has no save of its own.** The client domain consumes its
+  table save before the composed client or link registers a store write
+  (`../client/domain/client.md`, section 6). Its exchange still waits
+  behind writes already given, and is eligible only for the confirmed
+  party on the current link. A failed mixed write reports not kept only
+  for the ordinary requests whose records it carried; a held `Seen`
+  exchange is lost and retried normally. Consuming the save creates no
+  tracked write; store acknowledgements are unchanged. Every terminal
+  still emits `Erase`, including an absent new `Seen` key, with the usual
+  acknowledgement.
 - **Read at start,** the records the application's shell loaded handed
   to `jig-client` as it starts, each request's to the request table, and
   the stream's name to the link (section 4); one of a
@@ -731,6 +743,14 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   are not among those the application declares is one
   (`../client/domain/client.md`, 11). Pre-release, nothing is
   translated.
+- **Legacy pending `Seen` records** remain readable and restore as
+  `Kept`, are never saved again, and erase at their normal terminal.
+  They are not eagerly dropped or migrated. These client records are
+  separate from the engine's retained completed answers
+  (`../client/domain/contract.md`, 3.1). A new unanswered in-memory
+  `Seen` is silently lost on closing, reload or crash; the next opening
+  checks and sends the watermark again, with no notice from a record of
+  its own (`../client/domain/client.md`, section 11).
 - **Where** is the shell's: a browser tab's session storage, as text
   skein's small store part encodes (skein's `ui-web.md`, section 10); a
   file a native client writes whole and syncs; a service's file, synced
@@ -901,8 +921,8 @@ section 2).
 
 - **`jig-client`** is owed by its design (`../client/domain/client.md`):
   the link's states, out of date among them (sections 8 and 9 here); a
-  request's exchange sent only once its record is stored (section 10); a
-  credential held, or carried by the transport (section 8); reads and
+  kept request's exchange sent only once its record is stored, with
+  `Seen` memory-only (section 10); a credential held, or carried by the transport (section 8); reads and
   watches answered signed out, a reopened run's watch taken from its
   turn's beginning, and a run's document with no text and no call, for
   a run whose host gives neither (`../client/domain/contract.md`, 7.3);

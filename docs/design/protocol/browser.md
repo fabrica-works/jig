@@ -1,6 +1,6 @@
 # The browser's layer
 
-Provisional, 2026-10-14, revised 2026-10-18. What jig gives a browser
+Provisional, 2026-10-14, revised 2026-10-22. What jig gives a browser
 client, and where it stops: the application's server serves its pages
 and its bundle by skein's serving contract (skein's `ui-web.md`, 4.4),
 and jig serves no page, no bundle and reserves no path. jig gives the
@@ -361,7 +361,7 @@ transport, and each is usable without the other.
   | history | the paths its codec prints (section 9) |
   | the timer | the earliest of the client host's and the hidden tab's deadlines |
   | the platform's facts | nothing |
-  | title and closing | the title, the language, and whether the client holds pending requests |
+  | title and closing | the title, the language, and whether the small store holds kept request records (section 10) |
   | restart | jig's words for "the application failed", and skein's default limit (section 5) |
   | the hidden tab | skein's default delay, a minute (section 10) |
 
@@ -585,9 +585,16 @@ data (skein's `ui-web.md`, section 10; 5.1).
   the client's through the same transport (`../client/domain/view.md`, 18.8).
   A write the platform refuses, its quota full, is a failed write. The
   restart part's key is outside the prefix (section 5).
-- **Closing a tab with requests pending** asks the platform to warn
+- **Closing a tab with stored kept requests** asks the platform to warn
   (`beforeunload`), through skein's title and closing part, only while
-  the client holds requests not yet answered durable.
+  its small store holds those records. The existing predicate over
+  sixteen-byte request keys remains sufficient. A new top-level `Seen`
+  has no stored record, so `Seen` alone does not warn; ordinary or mixed
+  kept acts still do. Legacy stored pending `Seen` can warn until its
+  normal terminal erases it (`client.md`, section 10). Closing, reload
+  or crash silently loses new unanswered `Seen`; the next opening checks
+  and sends the forward-only watermark again. No shell classification
+  API is needed.
 
 ## 11. Signing in and out
 

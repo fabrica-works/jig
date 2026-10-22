@@ -1,6 +1,6 @@
 # jig's client
 
-Provisional, 2026-10-09, revised 2026-10-18. The design of jig's client:
+Provisional, 2026-10-09, revised 2026-10-22. The design of jig's client:
 `jig-client`, the client an application holds to reach the engine; the
 API it speaks with the engine; how an application's client root holds it
 beside its own kinds of object; jig's helpers; jig's reference UI, the
@@ -140,11 +140,11 @@ jig-client-world, jig-client-protocol-world, jig-client-wire-world   the client'
 | handle | the application's name for a watch or a read: its asker and a number (client.md, section 4) |
 | asker | the child of the client root a handle or a key names, by its owner number: an opaque number the client hands back and never reads (client.md, section 4; root.md, section 15) |
 | key | the application's name for a keyed request, its asker's and a number; the engine knows the request by the key the request table draws (client.md, section 6) |
-| keyed request | a party's request: kept before it is sent, sent again under its key, pending until its answer is durable |
+| keyed request | a party's request: ordinary requests kept before sending, top-level `Seen` in memory only; retried under its key and pending until answered (client.md, section 6) |
 | request table | skein-lib's container of keyed requests, held by the client: its only way out for them (client.md, section 6) |
 | link | whether the client reaches the engine: signed out, starting, live, offline, or out of date (client.md, 8.2) |
 | behind | a handle whose document may be old: its watch dropped and opening again, or changed (client.md, 8.1) |
-| small store | what a client keeps across its own restart: its requests not yet answered; each child of its root keeps its own records beside them (client.md, section 11) |
+| small store | what a client keeps across its own restart: its kept requests not yet answered, excluding new `Seen` and requests carrying a value; each child of its root keeps its own records beside them (client.md, section 11) |
 | kept work | the requests a client restored from its small store, told to the application as kept (client.md, section 11) |
 | credential | what a sign-in leaves, which jig mints, verifies, expires and revokes; held by the client, or carried by the transport unseen (client.md, section 12) |
 | transport | the application's carrier of jig's messages between the client and the clients' component: jig's default HTTP mapping, a socket, or in-process (client.md, section 16) |
@@ -221,16 +221,19 @@ where each is answered.
   watch among the handles on one subject, and names each opening afresh,
   so nothing arrives for a handle that has moved on (client.md, 8.1).
 - **The key is the application's name for a request;** the engine knows
-  it by the key the request table draws, which the small store keeps
-  beside it (client.md, section 6).
-- **Kept before sent, by the client.** A request's first exchange leaves
-  only once the transport says its record is stored (client.md,
-  section 11).
+  it by the table's drawn or caller-supplied key. A kept request's record
+  stores both keys; new `Seen` keeps them in memory (client.md, section 6).
+- **Kept requests before sent, by the client.** A kept request's first
+  exchange leaves only once the transport says its record is stored
+  (client.md, section 11).
 - **The client's barrier is skein-lib's.** Every keyed request, jig's and
   the application's, leaves through skein-lib's request table, which
-  the client holds: kept before it is sent, sent again under its key
-  within the engine's retention, and only for its party. It is to the
-  client what the journal is to the engine (client.md, section 6).
+  the client holds: ordinary requests kept before sending, top-level
+  `Seen` in memory only, both retried under their keys within the
+  engine's retention and only for their party. New `Seen` retains no
+  completed engine answer and retries against current state; unanswered
+  marks are silently lost on closing, reload or crash (client.md,
+  sections 6 and 11; contract.md, 3.1).
 - **The application's families travel as bytes,** under their owner's
   number and version, on the same connection and through the same
   table; the client reads their owner, version and size only (client.md,
@@ -336,8 +339,9 @@ where each is answered.
   shape:
   - *held by construction, whatever presents it:* a decision names the
     revision it saw, and a moved revision is refused (contract.md, 5.2);
-    made once, nothing lost and nothing answered done before durable
-    are the request table's and the engine's (client.md, section 6);
+    ordinary deciding acts made once, kept work surviving restart, and
+    nothing answered done before durable are the request table's and the
+    engine's (client.md, sections 6 and 11);
   - *given as data:* a decision's facts, in jig's documents, which the
     helper `facts` reads (client.md, section 19) and a presentation
     says, with `words` or its own words, wherever it confirms

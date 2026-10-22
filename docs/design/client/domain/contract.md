@@ -25,8 +25,9 @@ Section 9 lists what the engine's domain owes the client, and where
 - **Keyed requests, answered once durable.** Everything a party does that
   changes something is a request, keyed by its client, checked against
   the party's role, committed, and answered only once that commit is
-  durable; sent twice under its key, it is made once and answered alike
-  (`../../domain/people.md`, 5.1).
+  durable. Ordinary deciding acts sent twice under a retained key are
+  made once and answered alike; `Seen` advances a read position only
+  forward and retains no new answer (3.1; `../../domain/people.md`, 5.1).
 - **Several operations, one decision.** A compound request holds a short
   list of operations, admitted in order and committed together or not
   at all, under one key with one answer (3.4).
@@ -83,9 +84,10 @@ Section 9 lists what the engine's domain owes the client, and where
 - **Versions per owner,** a version not served refused with a typed
   answer (section 8).
 - **jig's promises stay below the API,** whatever the presentation: a
-  decision names the revision it saw (5.2); a request is made once, and
-  answered once durable (3.1); a document reflects only committed state
-  (section 6, 7.2); admission and authority are the engine's (3.2, 3.5);
+  decision names the revision it saw (5.2); an ordinary deciding request
+  is made once, and every request is answered once durable (3.1); a
+  document reflects only committed state (section 6, 7.2); admission and
+  authority are the engine's (3.2, 3.5);
   a credential is its party's (section 2). Confirming a deciding act is
   the application's, with the facts jig gives as data (5.4); keeping a
   credential from being used across sites is the application's server's
@@ -134,19 +136,36 @@ Section 9 lists what the engine's domain owes the client, and where
 - **Answered once durable:** the answer waits for the commit of the
   decision it reports, as every output that someone outside could act on
   does (`../../domain/engine.md`, 5.2).
-- **Kept for a retention:** a durable answer is saved under its key, and a
-  request sent again within the retention gets it again. `me` says how
-  long the retention is, so a client never sends a request again past
-  it (client.md, section 6). Busy and not ready are never kept: the
+- **Ordinary answers kept for a retention:** an ordinary deciding
+  request's durable original answer is saved under its key, success and
+  permanent routed refusal alike, and a request sent again within the
+  retention gets it again. `me` says how long the retention is, so a
+  client never sends a request again past it
+  (client.md, section 6). Busy and not ready are never kept: the
   client sends the request again, under its key, but a request carrying
   a value (below).
-- **One key, one ask:** a key sent again with a different ask is refused
-  as a conflict.
+- **Capacity is engine-wide:** retained answers plus pending ordinary
+  requests' reserved answer places, never per party. Retained replay or
+  conflict and pending joins or conflicts precede new admission. No
+  unexpired ordinary answer is evicted to admit another key.
+- **`Seen` keeps no new answer:** a new top-level `Seen` bypasses
+  completed-answer capacity, using the existing bounded pending, flight,
+  waiter, load, journal and output room without reserving an answer
+  place. It saves no `Answer` on success or routed refusal. While pending,
+  an identical request joins and a different ask conflicts as usual.
+  After completion its key is free: a retry is processed against current
+  subject and authority, and a different ask under that key is a new
+  request. Legacy retained `Seen` answers replay or conflict until their
+  original expiry, still occupying their old places without early
+  erasure or reclassification (`../../domain/people.md`, 5.1).
+- **One held key, one ask:** a key sent again with a different ask is
+  refused as a conflict while pending or retained.
 - **A name** is a key the application gives in place of one the client
   draws, for a request that comes from outside the application
   (sixteen bytes of a digest of an agent's key, say). The engine treats
   it as any key: a name sent again is answered as above, within the
-  retention, and one sent with another ask is refused as a conflict,
+  retention for an ordinary deciding request, and one sent with another
+  ask under a pending or retained key is refused as a conflict,
   which for a name is no bug of the client's. The application builds a
   named request from its own inputs and `me` alone, never from a clock,
   so that the name sent again makes the same ask: a template's deadline
@@ -189,7 +208,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 | `Decide` | a proposal, by its proposer and number: accept, reject with a reason, or pass up; or an escalation, by its held task and its hold's revision: release, leave held with a reason, or pass up | as `../../domain/tasks.md`, section 9 has it; or decided first, by whom and how |
 | `Answer` | a question, by its task and message, with the words; or a person task, by its revision, with the answer its contract asks (a choice, words, or the state an approval approves) or that it cannot be done | an answer to the question; the person task's result |
 | `Take`, `HandBack` | a person task addressed to a role the party holds | held by them, or back to the role |
-| `Seen` | how far the party has read: their results, or one conversation's turns | their read position over that moved (`../../domain/people.md`, section 6) |
+| `Seen` | how far the party has read: their results, or one conversation's turns | their durable read position advanced to `max(old, through)`; after completion a retry checks current subject and authority and may return `Unknown` after forget or `Role` after authority loss, never recreating history or replaying a new completed answer (3.1; `../../domain/people.md`, section 6) |
 | the project's own | notes, by the revision recalled; the policy, its templates' overrides among them (3.6); roles; a party's pool; services, a service's credential answered once; as `../../domain/people.md`, 5.1 and 5.2 | the note or the project changed |
 | adopting a resource | the application's own request (3.3), its form the application's; the engine's root makes the people request on the party's behalf | the project changed |
 | the party's LLM accounts | as `../../domain/accounts.md`, section 5 has them: signing in with an LLM provider; signing a source out; adding or replacing a key, carrying its value (3.1), of at most the bytes `me` states (5.1), and removing one; declaring a program's login under a name; checking a program source's login; an account's place among the holder's and its sources' order; its uses; resuming a limited source; removing an account, which signs each of its sources out and erases its keys. The party's own accounts, or, for an owner, the deployment's | an account made, renewed or changed. A sign-in is answered done with the address to open in a browser on the engine's machine, and ends on the `accounts` watch (7.1), made, renewed or refused; a sign-out's answer says whether the provider confirmed revocation, and names each host that did not sign a program's login out; a program's login declared is answered with the source's name, by which the application's own command signs the program in on each host |

@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-10, revised 2026-10-20. What an engine and a worker
+Provisional, 2026-10-10, revised 2026-10-22. What an engine and a worker
 are told when they start, as far as jig defines its shape: the parts of
 `../domain/engine.md`, section 14 that are jig's, the templates an
 application defines its shapes of work with, how an application's
@@ -384,6 +384,20 @@ host's half reports it (`llm.md`, 5.5).
   a project.
 - **A compound request's worst case** is `../domain/engine.md`, section
   13's, summed into the engine's worst case with the rest.
+- **Request-answer capacity** is shared engine-wide: retained answers
+  plus the ordinary pending flights that reserve answer places, not a
+  per-party allowance or a network-concurrency limit. Ordinary admission
+  reserves an answer for success or permanent routed refusal, and never
+  evicts an unexpired answer. Replay or conflict for a retained key and
+  joins or conflicts for a pending key precede new admission. New
+  top-level `Seen` neither reserves nor saves an answer; its flights use
+  the existing pending, waiter, load, journal and output room
+  independently, even when completed-answer places are full. Legacy
+  retained `Seen` answers occupy their old places until original expiry
+  (`../domain/people.md`, 5.1). These exceptions change no configured
+  limit or worst-case figure. Ordinary unique-key workload, permanent
+  refusals and pending reservations still need room throughout the
+  advertised retention.
 - **A template's grace** is within the tasks child's limit on a grace's
   span, or the start is refused, naming the template (3.1).
 - **The deployment's message bound** holds every kind of message a
