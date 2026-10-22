@@ -372,3 +372,158 @@ fn a_census_position_followed_by_another_task_is_refused() {
     ));
     assert!(!core.restore_inbox_row(&env.limits, &Record::Tasks(ended_census_chat())));
 }
+
+#[test]
+fn the_census_restores_unread_ended_replies_beside_the_result() {
+    const CHAT: u64 = 2; // The existing ended_census_chat owner.
+    const SIGN_IN: u64 = 10;
+    const ORDINARY_REPLY: u64 = 1;
+    const FINAL_REPLY: u64 = 2;
+    const REPLIES: u32 = 2; // The ordinary turn and the final kept turn.
+    const UPDATES: u32 = REPLIES + 1; // Plus the separately positioned result.
+    let (mut core, env) = census_fixture();
+    let tasks::Stored::Ended(mut owner) = ended_census_chat() else { panic!("ended census fixture") };
+    // Durable records for a kept conversation: RunBegan at 1, these two
+    // turns at 2/3, then RunEnded at 4 and the settled owner at time 100.
+    owner.flags = tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::Kept };
+    owner.phase =
+        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: Box::new(*b"final report") }));
+    owner.last_reply = FINAL_REPLY;
+    owner.turn = 2;
+    owner.activity = 4;
+    owner.ever_turned = true;
+    owner.last_answer = Some(owner.attempt);
+    owner.last_activity = Wall::from_nanos(75);
+    owner.changed = Wall::from_nanos(100);
+    let turns = [
+        tasks::ActivityLine {
+            task: CHAT,
+            position: 3,
+            at: Wall::from_nanos(75),
+            line: tasks::Line::Turn { reply: FINAL_REPLY, attempt: 1, turn: 2, read: None },
+        },
+        tasks::ActivityLine {
+            task: CHAT,
+            position: 2,
+            at: Wall::from_nanos(50),
+            line: tasks::Line::Turn { reply: ORDINARY_REPLY, attempt: 1, turn: 1, read: None },
+        },
+    ];
+    owner.replies = Box::new([
+        tasks::ReplyHint { number: FINAL_REPLY, activity: 3, attempt: 1, turn: 2, at: Wall::from_nanos(75) },
+        tasks::ReplyHint { number: ORDINARY_REPLY, activity: 2, attempt: 1, turn: 1, at: Wall::from_nanos(50) },
+    ]);
+    let _census = core.census(&env.limits);
+    assert!(core.restore_inbox_row(
+        &env.limits,
+        &Record::People(people::Stored::EndedRead { task: CHAT, party: PARTY, through: 0 })
+    ));
+    assert!(core.restore_inbox_row(&env.limits, &Record::Tasks(tasks::Stored::Ended(owner.clone()))));
+    // The result-range pass point-loads the same owner; it must not replace
+    // the conversation projection reconstructed by the position/owner pair.
+    assert!(core.restore_inbox_row(&env.limits, &Record::Tasks(tasks::Stored::Ended(owner.clone()))));
+    let _next = core.restart_done(RestartStep::LoadInbox);
+    let Document::Inbox(cached) = make(
+        &core,
+        &env.limits,
+        PARTY,
+        &Subject::Inbox { party: PARTY },
+        &Window { rows: UPDATES, after: None },
+        env.wall,
+    )
+    .unwrap() else {
+        panic!("restored inbox")
+    };
+    assert_eq!((cached.results_seen, cached.updates.len()), (3, UPDATES));
+    let result = cached.updates.get(0).unwrap();
+    assert_eq!(
+        (result.object, result.activity, result.reply.as_ref()),
+        (InboxObject::Result { position: 5 }, None, None)
+    );
+
+    // Authenticate the existing restored party through the people interface.
+    let mut out = Queue::with_capacity(people::max_out(&env.limits.people));
+    let identity = core.people.identity(PARTY).unwrap().clone();
+    people::step(
+        &mut core.people,
+        &Env { now: env.now, wall: env.wall, limits: env.limits.people },
+        people::Event::SignedIn {
+            reply_to: ReplyTo::new(Token::new(SIGN_IN)),
+            person: PARTY,
+            sign_in: SIGN_IN,
+            identity,
+            kind: people::Kind::Person,
+        },
+        &mut out,
+    );
+    let mut rows = List::with_capacity(REPLIES);
+    for line in &turns {
+        let tasks::Line::Turn { reply, .. } = line.line else { panic!("census turn fixture") };
+        let object = InboxObject::Reply { message: reply };
+        let update = tasks::Update {
+            party: PARTY,
+            at: line.at,
+            task: CHAT,
+            object: tasks::UpdateObject::Reply {
+                message: tasks::Newest::of(reply),
+                activity: tasks::Newest::of(line.position),
+            },
+        };
+        let mut row = stored_row(Record::Tasks(tasks::Stored::Update(update)), Some(*owner.clone()));
+        row.related = Some(Record::Tasks(tasks::Stored::Activity(line.clone())));
+        row.ended_read = Some(0);
+        row.inbox = Some(Cursor::Inbox { task: CHAT, object, at: Some(line.at) });
+        rows.push(row).unwrap();
+    }
+    let filter = reads::Filter { project: Some(1), goal: Some(CHAT) };
+    let group = reads::Group::Replies;
+    let Held::ReadLoad { load, .. } = read_start(
+        &mut core,
+        &env.limits,
+        SIGN_IN,
+        reads::Read::Inbox {
+            group,
+            filter,
+            from: Some(reads::Cursor::Store { scope: reads::Scope::Inbox { group, filter }, after: None }),
+        },
+    ) else {
+        panic!("restored stored reply selection")
+    };
+    let Some(reads::Answer::Page(page)) =
+        loaded_answer(&mut core, &env.limits, load, reads::Loaded::Page { rows: rows.into_boxed(), next: None })
+    else {
+        panic!("restored stored replies")
+    };
+    assert_eq!(page.rows.len(), REPLIES);
+    for (stored, line) in page.rows.iter().zip(&turns) {
+        let reads::PageRow::Inbox(entry) = stored else { panic!("stored Reply") };
+        let tasks::Line::Turn { reply, .. } = line.line else { panic!("expected turn") };
+        let mut cached_reply = None;
+        for entry in &cached.updates {
+            if entry.object == (InboxObject::Reply { message: reply }) {
+                cached_reply = Some(entry);
+                break;
+            }
+        }
+        let cached = cached_reply.expect("cached Reply after census join");
+        for supplied in [entry, cached] {
+            assert_eq!(
+                (supplied.object, supplied.activity, supplied.at, supplied.unread),
+                (InboxObject::Reply { message: reply }, Some(line.position), Some(line.at), Some(true))
+            );
+            assert_eq!(
+                supplied.cursor,
+                Cursor::Inbox { task: CHAT, object: InboxObject::Reply { message: reply }, at: Some(line.at) }
+            );
+            let TaskLink::Retained { chip, .. } = &supplied.task else { panic!("retained ended owner") };
+            assert_eq!((chip.number, &chip.phase), (CHAT, &PhaseLine::Ended));
+            let conversation = supplied.reply.as_ref().expect("ended conversation line");
+            assert_eq!(
+                (conversation.chip.number, &conversation.chip.phase, conversation.flags.retention),
+                (CHAT, &PhaseLine::Ended, tasks::Retention::Kept)
+            );
+            assert_eq!((conversation.project, conversation.requester), (1, tasks::Party::Person(PARTY)));
+            assert_eq!(conversation.conversation, Some(ConversationRead { seen: 0, unread: Count::Known(REPLIES) }));
+        }
+    }
+}

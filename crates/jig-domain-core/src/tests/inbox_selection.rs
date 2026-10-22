@@ -131,6 +131,346 @@ fn context_for(contexts: &List<InboxSelection>, cursor: Cursor) -> &InboxSelecti
     found.unwrap()
 }
 
+const CHAT: u64 = 1;
+const CHAT_PARTY: u64 = 1;
+const CHAT_SIGN_IN: u64 = 10;
+const ORDINARY_REPLY: u64 = 1;
+const FINAL_REPLY: u64 = 2;
+const ORDINARY_TURN: u32 = 1;
+const FINAL_TURN: u32 = 2;
+const RUN_ALLOWANCE: u64 = 10; // The existing claim fixture's allowance; both turns cost zero.
+const CHAT_REPLIES: u32 = 2; // The ordinary turn and the final turn.
+const CHAT_UPDATES: u32 = CHAT_REPLIES + 1; // Plus the independently positioned result.
+const CHAT_RECORDS: u32 = CHAT_REPLIES * 2 + 4; // Activity/index pairs, owner, result/index and ended position.
+
+/// Keep the real task child's turns and closing writes, without a store or host harness.
+fn finished_chat() -> (Core, Limits, Box<[Record]>) {
+    let (mut core, limits) = fixture();
+    // The membership fixture restores disconnected rows for selection only.
+    // Its existing make_task helper supplies a funded, kept conversation instead.
+    core.tasks = fixtures::fresh_tasks(&core, &limits);
+    drop(core.proofs.remove(&CHAT));
+    let task = fresh(&mut core.counters, Family::Task).unwrap();
+    let attempt = fresh(&mut core.counters, Family::Run).unwrap();
+    make_task(&mut core, &limits, task);
+    send_task(&mut core, &limits, tasks::Event::Prepare { reply_to: ReplyTo::new(Token::new(task)), task });
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Claim {
+            reply_to: ReplyTo::new(Token::new(task)),
+            task,
+            attempt,
+            resumed: false,
+            budget: RUN_ALLOWANCE,
+            account: None,
+            writes: Box::new([]),
+        },
+    );
+    let mut kept = List::with_capacity(CHAT_RECORDS);
+    for event in [
+        tasks::Event::Turn {
+            reply_to: ReplyTo::new(Token::new(task)),
+            task,
+            attempt,
+            turn: ORDINARY_TURN,
+            read: None,
+            refused: Box::new([]),
+            offered: None,
+            cumulative: 0,
+        },
+        tasks::Event::Turn {
+            reply_to: ReplyTo::new(Token::new(task)),
+            task,
+            attempt,
+            turn: FINAL_TURN,
+            read: None,
+            refused: Box::new([]),
+            offered: None,
+            cumulative: 0,
+        },
+        // The final turn is kept before its finish is admitted and closing settles.
+        tasks::Event::Activation {
+            reply_to: ReplyTo::new(Token::new(task)),
+            task,
+            attempt,
+            end: tasks::End::Finished {
+                result: tasks::TaskResult::Report { words: Box::new(*b"final report") },
+                cancel_delegates: false,
+            },
+            saved: None,
+            cause: tasks::Cause::Priced { cumulative: 0 },
+        },
+        tasks::Event::EffectsSettled { task },
+        tasks::Event::Settled { task },
+    ] {
+        for output in watch_outputs(&mut core, &limits, Event::Tasks(event)) {
+            if let Request::Write(Write::Save(record)) = output
+                && let Record::Tasks(
+                    tasks::Stored::Activity(tasks::ActivityLine { line: tasks::Line::Turn { .. }, .. })
+                    | tasks::Stored::Update(_)
+                    | tasks::Stored::Ended(_)
+                    | tasks::Stored::Result(_),
+                )
+                | Record::People(people::Stored::EndedRead { .. }) = &record
+            {
+                kept.push(record).unwrap();
+            }
+        }
+    }
+    core.reclaim();
+    (core, limits, kept.into_boxed())
+}
+
+fn chat_owner(records: &[Record]) -> &tasks::TaskRecord {
+    for record in records {
+        if let Record::Tasks(tasks::Stored::Ended(owner)) = record {
+            return owner;
+        }
+    }
+    panic!("the real closing decision saved its ended owner")
+}
+
+fn chat_rows(records: &[Record], through: u64, replies: bool) -> Box<[reads::Row]> {
+    let owner = chat_owner(records);
+    let mut rows = List::with_capacity(CHAT_UPDATES);
+    for record in records.iter().rev() {
+        let Record::Tasks(tasks::Stored::Update(update)) = record else { continue };
+        let (object, related) = match update.object {
+            UpdateObject::Reply { message, activity } if replies => {
+                let mut found = None;
+                for record in records {
+                    if let Record::Tasks(tasks::Stored::Activity(line)) = record
+                        && line.position == activity.value()
+                    {
+                        found = Some(record);
+                        break;
+                    }
+                }
+                let line = found.expect("the reply index names its emitted activity");
+                (InboxObject::Reply { message: message.value() }, Some(line.clone()))
+            }
+            UpdateObject::Result if !replies => (InboxObject::Result { position: owner.result_position }, None),
+            UpdateObject::Result | UpdateObject::Reply { .. } | UpdateObject::Proposal { .. } => continue,
+        };
+        let mut row = stored_row(record.clone(), Some(owner.clone()));
+        row.related = related;
+        row.ended_read = Some(through);
+        row.inbox = Some(Cursor::Inbox { task: owner.number, object, at: Some(update.at) });
+        rows.push(row).unwrap();
+    }
+    rows.into_boxed()
+}
+
+fn chat_entry(entries: &[InboxEntry], object: InboxObject) -> &InboxEntry {
+    for entry in entries {
+        if entry.object == object {
+            return entry;
+        }
+    }
+    panic!("chat inbox object")
+}
+
+fn assert_chat_replies(entries: &[InboxEntry], records: &[Record]) {
+    let owner = chat_owner(records);
+    let mut replies = 0_u32;
+    for entry in entries {
+        if let InboxObject::Reply { .. } = entry.object {
+            replies = replies.checked_add(1).expect("bounded chat reply count");
+        }
+    }
+    assert_eq!(replies, CHAT_REPLIES);
+    for message in [ORDINARY_REPLY, FINAL_REPLY] {
+        let entry = chat_entry(entries, InboxObject::Reply { message });
+        let mut activity = None;
+        for record in records {
+            if let Record::Tasks(tasks::Stored::Activity(line)) = record
+                && let tasks::Line::Turn { reply, .. } = line.line
+                && reply == message
+            {
+                activity = Some(line);
+                break;
+            }
+        }
+        let activity = activity.expect("the reply has an emitted turn activity");
+        assert_eq!((entry.activity, entry.at, entry.unread), (Some(activity.position), Some(activity.at), Some(true)));
+        assert_eq!(
+            entry.cursor,
+            Cursor::Inbox { task: CHAT, object: InboxObject::Reply { message }, at: Some(activity.at) }
+        );
+        let TaskLink::Retained { chip, .. } = &entry.task else { panic!("retained chat chip") };
+        assert_eq!((chip.number, &chip.phase), (CHAT, &PhaseLine::Ended));
+        let line = entry.reply.as_ref().expect("conversation line on a Reply");
+        assert_eq!(
+            (line.chip.number, &line.chip.phase, line.project, line.requester),
+            (CHAT, &PhaseLine::Ended, 1, tasks::Party::Person(CHAT_PARTY))
+        );
+        assert_eq!(line.flags.retention, tasks::Retention::Kept);
+        assert_eq!(line.conversation, Some(ConversationRead { seen: 0, unread: Count::Known(CHAT_REPLIES) }));
+    }
+    assert_eq!(owner.last_reply, FINAL_REPLY);
+}
+
+fn mark_chat_seen(core: &mut Core, limits: &Limits, records: &[Record], seen: people::Seen) -> Box<[Request]> {
+    core.reclaim();
+    let outputs = watch_outputs(
+        core,
+        limits,
+        Event::People(people::Event::Ask {
+            models: Box::new([]),
+            reply_to: ReplyTo::new(Token::new(91)),
+            sign_in: CHAT_SIGN_IN,
+            key: [1; 16],
+            ask: people::Ask::MarkSeen { seen },
+        }),
+    );
+    let mut request = None;
+    for output in &outputs {
+        if let Request::Held(held) = output
+            && let Held::Load(load) = held.as_ref()
+            && let Now::SeenConversation { request: wanted, .. } = load.as_ref()
+        {
+            request = Some(*wanted);
+            break;
+        }
+    }
+    let Some(request) = request else { return outputs };
+    let loaded = watch_outputs(
+        core,
+        limits,
+        Event::SeenConversationLoaded { request, row: Some(Box::new(chat_owner(records).clone())), busy: false },
+    );
+    let mut joined = false;
+    for output in &loaded {
+        if let Request::Held(held) = output
+            && let Held::Load(load) = held.as_ref()
+            && let Now::LoadEndedRead { request: wanted, task: CHAT, party: CHAT_PARTY } = load.as_ref()
+            && *wanted == request
+        {
+            joined = true;
+            break;
+        }
+    }
+    assert!(joined, "the owner join requests the matching ended position");
+    watch_outputs(
+        core,
+        limits,
+        Event::EndedReadLoaded { request, task: CHAT, party: CHAT_PARTY, through: 0, busy: false },
+    )
+}
+
+#[test]
+fn ending_a_kept_chat_preserves_cached_and_stored_replies() {
+    let (mut core, limits, records) = finished_chat();
+    assert!(records.contains(&Record::People(people::Stored::EndedRead { task: CHAT, party: CHAT_PARTY, through: 0 })));
+    let cached = inbox(&core, &limits, limits.documents.rows);
+    assert_eq!((cached.results_seen, cached.updates.len()), (0, CHAT_UPDATES));
+    assert_chat_replies(cached.updates.as_slice(), &records);
+    let result =
+        chat_entry(cached.updates.as_slice(), InboxObject::Result { position: chat_owner(&records).result_position });
+    assert_eq!((result.reply.as_ref(), result.activity, result.unread), (None, None, Some(true)));
+    let reads::Answer::Page(page) =
+        stored_page(&mut core, &limits, reads::Group::Replies, Some(CHAT), chat_rows(&records, 0, true))
+    else {
+        panic!("stored replies")
+    };
+    let mut entries = List::with_capacity(CHAT_REPLIES);
+    for row in &page.rows {
+        let reads::PageRow::Inbox(entry) = row else { panic!("Reply row") };
+        entries.push(entry.clone()).unwrap();
+    }
+    assert_chat_replies(entries.as_slice(), &records);
+}
+
+#[test]
+fn reading_results_leaves_ended_chat_turns_unread() {
+    let (mut core, limits, records) = finished_chat();
+    let through = chat_owner(&records).result_position;
+    let _marked = mark_chat_seen(&mut core, &limits, &records, people::Seen::Results { through });
+    let cached = inbox(&core, &limits, limits.documents.rows);
+    assert_eq!((cached.results_seen, cached.updates.len()), (through, CHAT_REPLIES));
+    assert_chat_replies(cached.updates.as_slice(), &records);
+    let reads::Answer::Page(page) =
+        stored_page(&mut core, &limits, reads::Group::Results, Some(CHAT), chat_rows(&records, 0, false))
+    else {
+        panic!("stored result selection")
+    };
+    assert!(page.rows.is_empty());
+}
+
+#[test]
+fn reading_the_last_turn_preserves_kept_result_and_history() {
+    let (mut core, limits, records) = finished_chat();
+    let marked =
+        mark_chat_seen(&mut core, &limits, &records, people::Seen::Conversation { task: CHAT, through: FINAL_REPLY });
+    let mut saved = false;
+    for output in &marked {
+        if let Request::Write(Write::Save(Record::People(people::Stored::EndedRead {
+            task: CHAT,
+            party: CHAT_PARTY,
+            through: FINAL_REPLY,
+        }))) = output
+        {
+            saved = true;
+            break;
+        }
+    }
+    assert!(saved);
+    let cached = inbox(&core, &limits, limits.documents.rows);
+    assert_eq!((cached.results_seen, cached.updates.len()), (0, 1));
+    assert_eq!(
+        cached.updates.get(0).unwrap().object,
+        InboxObject::Result { position: chat_owner(&records).result_position }
+    );
+    let reads::Answer::Page(page) =
+        stored_page(&mut core, &limits, reads::Group::Replies, Some(CHAT), chat_rows(&records, FINAL_REPLY, true))
+    else {
+        panic!("stored reply boundary")
+    };
+    assert!(page.rows.is_empty());
+    core.reclaim();
+    let Held::ReadLoad { load, .. } = read_start(&mut core, &limits, CHAT_SIGN_IN, reads::Read::Task { task: CHAT })
+    else {
+        panic!("kept task load")
+    };
+    let row = stored_row(Record::Tasks(tasks::Stored::Ended(Box::new(chat_owner(&records).clone()))), None);
+    let Some(reads::Answer::Historical(history)) =
+        loaded_answer(&mut core, &limits, load, reads::Loaded::Page { rows: Box::new([row]), next: None })
+    else {
+        panic!("kept task history")
+    };
+    let reads::Past::Task { document, result } = &history.value else { panic!("whole kept task") };
+    assert_eq!(
+        (document.chip.number, document.flags.retention, result.task.number),
+        (CHAT, tasks::Retention::Kept, CHAT)
+    );
+    let Ending::Done(ResultValue::Report(report)) = &result.ending else { panic!("kept final report") };
+    assert_eq!(report.bytes.as_ref(), b"final report");
+    core.reclaim();
+    let Held::ReadLoad { load, .. } =
+        read_start(&mut core, &limits, CHAT_SIGN_IN, reads::Read::Activity { task: CHAT, before: None })
+    else {
+        panic!("kept activity load")
+    };
+    let mut rows = List::with_capacity(CHAT_REPLIES);
+    for record in records.iter().rev() {
+        if let Record::Tasks(tasks::Stored::Activity(_)) = record {
+            rows.push(stored_row(record.clone(), Some(chat_owner(&records).clone()))).unwrap();
+        }
+    }
+    let Some(reads::Answer::Page(page)) =
+        loaded_answer(&mut core, &limits, load, reads::Loaded::Page { rows: rows.into_boxed(), next: None })
+    else {
+        panic!("kept turn history")
+    };
+    assert_eq!(page.rows.len(), CHAT_REPLIES);
+    for (row, expected) in page.rows.iter().zip([FINAL_REPLY, ORDINARY_REPLY]) {
+        let reads::PageRow::Activity { line, .. } = row else { panic!("kept turn activity") };
+        let tasks::Line::Turn { reply, .. } = line.line else { panic!("committed turn") };
+        assert_eq!(reply, expected);
+    }
+}
+
 #[test]
 fn inbox_membership_matches_the_original_read_predicate_at_every_requester_boundary() {
     let (mut core, mut limits) = fixture();
