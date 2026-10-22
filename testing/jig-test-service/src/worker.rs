@@ -389,7 +389,7 @@ impl Worker {
             smith::process::Request::Spawn { owner, deadline, .. } => self.process_spawn(owner, deadline),
             smith::process::Request::Send { owner, message, .. } => self.process_send(owner, message),
             smith::process::Request::Signal { owner, signal, .. } => self.process_signal(owner, signal),
-            smith::process::Request::Read { .. } => Self::process_read(),
+            smith::process::Request::Read { owner, .. } => self.process_read(owner),
             smith::process::Request::Wait { .. } => Self::process_wait(),
             smith::process::Request::Reap { .. } => Self::process_reap(),
         }
@@ -474,8 +474,10 @@ impl Worker {
         self.processes.get(&owner).expect("root owns process").signal(signal, &mut self.io);
         self.events.push(root::Event::Process(Box::new(smith::process::Event::Signalled { owner })));
     }
-    // Smith's process adapter keeps reads, exit waits and reaping active.
-    fn process_read() {}
+    fn process_read(&mut self, owner: Token) {
+        self.processes.get_mut(&owner).expect("root owns process").read(&mut self.process_events, &mut self.io);
+    }
+    // Smith's process adapter keeps exit waits and reaping active.
     fn process_wait() {}
     fn process_reap() {}
     pub(super) fn iterate(&mut self, now: Time, wall: Wall) {
