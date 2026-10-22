@@ -612,3 +612,80 @@ fn a_turn_load_preserves_the_gone_terminal() {
     assert_eq!(latest(&world), &reads::Answer::None(reads::Why::Gone));
     assert_eq!(world.reads.as_ref().expect("party").receipts.len(), 1);
 }
+
+#[test]
+fn a_delegates_question_waits_for_the_person_after_the_director_reads_it() {
+    let (mut world, director) = question_world(796, None);
+    let delegate = chat_task(&world);
+    let message = question(&mut world, director, 1);
+    let original_at = jig_core_world::fixtures::live_row(&world, director).inbox[0].at;
+    take_message(&mut world, director, 1, message);
+    assert!(jig_core_world::fixtures::live_row(&world, director).inbox.is_empty());
+    for restart in [false, true] {
+        if restart {
+            world.restart(796, false);
+        }
+        ask(
+            &mut world,
+            906,
+            reads::Read::Inbox {
+                group: reads::Group::Questions,
+                filter: reads::Filter { project: Some(1), goal: None },
+                from: None,
+            },
+        );
+        let reads::Answer::Page(page) = latest(&world) else { panic!("questions inbox") };
+        assert_eq!(page.rows.len(), 1);
+        let reads::PageRow::Inbox(entry) = page.rows.get(0).expect("one question entry") else {
+            panic!("question entry")
+        };
+        assert_eq!(entry.object, documents::InboxObject::Question { message });
+        assert_eq!(entry.at, Some(original_at));
+        ask(&mut world, 907, reads::Read::Question { task: director, message });
+        let reads::Answer::Document(frame) = latest(&world) else { panic!("live question: {:?}", latest(&world)) };
+        let documents::Document::Question(question) = frame.as_ref() else { panic!("question document") };
+        assert_eq!(question.words.as_ref(), b"original question?");
+        assert_eq!(question.at, original_at);
+        assert!(
+            question
+                .acts
+                .as_slice()
+                .iter()
+                .any(|offer| offer.act == core::acts::Act::Answer && offer.admission == core::acts::Admission::Allowed)
+        );
+    }
+    request(
+        &mut world,
+        96,
+        people::Ask::AnswerQuestion {
+            project: 1,
+            task: director,
+            question: message,
+            words: b"the person's answer".as_slice().into(),
+        },
+    );
+    let row = jig_core_world::fixtures::live_row(&world, director);
+    assert!(row.inbox.iter().any(|word| word.kind == tasks::MessageKind::Answer { question: message }
+        && word.words.as_ref() == b"the person's answer"));
+    assert!(row.question_lines[0].answer.is_some());
+    assert_eq!(
+        jig_core_world::fixtures::live_row(&world, delegate).questions.len(),
+        1,
+        "the delegate still has its reserved answer credit"
+    );
+    ask(
+        &mut world,
+        908,
+        reads::Read::Inbox {
+            group: reads::Group::Questions,
+            filter: reads::Filter { project: Some(1), goal: None },
+            from: None,
+        },
+    );
+    let reads::Answer::Page(page) = latest(&world) else { panic!("questions inbox") };
+    assert!(page.rows.is_empty());
+    ask(&mut world, 909, reads::Read::Question { task: director, message });
+    let reads::Past::Question { question, answer, .. } = past(&world) else { panic!("historical question") };
+    assert!(question.acts.is_empty());
+    assert!(answer.is_some());
+}

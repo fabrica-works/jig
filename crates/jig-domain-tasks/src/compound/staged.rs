@@ -101,6 +101,19 @@ impl CompoundTask<'_> {
 }
 
 impl Staged {
+    /// Answers admitted earlier in this compound close their question positions.
+    pub(crate) fn answered_question(&self, task: u64, question: u64) -> bool {
+        for plan in &self.plans {
+            if let Plan::Message(plan) = plan
+                && plan.number == task
+                && plan.prepared.word.kind == (crate::MessageKind::Answer { question })
+            {
+                return true;
+            }
+        }
+        false
+    }
+
     pub(crate) fn record<'a>(&'a self, domain: &'a crate::Domain, number: u64) -> Option<CompoundTask<'a>> {
         let base = crate::domain::record(domain, number)?;
         let mut row = borrowed(base);

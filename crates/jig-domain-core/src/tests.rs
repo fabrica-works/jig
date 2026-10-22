@@ -658,7 +658,11 @@ fn send_task(core: &mut Core, limits: &Limits, event: tasks::Event) {
     let mut out = Queue::with_capacity(tasks::max_out(&limits.tasks));
     tasks::step(&mut core.tasks, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.tasks }, event, &mut out);
     while let Some(request) = out.pop() {
+        if let tasks::Request::Save { record: tasks::Stored::Activity(line) } = &request {
+            let _retained = core.remember_question(line);
+        }
         if let tasks::Request::Save { record: tasks::Stored::Live(row) } = request {
+            core.prune_questions(row.number);
             let mut projections = Queue::with_capacity(room_max(limits).unwrap().writes);
             projections::save(core, limits, &row, &mut projections);
         }
@@ -891,6 +895,7 @@ fn documents_proposal_tracks_the_current_holder_and_funding_after_a_pass() {
         tasks::Event::WithdrawProposal { reply_to: ReplyTo::new(Token::new(52)), proposer: 2, proposal: 10 },
     );
     assert_eq!(make(&core, &limits, 1, &target, &window(), Wall::EPOCH), Err(Missing::Ended));
+    assert!(core.waiting_entries(&limits, core.tasks.task(1).unwrap()).is_empty());
 }
 
 #[test]
@@ -1164,10 +1169,51 @@ fn documents_question_words_are_whole_or_refused_and_answered_questions_end() {
             },
         },
     );
+    send_task(&mut core, &limits, tasks::Event::Prepare { reply_to: ReplyTo::new(Token::new(62)), task: 1 });
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Claim {
+            account: None,
+            reply_to: ReplyTo::new(Token::new(63)),
+            task: 1,
+            attempt: 1,
+            resumed: false,
+            budget: 10,
+            writes: Box::new([]),
+        },
+    );
+    send_task(&mut core, &limits, tasks::Event::Started { task: 1, attempt: 1 });
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Turn {
+            refused: Box::new([]),
+            reply_to: ReplyTo::new(Token::new(64)),
+            task: 1,
+            attempt: 1,
+            turn: 1,
+            read: Some(60),
+            offered: Some(60),
+            cumulative: 0,
+        },
+    );
+    assert!(core.tasks.task(1).unwrap().inbox.is_empty());
+    let entries = core.waiting_entries(&limits, core.tasks.task(1).unwrap());
+    let mut listed = false;
+    for entry in &entries {
+        listed |= entry.kind == people::EntryKind::Question { message: 60 } && entry.at == Wall::from_nanos(9);
+    }
+    assert!(listed);
     let target = Subject::Question { task: 1, message: 60 };
     let Document::Question(question) = make(&core, &limits, 1, &target, &window(), Wall::EPOCH).unwrap() else {
         panic!()
     };
+    let mut answerable = false;
+    for offer in &question.acts {
+        answerable |= offer.act == crate::acts::Act::Answer && offer.admission == crate::acts::Admission::Allowed;
+    }
+    assert!(answerable);
     assert_eq!(question.words.as_ref(), b"Whole question?");
     assert_eq!(question.at, Wall::from_nanos(9));
     limits.documents.text_bytes = 5;

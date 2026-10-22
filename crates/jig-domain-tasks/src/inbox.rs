@@ -69,7 +69,16 @@ pub(crate) fn prepare_staged(
     }
     match admission {
         Admission::Refusable => {
-            if !room_staged(domain, staged, limits, number, 1, word.words.len()) {
+            let mut unanswered = 0_usize;
+            for line in &task.question_lines {
+                if line.answer.is_none() {
+                    unanswered = unanswered.checked_add(1).expect("bounded question positions");
+                }
+            }
+            if (word.kind == MessageKind::Question
+                && unanswered >= usize::try_from(limits.inbox_messages).expect("u32 fits usize"))
+                || !room_staged(domain, staged, limits, number, 1, word.words.len())
+            {
                 return None;
             }
         }
@@ -361,13 +370,13 @@ pub(crate) fn check_message(
                 Party::Person(person) => {
                     let mut found = false;
                     if task.requester == Party::Person(person) {
-                        for prior in task.inbox {
-                            if prior.number == question && prior.kind == MessageKind::Question {
+                        for line in &task.question_lines {
+                            if line.message == question && line.answer.is_none() {
                                 found = true;
                             }
-                            if prior.kind == (MessageKind::Answer { question }) {
-                                found = false;
-                            }
+                        }
+                        if staged.answered_question(number, question) {
+                            found = false;
                         }
                     }
                     found

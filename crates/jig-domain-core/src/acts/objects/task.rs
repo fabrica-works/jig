@@ -271,12 +271,9 @@ pub(crate) fn question(
     }
     write(core, limits, party, number)?;
     let mut found = false;
-    for prior in &row.inbox {
-        if prior.number == message && prior.kind == tasks::MessageKind::Question {
+    for line in &row.question_lines {
+        if line.message == message && line.answer.is_none() {
             found = true;
-        }
-        if prior.kind == (tasks::MessageKind::Answer { question: message }) {
-            found = false;
         }
     }
     if found { Ok(()) } else { Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Reference }) }

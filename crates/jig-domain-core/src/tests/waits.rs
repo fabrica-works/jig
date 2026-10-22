@@ -35,8 +35,21 @@ fn a_question_to_the_requester_names_that_party_and_one_entry() {
     let mut parent = core.tasks.task(1).unwrap().clone();
     parent.inbox = Box::new([question(3, 10)]);
     parent.last_message = 3;
+    parent.question_lines = Box::new([tasks::QuestionLine { message: 3, line: parent.activity, answer: None }]);
     let child = core.tasks.task(2).unwrap().clone();
     restore(&mut core, &limits, Box::new([parent, child]));
+    let position = core.tasks.task(1).unwrap().activity;
+    assert!(core.remember_question(&tasks::ActivityLine {
+        task: 1,
+        position,
+        at: Wall::from_nanos(10),
+        line: tasks::Line::Words {
+            message: 3,
+            by: tasks::Party::Task(2),
+            kind: tasks::MessageKind::Question,
+            words: b"Question?".as_slice().into()
+        }
+    }));
     assert_eq!(
         core.waits_on(&limits, 1),
         WaitsOn::Party {
@@ -54,6 +67,7 @@ fn the_oldest_of_two_waiting_entries_names_whom() {
     let mut parent = core.tasks.task(1).unwrap().clone();
     parent.inbox = Box::new([question(3, 10)]);
     parent.last_message = 3;
+    parent.question_lines = Box::new([tasks::QuestionLine { message: 3, line: parent.activity, answer: None }]);
     let mut child = core.tasks.task(2).unwrap().clone();
     child.revisions.hold = 1;
     child.escalation = tasks::Escalation::Waiting {
@@ -65,6 +79,18 @@ fn the_oldest_of_two_waiting_entries_names_whom() {
     child.phase =
         tasks::Phase::Held { why: tasks::Hold::Budget, source: None, was: tasks::Was::Active(tasks::Active::Due) };
     restore(&mut core, &limits, Box::new([parent, child]));
+    let position = core.tasks.task(1).unwrap().activity;
+    assert!(core.remember_question(&tasks::ActivityLine {
+        task: 1,
+        position,
+        at: Wall::from_nanos(10),
+        line: tasks::Line::Words {
+            message: 3,
+            by: tasks::Party::Task(2),
+            kind: tasks::MessageKind::Question,
+            words: b"Question?".as_slice().into()
+        }
+    }));
     assert_eq!(
         core.waits_on(&limits, 1),
         WaitsOn::Party {

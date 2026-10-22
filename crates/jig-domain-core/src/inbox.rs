@@ -40,27 +40,15 @@ fn proposal_kind(kind: tasks::ProposalKind) -> authority::ProposalKind {
     }
 }
 
-fn question_answered(row: &tasks::TaskRecord, question: u64) -> bool {
-    for word in &row.inbox {
-        match word.kind {
-            tasks::MessageKind::Answer { question: answered } if answered == question => return true,
-            tasks::MessageKind::Answer { .. }
-            | tasks::MessageKind::Question
-            | tasks::MessageKind::EffectNotMade { .. }
-            | tasks::MessageKind::Words
-            | tasks::MessageKind::Met { .. }
-            | tasks::MessageKind::Amendment { .. }
-            | tasks::MessageKind::Proposal { .. }
-            | tasks::MessageKind::ProposalDecision { .. }
-            | tasks::MessageKind::Escalation { .. }
-            | tasks::MessageKind::Notice { .. }
-            | tasks::MessageKind::Timer { .. }
-            | tasks::MessageKind::News { .. }
-            | tasks::MessageKind::PersonStalled { .. }
-            | tasks::MessageKind::Result(_) => {}
-        }
+pub(crate) fn questions_live(phase: &tasks::Phase) -> bool {
+    match phase {
+        tasks::Phase::Closing(_) | tasks::Phase::Ended(_) => false,
+        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Held { .. } => true,
     }
-    false
+}
+
+pub(crate) fn question_capacity(limits: &Limits) -> Option<u32> {
+    limits.tasks.tasks.checked_mul(limits.tasks.inbox_messages)
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -93,7 +81,11 @@ pub(crate) fn reply_refs(limits: &Limits, row: &tasks::TaskRecord, party: u64) -
 
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     let headers = limits.people.people.checked_mul(limits.people.inbox_entries)?.checked_add(1)?;
-    skein_lib::Map::<u64, ArchivedChat>::worst_case(headers)?
+    let questions = question_capacity(limits)?;
+    skein_lib::Map::<(u64, u64), tasks::ActivityLine>::worst_case(questions)?
+        .checked_add(u64::from(questions).checked_mul(u64::from(limits.tasks.message_bytes))?)?
+        .checked_add(List::<(u64, u64)>::worst_case(questions)?)?
+        .checked_add(skein_lib::Map::<u64, ArchivedChat>::worst_case(headers)?)?
         .checked_add(
             u64::from(headers)
                 .checked_mul(crate::documents::chip_heap_worst_case(&limits.documents)?.checked_mul(2)?)?,
@@ -101,6 +93,49 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<u64>::worst_case(headers)?)?
         .checked_add(List::<people::ReplyRef>::worst_case(limits.tasks.inbox_messages)?)?
         .checked_add(List::<people::Update>::worst_case(limits.people.inbox_entries)?)
+}
+
+impl Core {
+    /// Retain only activity named by an unanswered question's durable position.
+    pub(crate) fn remember_question(&mut self, line: &tasks::ActivityLine) -> bool {
+        let Some(owner) = self.tasks.task(line.task) else { return false };
+        let tasks::Line::Words { message, kind: tasks::MessageKind::Question, .. } = &line.line else {
+            return false;
+        };
+        let mut named = false;
+        for position in &owner.question_lines {
+            named |= position.message == *message && position.line == line.position && position.answer.is_none();
+        }
+        if !named {
+            return false;
+        }
+        self.prune_questions(line.task);
+        self.question_activity.insert((line.task, line.position), line.clone()).expect("bounded open questions");
+        true
+    }
+
+    pub(crate) fn prune_questions(&mut self, task: u64) {
+        let mut stale = List::with_capacity(self.question_activity.capacity());
+        for (key, _) in &self.question_activity {
+            if key.0 != task {
+                continue;
+            }
+            let mut keep = false;
+            if let Some(owner) = self.tasks.task(task)
+                && questions_live(&owner.phase)
+            {
+                for position in &owner.question_lines {
+                    keep |= position.line == key.1 && position.answer.is_none();
+                }
+            }
+            if !keep {
+                stale.push(*key).expect("bounded question snapshot");
+            }
+        }
+        for key in stale.into_boxed() {
+            drop(self.question_activity.remove(&key));
+        }
+    }
 }
 
 impl Core {
@@ -184,32 +219,17 @@ impl Core {
         }
         match row.requester {
             tasks::Party::Person(person) => {
-                for word in &row.inbox {
-                    match word.kind {
-                        tasks::MessageKind::Question => {
-                            if !question_answered(row, word.number) {
-                                add(
-                                    &mut entries,
-                                    row,
-                                    people::Whom::Person(person),
-                                    people::EntryKind::Question { message: word.number },
-                                    word.at,
-                                );
-                            }
-                        }
-                        tasks::MessageKind::Answer { .. }
-                        | tasks::MessageKind::ProposalDecision { .. }
-                        | tasks::MessageKind::Proposal { .. }
-                        | tasks::MessageKind::EffectNotMade { .. }
-                        | tasks::MessageKind::Words
-                        | tasks::MessageKind::Met { .. }
-                        | tasks::MessageKind::Amendment { .. }
-                        | tasks::MessageKind::Notice { .. }
-                        | tasks::MessageKind::Timer { .. }
-                        | tasks::MessageKind::News { .. }
-                        | tasks::MessageKind::PersonStalled { .. }
-                        | tasks::MessageKind::Result(_)
-                        | tasks::MessageKind::Escalation { .. } => {}
+                for line in &row.question_lines {
+                    if line.answer.is_none()
+                        && let Some(fact) = self.question_activity.get(&(row.number, line.line))
+                    {
+                        add(
+                            &mut entries,
+                            row,
+                            people::Whom::Person(person),
+                            people::EntryKind::Question { message: line.message },
+                            fact.at,
+                        );
                     }
                 }
             }

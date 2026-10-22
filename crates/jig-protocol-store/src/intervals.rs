@@ -32,7 +32,9 @@ fn census_ranges(census: &core::Census) -> Box<[Range]> {
     let capacity = u32::try_from(census.results.len())
         .expect("bounded census parties")
         .checked_add(1)
-        .expect("census parties and conversation family");
+        .expect("bounded census parties")
+        .checked_add(u32::try_from(census.questions.len()).expect("bounded census questions"))
+        .expect("bounded census parties, questions and conversation family");
     let mut ranges = List::with_capacity(capacity);
     ranges.push(Range::prefix(&[keys::JIG, 2, 7])).expect("one conversation family");
     for read in &census.results {
@@ -40,6 +42,11 @@ fn census_ranges(census: &core::Census) -> Box<[Range]> {
         let key = core::Key::Tasks(jig_domain_tasks::Key::Result { party: read.party, position: read.after });
         range.start = after(&encoded(&key));
         ranges.push(range).expect("one result interval per census party");
+    }
+    for &(task, position) in &census.questions {
+        ranges
+            .push(point(&core::Key::Tasks(jig_domain_tasks::Key::Activity { task, position })))
+            .expect("one point per open question");
     }
     ranges.into_boxed()
 }

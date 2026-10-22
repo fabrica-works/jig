@@ -416,7 +416,10 @@ root for one step at a time, and the root asks the store:
   conversation not yet erased (7.4), then the results' index from each
   party's read position over results (4.4), parties in the census's
   order; each row joined to its ended task's record by a point read;
-  never every ended task (section 15). The census:
+  never every ended task (section 15). It then reads each unanswered
+  question's activity line by the position its live task keeps (15.7),
+  to rebuild the core's bounded, volatile question facts: the original
+  time and words, never another durable record. The census:
   - hands up an ended read position, then its task's record, and a
     result's row only as its task's record;
   - never parts a position from its record: a page counts both against

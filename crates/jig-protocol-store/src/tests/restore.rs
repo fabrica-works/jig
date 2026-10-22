@@ -55,6 +55,7 @@ fn assert_corrupt(store: &mut Store, events: &[Event]) {
 
 fn census() -> Restore {
     Restore::Jig(Box::new([RestoreRange::Census(Census {
+        questions: Box::new([]),
         results: Box::new([ReadResults { party: ALICE, after: 0 }]),
     })]))
 }

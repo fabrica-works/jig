@@ -339,6 +339,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         // Atomic procedure admission saves every live row and finite balance.
         .checked_add(List::<crate::TaskRecord>::worst_case(limits.tasks)?)?
         .checked_add(List::<(crate::Funder, crate::Numbers)>::worst_case(limits.funders)?)?
+        // Ordering question positions after their first answer.
+        .checked_add(Map::<(bool, core::cmp::Reverse<u64>), crate::QuestionLine>::worst_case(limits.inbox_messages)?)?
+        .checked_add(List::<crate::QuestionLine>::worst_case(limits.inbox_messages)?)?
         // Bounded graph/admission and traversal snapshots; no recursive walk.
         .checked_add(List::<u64>::worst_case(limits.tasks.max(limits.batch))?.checked_mul(3)?)?
         .checked_add(List::<u32>::worst_case(limits.batch)?)?

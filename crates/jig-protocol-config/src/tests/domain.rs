@@ -383,7 +383,9 @@ fn memory_below_the_components_sum_is_refused() {
     // and its replay: max(30,960 task carrier + 4,096 spec + 4,096 message, 8,192
     // amendment) = 39,152; 8 * 43,648 = 349,184.
     // 18,729,231,011 + 176 + 349,184 = 18,729,580,371 (one byte is supplied).
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_729_580_371 });
+    // Question positions' ordering scratch and the core's bounded activity
+    // cache, pruning keys and census keys add 288,016 bytes at this profile.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_729_868_387 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

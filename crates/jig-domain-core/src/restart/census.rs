@@ -9,6 +9,8 @@ pub struct ReadResults {
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Census {
+    /// Exact activity keys of unanswered questions, reconstructed at restart.
+    pub questions: Box<[(u64, u64)]>,
     pub results: Box<[ReadResults]>,
 }
 impl Census {
@@ -21,6 +23,17 @@ impl Census {
     pub fn interval(&self, key: &Key) -> Option<u32> {
         match key {
             Key::People(jig_domain_people::Key::EndedRead { .. }) => Some(0),
+            Key::Tasks(tasks::Key::Activity { task, position }) => {
+                for (index, key) in self.questions.iter().enumerate() {
+                    if key == &(*task, *position) {
+                        return u32::try_from(self.results.len())
+                            .ok()?
+                            .checked_add(1)?
+                            .checked_add(u32::try_from(index).ok()?);
+                    }
+                }
+                None
+            }
             Key::Tasks(tasks::Key::Result { party, position }) => {
                 for (index, read) in self.results.iter().enumerate() {
                     if read.party == *party && *position > read.after {
@@ -41,7 +54,6 @@ impl Census {
                 | tasks::Key::PersonProposal(_)
                 | tasks::Key::History { .. }
                 | tasks::Key::Milestone { .. }
-                | tasks::Key::Activity { .. }
                 | tasks::Key::Update { .. }
                 | tasks::Key::EndedByParty { .. }
                 | tasks::Key::EndedByProject { .. }

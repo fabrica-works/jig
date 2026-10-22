@@ -628,6 +628,23 @@ fn stored_waiting_and_reply_entries_keep_separate_original_contexts_and_activity
         hits: 0,
         eligible: true,
     }]);
+    owner.question_lines = Box::new([tasks::QuestionLine { message: u64::MAX, line: owner.activity, answer: None }]);
+    core.question_activity
+        .insert(
+            (owner.number, owner.activity),
+            tasks::ActivityLine {
+                task: owner.number,
+                position: owner.activity,
+                at: Wall::EPOCH,
+                line: tasks::Line::Words {
+                    message: u64::MAX,
+                    by: tasks::Party::Task(2),
+                    kind: tasks::MessageKind::Question,
+                    words: Box::new(*b"question"),
+                },
+            },
+        )
+        .unwrap();
     let object = InboxObject::Question { message: u64::MAX };
     let mut row = stored_row(Record::Tasks(tasks::Stored::Live(Box::new(owner.clone()))), None);
     row.inbox = Some(Cursor::Inbox { task: 1, object, at: Some(Wall::EPOCH) });

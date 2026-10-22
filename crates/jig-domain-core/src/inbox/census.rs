@@ -12,7 +12,8 @@ pub(crate) struct Progress {
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     Map::<u64, Progress>::worst_case(limits.people.people)?
         .checked_add(List::<u64>::worst_case(limits.people.people)?)?
-        .checked_add(List::<ReadResults>::worst_case(limits.people.people)?)
+        .checked_add(List::<ReadResults>::worst_case(limits.people.people)?)?
+        .checked_add(List::<(u64, u64)>::worst_case(super::question_capacity(limits)?)?)
 }
 impl Core {
     pub fn census(&mut self, limits: &Limits) -> Census {
@@ -49,6 +50,18 @@ impl Core {
             people::step(&mut self.people, &env, people::Event::Waiting { task: proposal.first(), entries }, &mut out);
             assert!(out.is_empty(), "restored pending proposals decide nothing");
         }
+        let mut questions = List::with_capacity(super::question_capacity(limits).expect("validated question bound"));
+        for task in self.tasks.view_tasks() {
+            let row = self.tasks.task(task.number).expect("live view owner");
+            if !super::questions_live(&row.phase) {
+                continue;
+            }
+            for line in &row.question_lines {
+                if line.answer.is_none() {
+                    questions.push((row.number, line.line)).expect("bounded open questions");
+                }
+            }
+        }
         let mut results = List::with_capacity(limits.people.people);
         for party in &self.people.parties() {
             self.census_progress
@@ -61,7 +74,7 @@ impl Core {
                 })
                 .expect("bounded restored parties");
         }
-        Census { results: results.into_boxed() }
+        Census { questions: questions.into_boxed(), results: results.into_boxed() }
     }
 }
 
@@ -71,6 +84,17 @@ impl Core {
         use jig_domain_tasks as tasks;
         if self.restart_step() != Some(crate::RestartStep::LoadInbox) || !self.people.ready() {
             return false;
+        }
+        if let crate::Record::Tasks(tasks::Stored::Activity(line)) = record {
+            if !self.remember_question(line) {
+                return false;
+            }
+            let owner = self.tasks.task(line.task).expect("named question owner");
+            let entries = self.waiting_entries(limits, owner);
+            let mut out = Queue::with_capacity(people::max_out(&limits.people));
+            let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+            people::step(&mut self.people, &env, people::Event::Waiting { task: line.task, entries }, &mut out);
+            return out.is_empty();
         }
         if let crate::Record::People(people::Stored::EndedRead { task, party, through }) = record {
             if self.census_position.is_some() {

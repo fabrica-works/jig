@@ -3,7 +3,7 @@ use crate::{
     Change, Domain, History, Limits, MessageKind, Party, Proposal, ProposalState, Request, Stored, TaskRecord, Word,
 };
 use alloc::boxed::Box;
-use skein_lib::{Env, List, Queue};
+use skein_lib::{Env, List, Map, Queue};
 
 /// A question this task heard and the positions of its original lines.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -31,11 +31,17 @@ pub(crate) fn message(task: &mut TaskRecord, word: &Word, bound: u32) {
     if word.kind == MessageKind::Question {
         let mut kept = List::with_capacity(bound);
         kept.push(QuestionLine { message: word.number, line: task.activity, answer: None }).expect("one question fits");
-        for line in &task.question_lines {
-            if kept.room() == 0 {
-                break;
+        for answered in [false, true] {
+            for line in &task.question_lines {
+                if line.answer.is_some() != answered {
+                    continue;
+                }
+                if kept.room() == 0 {
+                    assert!(answered, "unanswered question admitted within its bound");
+                    break;
+                }
+                kept.push(*line).expect("bounded question positions");
             }
-            kept.push(*line).expect("bounded question positions");
         }
         task.question_lines = kept.into_boxed();
     }
@@ -81,14 +87,8 @@ pub(crate) fn valid(task: &TaskRecord, bound: u32) -> bool {
     if task.hold > task.milestone || task.question_lines.len() > bound || task.proposal_rows.len() > bound {
         return false;
     }
-    let mut previous = u64::MAX;
     for (index, line) in task.question_lines.iter().enumerate() {
-        if line.message == 0
-            || line.message > task.last_message
-            || line.line == 0
-            || line.line > task.activity
-            || (index != 0 && line.line >= previous)
-        {
+        if line.message == 0 || line.message > task.last_message || line.line == 0 || line.line > task.activity {
             return false;
         }
         if let Some(answer) = line.answer
@@ -98,14 +98,18 @@ pub(crate) fn valid(task: &TaskRecord, bound: u32) -> bool {
         {
             return false;
         }
+        // Older records interleave answered positions in activity order.
+        // Each group stays newest first, with no position or message repeated.
         for old in task.question_lines.iter().take(index) {
-            if old.message == line.message {
+            if old.message == line.message
+                || old.line == line.line
+                || (old.answer.is_some() == line.answer.is_some() && old.line < line.line)
+            {
                 return false;
             }
         }
-        previous = line.line;
     }
-    previous = u64::MAX;
+    let mut previous = u64::MAX;
     for (index, row) in task.proposal_rows.iter().enumerate() {
         if row.proposal == 0
             || row.revision == 0
@@ -160,10 +164,26 @@ fn answer(task: &mut TaskRecord, question: u64, heard: AnswerLine) -> bool {
     for line in &mut task.question_lines {
         if line.message == question && line.answer.is_none() {
             line.answer = Some(heard);
+            order_questions(task);
             return true;
         }
     }
     false
+}
+
+fn order_questions(task: &mut TaskRecord) {
+    let capacity = u32::try_from(task.question_lines.len()).expect("bounded question positions");
+    let mut ordered = Map::with_capacity(capacity);
+    for line in &task.question_lines {
+        ordered
+            .insert((line.answer.is_some(), core::cmp::Reverse(line.line)), *line)
+            .expect("unique question positions");
+    }
+    let mut kept = List::with_capacity(capacity);
+    for (_, line) in &ordered {
+        kept.push(*line).expect("same bounded positions");
+    }
+    task.question_lines = kept.into_boxed();
 }
 
 pub(crate) fn sent_answer(

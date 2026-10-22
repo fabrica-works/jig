@@ -155,11 +155,21 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<skein_kv::Event>::worst_case(skein_kv::MAX_OUT.above)?)?
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below)?)?
         .checked_add(Queue::<Event>::worst_case(MAX_OUT_DOWN)?)?
+        .checked_add(question_restore_worst_case(limits)?)?
         .checked_add(commits::worst_case(limits)?)?
         .checked_add(secrets::worst_case(limits)?)?
         .checked_add(transcripts::worst_case(limits)?)?
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)?
         .checked_add(names_worst_case()?)
+}
+
+// The census's exact question keys become point ranges beside the combined
+// restore intervals. Both arrays and their endpoints may coexist.
+fn question_restore_worst_case(limits: &Limits) -> Option<u64> {
+    let count = limits.core.tasks.tasks.checked_mul(limits.core.tasks.inbox_messages)?;
+    skein_lib::List::<skein_kv::Range>::worst_case(count)?
+        .checked_mul(2)?
+        .checked_add(u64::from(count).checked_mul(u64::from(limits.store.key).checked_add(1)?)?.checked_mul(4)?)
 }
 
 /// At most one configured model per `Models` bit, each name within its bound.

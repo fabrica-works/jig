@@ -771,6 +771,12 @@ pub(super) fn tag_tasks(
                 continue;
             }
             tasks::Request::Save { record } => {
+                if let tasks::Stored::Activity(line) = &record {
+                    let _retained = core.remember_question(line);
+                }
+                if let tasks::Stored::Live(task) | tasks::Stored::Ended(task) = &record {
+                    core.prune_questions(task.number);
+                }
                 if let Some(archive) = crate::proposals::decision_record(&record, env.wall) {
                     // Accepted task batches already saved their member numbers
                     // with Made; the history row must not replace that evidence.

@@ -188,6 +188,7 @@ fn a_partys_updates_interval_holds_no_other_partys_rows() {
 fn census() -> jig_domain_core::Census {
     use jig_domain_core::{Census, ReadResults};
     Census {
+        questions: Box::new([]),
         results: Box::new([
             ReadResults { party: 2, after: 1 },
             ReadResults { party: 1, after: 0 },
@@ -200,7 +201,7 @@ fn census() -> jig_domain_core::Census {
 fn the_census_holds_the_keys_it_admits_and_no_others() {
     use jig_domain_core::Census;
     let mut rng = Rng::new(0x5701_e008);
-    let empty = RestoreRange::Census(Census { results: Box::new([]) });
+    let empty = RestoreRange::Census(Census { questions: Box::new([]), results: Box::new([]) });
     let listed = RestoreRange::Census(census());
     let mappings = [(&empty, intervals::restore(&empty)), (&listed, intervals::restore(&listed))];
     for _ in 0_u32..2_000 {
@@ -281,4 +282,25 @@ fn the_people_restore_range_stops_before_ended_read_positions() {
         &ranges,
         &key_bytes(&Key::People(jig_domain_people::Key::EndedRead { task: TASK, party: PARTY }))
     ));
+}
+
+#[test]
+fn the_census_reads_only_the_named_question_activity_positions() {
+    use jig_domain_core::Census;
+    let census = Census { questions: Box::new([(2, 3), (u64::MAX, u64::MAX)]), results: Box::new([]) };
+    let ranges = intervals::restore(&RestoreRange::Census(census.clone()));
+    for task in [0, 1, 2, u64::MAX] {
+        for position in [0, 2, 3, 4, u64::MAX] {
+            let key = Key::Tasks(jig_domain_tasks::Key::Activity { task, position });
+            let wanted = census.questions.contains(&(task, position));
+            assert_eq!(census.admits(&key), wanted);
+            assert_eq!(fixtures::within(&ranges, &key_bytes(&key)), wanted);
+            if let Some(index) = census.interval(&key) {
+                assert!(fixtures::within(
+                    core::slice::from_ref(&ranges[usize::try_from(index).unwrap()]),
+                    &key_bytes(&key)
+                ));
+            }
+        }
+    }
 }

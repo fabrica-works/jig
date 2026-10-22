@@ -584,66 +584,38 @@ pub(super) fn question(
     decision: Wall,
 ) -> Result<Question, Missing> {
     let row = super::small::visible(core, party, number)?;
-    for word in &row.inbox {
-        match word.kind {
-            tasks::MessageKind::Answer { question } if question == message => return Err(Missing::Ended),
-            tasks::MessageKind::Answer { .. }
-            | tasks::MessageKind::EffectNotMade { .. }
-            | tasks::MessageKind::Words
-            | tasks::MessageKind::Question
-            | tasks::MessageKind::Met { .. }
-            | tasks::MessageKind::Amendment { .. }
-            | tasks::MessageKind::Proposal { .. }
-            | tasks::MessageKind::ProposalDecision { .. }
-            | tasks::MessageKind::Escalation { .. }
-            | tasks::MessageKind::Notice { .. }
-            | tasks::MessageKind::Timer { .. }
-            | tasks::MessageKind::News { .. }
-            | tasks::MessageKind::PersonStalled { .. }
-            | tasks::MessageKind::Result(_) => {}
-        }
+    if !crate::inbox::questions_live(&row.phase) {
+        return Err(Missing::Ended);
     }
-    for word in &row.inbox {
-        if word.number != message {
+    for line in &row.question_lines {
+        if line.message != message || line.answer.is_some() {
             continue;
         }
-        match word.kind {
-            tasks::MessageKind::Question => {
-                if word.words.len() > usize::try_from(limits.documents.text_bytes).expect("text bound fits") {
-                    return Err(Missing::TooLarge);
-                }
-                return Ok(Question {
-                    acts: super::offers::subject(
-                        core,
-                        limits,
-                        party,
-                        &super::Subject::Question { task: number, message },
-                        decision,
-                    )?,
-                    task: super::small::chip(core, limits, party, number)?,
-                    message,
-                    from: word.from,
-                    at: word.at,
-                    words: skein_lib::bytes::copy_of(&word.words),
-                });
-            }
-            tasks::MessageKind::Answer { .. }
-            | tasks::MessageKind::EffectNotMade { .. }
-            | tasks::MessageKind::Words
-            | tasks::MessageKind::Met { .. }
-            | tasks::MessageKind::Amendment { .. }
-            | tasks::MessageKind::Proposal { .. }
-            | tasks::MessageKind::ProposalDecision { .. }
-            | tasks::MessageKind::Escalation { .. }
-            | tasks::MessageKind::Notice { .. }
-            | tasks::MessageKind::Timer { .. }
-            | tasks::MessageKind::News { .. }
-            | tasks::MessageKind::PersonStalled { .. }
-            | tasks::MessageKind::Result(_) => return Err(Missing::Unknown),
+        let fact = core.question_activity.get(&(number, line.line)).ok_or(Missing::Ended)?;
+        let tasks::Line::Words { by, kind: tasks::MessageKind::Question, words, .. } = &fact.line else {
+            return Err(Missing::Unknown);
+        };
+        if words.len() > usize::try_from(limits.documents.text_bytes).expect("text bound fits") {
+            return Err(Missing::TooLarge);
         }
+        return Ok(Question {
+            acts: super::offers::subject(
+                core,
+                limits,
+                party,
+                &super::Subject::Question { task: number, message },
+                decision,
+            )?,
+            task: super::small::chip(core, limits, party, number)?,
+            message,
+            from: *by,
+            at: fact.at,
+            words: skein_lib::bytes::copy_of(words),
+        });
     }
     Err(Missing::Ended)
 }
+
 pub(super) fn person(
     core: &Core,
     limits: &Limits,
