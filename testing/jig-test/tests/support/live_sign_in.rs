@@ -83,6 +83,8 @@ pub fn configuration_at(directory: &Path, address: &str) -> crate::codec::Limits
     endpoint["models"][0]["output"] = 4096.into();
     endpoint["models"][0]["efforts"] = serde_json::json!(["low"]);
     endpoint["models"][0]["reasoning_item"] = 65_536.into();
+    endpoint["models"][0]["window"] = 272_000.into();
+    endpoint["models"][0]["idle"] = 300_000.into();
     agent["trace"] = support::trace::settings(directory);
     support::private(&path, &serde_json::to_vec(&agent).expect("live agent JSON"));
     support::private(&directory.join("charters/chat.txt"), crate::INSTRUCTIONS.as_bytes());
