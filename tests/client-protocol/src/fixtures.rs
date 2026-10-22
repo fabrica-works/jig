@@ -57,7 +57,7 @@ pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
         heartbeat: Duration::from_millis(50),
         rows,
         served: jig_client_world::test::list([
-            Served { family: None, first: 11, last: 11 },
+            Served { family: None, first: 12, last: 12 },
             Served { family: Some(1), first: 1, last: 1 },
         ]),
         providers: List::with_capacity(0),

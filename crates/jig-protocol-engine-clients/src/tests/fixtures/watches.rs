@@ -41,7 +41,7 @@ impl Exchange {
 pub fn owned_subject(value: &w::Subject) -> w::Owned {
     let mut bytes = Writer::new(usize::try_from(value.measure()).expect("wire size"));
     value.encode(&mut bytes).expect("subject");
-    w::Owned::new(&wire(), w::OwnedParts { owner: w::Owner::Jig, version: 11, record: bytes.finish() })
+    w::Owned::new(&wire(), w::OwnedParts { owner: w::Owner::Jig, version: 12, record: bytes.finish() })
         .expect("subject owner")
 }
 pub fn family_subject() -> w::Owned {

@@ -50,7 +50,7 @@ fn a_cursor_that_does_not_decode_is_answered_unknown() {
         let value = w::Read::Spend(
             w::ReadSpend::new(&limits, w::ReadSpendParts { project: 3, after: Some(after) }).expect(label),
         );
-        let owner = exchange.send(crate::Message::Read(f::owned_read(w::Owner::Jig, 11, f::encoded_read(&value))));
+        let owner = exchange.send(crate::Message::Read(f::owned_read(w::Owner::Jig, 12, f::encoded_read(&value))));
         exchange.authenticate();
         assert_eq!(exchange.read_answer(owner), f::read_none(w::ReadNone::Unknown), "{label}");
         assert!(exchange.out.is_empty(), "{label}");
@@ -64,7 +64,7 @@ fn a_read_signed_out_is_answered_signed_out() {
         let mut exchange = f::read_exchange();
         let owner = if label == "absent digest" {
             let owner =
-                exchange.send(crate::Message::Read(f::owned_read(w::Owner::Jig, 11, f::encoded_read(&w::Read::Me))));
+                exchange.send(crate::Message::Read(f::owned_read(w::Owner::Jig, 12, f::encoded_read(&w::Read::Me))));
             let Some(Request::Secrets(SecretsRequest::Get { owner: who })) = exchange.out.pop() else {
                 panic!("digest get")
             };

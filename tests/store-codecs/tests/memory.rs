@@ -9,7 +9,7 @@ static HEAP: Counting = Counting;
 fn check<T>(family: &str, record: &str, bound: u64, decode: impl FnOnce(&[u8]) -> T) {
     let version = match family {
         "core" => 4,
-        "tasks" | "people" => 6,
+        "tasks" | "people" => 7,
         "component" => 2,
         _ => 1,
     };

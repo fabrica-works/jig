@@ -18,7 +18,7 @@ mod stream;
 
 #[test]
 fn the_link_serves_the_wire_s_version_alone() {
-    assert!(serves(c::VersionRange { first: 11, last: 11 }));
+    assert!(serves(c::VersionRange { first: 12, last: 12 }));
     assert!(!serves(c::VersionRange { first: 7, last: 7 }));
 }
 

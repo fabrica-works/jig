@@ -12,7 +12,7 @@ const FIRST: u64 = 1 << 63;
 
 fn carrying(owner: w::Owner, value: &[u8]) -> Box<[u8]> {
     let (request, version) = match owner {
-        w::Owner::Jig => (f::encode_ask(&f::start(&f::wire())), 11),
+        w::Owner::Jig => (f::encode_ask(&f::start(&f::wire())), 12),
         w::Owner::Family(_) => (f::family_request(Box::from(b"abc".as_slice())), 2),
     };
     let record = w::Keyed::new(
