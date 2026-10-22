@@ -5,7 +5,8 @@
 # slow period is flagged SLOW as it runs.
 
 [profile.default]
-default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^browser_/)"
+# The gate reads live configurations; the live tests themselves need a person.
+default-filter = "not binary(/^fuzzy_/) & (not binary(/^(process|live)$/) | (binary(=live) & test(=the_live_configurations_are_ones_jig_test_reads))) & not binary(/^browser_/)"
 global-timeout = "15s"
 slow-timeout = { period = "500ms" }
 

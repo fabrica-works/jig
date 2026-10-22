@@ -28,15 +28,17 @@ fn a_secret_file_readable_by_others_refuses_the_start() {
     let secret = directory.join("worker.secret");
     fs::write(&secret, b"private-worker-value").expect("secret file");
     fs::set_permissions(&secret, fs::Permissions::from_mode(0o644)).expect("public permissions");
+    let agent = agent_document(&directory, false);
     let bytes = format!(
         r#"{{"workers":[{{
         "engine":{{"socket":"127.0.0.1:7200"}},"name":"worker-a","secret":"{}","slots":1,
         "programs":{{"check_interval_ms":60000}},
         "graces":{{"grace_ms":10000,"agent_stop_ms":5000,"delivery_ms":1000,"save_ms":1000}},
-        "agent":{{"program":"jig-test","configuration":"agent.json","arguments":["agent"]}},
+        "agent":{{"program":"jig-test","configuration":"{}","arguments":["agent"]}},
         "limits":{{"profile":"small"}},"memory_bytes":1152921504606846976
     }}],"application":{{"workers":[{{"root":"agent-root"}}]}}}}"#,
-        secret.display()
+        secret.display(),
+        agent.display()
     );
     let mut owned = Vec::new();
     let error = prepare(bytes.as_bytes(), &mut owned, None).err().expect("start refused");

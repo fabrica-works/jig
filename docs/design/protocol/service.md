@@ -385,6 +385,9 @@ section 2).
   and confirmed sign-out; it prints the browser link and the SSH tunnel
   needed for the fixed loopback callback on port 1455, and however the
   run ends, the sign-in's record does not outlive it.
+  Both live tests declare low effort on the engine's and agent's models;
+  the gate reads their configurations through startup's readers, without
+  network or a person.
 - **The browser tier:** `jig-test` serving jig's test application's
   bundle and the mapping at `/jig`, and Chromium, children of the
   harness's loop, a person in a page, and jig's attack stories against

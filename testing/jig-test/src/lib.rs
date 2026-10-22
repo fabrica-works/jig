@@ -264,7 +264,14 @@ fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String>
     }
     Ok(service::AccountsRuntime { d2: service::D2::empty(), providers, trust_roots, trust_root_bytes })
 }
-fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> Result<service::Service, String> {
+struct Configured {
+    document: skein_json::Document,
+    engine: Option<config::Engine>,
+    workers: u32,
+    bounds: Vec<config::File>,
+    agent: Option<AgentStart>,
+}
+fn configured(bytes: &[u8]) -> Result<Configured, String> {
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .map_err(|why| format!("configuration: {why:?}"))?;
@@ -286,8 +293,6 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> R
         bounds.extend(config::worker_files(&worker).into_vec());
         specs.push(worker);
     }
-    let user = skein_shell::effective_user();
-    let files = read_files(bytes, &bounds, user)?;
     let agent = specs.first().map(|worker| agent(path(&worker.agent.configuration))).transpose()?;
     if specs
         .iter()
@@ -295,11 +300,22 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> R
     {
         return Err("one-process workers must share their agent configuration".into());
     }
-    let mut roots = List::with_capacity(workers.len());
-    if !specs.is_empty() {
+    Ok(Configured { document, engine, workers: workers.len(), bounds, agent })
+}
+/// Read deployment and agent configuration, without startup files, roots, account resolution or store adoption.
+pub fn check(configuration: &Path) -> Result<(), String> {
+    configured(&read_configuration(configuration)?).map(|_| ())
+}
+fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> Result<service::Service, String> {
+    let Configured { document, engine, workers, bounds, agent } = configured(bytes)?;
+    let mut whole = read::Object::new(&document, 0).map_err(|why| format!("configuration: {why:?}"))?;
+    let user = skein_shell::effective_user();
+    let files = read_files(bytes, &bounds, user)?;
+    let mut roots = List::with_capacity(workers);
+    if workers != 0 {
         let application = member(&document, 0, b"application")?;
         let at = member(&document, application, b"workers")?;
-        let paths = read::list(&document, at, workers.len()).map_err(|why| format!("worker roots: {why:?}"))?;
+        let paths = read::list(&document, at, workers).map_err(|why| format!("worker roots: {why:?}"))?;
         for at in &paths {
             let at = member(&document, *at, b"root")?;
             let name = read::text(&document, at, 4096).map_err(|why| format!("worker root: {why:?}"))?;
@@ -353,7 +369,7 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> R
     )
     .map_err(|why| format!("startup: {why:?}"))?;
     if let Some(configured) = &agent {
-        configure_sources(&mut service, configured, workers.len())?;
+        configure_sources(&mut service, configured, workers)?;
     }
     if let Some(directory) = service.bundle_directory() {
         let bundle = bundle::read(path(directory))?;

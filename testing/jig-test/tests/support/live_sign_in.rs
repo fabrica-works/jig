@@ -18,13 +18,17 @@ const SIGN_IN_WAIT: Duration = Duration::from_secs(330);
 const WHOLE: Duration = Duration::from_secs(600);
 
 pub fn configuration(directory: &Path) -> crate::codec::Limits {
-    let mut value = support::configuration_value(directory);
     let address = ("api.openai.com", 443)
         .to_socket_addrs()
         .expect("resolve public Responses endpoint")
         .find(std::net::SocketAddr::is_ipv4)
         .expect("public Responses IPv4 endpoint")
         .to_string();
+    configuration_at(directory, &address)
+}
+
+pub fn configuration_at(directory: &Path, address: &str) -> crate::codec::Limits {
+    let mut value = support::configuration_value(directory);
     let path = directory.join("config.json");
     let engine = &mut value["engine"];
     engine["llm"]["providers"][0] = serde_json::json!({
@@ -52,6 +56,7 @@ pub fn configuration(directory: &Path) -> crate::codec::Limits {
     endpoint.as_object_mut().expect("endpoint").remove("trust");
     engine["llm"]["models"][0]["name"] = MODEL.into();
     engine["llm"]["models"][0]["output"] = 4096.into();
+    engine["llm"]["models"][0]["efforts"] = serde_json::json!(["low"]);
     engine["charters"][0]["model"] = MODEL.into();
     engine["charters"][0]["turns"] = 5.into();
     engine["charters"][0]["time_ms"] = 240_000.into();
@@ -61,10 +66,12 @@ pub fn configuration(directory: &Path) -> crate::codec::Limits {
     let limits = crate::store_limits(&bytes);
     let path = directory.join("agent.json");
     let mut agent = support::agent_value(directory);
+    // The 64 KiB reasoning item and complete trace exceed standard's memory ceiling.
+    agent["profile"]["declared"]["memory"] = (3_u64 << 30).into();
     let endpoint = &mut agent["endpoints"][0];
     endpoint["provider"] = "openai".into();
     endpoint["dialect"] = 3.into();
-    endpoint["address"] = address.as_str().into();
+    endpoint["address"] = address.into();
     endpoint["transport"] = "tls".into();
     endpoint["server_name"] = "api.openai.com".into();
     endpoint.as_object_mut().expect("endpoint").remove("trust_der");
@@ -72,10 +79,10 @@ pub fn configuration(directory: &Path) -> crate::codec::Limits {
     endpoint["headers"] = serde_json::json!([]);
     endpoint["connect"] = 10_000.into();
     endpoint["handshake"] = 10_000.into();
-    endpoint["reasoning_effort"] = "low".into();
     endpoint["models"][0]["name"] = MODEL.into();
     endpoint["models"][0]["output"] = 4096.into();
-    endpoint["models"][0]["reasoning_item"] = 2048.into();
+    endpoint["models"][0]["efforts"] = serde_json::json!(["low"]);
+    endpoint["models"][0]["reasoning_item"] = 65_536.into();
     agent["trace"] = support::trace::settings(directory);
     support::private(&path, &serde_json::to_vec(&agent).expect("live agent JSON"));
     support::private(&directory.join("charters/chat.txt"), crate::INSTRUCTIONS.as_bytes());

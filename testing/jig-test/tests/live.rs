@@ -15,51 +15,62 @@ const INSTRUCTIONS: &str = "Report exactly: Process answer";
 const WORDS: &str = "Follow the first sentence.";
 
 fn configuration(directory: &Path, source: &Path) -> codec::Limits {
-    support::configuration(directory);
     let settings: serde_json::Value =
         serde_json::from_slice(&fs::read(source).expect("live settings")).expect("public live settings JSON");
+    let limits = configuration_at(
+        directory,
+        settings["model"].as_str().expect("live model"),
+        settings["address"].as_str().expect("live address"),
+    );
+    let raw = fs::read(settings["account_file"].as_str().expect("D2 record path")).expect("D2 handed-in fixture");
+    support::d2::preseed(directory, &raw);
+    limits
+}
+
+fn configuration_at(directory: &Path, model: &str, address: &str) -> codec::Limits {
+    support::configuration(directory);
     let path = directory.join("config.json");
     let mut value: serde_json::Value =
         serde_json::from_slice(&fs::read(&path).expect("fixture configuration")).expect("fixture JSON");
     let engine = &mut value["engine"];
-    engine["llm"]["providers"][0]["models"][0] = settings["model"].clone();
+    engine["llm"]["providers"][0]["models"][0] = model.into();
     let endpoint = &mut engine["llm"]["endpoints"][0];
     endpoint["provider"] = "codex".into();
     endpoint["dialect"] = 1.into();
-    endpoint["address"] = serde_json::json!({"socket":settings["address"]});
+    endpoint["address"] = serde_json::json!({"socket":address});
     endpoint["transport"] = "tls".into();
     endpoint["server_name"] = "chatgpt.com".into();
-    let model = &mut engine["llm"]["models"][0];
-    model["name"] = settings["model"].clone();
-    model["output"] = 4096.into();
-    engine["charters"][0]["model"] = settings["model"].clone();
+    engine["llm"]["models"][0]["name"] = model.into();
+    engine["llm"]["models"][0]["output"] = 4096.into();
+    engine["llm"]["models"][0]["efforts"] = serde_json::json!(["low"]);
+    engine["charters"][0]["model"] = model.into();
     engine["charters"][0]["turns"] = 5.into();
     engine["charters"][0]["time_ms"] = 240_000.into();
     engine["charters"][0]["waiting_ms"] = 10_000.into();
     let bytes = serde_json::to_vec(&value).expect("live deployment JSON");
     fs::write(&path, &bytes).expect("live deployment configuration");
     let limits = store_limits(&bytes);
-    let raw = fs::read(settings["account_file"].as_str().expect("D2 record path")).expect("D2 handed-in fixture");
-    support::d2::preseed(directory, &raw);
     let path = directory.join("agent.json");
     let mut agent: serde_json::Value =
         serde_json::from_slice(&fs::read(&path).expect("agent fixture")).expect("agent JSON");
+    // The 64 KiB reasoning item and complete trace exceed standard's memory ceiling.
+    agent["profile"]["declared"]["memory"] = (3_u64 << 30).into();
     // The live record names its account: the withdrawn Codex arm, kept for this test only.
     let endpoint = &mut agent["endpoints"][0];
     endpoint["provider"] = "codex".into();
     endpoint["dialect"] = 1.into();
-    endpoint["address"] = settings["address"].clone();
+    endpoint["address"] = address.into();
     endpoint["server_name"] = "chatgpt.com".into();
     endpoint.as_object_mut().expect("endpoint").remove("trust_der");
     endpoint["connect"] = 10_000.into();
     endpoint["handshake"] = 10_000.into();
-    endpoint["reasoning_effort"] = "low".into();
     endpoint["headers"] = serde_json::json!(skein_llm::openai::identity::headers().iter().map(|header|
         serde_json::json!({"name":String::from_utf8_lossy(&header.name),"value":String::from_utf8_lossy(&header.value)})
     ).collect::<Vec<_>>());
-    endpoint["models"][0]["name"] = settings["model"].clone();
+    endpoint["models"][0]["name"] = model.into();
     endpoint["models"][0]["output"] = 4096.into();
-    endpoint["models"][0]["reasoning_item"] = 2048.into();
+    endpoint["models"][0]["efforts"] = serde_json::json!(["low"]);
+    endpoint["models"][0]["reasoning_item"] = 65_536.into();
     agent["trace"] =
         serde_json::json!({"path":directory.join("agent-trace.jsonl"),"capture":"everything","delivery":"complete"});
     fs::write(path, serde_json::to_vec(&agent).expect("live agent JSON")).expect("live agent configuration");
@@ -123,6 +134,17 @@ fn capture(directory: &Path, destination: &Path) -> bool {
     );
     assert!(!requests.is_empty(), "provider request captured before interpreting the answer");
     present
+}
+
+/// Both live tests' configurations, read as jig-test's startup reads them: no network, no person.
+#[test]
+fn the_live_configurations_are_ones_jig_test_reads() {
+    let sign_in = support::scratch();
+    live_sign_in::configuration_at(sign_in.path(), "192.0.2.1:443");
+    assert_eq!(jig_test::check(&sign_in.path().join("config.json")), Ok(()));
+    let d2 = support::scratch();
+    configuration_at(d2.path(), "gpt-6-luna", "192.0.2.1:443");
+    assert_eq!(jig_test::check(&d2.path().join("config.json")), Ok(()));
 }
 
 #[test]
