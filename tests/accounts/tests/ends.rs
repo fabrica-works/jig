@@ -8,7 +8,12 @@ const BOB: u64 = 9;
 const PROVIDER: u32 = 1;
 
 fn started() -> World {
-    let mut world = World::with(providers(vec![provider(PROVIDER, true, false)]), &[]);
+    started_with_plan(false)
+}
+fn started_with_plan(plan: bool) -> World {
+    let mut offered = provider(PROVIDER, true, false);
+    offered.signed_in_plan = plan;
+    let mut world = World::with(providers(vec![offered]), &[]);
     world.step(Event::Want);
     world
 }
@@ -95,4 +100,34 @@ fn a_full_history_of_ends_drops_its_oldest_and_loses_no_fact() {
     assert!(world.domain.last_end(u64::from(LIMITS.facts)).is_some());
     assert_eq!(world.ended().len(), usize::try_from(LIMITS.facts).expect("facts fit"));
     assert_eq!(world.domain.facts_lost(), lost);
+}
+
+#[test]
+fn a_deployment_plan_sign_in_is_refused_without_taking_a_source_number() {
+    let mut world = started_with_plan(true);
+    assert_eq!(
+        world.step(Event::SignIn {
+            request: Token::new(ALICE),
+            holder: Holder::Deployment,
+            by: ALICE,
+            provider: PROVIDER
+        }),
+        vec![Request::Answer {
+            request: Token::new(ALICE),
+            answer: jig_domain_accounts::Answer::Refused { refusal: Refusal::Provider { provider: PROVIDER } }
+        }]
+    );
+    assert!(world.domain.pending().is_empty());
+    // The person's sign-in to that same provider still takes the first source number.
+    assert_eq!(ask(&mut world, ALICE, Holder::Party(ALICE)), 0);
+}
+
+#[test]
+fn a_person_can_start_a_plan_sign_in() {
+    let mut world = started_with_plan(true);
+    let source = ask(&mut world, ALICE, Holder::Party(ALICE));
+    assert_eq!(
+        world.domain.pending().as_slice(),
+        &[Pending { source, provider: PROVIDER, holder: Holder::Party(ALICE), by: ALICE }]
+    );
 }

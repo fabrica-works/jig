@@ -29,7 +29,8 @@ pub enum Refusal {
     Held {
         provider: u32,
     },
-    /// No configured provider of this number offers this source.
+    /// No configured provider of this number offers this source to this holder; a plan's
+    /// sign-in belongs to a person (accounts.md, 3.2).
     Provider {
         provider: u32,
     },

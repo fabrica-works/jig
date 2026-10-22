@@ -197,11 +197,11 @@ fn list<T>(items: impl IntoIterator<Item = T>) -> List<T> {
 #[test]
 fn a_sign_in_under_way_is_shown_to_the_party_that_asked_and_unsettles_it() {
     let (mut core, env) = fixture(vec![]);
-    let source = ask(&mut core, &env, ALICE, 1, people::AccountHolder::Deployment);
+    let source = ask(&mut core, &env, ALICE, 1, people::AccountHolder::Own);
     let underway = document(&core, &env, ALICE);
     assert_eq!(
         underway.signing.as_slice(),
-        &[SignInLine { source, provider: PROVIDER, holder: accounts::Holder::Deployment }]
+        &[SignInLine { source, provider: PROVIDER, holder: accounts::Holder::Party(ALICE) }]
     );
     assert!(!underway.settled);
     let other = document(&core, &env, BOB);

@@ -43,7 +43,7 @@ pub(crate) fn sign_in(
     provider: u32,
     out: &mut Queue<Request>,
 ) {
-    if let Err(refusal) = startable(domain, &env.limits, provider) {
+    if let Err(refusal) = startable(domain, &env.limits, holder, provider) {
         out.push(Request::Answer { request, answer: Answer::Refused { refusal } });
         return;
     }
@@ -88,12 +88,12 @@ pub(crate) fn close(domain: &mut Domain, out: &mut Queue<Request>) {
     domain.signing = Map::with_capacity(domain.signing.capacity());
 }
 
-fn startable(domain: &Domain, limits: &Limits, provider: u32) -> Result<(), Refusal> {
+fn startable(domain: &Domain, limits: &Limits, holder: Holder, provider: u32) -> Result<(), Refusal> {
     if !domain.wanted() {
         return Err(Refusal::Closing);
     }
     match domain.providers.get(provider) {
-        Some(offered) if offered.offers.sign_in => {}
+        Some(offered) if offered.offers.sign_in && !(holder == Holder::Deployment && offered.signed_in_plan) => {}
         Some(_) | None => return Err(Refusal::Provider { provider }),
     }
     room_for_sign_in(limits, domain.signing.len().saturating_add(domain.keeping.len()))?;
