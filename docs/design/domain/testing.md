@@ -67,7 +67,13 @@ referee in the loop, the heap counted at every iteration
   and an inbox by their party's changes; changes coalesced, one delivery
   in flight per watch, and the watches' limits refused at the entrance
   (engine.md, section 11).
-- **notes, accounts:** each its own concern.
+- **notes:** its own concern.
+- **accounts:** the existing world checks source deadline creation,
+  merge and restore with injected monotonic/wall clock pairs: later,
+  earlier and equal resets, the old pair kept on a tie, a no-reset
+  limit overriding a timed one to `None`, and indefinite limits kept
+  until resumed. Restore preserves the exact saved wall; timers are
+  checked just before and at the monotonic deadline (accounts.md, 3.5).
 - **the hub,** with agent capabilities of both kinds, smith's: agent
   processes, `smith-host-domain` over smith's agent processes over skein's
   fake LLM;
@@ -102,6 +108,24 @@ reference made from outside: a task query's rows against every task the
 scenario made, filtered and ordered as the query asks, its ended part
 within what its index serves; what each task waits on against the
 tree and the entries the scenario made.
+
+The existing `joint_clock` and documents fixtures compare a source's
+deadline in task waits, accounts and deployment documents and in its
+stored reset. Different injected clock pairs between reads leave those
+wall facts exactly equal, including after restore: literal equality,
+never a real-clock sample or tolerance (accounts.md, 3.5; engine.md, 5.4).
+
+The existing charters and templates stories check `me`'s
+`resolved_default` with catalogue and charter orders opposed, explicit
+and omitted intent, a chosen executor, no eligible model, and account,
+policy, membership and effective-executor changes that refresh the
+preview. The resolver and payer are Create's own (engine.md, 11.1).
+
+First-start and restart stories use people roster capacities equal to
+and above the actual configured project count; they seed the whole set
+and keep it across restart. Invalid programmatic configuration is
+`Core::new`'s precondition, never an invalid world constructor or a
+catch-panic scenario (engine.md, section 14).
 
 ## 5. The conformance world
 

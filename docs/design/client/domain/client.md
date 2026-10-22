@@ -423,6 +423,21 @@ handles, as every presentation does (sections 7 and 8).
   in flight abandons that read, and so does `Unwatch` on the handle; an
   abandoned read's terminal is dropped when it comes. A full slab of
   reads answers the read at once, refused by the client's limit.
+- **Credential boundaries end reads visibly.** On sign-out and on
+  every successful sign-in, the domain removes each pending read and
+  emits its one `Page`: `Jig(ReadResult::None(ReadNone::SignedOut))`,
+  or `Family { family, record: None }`. This is unconditional, including
+  before the first `me`. There is no automatic replay; whoever asked
+  must ask again. A failed, refused, lost or not-ready sign-in that
+  installs no credential leaves old reads pending. Reads made during
+  an exchange use the old credential until successful installation.
+- **Pending ownership** is internal: `PendingRead { token: Token,
+  family: Option<u16> }`. A response before the credential boundary
+  wins; the boundary before a response emits cancellation. Existing
+  token matching prevents a late reply or loss from completing a
+  replacement read under the same handle. A read under an old credential
+  never answers under the new one. Supersession and `Unwatch` still
+  abandon reads as above; credential boundaries do not.
 - **A family's read** names its owner, its scope (a project, the
   deployment, or the party's own) and its record's bytes (contract.md,
   7.5); its page is its owner's, as bytes.
@@ -766,10 +781,11 @@ for any presentation of a chat or of any agent task's activity.
   restart keeps the credential where its platform keeps secrets, and
   gives it back with `Held`.
 - **Signed out:** an answer, a read's terminal, a watch's end or the
-  stream saying so drops the credential held, ends every handle
-  (`Ended`, signed out), parks every request, and tells `Link` signed
-  out. The application signs in again as it likes, and the parked
-  requests are sent once the same party is confirmed, within the
+  stream saying so drops the credential held, ends every watch handle
+  (`Ended`, signed out), visibly ends every pending read (section 7),
+  parks every request, and tells `Link` signed out. The application
+  signs in again as it likes, and the parked requests are sent once the
+  same party is confirmed, within the
   retention (`../../domain/people.md`, 5.1).
 - **`SignOut`** sends the component's sign-out with the credential held,
   or none under `Transport`, to end the sign-in on the engine. Answered
@@ -787,10 +803,15 @@ for any presentation of a chat or of any agent task's activity.
   its sign-ins each exchange belongs to. Once a newer sign-in is
   live, an earlier one's sign-out answer is dropped, and the newer
   stands. Nothing else the earlier sign-in owes reaches the newer one:
-  going signed out parks every request, abandons every read and ends
-  every handle, so an earlier attempt's answer is stale to the request
-  table, an abandoned read's terminal is dropped, and an ended watch's
-  deliveries are dropped by their names (sections 6 to 8).
+  going signed out parks every request, visibly ends every pending read
+  and ends every watch handle. Successful sign-in also ends all pending
+  reads before opening `me`, even before the first sign-in's `me`.
+  Thus an earlier attempt's answer is stale to the request table, a
+  completed or cancelled read's late terminal fails its token match,
+  and an ended watch's deliveries are dropped by their names (sections
+  6 to 8). The link erases old exchange names; the domain owns read
+  cancellation, with no new link output, public `Readout` variant or
+  wire record.
 - **A service's credential, when an owner makes one,** reaches the
   application once, in that request's `Answered` outcome; the client
   keeps no copy of it, and the small store holds no answer
@@ -862,6 +883,13 @@ Each is configured and part of the worst case:
 transcript: its texts, its calls' names, inputs and outcomes, and its
 results' summaries. It is at least the receiving field bound `text` and
 at most `turn_bytes`; limits outside those bounds are refused.
+
+Reads have room independently of watch handles; a read need not own a
+watch. Pending entries price both their token and optional family. A
+credential boundary may emit one `Page` per pending read, in addition to
+watch and request outputs: `max_out`, `worst_case` validation and the
+composed domain/link queues include an explicit reads term, never assume
+that `handles * 2` has room for it.
 
 `worst_case` sums the containers' own and the bytes each entity may hold
 (programming-model.md, 6.3). Each held document is priced at twice its
@@ -1008,7 +1036,8 @@ with a person in front of a tree, are view.md's, 18.10.
     clock; no wake policy, so the executor's own;
     the template's LLM choice, or the goal draft's where it names one,
     by configured names (contract.md, 3.2), none being the charter's
-    default;
+    default resolved at Create. Shapes copy configured intent, never
+    `resolved_default`, the separate preview served in `me`;
     no parameters, inputs, dependencies or grants named after it;
   - a template it cannot fill gives `NotOffered::Template`, and nothing
     is sent: a contract no `Create` names (an approval, or a verdict

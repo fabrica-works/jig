@@ -246,6 +246,16 @@ requires. Existing variant tags, client version 11, worker version 4 and
 all store families stay fixed. Nothing in this data slice changes status
 or person-facing words (`../client/domain/contract.md`, 5.1).
 
+Client v12 carries `resolved_default: Option<LlmChoice>` beside each
+effective template's configured LLM intent in `me`
+(`../client/domain/contract.md`, 5.1). The schema, generated codecs,
+translations, golden records and served-version declarations move
+with that field (sections 9 and 14). It is a preview of Create's
+once-at-creation resolver, never task intent or a reservation. This
+changes no core or task store version or layout, requires no migration,
+and leaves application-family versions separate. Implementation status
+is in `../STATUS.md`.
+
 ## 4. The connection
 
 A client keeps one connection to the engine, whatever carries it, of
@@ -443,6 +453,15 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   cursors, or why there is none (unknown, busy, signed out, version not
   served) (`../client/domain/contract.md`, section 6). A page's cursor
   is the engine's, opaque bytes the client gives back.
+- **Credential boundaries, on the client,** visibly end pending reads
+  in the domain's existing `Page` forms: jig's `ReadNone::SignedOut` or
+  a family's `None`, once each, on sign-out and unconditionally on
+  successful sign-in, before the first `me` too
+  (`../client/domain/client.md`, sections 7 and 12). The link erases
+  old exchange names; the domain retains pending token and optional
+  family and fences late completions with its existing token match.
+  This adds no link output, public `Readout` variant or wire record,
+  and never replays a read. Supersession and `Unwatch` remain abandonment.
 - **A task query's page** carries its two groups, live then ended, each
   with its cursor, and says whether the ended group was cut by a filter
   beyond its index's prefix, or has none for the query's keys
@@ -610,6 +629,12 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   or lost, is the sign-in's whose credential it carried: a client that
   has since authenticated a newer sign-in drops it, and keeps the newer
   credential (`../client/domain/client.md`, section 12).
+- **Installing a credential** ends every pending read visibly in the
+  client domain (section 6), including `Held` or `Transport` before
+  the first `me`. A `Link` or `Service` exchange that fails, is refused,
+  is lost or is not ready and installs no credential leaves old reads
+  pending; reads made during it still belong to the old credential.
+  A read made under that credential cannot answer under its replacement.
 - **While the engine stops** (`../domain/engine.md`, 6.1), a sign-in, a
   sign-out and a `Mint` are answered not ready, as a keyed request is:
   nothing is committed, kept or erased, and a link's secret is not
@@ -643,6 +668,10 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   read: *version not served*, naming the owner and the ranges the engine
   serves. A keyed request, a read and a watch's opening are each
   answered so; nothing is done.
+- **The template preview's wire** is v12 (section 3); its schema,
+  codec, translations, goldens and served-version range change together.
+  Family owners keep their own versions; core and task store versions
+  do not change for this preview.
 - **The client's versions:** jig's is its wire's; each family owner's,
   the application declares as it makes the client, and the client
   judges each hello against them, whole (`../client/domain/client.md`,
@@ -779,7 +808,10 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **The default mapping's,** at each end: its HTTP machines', TLS's, and
   the stream's buffer, at those limits.
 - **The worst case** of each side is its components' and its transport's,
-  at those limits.
+  at those limits. The client prices pending-read token and optional
+  family metadata, and up to one cancellation `Page` per independently
+  bounded read on a credential boundary, in `max_out` and composed
+  queues (`../client/domain/client.md`, section 14).
 
 ## 14. Testing
 
@@ -794,6 +826,12 @@ section 2).
   `ops`'s wire and jig's test family's) checked for drift against their
   schemas, and jig's wire's decoders run over arbitrary and mutated
   bytes in the fuzzy suite (skein's `codec.md`, section 6).
+- **The template preview** uses the existing client-protocol carriage
+  tests and wire goldens: v12 preserves both configured intent and
+  `resolved_default`, including `None`. The existing shapes tests keep
+  omission, and the reference view tests consume the supplied preview;
+  core charters/templates stories own resolution order and invalidation
+  (`../domain/testing.md`, section 4).
 - **The component's world,** `jig-engine-clients-world`: the component
   against a scripted transport of messages and a scripted root, with no
   HTTP: answers of every kind and none, deliveries paced by a slow

@@ -481,8 +481,18 @@ served is held, kept and unsent, for its owner's version (client.md,
     what waits for them, counted exactly (questions, proposals,
     escalations, person tasks), and their updates unread, counted up to
     a limit; their read position over results; each project's merged
-    templates (3.6); what they may create in each project, as the bounds
-    a draft is compared with (5.3); their role in the deployment, if
+    templates (3.6), each with `resolved_default: Option<LlmChoice>`
+    beside its configured LLM intent. The preview uses Create's own
+    resolver, charter order, effective creating authority and current
+    receiving-party payer (`../../domain/engine.md`, 11.1). An explicit
+    choice previews itself; an omitted choice with no eligible model
+    or an executor still *chosen* gives `None`. It grants and reserves
+    nothing. Shapes retain configured intent, never the preview, and
+    a clipped catalogue gives no order from which to guess it. Relevant
+    account/source, policy, membership and effective-executor changes
+    invalidate it (7.2). The document also gives what they may create
+    in each project, as the bounds a draft is compared with (5.3);
+    their role in the deployment, if
     any; the models they may choose in each project, as the brief's
     catalogue gives them (`../../domain/engine.md`, section 9): each
     with its LLM provider, window and output, the efforts it takes, its
@@ -739,7 +749,11 @@ settled fields remain available.
   owner number (root.md, section 15). The value is in the application's
   own documents.
 - **Times are wall times,** which the store keeps, so a document means the
-  same after a restart.
+  same after a restart. Accounts' source limits and retries carry the
+  wall fact retained when they were created (`../../domain/accounts.md`,
+  3.5): a task's wait, the account's and the deployment's projections
+  all use that exact fact, as the store does, never convert again at
+  read time. Their timers remain monotonic.
 - **Bounded:** each document within its limits, in bytes and windows,
   never in rows sized for one client's screen. A path and an authority
   are bounded by the engine's names and authorities, not by a window's
@@ -832,6 +846,14 @@ party reads is therefore never lost by a crash.
 | the deployment | live state |
 | an application's read, naming its owner, its scope and its window (7.5) | its owner, the connector, through the engine's root |
 
+- **An ended subject is read, not watched.** A watch on a subject that
+  has ended is refused `Unknown` (7.2); a client wanting the end reads
+  the subject. `Unknown` says there is no live subject, never that the
+  task ended successfully. A task read returns its live state or retained
+  terminal history under the party's current visibility. A retained load
+  waits for the preceding commits to be durable and checks current
+  sign-in and visibility when it completes; it never restores a retired
+  row into the live set (`../../domain/engine.md`, 5.2 and 5.3).
 - **Pages** are within a row and a byte limit, and carry a cursor for the
   next, or say there is none (`../../domain/engine.md`, 5.3).
 - **Refused** for what the party may not see, as unknown; when the
@@ -947,7 +969,10 @@ new `me` watch, including after restart.
   up, and what the engine keeps per watch is a mark and a window, never a
   backlog.
 - **The first delivery** is the subject's document when the watch is
-  admitted.
+  admitted. A watch on a subject that has ended is refused `Unknown`;
+  a client wanting the end reads the subject (section 6). `Unknown` is
+  not terminal success and does not distinguish ended from absent or
+  hidden history.
 - **Ended,** each saying why: the client left; its subject ended and left
   the engine; the party may no longer see it; the sign-in ended; the
   engine is stopping.
@@ -995,8 +1020,11 @@ new `me` watch, including after restart.
   in it; an account's source, state, order or uses touched, a program's
   login reported on a host, or a sign-in or a check begun or ended,
   marks the `accounts` of the parties it concerns and the
-  `deployment`'s. Matching a task against the open queries is bounded by the
-  watches the engine allows, each a fixed set of keys. A connector marks
+  `deployment`'s, and the affected parties' `me` when template default
+  eligibility changes. Membership and effective-executor changes also
+  invalidate affected `resolved_default` previews (5.1). Matching a
+  task against the open queries is bounded by the watches the engine
+  allows, each a fixed set of keys. A connector marks
   its own subjects, through the root, as its state changes.
 
 ### 7.3 A run's live text

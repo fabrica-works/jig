@@ -151,6 +151,20 @@ its own, wherever a presentation builds on skein's UI kit.
   scripted application; the reference UI's (view.md, 18.10) and
   pages.md's, section 10, each written once in a person's terms, through
   jig's test application.
+- **Read cancellation at credential boundaries** uses client-domain
+  step tests and the existing composed `jig-client` sign-in fixture:
+  `Held` and `Transport`, successful `Link` and `Service`, response
+  before and after the boundary, sign-out learned from a read, and
+  reads before the first `me`. Each pending jig or family read ends
+  visibly once, no read is replayed, and refusal, loss or not-ready
+  without installation leaves old reads eligible. Late `Reply` and
+  `Lost`, same-handle replacement, and full independent read room check
+  token fencing and the output bound (client.md, sections 7, 12 and 14).
+  The protocol world is used only for an ordering the lower fixture
+  cannot express (`../../protocol/client.md`, section 14).
+- **Shapes** preserve a template's omitted LLM intent even when its
+  `resolved_default` preview names a model; the existing shapes step
+  tests check that the preview never enters `Create`.
 - **At the text shell.** A client of the reference UI's stories may be
   played as skein's text shell is (view.md, section 15): each tree it
   shows printed by its renderer, and each act the person makes typed as

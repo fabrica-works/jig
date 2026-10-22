@@ -617,6 +617,15 @@ holds, and neither of its components reads them.
   configuration, with TLS by its server name and trusted roots, in
   plaintext to a loopback address, or, in one process, to an in-process
   name (skein's `io.md`, section 4).
+- **Local refusal names** are public `u16` constants exported by
+  `jig-protocol-worker-link`: `REFUSED_LIMITS = 2` and
+  `REFUSED_FRAMING = 3`. These are skein's channel namespace
+  (skein's `channel.md`, 5.1), separate from jig's application reasons
+  starting at 256 (4.1). All three local `Refuse`/loss pairs use them:
+  incompatible terms use `REFUSED_LIMITS`, and malformed records,
+  including `TurnBusy`, use `REFUSED_FRAMING`. The sent reason and
+  corresponding `RefusedHere` loss agree. Applications match those
+  names; wire numbers and `Closed` facts do not change.
 - **Redial on loss,** after a jittered backoff that doubles up to a
   ceiling, starting over once a channel has proved itself: it carried the
   hello and stayed open for the configured span.
@@ -727,6 +736,12 @@ suite.
   name), sources, checks, logins and sign-outs, relays across channels,
   and the grace passing and not. smith's
   payloads are opaque bytes there, as they are to the components.
+  The existing worker-link incompatible-terms and malformed-body
+  fixtures assert the independent literal wire reasons 2 and 3,
+  exactly one loss, and no forwarded body. The existing trace fixture
+  also admits a malformed `TurnBusy` to the real decoder; it must not
+  decode it as valid Busy before the component sees it. This extends
+  the fixture, with no new harness or worker-wire version.
 - **The channel's protocol world,** `tests/channel`: the engine's side
   with the core under jig's test root, and the worker's side with the hub
   under the test worker's root, both as the reference service composes

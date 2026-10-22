@@ -338,10 +338,27 @@ says (`../protocol/llm.md`, section 5) and what runs' agents notice
   - **cancelled,** at the close.
 - **Close** releases every source, and ends once the component has
   closed.
+- **Deadlines belong to their source.** At creation of a limit or a
+  retry, the accounts child retains `Deadline { at: Time, wall: Wall }`
+  from that step's injected `env.now` and `env.wall`. Its `Limited` and
+  `Later` state and spent-until facts expose that pair to the core.
+  Timers use `at`; every task wait, account and deployment document,
+  and stored reset uses the retained `wall`, exactly. Later clock
+  samples and wall corrections do not change an existing deadline.
+  The existing event and step environment suffice; no new `Event` is
+  needed.
+- **Limit merging keeps the same precedence.** A later reset replaces
+  both `at` and `wall`; an earlier reset keeps the old pair, and a tie
+  keeps the old pair too. A limit with no reset overrides a timed
+  limit to `None`; an indefinite limit stays indefinite until resumed.
+  No wall from a losing reset replaces the winner's wall.
 - **What the store keeps** of each source is its kind, its name, its
   state, and a limit's reset as a wall time (engine.md, 5.4): a restart
-  lifts a limit whose reset passed while the engine was down, and holds
-  a later one until it. A program's login on a worker is not stored: its
+  preserves that saved wall exactly, maps it once to a fresh monotonic
+  `at`, lifts a limit whose reset passed while the engine was down,
+  and holds a later one until it. The existing optional wall reset
+  represents both timed and indefinite limits; no store or wire layout
+  changes. A program's login on a worker is not stored: its
   half reports it as `logins`, which follow the worker's hello
   (`../protocol/channel.md`, 4.3).
 

@@ -250,6 +250,15 @@ not select accounts or infer provider membership. The public JSON refuses
   them, and its priority where the template is tracked. An override of
   the default priority of an untracked template is kept, and shown with
   the policy, but has no effect: the merged template stays untracked.
+- **A served preview is separate from configuration.** `me` adds
+  `resolved_default: Option<LlmChoice>` beside each effective template's
+  configured intent, using Create's resolver and charter order under
+  the effective creating authority and current receiving-party payer
+  (`../domain/engine.md`, 11.1). Explicit intent previews itself;
+  omitted intent with a chosen executor or no eligible model gives
+  `None`. It is not a configuration member or a reservation, and
+  shapes never turn it into explicit intent. Create's once-at-creation
+  resolution remains `../domain/tasks.md`, section 3's.
 - **The engine never expands one into work.** The core validates the
   merged defaults above and keeps the
   configuration's templates, and each policy's overrides, only to serve
@@ -331,6 +340,16 @@ host's half reports it (`llm.md`, 5.5).
   memory the configuration states; the terms of the workers' channel
   follow from the same limits (`channel.md`, section 11). A profile whose
   sum does not fit refuses the start, saying by how much.
+- **Configured projects fit both owners.** After every override is
+  applied, the actual distinct configured project count, including
+  ownerless rows, fits authority's project capacity and
+  `limits.people.projects`, the people roster's capacity. A violation
+  returns the existing `What::Bound` at the projects path before
+  first-start mutation. The count is the configured rows, not a list's
+  allocated capacity, and no extra project is implied. `Core::new`
+  asserts the same people-roster relation as a programmer precondition
+  (`../domain/engine.md`, section 14); no new public error type is
+  needed.
 - **Charters' budgets:** each charter's turns and time are above its
   reserve's, and its default budget holds its reserve and one of its
   default model's most costly completions (`../domain/authority.md`,
@@ -415,7 +434,14 @@ memory sum even when every run slot is occupied.
   `urn:uuid:…` sent to LLM providers as `ext_agent_host_id`
   (`store.md`, 4.4), and the core seeds owners and projects from
   configuration into its first commit (`../domain/engine.md`, 5.4 and
-  section 14).
+  section 14). The admitted projects seed as a whole; fixed
+  insufficient capacity is rejected by the whole-config check after
+  overrides (section 6), never handled by partial or incremental seed.
+  Existing configuration tests put two configured projects below, at
+  and above the people capacity (capacities 3, 2 and 1), asserting
+  `What::Bound` at the projects path for the last. The core's existing
+  seed/restart stories use capacity equal to and above the project
+  count (`../domain/testing.md`, section 4).
 - **Every later start** reads the deployment from the store, and the
   installation's identifier, ignoring the one the shell drew. The
   configuration's projects are ignored; its rules, charters, templates,

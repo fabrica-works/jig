@@ -356,7 +356,13 @@ root wraps both in its store vocabulary (root.md, section 6).
 **Times** the store keeps are wall times (`env.wall`), so a record means
 the same after a restart; a wait the core arms is a deadline on its
 monotonic clock (`env.now`), computed from them (programming-model.md,
-section 9).
+section 9). Accounts' source deadlines retain both clocks where the
+limit or retry is created (`accounts.md`, 3.5): timers use `Deadline.at`,
+and every projection and stored reset uses its source-owned
+`Deadline.wall`, never a conversion at read or save time. Restore keeps
+the exact wall and maps it to the new monotonic clock once. The existing
+optional wall reset and client fields keep their layouts. Fleet grace
+and adrift times remain the fleet's separate concern.
 
 ### 5.5 What the core asks of the store
 
@@ -1088,8 +1094,21 @@ Nothing the core decides depends on a view arriving.
   client fills a template into an ordinary request, which the core
   checks as one written by hand, so a template grants nothing, and a task
   keeps the values it was made with, never which template gave them.
+- **A resolved default beside intent.** Each effective template in `me`
+  carries `resolved_default: Option<LlmChoice>` beside its configured
+  LLM choice. An explicit template choice previews itself. For an
+  omitted choice, the core uses Create's own resolver, in charter
+  order, under the effective creating authority and with the current
+  receiving party as payer. No eligible model, or an executor still
+  *chosen*, gives `None`. This is an observation, never admission or
+  an account reservation. The client's shapes keep the configured
+  intent, never copy the preview into a request. Create resolves an
+  omitted choice once and the task retains it (tasks.md, section 3);
+  the preview changes no task or core store layout.
 - **Marked** as any of it moves. A pool's amount left moves with spend;
-  its marks are coalesced, as every watch's are.
+  account and source changes affecting eligibility, policy, membership
+  and effective-executor changes invalidate the affected previews.
+  Its marks are coalesced, as every watch's are.
 
 ### 11.2 Task queries
 
@@ -1348,7 +1367,15 @@ protocol layer, which composes jig's pieces with its own:
   own slots, the charters the deployment offers with their runs' budgets
   and reserves, the application's templates, which the core only serves
   (11.1), procedures' settings, limits. Projects and their policies are
-  the store's, seeded from configuration on a first start.
+  the store's, seeded from configuration on a first start. The
+  whole-config check after overrides admits only an actual configured
+  project count within both authority and people roster capacities,
+  ownerless projects included (`../protocol/configuration.md`, section
+  6). `Core::new` asserts the matching
+  `projects.len() <= limits.people.projects` programmer precondition,
+  alongside its other configuration assertions. Operator input reaches
+  that constructor only after validation; the core seeds the whole set,
+  with no implicit extra project or partial seed.
 
 ## 15. The world
 
