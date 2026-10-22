@@ -153,6 +153,20 @@ inbox are the views child's (engine.md, section 11).
   everyone else gets a role from a project's owner, or by adoption's seed
   (section 4). The first owners decide the deployment's LLM accounts
   (accounts.md, 3.2).
+- **The deployment's roles** are a roster of their own, kept as
+  project 0's: a party's role in the deployment, on which the
+  deployment's scope is admitted (`../client/domain/contract.md`, 7.5).
+  - *The first start* makes each first owner its owner, whether or not
+    configuration seeds a project. It is seeded then only: a later start
+    reads it from the store, and seeds it into no store that lacks it
+    (`../protocol/configuration.md`, section 8).
+  - *Project 0 is no project.* Configuration names none
+    (`../protocol/configuration.md`, section 3), and a party's projects,
+    in their frame, in `me` and in an account's readiness, leave it out:
+    it is read only as the party's role in the deployment, `me`'s
+    `deployment_role`.
+  - *Its roster counts* against people's `projects`, as a project's
+    does, and never against authority's: it has no policy.
 
 ## 4. Roles
 

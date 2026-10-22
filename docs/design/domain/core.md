@@ -1,6 +1,6 @@
 # The model
 
-Provisional, 2026-10-07, revised 2026-10-18. What jig's domain is
+Provisional, 2026-10-07, revised 2026-10-22. What jig's domain is
 beneath its parts: an engine core that runs work done by agents,
 procedures and people, keeps it in its own store, and drives external
 systems through an application's connectors. Every other document in
@@ -270,8 +270,9 @@ not own.
 
 A project is a body of work people steer, kept in the store:
 
-- **its number,** by which the store, addresses and every request name
-  it, never changed;
+- **its number,** from 1, by which the store, addresses and every
+  request name it, never changed: 0 names no project, but the
+  deployment's roles (people.md, section 3);
 - **its name,** by which people know it, unique in the deployment
   (below);
 - **its resources,** each adopted from a connector with a role: *owned*

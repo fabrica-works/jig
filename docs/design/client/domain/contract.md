@@ -1098,7 +1098,8 @@ any watch's deliveries do (`../../protocol/client.md`, section 7).
 
 - **Scopes.** An application's request, read or subject names one:
   - *a project,* admitted on the party's role in it;
-  - *the deployment,* admitted on their role in the deployment;
+  - *the deployment,* admitted on their role in the deployment
+    (`../../domain/people.md`, section 3);
   - *the party's own,* what is the signed-in party's across projects (an
     application's settings of theirs, the incidents they are paged
     for), admitted on the credential alone, and naming no party: the

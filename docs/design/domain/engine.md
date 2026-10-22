@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-21. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-22. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -1372,10 +1372,12 @@ protocol layer, which composes jig's pieces with its own:
   project count within both authority and people roster capacities,
   ownerless projects included (`../protocol/configuration.md`, section
   6). `Core::new` asserts the matching
-  `projects.len() <= limits.people.projects` programmer precondition,
-  alongside its other configuration assertions. Operator input reaches
-  that constructor only after validation; the core seeds the whole set,
-  with no implicit extra project or partial seed.
+  `projects.len() + 1 <= limits.people.projects` programmer
+  precondition, the one being the deployment's roles (people.md,
+  section 3), alongside its other configuration assertions. Operator
+  input reaches that constructor only after validation; the core seeds
+  the whole set and the deployment's roster, with no other implicit
+  roster or partial seed.
 
 ## 15. The world
 
