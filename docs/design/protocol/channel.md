@@ -138,11 +138,13 @@ The opening is skein's (skein's `channel.md`, section 5): `Open` from the
 worker, `Accept` or `Refuse` from the engine, then each side's `Terms`.
 
 - **The magic** names jig's channel; the schema gives its four bytes.
-- **One version at a time.** jig's worker channel speaks version 4,
-  which adds `ProgramValue` as `GrantValue` tag 3 and keeps the kind
-  numbers. A worker of another version is refused with skein's *version*,
-  and nothing is translated (skein's `codec.md`, section 5). An engine
-  and its workers are one application, released together.
+- **One version at a time.** jig's worker channel speaks version 5,
+  whose `GrantValue` is a credential, an application's credential or a
+  program source's name (tags 0 to 2: section 8), with no other form,
+  and which keeps the kind numbers. A worker of another version is
+  refused with skein's *version*, and nothing is translated (skein's
+  `codec.md`, section 5). An engine and its workers are one application,
+  released together.
 - **A worker's credential** is a record of `jig-protocol-worker-wire`'s:
   - the worker's name, which the engine's configuration lists;
   - its secret;

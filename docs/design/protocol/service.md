@@ -374,7 +374,13 @@ section 2).
   loopback, over jig's default HTTP mapping,
   runs taken by smith's real agent processes, then the binary killed and
   restarted, and the work found where it was; it checks integration, as
-  skein's real-loop tests do. `ops`'s binary proves its own shape the
+  skein's real-loop tests do. A person's sign-in at skein's fake issuer,
+  through the native client, outlives the binary killed and restarted
+  on its directory: the source is restored and usable, a run's grant
+  the LLM peer refuses is refreshed at the issuer and the run answered
+  on the newer generation, and the sign-out is confirmed by the
+  issuer's revocation, the account gone. A binary told to stop with a
+  sign-in under way ends at once. `ops`'s binary proves its own shape the
   same way.
 - **The live layer:** `jig-test` with a real LLM account, a key added
   by a request, a sign-in made as the test starts, or a program's login

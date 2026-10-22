@@ -495,7 +495,7 @@ among their own (`../client/domain/contract.md`, 7.1).
 
 | Request | What it does |
 |---|---|
-| sign in | starts an LLM provider's sign-in; the visit goes to the client that asked, and the redirect to a loopback listener the engine binds for this sign-in; makes an account, renews one of the same subject, or is refused for a subject another holder holds (3.3) |
+| sign in | starts an LLM provider's sign-in; the visit goes to the client that asked, and the redirect to a loopback listener the engine binds for this sign-in; makes an account, renews one of the same subject, or is refused for a subject another holder holds (3.3); refused before it starts for the deployment where the provider's sign-in brings a plan, since only a person holds one (3.2) |
 | sign out | revokes the record at the LLM provider, or has each worker sign a program's login out, and removes the source; when revocation is not confirmed, the answer says to disconnect the application in the provider's settings (providers.md, 2.3) |
 | add a key, replace it, remove it | adding names the account it joins, a new key's account by default; a person's, or the deployment's by its owners |
 | declare a program's login | makes the account, or adds the source to one, under the name its holder gives (3.4); each host then reports whether its login is usable, and the answer names the application's command to run there, which hands the terminal to the program's own sign-in (smith's `protocol/programs.md`, section 4) |

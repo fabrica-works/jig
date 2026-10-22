@@ -237,7 +237,7 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 | release a source | release |
 | sign out a source, or remove it | sign out: revoke its record, take the account out |
 | cancel a sign-in | cancel |
-| close | close |
+| close | cancel each sign-in under way, then close: a sign-in waiting on a person never holds the close |
 
 | The driver says | The accounts child hears |
 |---|---|
