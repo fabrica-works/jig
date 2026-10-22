@@ -1,7 +1,10 @@
 //! Binary, native person and independent provider on Skein's real ring.
 pub mod d2;
 pub mod trace;
+use crate::account_sign_in_visitor::Visitor;
 use jig_client_protocol_world::native::{NativeClient, Script};
+use jig_protocol_accounts_world::{fixtures as accounts, world::Story};
+use skein_fake_peers::{Transport, oauth};
 use skein_io::kernel::{Complete, Done, Fd, Op, Signal, Submit};
 use skein_lib::{Duration, Queue, Time, Token, Wall};
 use skein_shell::{Clock, Host};
@@ -267,6 +270,8 @@ pub(super) enum Process {
     Binary(Box<Binary>),
     Person(Box<Person>),
     Peer(Box<skein_fake_peers::llm::Peer>),
+    Issuer(Box<oauth::Peer>),
+    Visitor(Box<Visitor>),
 }
 impl Process {
     fn host(&self) -> &dyn Host {
@@ -274,6 +279,8 @@ impl Process {
             Self::Binary(x) => x.as_ref(),
             Self::Person(x) => x.as_ref(),
             Self::Peer(x) => x.as_ref(),
+            Self::Issuer(x) => x.as_ref(),
+            Self::Visitor(x) => x.as_ref(),
         }
     }
     fn host_mut(&mut self) -> &mut dyn Host {
@@ -281,6 +288,8 @@ impl Process {
             Self::Binary(x) => x.as_mut(),
             Self::Person(x) => x.as_mut(),
             Self::Peer(x) => x.as_mut(),
+            Self::Issuer(x) => x.as_mut(),
+            Self::Visitor(x) => x.as_mut(),
         }
     }
 }
@@ -397,4 +406,47 @@ fn run_mode(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm
     let Process::Person(person) = &outcome.procs[1] else { panic!("native person") };
     let client = person.client.as_ref().expect("signed-in client");
     (client.signed_in, client.chats_made)
+}
+
+pub(super) fn issuer() -> oauth::Peer {
+    let profile = accounts::limits();
+    let limits = skein_fake_oauth::Limits {
+        document: profile.client.document,
+        uri_bytes: 256,
+        request_bytes: 1024,
+        codes: 1,
+        rotations: 2,
+        carried: 5,
+        plans: 2,
+    };
+    let response = oauth::least_response(&limits).expect("issuer response");
+    let mut peer = oauth::Peer::new(
+        "127.0.0.1:31000".parse().expect("issuer socket"),
+        Transport::Plaintext,
+        skein_fake_peers::Limits {
+            io: profile.io,
+            connections: 2,
+            queue: accounts::ROOM,
+            plaintext: 32768,
+            ciphertext: 32768,
+            observations: 64,
+            observation_bytes: 4096,
+        },
+        skein_fake_oauth::Config {
+            terms: accounts::issuer_terms(Story::AccountSignInVaryingPort),
+            authorization_url: accounts::AUTHORIZE.into(),
+            token_endpoint: accounts::TOKEN.into(),
+            client_id: b"client".as_slice().into(),
+            client_secret: None,
+            redirect_uri: accounts::PARTY_REDIRECT.into(),
+            refresh_token: b"seed".as_slice().into(),
+        },
+        limits,
+        skein_http::server::Limits { response, ..profile.server },
+    )
+    .expect("issuer");
+    for plan in accounts::issuer_plans(Story::AccountSignInVaryingPort) {
+        peer.queue(plan).expect("issuer plan");
+    }
+    peer
 }

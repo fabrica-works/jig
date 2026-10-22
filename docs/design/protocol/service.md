@@ -388,6 +388,7 @@ section 2).
   Both live tests declare low effort on the engine's and agent's models;
   the gate reads their configurations through startup's readers, without
   network or a person.
+  The live sign-in story also runs on fake peers in the process tier.
 - **The browser tier:** `jig-test` serving jig's test application's
   bundle and the mapping at `/jig`, and Chromium, children of the
   harness's loop, a person in a page, and jig's attack stories against

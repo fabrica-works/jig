@@ -83,3 +83,19 @@ fn a_party_adds_replaces_and_removes_a_key() {
     account_keys::configuration(directory.path());
     account_keys::run(directory.path());
 }
+
+#[expect(dead_code, reason = "only the live binary uses the DNS-resolving configuration entry")]
+#[path = "support/live_sign_in.rs"]
+mod live_sign_in;
+
+/// The live sign-in story on fake peers: a deployment's sign-in made, used for an answer and signed out.
+#[test]
+fn a_deployment_signs_in_at_the_fake_issuer_and_the_live_story_answers_and_signs_out() {
+    let directory = support::scratch();
+    let peers = live_sign_in::Peers::Fake;
+    let clock = skein_shell::Clock::new();
+    let started = clock.now().now;
+    let limits = live_sign_in::configuration_at(directory.path(), "127.0.0.1:34443", peers);
+    let outcome = live_sign_in::run(directory.path(), started, peers);
+    live_sign_in::check(directory.path(), &limits, outcome, peers);
+}

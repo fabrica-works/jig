@@ -1,19 +1,13 @@
 //! LLM account sign-in against the shipped process and the existing independent issuer/browser.
-use crate::account_sign_in_visitor::Visitor;
-use crate::support::{Person, private, start};
+use crate::support::{Person, Process, issuer, private, start};
 use jig_client::{Asker, Key, contract as c};
 use jig_client_protocol_world::native::Received;
 use jig_client_protocol_world::native::{NativeClient, Script};
-use jig_protocol_accounts_world::{fixtures as accounts, world::Story};
-use skein_fake_peers::{Transport, oauth};
-use skein_io::kernel::{Complete, Signal, Submit};
-use skein_lib::{Duration, Queue, Time, Wall};
+use skein_fake_peers::oauth;
+use skein_io::kernel::Signal;
+use skein_lib::{Duration, Queue, Time};
 use skein_shell::{Clock, Host};
-use skein_world::{
-    Referee,
-    end_to_end::{Binary, Streams},
-    real,
-};
+use skein_world::{Referee, end_to_end::Streams, real};
 use std::{fs, path::Path};
 
 const ACCOUNT_SIGN_IN: Key = Key { asker: Asker(7), number: 1 };
@@ -33,104 +27,6 @@ pub fn configuration(directory: &Path) {
         }}
     }]);
     private(&path, &serde_json::to_vec(&value).expect("configuration JSON"));
-}
-fn issuer() -> oauth::Peer {
-    let profile = accounts::limits();
-    let limits = skein_fake_oauth::Limits {
-        document: profile.client.document,
-        uri_bytes: 256,
-        request_bytes: 1024,
-        codes: 1,
-        rotations: 2,
-        carried: 5,
-        plans: 2,
-    };
-    let response = oauth::least_response(&limits).expect("issuer response");
-    let mut peer = oauth::Peer::new(
-        "127.0.0.1:31000".parse().expect("issuer socket"),
-        Transport::Plaintext,
-        skein_fake_peers::Limits {
-            io: profile.io,
-            connections: 2,
-            queue: accounts::ROOM,
-            plaintext: 32768,
-            ciphertext: 32768,
-            observations: 64,
-            observation_bytes: 4096,
-        },
-        skein_fake_oauth::Config {
-            terms: accounts::issuer_terms(Story::AccountSignInVaryingPort),
-            authorization_url: accounts::AUTHORIZE.into(),
-            token_endpoint: accounts::TOKEN.into(),
-            client_id: b"client".as_slice().into(),
-            client_secret: None,
-            redirect_uri: accounts::PARTY_REDIRECT.into(),
-            refresh_token: b"seed".as_slice().into(),
-        },
-        limits,
-        skein_http::server::Limits { response, ..profile.server },
-    )
-    .expect("issuer");
-    for plan in accounts::issuer_plans(Story::AccountSignInVaryingPort) {
-        peer.queue(plan).expect("issuer plan");
-    }
-    peer
-}
-enum Process {
-    Binary(Box<Binary>),
-    Person(Box<Person>),
-    Issuer(Box<oauth::Peer>),
-    Visitor(Box<Visitor>),
-}
-impl Process {
-    fn host(&self) -> &dyn Host {
-        match self {
-            Self::Binary(x) => x.as_ref(),
-            Self::Person(x) => x.as_ref(),
-            Self::Issuer(x) => x.as_ref(),
-            Self::Visitor(x) => x.as_ref(),
-        }
-    }
-    fn host_mut(&mut self) -> &mut dyn Host {
-        match self {
-            Self::Binary(x) => x.as_mut(),
-            Self::Person(x) => x.as_mut(),
-            Self::Issuer(x) => x.as_mut(),
-            Self::Visitor(x) => x.as_mut(),
-        }
-    }
-}
-impl Host for Process {
-    fn iterate(&mut self, now: Time, wall: Wall) {
-        self.host_mut().iterate(now, wall);
-    }
-    fn drain(&mut self) {
-        self.host_mut().drain();
-    }
-    fn completions(&mut self) -> &mut Queue<Complete> {
-        self.host_mut().completions()
-    }
-    fn submissions(&mut self) -> &mut Queue<Submit> {
-        self.host_mut().submissions()
-    }
-    fn work_pending(&self, now: Time) -> bool {
-        self.host().work_pending(now)
-    }
-    fn next_deadline(&self) -> Option<Time> {
-        self.host().next_deadline()
-    }
-    fn next_policy_deadline(&self) -> Option<Time> {
-        self.host().next_policy_deadline()
-    }
-    fn is_empty(&self) -> bool {
-        self.host().is_empty()
-    }
-    fn worst_case(&self) -> u64 {
-        self.host().worst_case()
-    }
-    fn operations(&self) -> u32 {
-        self.host().operations()
-    }
 }
 #[derive(Debug, Default)]
 enum Phase {

@@ -2,11 +2,14 @@
 use crate::support::{self, Person, Process};
 use jig_client::{Asker, Handle, Key, contract as c};
 use jig_client_protocol_world::native::{NativeClient, Received, Script};
+use jig_protocol_accounts_world::fixtures;
+use jig_protocol_config as config;
+use jig_protocol_store::{codec, transcripts};
 use skein_io::kernel::Signal;
 use skein_lib::{Duration, Queue, Time};
 use skein_shell::{Clock, Host};
 use skein_world::{Referee, end_to_end::Streams, real};
-use std::{net::ToSocketAddrs, path::Path};
+use std::{fs, net::ToSocketAddrs, path::Path};
 
 const SIGN_IN: Key = Key { asker: Asker(77), number: 1 };
 const SIGN_OUT: Key = Key { asker: Asker(77), number: 2 };
@@ -17,43 +20,33 @@ const MODEL: &str = "gpt-6-luna";
 const SIGN_IN_WAIT: Duration = Duration::from_secs(330);
 const WHOLE: Duration = Duration::from_secs(600);
 
-pub fn configuration(directory: &Path) -> crate::codec::Limits {
+pub fn configuration(directory: &Path) -> codec::Limits {
     let address = ("api.openai.com", 443)
         .to_socket_addrs()
         .expect("resolve public Responses endpoint")
         .find(std::net::SocketAddr::is_ipv4)
         .expect("public Responses IPv4 endpoint")
         .to_string();
-    configuration_at(directory, &address)
+    configuration_at(directory, &address, Peers::Real)
 }
 
-pub fn configuration_at(directory: &Path, address: &str) -> crate::codec::Limits {
+pub fn configuration_at(directory: &Path, address: &str, peers: Peers) -> codec::Limits {
     let mut value = support::configuration_value(directory);
     let path = directory.join("config.json");
     let engine = &mut value["engine"];
     engine["llm"]["providers"][0] = serde_json::json!({
         "name":"ChatGPT", "number":PROVIDER, "models":[MODEL],
         "signed_in_plan":true, "manage_usage":"https://chatgpt.com/settings/usage",
-        "sources":{"sign_in":{
-            "issuer":"https://auth.openai.com", "client":"dynamic_agent_client",
-            "authorization":"https://auth.openai.com/api/accounts/authorize",
-            "token":"https://auth.openai.com/api/accounts/oauth/token",
-            "revocation":"https://auth.openai.com/api/accounts/oauth/revoke",
-            "keys":"https://auth.openai.com/.well-known/jwks.json",
-            "transport":"tls", "server_name":"auth.openai.com",
-            "scopes":["openid","profile","email","offline_access","resource.invoke","chatgpt.tokens.use.direct"],
-            "must_grant":["chatgpt.tokens.use.direct"], "resource":"https://api.openai.com/v1",
-            "name_hint":"jig", "redirect_path":"auth/callback", "redirect_port":1455
-        }}
+        "sources":{"sign_in":peers.sign_in()}
     });
     let endpoint = &mut engine["llm"]["endpoints"][0];
     endpoint["provider"] = "openai".into();
     endpoint["dialect"] = 3.into();
     endpoint["address"] = serde_json::json!({"socket":address});
     endpoint["transport"] = "tls".into();
-    endpoint["server_name"] = "api.openai.com".into();
+    endpoint["server_name"] = peers.server_name().into();
     endpoint["headers"] = serde_json::json!([]);
-    endpoint.as_object_mut().expect("endpoint").remove("trust");
+    peers.trust(endpoint, "trust", directory);
     engine["llm"]["models"][0]["name"] = MODEL.into();
     engine["llm"]["models"][0]["output"] = 4096.into();
     engine["llm"]["models"][0]["efforts"] = serde_json::json!(["low"]);
@@ -63,7 +56,7 @@ pub fn configuration_at(directory: &Path, address: &str) -> crate::codec::Limits
     engine["charters"][0]["waiting_ms"] = 10_000.into();
     let bytes = serde_json::to_vec(&value).expect("live config JSON");
     support::private(&path, &bytes);
-    let limits = crate::store_limits(&bytes);
+    let limits = store_limits(&bytes);
     let path = directory.join("agent.json");
     let mut agent = support::agent_value(directory);
     // The 64 KiB reasoning item and complete trace exceed standard's memory ceiling.
@@ -73,8 +66,8 @@ pub fn configuration_at(directory: &Path, address: &str) -> crate::codec::Limits
     endpoint["dialect"] = 3.into();
     endpoint["address"] = address.into();
     endpoint["transport"] = "tls".into();
-    endpoint["server_name"] = "api.openai.com".into();
-    endpoint.as_object_mut().expect("endpoint").remove("trust_der");
+    endpoint["server_name"] = peers.server_name().into();
+    peers.trust(endpoint, "trust_der", directory);
     endpoint["identity"] = "plain".into();
     endpoint["headers"] = serde_json::json!([]);
     endpoint["connect"] = 10_000.into();
@@ -87,8 +80,8 @@ pub fn configuration_at(directory: &Path, address: &str) -> crate::codec::Limits
     endpoint["models"][0]["idle"] = 300_000.into();
     agent["trace"] = support::trace::settings(directory);
     support::private(&path, &serde_json::to_vec(&agent).expect("live agent JSON"));
-    support::private(&directory.join("charters/chat.txt"), crate::INSTRUCTIONS.as_bytes());
-    eprintln!("Live model={MODEL}; Responses={address}; TLS server_name=api.openai.com; machine trust");
+    support::private(&directory.join("charters/chat.txt"), INSTRUCTIONS.as_bytes());
+    peers.describe(address);
     limits
 }
 
@@ -104,6 +97,7 @@ enum Phase {
 }
 struct Judge {
     phase: Phase,
+    peers: Peers,
     deadline: Time,
     sign_in_deadline: Option<Time>,
     received: usize,
@@ -199,7 +193,7 @@ impl Referee<Process> for Judge {
                         SIGN_IN,
                         c::Ask::SignIn { holder: c::AccountHolder::Deployment, provider: PROVIDER },
                     );
-                    self.sign_in_deadline = Some(now.saturating_add(SIGN_IN_WAIT));
+                    self.sign_in_deadline = Some(now.saturating_add(self.peers.sign_in_wait()));
                     self.phase = Phase::Address;
                 }
             }
@@ -210,10 +204,7 @@ impl Referee<Process> for Judge {
                     else {
                         panic!("ChatGPT sign-in start: {answer:?}");
                     };
-                    eprintln!("Sign in at: {}", std::str::from_utf8(&address).expect("authorization URL"));
-                    eprintln!(
-                        "(the browser must reach 127.0.0.1:1455 on this machine: ssh -L 1455:127.0.0.1:1455 HOST)"
-                    );
+                    self.peers.visit(procs, &address);
                     self.phase = Phase::Signing { source };
                     self.signing(procs, source);
                 }
@@ -248,6 +239,7 @@ impl Referee<Process> for Judge {
                 if native.is_empty() {
                     let Process::Binary(binary) = &mut procs[0] else { panic!("binary") };
                     binary.signal(Signal::Kill);
+                    self.peers.shutdown(procs);
                     self.phase = Phase::Ended;
                 }
             }
@@ -280,7 +272,7 @@ impl Referee<Process> for Judge {
     }
 }
 
-pub fn run(directory: &Path, started: Time) -> (u32, u32) {
+pub fn run(directory: &Path, started: Time, peers: Peers) -> (u32, u32) {
     let clock = Clock::new();
     let mut binary = support::start(directory);
     let streams = binary.take_streams().expect("binary pipes");
@@ -290,7 +282,8 @@ pub fn run(directory: &Path, started: Time) -> (u32, u32) {
     let root = skein_shell::open_root(client_directory.path()).expect("client root");
     let mut world = real::World::new(Judge {
         phase: Phase::Admission,
-        deadline: started.saturating_add(Duration::from_secs(590)),
+        peers,
+        deadline: started.saturating_add(peers.deadline()),
         sign_in_deadline: None,
         received: 0,
         accounts: None,
@@ -301,7 +294,7 @@ pub fn run(directory: &Path, started: Time) -> (u32, u32) {
         Process::Person(Box::new(Person {
             client: None,
             root: Some(root),
-            script: Some(Script::answered_report(crate::WORDS.as_bytes(), support::ANSWER, Duration::from_secs(240))),
+            script: Some(Script::answered_report(WORDS.as_bytes(), support::ANSWER, Duration::from_secs(240))),
             account_sign_in: true,
             llm_key: None,
             input: Some(input),
@@ -313,10 +306,206 @@ pub fn run(directory: &Path, started: Time) -> (u32, u32) {
             submissions: Queue::with_capacity(512),
         }))
     });
-    let remaining = started.saturating_add(WHOLE).saturating_since(clock.now().now);
+    peers.spawn(&mut world);
+    let remaining = started.saturating_add(peers.whole()).saturating_since(clock.now().now);
     let outcome = world.run(&clock, remaining);
     assert!(outcome.procs.iter().all(Host::is_empty), "all live sign-in io settles");
     let Process::Person(person) = &outcome.procs[1] else { panic!("native person") };
     let native = person.client.as_ref().expect("signed-in client");
     (native.signed_in, native.chats_made)
+}
+
+pub const INSTRUCTIONS: &str = "Report exactly: Process answer";
+pub const WORDS: &str = "Follow the first sentence.";
+
+pub fn store_limits(bytes: &[u8]) -> codec::Limits {
+    let document = config::document(bytes, &config::DocumentLimits { bytes: 1 << 20, tokens: 1 << 20, depth: 32 })
+        .expect("live document");
+    let at = config::read::Object::new(&document, 0)
+        .expect("document object")
+        .member(&document, b"engine")
+        .expect("engine member");
+    let engine = config::engine(&document, at, &config::Directories::working()).expect("live engine configuration");
+    codec::limits(&engine.limits.core).expect("live store codec limits")
+}
+
+pub fn completions(directory: &Path, limits: &codec::Limits) -> u32 {
+    let path = directory.join("state/transcripts/0000000000000000/0000000000000001");
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return 0,
+        Err(error) => panic!("live transcript: {error}"),
+    };
+    let mut at = 0;
+    let mut count = 0;
+    while at + 4 <= bytes.len() {
+        let length = u32::from_be_bytes(bytes[at..at + 4].try_into().expect("frame length")) as usize;
+        if length < 12 || at + length > bytes.len() {
+            break;
+        }
+        let turn = transcripts::frame::decode(&bytes[at..at + length], limits).expect("durable live turn");
+        assert_eq!((turn.task, turn.attempt, turn.turn), (1, 1, count + 1));
+        // Smith's transcript.md, 1: a turn is one completion, including compaction.
+        count += 1;
+        at += length;
+    }
+    count
+}
+
+pub fn capture(directory: &Path, destination: &Path) -> bool {
+    let bytes = fs::read(directory.join("agent-trace.jsonl")).expect("Smith provider trace");
+    let mut requests = Vec::new();
+    for line in bytes.split(|byte| *byte == b'\n').filter(|line| !line.is_empty()) {
+        let record: serde_json::Value = serde_json::from_slice(line).expect("Smith event JSON");
+        if let Some(prompt) = record.get("prompt") {
+            requests.push(serde_json::json!({"instructions":prompt["system"],"input":prompt["messages"]}));
+        }
+    }
+    fs::write(destination, serde_json::to_vec_pretty(&requests).expect("request capture JSON"))
+        .expect("system/input capture file");
+    let present = requests.iter().any(|request| {
+        request["instructions"].as_str().is_some_and(|system| system.contains(INSTRUCTIONS) && system.contains(WORDS))
+    });
+    eprintln!(
+        "live request capture={}; brief={}; file={}",
+        requests.len(),
+        if present { "present" } else { "absent" },
+        destination.display()
+    );
+    assert!(!requests.is_empty(), "provider request captured before interpreting the answer");
+    present
+}
+
+pub fn check(directory: &Path, limits: &codec::Limits, outcome: (u32, u32), peers: Peers) {
+    let count = completions(directory, limits);
+    eprintln!("live completions={count}");
+    assert!(
+        capture(directory, &directory.join("live-request.json")),
+        "the provider request includes charter and task words"
+    );
+    support::trace::check(directory, peers.credential());
+    assert!((1..=5).contains(&count), "at most five real completions, and at least one answer");
+    assert_eq!(outcome, (1, 1));
+}
+
+/// The live story's real backends or independent fake peers on loopback.
+#[derive(Clone, Copy)]
+pub enum Peers {
+    Real,
+    Fake,
+}
+impl Peers {
+    fn sign_in(self) -> serde_json::Value {
+        match self {
+            Self::Real => serde_json::json!({
+                "issuer":"https://auth.openai.com", "client":"dynamic_agent_client",
+                "authorization":"https://auth.openai.com/api/accounts/authorize",
+                "token":"https://auth.openai.com/api/accounts/oauth/token",
+                "revocation":"https://auth.openai.com/api/accounts/oauth/revoke",
+                "keys":"https://auth.openai.com/.well-known/jwks.json",
+                "transport":"tls", "server_name":"auth.openai.com",
+                "scopes":["openid","profile","email","offline_access","resource.invoke","chatgpt.tokens.use.direct"],
+                "must_grant":["chatgpt.tokens.use.direct"], "resource":"https://api.openai.com/v1",
+                "name_hint":"jig", "redirect_path":"auth/callback", "redirect_port":1455
+            }),
+            Self::Fake => serde_json::json!({
+                "issuer":"http://127.0.0.1:31000", "client":"client", "scopes":["openid","read"],
+                "name_hint":"jig-test", "authorization":"http://127.0.0.1:31000/authorize",
+                "token":"http://127.0.0.1:31000/token", "revocation":"http://127.0.0.1:31000/revoke",
+                "keys":"http://127.0.0.1:31000/keys", "transport":"plaintext",
+                "must_grant":["openid","read"], "resource":"api", "redirect_path":"callback"
+            }),
+        }
+    }
+    fn server_name(self) -> &'static str {
+        match self {
+            Self::Real => "api.openai.com",
+            Self::Fake => "skein.test",
+        }
+    }
+    fn trust(self, endpoint: &mut serde_json::Value, field: &str, directory: &Path) {
+        match self {
+            Self::Real => {
+                endpoint.as_object_mut().expect("endpoint").remove(field);
+            }
+            Self::Fake => endpoint[field] = serde_json::json!(directory.join("root.der")),
+        }
+    }
+    fn describe(self, address: &str) {
+        match self {
+            Self::Real => {
+                eprintln!("Live model={MODEL}; Responses={address}; TLS server_name=api.openai.com; machine trust")
+            }
+            Self::Fake => {
+                eprintln!("Live model={MODEL}; Responses={address}; TLS server_name=skein.test; fixture trust")
+            }
+        }
+    }
+    fn sign_in_wait(self) -> Duration {
+        match self {
+            Self::Real => SIGN_IN_WAIT,
+            Self::Fake => Duration::from_secs(10),
+        }
+    }
+    fn deadline(self) -> Duration {
+        match self {
+            Self::Real => Duration::from_secs(590),
+            Self::Fake => Duration::from_secs(10),
+        }
+    }
+    fn whole(self) -> Duration {
+        match self {
+            Self::Real => WHOLE,
+            Self::Fake => Duration::from_secs(15),
+        }
+    }
+    fn credential(self) -> Option<&'static [u8]> {
+        match self {
+            Self::Real => None,
+            Self::Fake => Some(fixtures::TOKEN_SECOND),
+        }
+    }
+    fn visit(self, procs: &mut [Process], address: &[u8]) {
+        match self {
+            Self::Real => {
+                eprintln!("Sign in at: {}", std::str::from_utf8(address).expect("authorization URL"));
+                eprintln!("(the browser must reach 127.0.0.1:1455 on this machine: ssh -L 1455:127.0.0.1:1455 HOST)");
+            }
+            Self::Fake => {
+                let Process::Visitor(visitor) = &mut procs[3] else { panic!("browser") };
+                visitor.hand(address);
+            }
+        }
+    }
+    fn shutdown(self, procs: &mut [Process]) {
+        if let Self::Fake = self {
+            for proc in procs {
+                match proc {
+                    Process::Issuer(issuer) => issuer.shutdown(),
+                    Process::Peer(peer) => peer.shutdown(),
+                    Process::Binary(_) | Process::Person(_) | Process::Visitor(_) => {}
+                }
+            }
+        }
+    }
+    fn spawn(self, world: &mut real::World<Process, Judge>) {
+        if let Self::Fake = self {
+            world.spawn(|| Process::Issuer(Box::new(support::issuer())));
+            world.spawn(|| Process::Visitor(Box::default()));
+            let mut script = jig_channel_world::fixtures::one_chat(WORDS.as_bytes());
+            script.result = br#"{"form":"report","text":"Process answer","fields":{}}"#.as_slice().into();
+            world.spawn(|| {
+                Process::Peer(Box::new(jig_channel_world::fixtures::provider(
+                    Box::new([skein_fake_llm_domain::api::Script {
+                        cue: Box::default(),
+                        turns: jig_channel_world::fixtures::provider_turns(&script),
+                    }]),
+                    skein_llm::Credential::bearer(fixtures::TOKEN_SECOND.into()),
+                    Duration::ZERO,
+                    skein_fake_peers::Transport::Tls,
+                    skein_fake_llm_protocol::documents::Provider::OpenAi,
+                )))
+            });
+        }
+    }
 }

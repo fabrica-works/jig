@@ -2,17 +2,14 @@
 #[expect(dead_code, reason = "shared process support; live uses the account sign-in and explicit D2 entries")]
 mod support;
 use jig_client_protocol_world::native::Script;
-use jig_protocol_config as config;
-use jig_protocol_store::{codec, transcripts};
+use jig_protocol_store::codec;
+use live_sign_in::{INSTRUCTIONS, WORDS, capture, completions, store_limits};
 use skein_lib::Duration;
 use skein_shell::Clock;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 #[path = "support/live_sign_in.rs"]
 mod live_sign_in;
-
-const INSTRUCTIONS: &str = "Report exactly: Process answer";
-const WORDS: &str = "Follow the first sentence.";
 
 fn configuration(directory: &Path, source: &Path) -> codec::Limits {
     let settings: serde_json::Value =
@@ -80,70 +77,15 @@ fn configuration_at(directory: &Path, model: &str, address: &str) -> codec::Limi
     limits
 }
 
-fn store_limits(bytes: &[u8]) -> codec::Limits {
-    let document = config::document(bytes, &config::DocumentLimits { bytes: 1 << 20, tokens: 1 << 20, depth: 32 })
-        .expect("live document");
-    let at = config::read::Object::new(&document, 0)
-        .expect("document object")
-        .member(&document, b"engine")
-        .expect("engine member");
-    let engine = config::engine(&document, at, &config::Directories::working()).expect("live engine configuration");
-    codec::limits(&engine.limits.core).expect("live store codec limits")
-}
-
-fn completions(directory: &Path, limits: &codec::Limits) -> u32 {
-    let path = directory.join("state/transcripts/0000000000000000/0000000000000001");
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return 0,
-        Err(error) => panic!("live transcript: {error}"),
-    };
-    let mut at = 0;
-    let mut count = 0;
-    while at + 4 <= bytes.len() {
-        let length = u32::from_be_bytes(bytes[at..at + 4].try_into().expect("frame length")) as usize;
-        if length < 12 || at + length > bytes.len() {
-            break;
-        }
-        let turn = transcripts::frame::decode(&bytes[at..at + length], limits).expect("durable live turn");
-        assert_eq!((turn.task, turn.attempt, turn.turn), (1, 1, count + 1));
-        // Smith's transcript.md, 1: a turn is one completion, including compaction.
-        count += 1;
-        at += length;
-    }
-    count
-}
-
-fn capture(directory: &Path, destination: &Path) -> bool {
-    let bytes = fs::read(directory.join("agent-trace.jsonl")).expect("Smith provider trace");
-    let mut requests = Vec::new();
-    for line in bytes.split(|byte| *byte == b'\n').filter(|line| !line.is_empty()) {
-        let record: serde_json::Value = serde_json::from_slice(line).expect("Smith event JSON");
-        if let Some(prompt) = record.get("prompt") {
-            requests.push(serde_json::json!({"instructions":prompt["system"],"input":prompt["messages"]}));
-        }
-    }
-    fs::write(destination, serde_json::to_vec_pretty(&requests).expect("request capture JSON"))
-        .expect("system/input capture file");
-    let present = requests.iter().any(|request| {
-        request["instructions"].as_str().is_some_and(|system| system.contains(INSTRUCTIONS) && system.contains(WORDS))
-    });
-    eprintln!(
-        "live request capture={}; brief={}; file={}",
-        requests.len(),
-        if present { "present" } else { "absent" },
-        destination.display()
-    );
-    assert!(!requests.is_empty(), "provider request captured before interpreting the answer");
-    present
-}
-
 /// Both live tests' configurations, read as jig-test's startup reads them: no network, no person.
 #[test]
 fn the_live_configurations_are_ones_jig_test_reads() {
     let sign_in = support::scratch();
-    live_sign_in::configuration_at(sign_in.path(), "192.0.2.1:443");
+    live_sign_in::configuration_at(sign_in.path(), "192.0.2.1:443", live_sign_in::Peers::Real);
     assert_eq!(jig_test::check(&sign_in.path().join("config.json")), Ok(()));
+    let fake = support::scratch();
+    live_sign_in::configuration_at(fake.path(), "127.0.0.1:34443", live_sign_in::Peers::Fake);
+    assert_eq!(jig_test::check(&fake.path().join("config.json")), Ok(()));
     let d2 = support::scratch();
     configuration_at(d2.path(), "gpt-6-luna", "192.0.2.1:443");
     assert_eq!(jig_test::check(&d2.path().join("config.json")), Ok(()));
@@ -185,16 +127,8 @@ fn a_person_signs_in_to_chatgpt_and_a_real_model_answers() {
     let started = clock.now().now;
     let result = std::panic::catch_unwind(|| {
         let limits = live_sign_in::configuration(directory.path());
-        let outcome = live_sign_in::run(directory.path(), started);
-        let count = completions(directory.path(), &limits);
-        eprintln!("live completions={count}");
-        assert!(
-            capture(directory.path(), &directory.path().join("live-request.json")),
-            "the provider request includes charter and task words"
-        );
-        support::trace::check(directory.path(), None);
-        assert!((1..=5).contains(&count), "at most five real completions, and at least one answer");
-        assert_eq!(outcome, (1, 1));
+        let outcome = live_sign_in::run(directory.path(), started, live_sign_in::Peers::Real);
+        live_sign_in::check(directory.path(), &limits, outcome, live_sign_in::Peers::Real);
     });
     let wall_ms = clock.now().now.saturating_since(started).as_nanos() / 1_000_000;
     eprintln!("live ChatGPT wall={wall_ms}ms");
@@ -217,3 +151,9 @@ fn a_person_signs_in_to_chatgpt_and_a_real_model_answers() {
         std::panic::resume_unwind(failed);
     }
 }
+
+// Reuse the account sign-in world's browser source; it remains a private test helper.
+use jig_protocol_accounts_world::fixtures;
+#[expect(dead_code, reason = "only the accounts process judge uses browser status diagnostics")]
+#[path = "../../../tests/protocol-accounts/src/visitor.rs"]
+mod account_sign_in_visitor;
