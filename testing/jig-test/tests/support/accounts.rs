@@ -217,6 +217,7 @@ fn run_world<R: Referee<Process>>(
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds.into_iter().chain([root]).collect(), || {
         Process::Person(Box::new(Person {
+            seed: crate::support::CLIENT_SEED,
             client: None,
             root: Some(root),
             script: Some(Script::account_sign_in()),

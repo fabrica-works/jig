@@ -16,6 +16,8 @@ use skein_world::{
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 pub const ANSWER: &[u8] = b"Process answer";
+// The deterministic first native client; a fresh client after restart uses another seed.
+pub(super) const CLIENT_SEED: u64 = 7;
 const PIPE: Token = Token::new(u64::MAX);
 const CLOSE: Token = Token::new(u64::MAX - 1);
 
@@ -123,6 +125,7 @@ pub(super) fn client_settings(address: std::net::SocketAddr) -> jig_client_shell
     }
 }
 pub(super) struct Person {
+    pub(super) seed: u64,
     pub(super) client: Option<NativeClient>,
     pub(super) root: Option<Fd>,
     pub(super) script: Option<Script>,
@@ -187,7 +190,7 @@ impl Host for Person {
                 client_settings(address),
                 self.root.take().expect("client root"),
                 skein_shell::effective_user(),
-                7,
+                self.seed,
                 self.script.take().expect("person script"),
             );
             if self.account_sign_in || self.llm_key.is_some() {
@@ -384,6 +387,7 @@ fn run_mode(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds.into_iter().chain([root]).collect(), || {
         Process::Person(Box::new(Person {
+            seed: CLIENT_SEED,
             client: None,
             root: Some(root),
             script: Some(script),
@@ -409,6 +413,9 @@ fn run_mode(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm
 }
 
 pub(super) fn issuer() -> oauth::Peer {
+    issuer_with_plans(accounts::issuer_plans(Story::AccountSignInVaryingPort))
+}
+pub(super) fn issuer_with_plans(plans: Vec<skein_fake_oauth::Plan>) -> oauth::Peer {
     let profile = accounts::limits();
     let limits = skein_fake_oauth::Limits {
         document: profile.client.document,
@@ -417,7 +424,7 @@ pub(super) fn issuer() -> oauth::Peer {
         codes: 1,
         rotations: 2,
         carried: 5,
-        plans: 2,
+        plans: u32::try_from(plans.len()).expect("fixture plans fit"),
     };
     let response = oauth::least_response(&limits).expect("issuer response");
     let mut peer = oauth::Peer::new(
@@ -445,7 +452,7 @@ pub(super) fn issuer() -> oauth::Peer {
         skein_http::server::Limits { response, ..profile.server },
     )
     .expect("issuer");
-    for plan in accounts::issuer_plans(Story::AccountSignInVaryingPort) {
+    for plan in plans {
         peer.queue(plan).expect("issuer plan");
     }
     peer

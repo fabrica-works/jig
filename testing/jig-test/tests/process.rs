@@ -122,3 +122,17 @@ fn a_provider_refusing_the_plan_s_grant_fails_the_live_story_in_words() {
     eprintln!("{trace}");
     assert!(trace.contains(r#""class":"unauthorized""#) && trace.contains(r#""status":401"#), "{trace}");
 }
+
+#[path = "support/restarted_sign_in.rs"]
+mod restarted_sign_in;
+
+/// A person's sign-in outlives the binary killed and restarted, is refreshed at the issuer, and signs out.
+#[test]
+fn a_person_s_sign_in_outlives_a_restart_is_refreshed_at_the_issuer_and_signs_out() {
+    let directory = support::scratch();
+    let result = std::panic::catch_unwind(|| restarted_sign_in::run(directory.path()));
+    if let Err(failure) = result {
+        eprintln!("{}", support::trace::failures(directory.path()));
+        std::panic::resume_unwind(failure);
+    }
+}

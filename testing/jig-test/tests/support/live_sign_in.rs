@@ -146,7 +146,7 @@ fn progress(previous: &mut String, document: &c::OwnerAccounts, source: u32) {
 }
 /// The chat's run in words: its phase, attempt, retry, work, hold, ending and run wait. A
 /// result's words are the page's; no grant or credential is in the task document.
-fn run_line(task: &c::Task) -> String {
+pub(super) fn run_line(task: &c::Task) -> String {
     let c::ChipPhase::Owner { phase, details } = task.chip.details.as_ref() else {
         return format!("phase={:?}; wait={:?}", task.chip.phase, task.run_wait);
     };
@@ -174,7 +174,7 @@ fn ending(ending: &c::OwnerChipEnding) -> String {
 }
 /// Whether the run can no longer bring the answer: any failed or refused attempt, a hold, an
 /// ending other than a report, or a host's refusal. Each fails the test at once, in words.
-fn failed(task: &c::Task) -> bool {
+pub(super) fn failed(task: &c::Task) -> bool {
     let refused = matches!(task.run_wait, Some(c::TaskRunWait::Refused(_)));
     let c::ChipPhase::Owner { phase, details } = task.chip.details.as_ref() else { return refused };
     refused
@@ -356,12 +356,6 @@ impl Referee<Process> for Judge {
 
 pub fn run(directory: &Path, started: Time, peers: Peers) -> (u32, u32) {
     let clock = Clock::new();
-    let mut binary = support::start(directory);
-    let streams = binary.take_streams().expect("binary pipes");
-    let fds = streams.descriptors();
-    let Streams::Pipes { input, output } = streams else { panic!("pipes mode") };
-    let client_directory = tempfile::tempdir_in(directory).expect("native client directory");
-    let root = skein_shell::open_root(client_directory.path()).expect("client root");
     let mut world = real::World::new(Judge {
         phase: Phase::Admission,
         peers,
@@ -375,23 +369,12 @@ pub fn run(directory: &Path, started: Time, peers: Peers) -> (u32, u32) {
         run: String::new(),
         ended: None,
     });
-    world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
-    world.spawn_with_fds(fds.into_iter().chain([root]).collect(), || {
-        Process::Person(Box::new(Person {
-            client: None,
-            root: Some(root),
-            script: Some(Script::answered_report(WORDS.as_bytes(), support::ANSWER, Duration::from_secs(240))),
-            account_sign_in: true,
-            llm_key: None,
-            input: Some(input),
-            output: Some(output),
-            reading: false,
-            closing: 0,
-            bytes: Vec::new(),
-            completions: Queue::with_capacity(512),
-            submissions: Queue::with_capacity(512),
-        }))
-    });
+    let _client_directory = spawn_client(
+        &mut world,
+        directory,
+        Script::answered_report(WORDS.as_bytes(), support::ANSWER, Duration::from_secs(240)),
+        support::CLIENT_SEED,
+    );
     peers.spawn(&mut world);
     let remaining = started.saturating_add(peers.whole()).saturating_since(clock.now().now);
     let outcome = world.run(&clock, remaining);
@@ -580,23 +563,60 @@ impl Peers {
         if let Self::Fake | Self::Refusing = self {
             world.spawn(|| Process::Issuer(Box::new(support::issuer())));
             world.spawn(|| Process::Visitor(Box::default()));
-            let mut script = jig_channel_world::fixtures::one_chat(WORDS.as_bytes());
-            script.result = br#"{"form":"report","text":"Process answer","fields":{}}"#.as_slice().into();
-            world.spawn(|| {
-                Process::Peer(Box::new(jig_channel_world::fixtures::provider(
-                    Box::new([skein_fake_llm_domain::api::Script {
-                        cue: Box::default(),
-                        turns: jig_channel_world::fixtures::provider_turns(&script),
-                    }]),
-                    skein_llm::Credential::bearer(match self {
-                        Self::Refusing => b"not the plan's grant".as_slice().into(),
-                        Self::Real | Self::Fake => fixtures::TOKEN_SECOND.into(),
-                    }),
-                    Duration::ZERO,
-                    skein_fake_peers::Transport::Tls,
-                    skein_fake_llm_protocol::documents::Provider::OpenAi,
-                )))
-            });
+            world.spawn(|| Process::Peer(Box::new(fake_peer(self))));
         }
     }
+}
+
+/// Shared fake model and credential check for the process stories.
+pub(super) fn fake_peer(peers: Peers) -> skein_fake_peers::llm::Peer {
+    let mut script = jig_channel_world::fixtures::one_chat(WORDS.as_bytes());
+    script.result = br#"{"form":"report","text":"Process answer","fields":{}}"#.as_slice().into();
+    jig_channel_world::fixtures::provider(
+        Box::new([skein_fake_llm_domain::api::Script {
+            cue: Box::default(),
+            turns: jig_channel_world::fixtures::provider_turns(&script),
+        }]),
+        skein_llm::Credential::bearer(match peers {
+            Peers::Refusing => b"not the plan's grant".as_slice().into(),
+            Peers::Real | Peers::Fake => fixtures::TOKEN_SECOND.into(),
+        }),
+        Duration::ZERO,
+        skein_fake_peers::Transport::Tls,
+        skein_fake_llm_protocol::documents::Provider::OpenAi,
+    )
+}
+
+/// The process stories share a native client held for account setup.
+pub(super) fn spawn_client<R: Referee<Process>>(
+    world: &mut real::World<Process, R>,
+    directory: &Path,
+    script: Script,
+    seed: u64,
+) -> tempfile::TempDir {
+    let mut binary = support::start(directory);
+    let streams = binary.take_streams().expect("binary pipes");
+    let fds = streams.descriptors();
+    let Streams::Pipes { input, output } = streams else { panic!("pipes mode") };
+    let client_directory = tempfile::tempdir_in(directory).expect("native client directory");
+    let root = skein_shell::open_root(client_directory.path()).expect("client root");
+    world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
+    world.spawn_with_fds(fds.into_iter().chain([root]).collect(), || {
+        Process::Person(Box::new(Person {
+            seed,
+            client: None,
+            root: Some(root),
+            script: Some(script),
+            account_sign_in: true,
+            llm_key: None,
+            input: Some(input),
+            output: Some(output),
+            reading: false,
+            closing: 0,
+            bytes: Vec::new(),
+            completions: Queue::with_capacity(512),
+            submissions: Queue::with_capacity(512),
+        }))
+    });
+    client_directory
 }
