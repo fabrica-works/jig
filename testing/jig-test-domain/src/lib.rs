@@ -347,12 +347,24 @@ pub struct Domain {
 }
 
 impl Domain {
-    /// Project each child's already-armed elapsed deadline to the application's loop.
-    /// The loop sends the corresponding Timer input; this root chooses no cadence.
+    /// Project each child's original elapsed deadline and the saved people
+    /// wall expiry at the supplied clocks. The loop sends the owner's Timer.
     #[must_use]
-    pub fn core_deadlines(&self) -> [(core::Timer, Option<Time>); 6] {
+    pub fn core_deadlines(&self, now: Time, wall: Wall) -> [(core::Timer, Option<Time>); 6] {
+        let elapsed = self.core.people.next_deadline();
+        let saved = match self.core.people.next_wall_expiry() {
+            Some(expiry) if self.core.people.ready() => Some(
+                now.saturating_add(skein_lib::Duration::from_nanos(expiry.as_nanos().saturating_sub(wall.as_nanos()))),
+            ),
+            Some(_) | None => None,
+        };
+        let people = match (elapsed, saved) {
+            (Some(left), Some(right)) => Some(left.min(right)),
+            (Some(at), None) | (None, Some(at)) => Some(at),
+            (None, None) => None,
+        };
         [
-            (core::Timer::People, self.core.people.next_deadline()),
+            (core::Timer::People, people),
             (core::Timer::Tasks, self.core.tasks.next_deadline()),
             (core::Timer::Fleet, self.core.fleet.next_deadline()),
             (core::Timer::Brief, self.core.brief.next_deadline()),
@@ -946,17 +958,12 @@ fn wall_due(env: &Env<Limits>, expiry: Wall) -> bool {
 }
 
 fn timers_due(domain: &Domain, env: &Env<Limits>) -> bool {
-    for (_, due) in domain.core_deadlines() {
+    for (_, due) in domain.core_deadlines(env.now, env.wall) {
         if let Some(due) = due
             && due <= env.now
         {
             return true;
         }
-    }
-    if let Some(expiry) = domain.core.people.next_wall_expiry()
-        && wall_due(env, expiry)
-    {
-        return true;
     }
     for (_, due) in domain.connector_deadlines() {
         if let Some(due) = due

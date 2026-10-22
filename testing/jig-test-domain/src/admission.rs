@@ -184,7 +184,10 @@ mod expiry_tests {
         }
         env.now = Time::from_nanos(2);
         env.wall = expiry;
+        let projected = domain.core_deadlines(env.now, env.wall);
+        assert!(projected.contains(&(core::Timer::People, Some(env.now))));
         assert!(super::try_step(&mut domain, &env, Event::Timer(core::Timer::People)).is_err());
+        assert_eq!(domain.core_deadlines(env.now, env.wall), projected, "refusal retains the service deadline");
         assert_eq!(domain.core.people.sign_in_person(1), Some(1));
         assert_eq!(domain.core.people.next_wall_expiry(), Some(expiry));
         assert_eq!(domain.core.people.next_deadline(), elapsed);

@@ -79,7 +79,9 @@ fn joint_scheduler_expires_the_actual_sign_in_at_its_armed_people_deadline() {
     let mut world = World::scripted_clock(world::config(8453), limits, Peers::new(Vec::new(), Vec::new()), now, wall);
     sign_in(&mut world, 7);
     let due = Time::from_nanos(now.as_nanos() + limits.core.people.sign_in_lifetime.as_nanos());
-    assert!(world.domain.core_deadlines().contains(&(core::Timer::People, Some(due))));
+    assert!(
+        world.domain.core_deadlines(world.clocks().0, world.clocks().1).contains(&(core::Timer::People, Some(due)))
+    );
     let saved = world
         .store
         .rows
@@ -100,7 +102,38 @@ fn joint_scheduler_expires_the_actual_sign_in_at_its_armed_people_deadline() {
     assert!(!world.store.rows.contains_key(&saved), "People fired through the normal durable root route");
     assert!(world.store.applied > applied);
     assert_eq!(world.clocks(), (due, wall), "an elapsed deadline needs no wall jump");
-    assert!(world.domain.core_deadlines().contains(&(core::Timer::People, None)));
+    assert!(world.domain.core_deadlines(world.clocks().0, world.clocks().1).contains(&(core::Timer::People, None)));
+}
+
+#[test]
+fn joint_scheduler_erases_a_sign_in_when_wall_jumps_before_its_elapsed_alarm() {
+    let limits = world::limits();
+    let now = Time::from_nanos(17);
+    let wall = Wall::from_nanos(1_000_000_000_000);
+    let mut world = World::scripted_clock(world::config(8455), limits, Peers::new(Vec::new(), Vec::new()), now, wall);
+    sign_in(&mut world, 7);
+    let saved = world
+        .store
+        .rows
+        .iter()
+        .find_map(|(key, row)| match row {
+            root::Record::Core(core::Record::People(people::Stored::SignIn { person: 1, expires, .. })) => {
+                Some((key.clone(), *expires))
+            }
+            root::Record::Core(_) | root::Record::Connector { .. } => None,
+        })
+        .expect("actual durable sign-in and saved wall expiry");
+    let applied = world.store.applied;
+    let elapsed = Time::from_nanos(now.as_nanos() + 1);
+    world.fire_due(elapsed, saved.1);
+    assert!(
+        !world.store.rows.contains_key(&saved.0),
+        "the ordinary People timer erases the wall-expired sign-in before its original elapsed alarm"
+    );
+    assert_eq!(world.store.applied, applied + 1, "one durable expiry decision");
+    assert_eq!(world.clocks(), (elapsed, saved.1));
+    world.fire_due(elapsed, saved.1);
+    assert_eq!(world.store.applied, applied + 1, "the expiry fires once");
 }
 
 #[test]
@@ -108,7 +141,8 @@ fn joint_scheduler_resamples_the_effect_wall_after_correction_and_consumes_the_r
     let mut world = World::new(8454, false);
     let now = world.clocks().0;
     let wall = Wall::from_nanos(1_000_000_000_000);
-    world.set_clock(now, wall);
+    // Settle People made due by the forward correction before isolating the effect deadline.
+    world.fire_due(now, wall);
     world.hold_writes = true;
     let deadline = Wall::from_nanos(wall.as_nanos() + 500);
     let key = world.call_key(1);

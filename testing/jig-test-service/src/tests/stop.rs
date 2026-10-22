@@ -176,7 +176,7 @@ fn a_paused_core_timer_does_not_pin_the_service_while_stopping() {
     let mut driven = fixtures::Driven::started(&fixtures::engine_document());
     let engine = fixtures::engine(&mut driven.service);
     engine.values.accounts.expire(EXPIRE_VALUES);
-    let timers = engine.domain.core_deadlines();
+    let timers = engine.domain.core_deadlines(engine.env.now, engine.env.wall);
     let mut people = None;
     for (timer, deadline) in timers {
         if timer == core::Timer::People {
@@ -195,6 +195,63 @@ fn a_paused_core_timer_does_not_pin_the_service_while_stopping() {
     assert_eq!(engine.next_deadline(), Some(due));
     engine.step(root::Event::Stop);
     assert!(engine.domain.stopping());
-    assert_eq!(engine.domain.core_deadlines(), timers, "paused timers keep their values");
+    assert_eq!(
+        engine.domain.core_deadlines(engine.env.now, engine.env.wall),
+        timers,
+        "paused timers keep their values"
+    );
     assert_eq!(engine.next_deadline(), Some(live), "only a live timer asks the service to fire");
+}
+
+#[test]
+fn the_service_fires_wall_expiry_before_the_original_elapsed_alarm() {
+    use jig_domain_core as core;
+    use jig_domain_people as people;
+    use skein_lib::{Time, Token};
+    const WATCHER: Token = Token::new(901);
+    const ELAPSED: Time = Time::from_nanos(2); // The fixture signs in at elapsed 1.
+    let mut driven = fixtures::Driven::started(&fixtures::engine_document());
+    let Some(people::Reply::SignedIn { expires, .. }) = driven.reply else {
+        panic!("fixture sign-in");
+    };
+    driven.party(core::Event::Watch {
+        watcher: WATCHER,
+        sign_in: driven.sign_in.raw(),
+        subject: core::documents::Watched::Frame,
+        window: core::documents::Window { rows: 1, after: None },
+    });
+    driven.commit_all();
+    driven.party(core::Event::Delivered { watcher: WATCHER });
+    driven.commit_all();
+    let engine = fixtures::engine(&mut driven.service);
+    let original = engine.domain.core_deadlines(engine.env.now, engine.env.wall);
+    let mut original_people = None;
+    for (timer, deadline) in original {
+        if timer == core::Timer::People {
+            original_people = deadline;
+        }
+    }
+    assert!(original_people.expect("armed sign-in") > ELAPSED);
+    engine.env.now = ELAPSED;
+    engine.env.wall = expires;
+    assert_eq!(engine.next_deadline(), Some(ELAPSED), "the service resamples saved wall expiry");
+    let mut endings = 0_u32;
+    // The existing service/store route commits the expiry and releases its ending.
+    for _ in 0_u32..16 {
+        crate::iterate(&mut driven.service, ELAPSED, expires);
+        let engine = fixtures::engine(&mut driven.service);
+        while let Some(output) = engine.parties_out().pop() {
+            let crate::PartyOutput::Held(root::Delivery::Core(core::Held::WatchEnded { watcher, why })) = output else {
+                panic!("unexpected expiry output: {output:?}");
+            };
+            assert_eq!(watcher, WATCHER, "expiry ends the bound watch ({why:?})");
+            endings += 1;
+        }
+    }
+    assert_eq!(endings, 1, "one terminal through the ordinary service timer route");
+    let engine = fixtures::engine(&mut driven.service);
+    assert!(
+        engine.domain.core_deadlines(engine.env.now, engine.env.wall).contains(&(core::Timer::People, None)),
+        "the timer removed the sign-in, rather than only closing its watch during Resume"
+    );
 }

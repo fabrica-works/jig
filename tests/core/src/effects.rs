@@ -155,7 +155,7 @@ impl World {
     pub fn next_due(&self) -> Option<Time> {
         let (now, wall) = self.clocks();
         let mut next = None;
-        for (_, deadline) in self.domain.core_deadlines() {
+        for (_, deadline) in self.domain.core_deadlines(now, wall) {
             if let Some(deadline) = deadline {
                 next = Some(next.map_or(deadline, |prior: Time| prior.min(deadline)));
             }
@@ -180,7 +180,7 @@ impl World {
     pub fn fire_due(&mut self, now: Time, wall: Wall) {
         self.set_clock(now, wall);
         let mut events = Vec::new();
-        for (timer, deadline) in self.domain.core_deadlines() {
+        for (timer, deadline) in self.domain.core_deadlines(now, wall) {
             if deadline.is_some_and(|deadline| deadline <= now) {
                 events.push(root::Event::Timer(timer));
             }
