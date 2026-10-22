@@ -22,6 +22,7 @@ pub struct Referee {
     pub(crate) expected_answers: usize,
     pub(crate) story: crate::stories::Story,
     pub(crate) injected: bool,
+    pub(crate) calibrating_held_turn: bool,
     pub(crate) resumed_attempt: u64,
     pub(crate) engine_observed: usize,
     pub(crate) roots_observed: std::collections::BTreeMap<u64, u64>,
@@ -66,6 +67,16 @@ impl skein_world::Referee<Proc> for Referee {
                         self.story,
                         now,
                     );
+                    if host.holding && crate::world::pending_turn(&store) {
+                        let mut views = self.views.borrow_mut();
+                        if views.held_turn_submissions.is_none() {
+                            views.held_turn_submissions = Some(host.submitted);
+                            if self.calibrating_held_turn {
+                                self.injected = true;
+                                host.holding = false;
+                            }
+                        }
+                    }
                     let engine = host.service.engine().expect("engine layer");
                     self.views.borrow_mut().messages_ended = self.rules.message_ends.len();
                     self.views.borrow_mut().refusals_kept = !self.rules.refused_messages.is_empty();

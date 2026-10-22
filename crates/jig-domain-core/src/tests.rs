@@ -582,13 +582,43 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
 }
 
 #[test]
-fn documents_reject_oversized_whole_requests_and_invalid_bounds() {
-    let (core, mut limits) = core();
-    let empty = Subject::Chips { tasks: List::with_capacity(0) };
-    assert_eq!(make(&core, &limits, 1, &empty, &Window { rows: 33, after: None }, Wall::EPOCH), Err(Missing::TooLarge));
+fn documents_clamp_oversized_windows_and_reject_invalid_bounds() {
+    let (core, mut limits) = make_tree();
+    let subject = Subject::Tree { task: 1 };
+    assert_eq!(limits.documents.rows, 32);
+    let Document::Tree(tree) =
+        make(&core, &limits, 1, &subject, &Window { rows: 33, after: None }, Wall::EPOCH).unwrap()
+    else {
+        panic!("tree document")
+    };
+    assert_eq!(tree.root.number, 1);
+    assert_eq!(tree.rows.len(), 3);
+    assert_eq!(tree.rows.get(2).unwrap().chip.number, 4);
+    assert_eq!(tree.next, None);
+    limits.documents.rows = 2;
+    let Document::Tree(tree) =
+        make(&core, &limits, 1, &subject, &Window { rows: 33, after: None }, Wall::EPOCH).unwrap()
+    else {
+        panic!("clamped tree document")
+    };
+    assert_eq!(tree.root.number, 1);
+    assert_eq!(tree.rows.len(), 2);
+    assert_eq!(tree.rows.get(1).unwrap().chip.number, 3);
+    assert_eq!(tree.next, Some(Cursor::Number { number: 3 }));
+    let Document::Tree(tree) =
+        make(&core, &limits, 1, &subject, &Window { rows: 33, after: Some(Cursor::Number { number: 2 }) }, Wall::EPOCH)
+            .unwrap()
+    else {
+        panic!("clamped continuation")
+    };
+    assert_eq!(tree.rows.len(), 2);
+    assert_eq!(tree.rows.get(0).unwrap().chip.number, 3);
+    assert_eq!(tree.rows.get(1).unwrap().chip.number, 4);
+    assert_eq!(tree.next, None);
     assert!(document_worst_case(&limits.documents).is_some());
     limits.documents.lines = 0;
     assert_eq!(document_worst_case(&limits.documents), None);
+    assert_eq!(make(&core, &limits, 1, &subject, &window(), Wall::EPOCH), Err(Missing::TooLarge));
     limits.documents.lines = u32::MAX;
     limits.documents.chips = u32::MAX;
     assert_eq!(document_worst_case(&limits.documents), None);
@@ -1935,6 +1965,101 @@ fn signed_out_unknown_and_full_watches_are_refused_without_keyed_work() {
         Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Watched::Frame, window: window() },
     );
     assert_watch_refusal(&out[0], WatchRefusal::Busy);
+}
+
+#[test]
+fn a_tree_watch_past_the_rows_bound_keeps_its_clamped_window() {
+    let (mut core, mut limits) = make_tree();
+    let (authenticated, auth_limits) = watch_core();
+    core.people = authenticated.people;
+    limits.people = auth_limits.people;
+    limits.documents.rows = 2;
+    let watcher = Token::new(30);
+    let after = Some(Cursor::Number { number: 2 });
+    let out = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher, sign_in: 10, subject: Watched::Tree { task: 1 }, window: Window { rows: 32, after } },
+    );
+    assert_eq!(out.len(), 2);
+    let Request::Held(held) = &out[0] else { panic!("admitted delivery") };
+    let Held::Delivery { document, .. } = held.as_ref() else { panic!("document delivery") };
+    let Document::Tree(tree) = document.as_ref() else { panic!("tree document") };
+    assert_eq!(tree.rows.len(), 2);
+    assert_eq!(tree.rows.get(0).unwrap().chip.number, 3);
+    assert_eq!(tree.rows.get(1).unwrap().chip.number, 4);
+    assert_eq!(core.view_subjects.get(&watcher).unwrap().window, Window { rows: 2, after });
+    assert_eq!(core.views.watchers(), 1);
+}
+
+#[test]
+fn an_application_watch_asks_its_connector_with_the_clamped_window() {
+    let (mut core, mut limits) = watch_core();
+    limits.documents.rows = 2;
+    let watcher = Token::new(30);
+    let connector = core.connectors[0];
+    let subject = Token::new(90);
+    let scope = people::ApplicationScope::Project(1);
+    let after = Some(Cursor::Number { number: 7 });
+    let out = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch {
+            watcher,
+            sign_in: 10,
+            subject: Watched::Application { scope, connector, subject },
+            window: Window { rows: 32, after },
+        },
+    );
+    assert_eq!(out.len(), 2);
+    let Request::Ask {
+        connector: owner,
+        ask: Ask::Document { watcher: got, scope: got_scope, subject: got_subject, party, window },
+    } = &out[0]
+    else {
+        panic!("connector construction")
+    };
+    assert_eq!((*owner, *got, *got_scope, *got_subject, *party), (connector, watcher, scope, subject, 1));
+    assert_eq!(*window, Window { rows: 2, after });
+    assert_eq!(core.view_subjects.get(&watcher).unwrap().window, *window);
+}
+
+#[test]
+fn a_watch_whose_task_has_an_oversized_whole_value_is_refused_unknown() {
+    let (mut core, mut limits) = tree_core();
+    let (authenticated, auth_limits) = watch_core();
+    core.people = authenticated.people;
+    limits.people = auth_limits.people;
+    let mut row = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
+    row.authority.grants = Box::new([tasks::Grant {
+        connector: 1,
+        kind: 1,
+        pattern: tasks::Pattern {
+            segments: Box::new([b"whole".as_slice().into()]),
+            last: tasks::Last::Exact(b"end".as_slice().into()),
+        },
+    }]);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(1)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([row]),
+        },
+    );
+    limits.documents.text_bytes = 4;
+    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH), Err(Missing::TooLarge));
+    let out = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Watched::Task { task: 1 }, window: window() },
+    );
+    assert_eq!(out.len(), 2);
+    assert_watch_refusal(&out[0], WatchRefusal::Unknown);
+    assert!(core.view_subjects.is_empty());
+    assert!(core.view_names.is_empty());
+    assert_eq!(core.views.watchers(), 0);
 }
 
 #[test]

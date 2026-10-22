@@ -5,8 +5,13 @@ use crate::{
 };
 use skein_lib::Duration;
 
-/// The deterministic startup step immediately before its provider query is submitted.
-pub const BEFORE_PROVIDER_QUERY: u32 = 124;
+/// Measure the same startup through the real account request and provider query.
+#[must_use]
+pub fn before_provider_query(settings: world::Settings) -> u32 {
+    let mut calibration = script(Story::Chat);
+    calibration.latency = Duration::from_secs(1);
+    world::run(settings, calibration).query_submissions.expect("provider query")
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum Story {
@@ -92,22 +97,15 @@ pub fn drawn(seed: u64) -> Outcome {
         latency_max: Duration::from_millis(1),
         ..skein_sim::Faults::NONE
     };
-    let mut story = match draw.below(6) {
+    let story = match draw.below(6) {
         0 => Story::Chat,
         1 => Story::Progress,
         2 => Story::Call,
         3 => Story::HeldCommit,
         4 => Story::MidFrame,
-        5 => Story::Restart { before: BEFORE_PROVIDER_QUERY },
+        5 => Story::Restart { before: before_provider_query(settings) },
         _ => panic!("bounded draw"),
     };
-    if matches!(story, Story::Restart { .. }) {
-        // Measure the same faulted startup through the real account request first.
-        let mut calibration = script(Story::Chat);
-        calibration.latency = Duration::from_secs(1);
-        let before = world::run(settings, calibration).query_submissions.expect("provider query");
-        story = Story::Restart { before };
-    }
     world::run(settings, script(story))
 }
 

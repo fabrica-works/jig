@@ -335,6 +335,7 @@ pub enum Document {
 }
 
 /// Make the current visible document without changing state or emitting effects.
+/// Clamp its window to the engine's rows (`client/domain/contract.md`, 7.2).
 pub fn make(
     core: &Core,
     limits: &Limits,
@@ -343,9 +344,10 @@ pub fn make(
     window: &Window,
     decision: Wall,
 ) -> Result<Document, Missing> {
-    if document_worst_case(&limits.documents).is_none() || window.rows > limits.documents.rows {
+    if document_worst_case(&limits.documents).is_none() {
         return Err(Missing::TooLarge);
     }
+    let window = &Window { rows: window.rows.min(limits.documents.rows), ..*window };
     core.people.identity(party).ok_or(Missing::Unknown)?;
     match subject {
         Subject::Application { .. } => Err(Missing::Unknown),

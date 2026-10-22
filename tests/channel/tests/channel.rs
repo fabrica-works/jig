@@ -93,7 +93,8 @@ fn a_partition_seen_late_by_the_engine_places_no_attempt_early() {
 
 #[test]
 fn a_restarted_engine_adopts_the_worker_s_run_at_its_hello() {
-    let outcome = run(Story::Restart { before: jig_channel_world::stories::BEFORE_PROVIDER_QUERY });
+    let before = jig_channel_world::stories::before_provider_query(fixtures::calm(fixtures::SEED));
+    let outcome = run(Story::Restart { before });
     assert!(outcome.adopting_hellos > 0);
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert_eq!(outcome.turns_committed, 1);

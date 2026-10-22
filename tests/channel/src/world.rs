@@ -21,7 +21,7 @@ pub struct Settings {
     pub seed: u64,
     pub config: skein_sim::Config,
 }
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Script {
     pub words: Box<[u8]>,
     pub result: Box<[u8]>,
@@ -69,26 +69,42 @@ pub struct Outcome {
     pub held_at_restart: Option<u64>,
     pub recovered_commits: Vec<u64>,
     pub query_submissions: Option<u32>,
+    pub held_turn_submissions: Option<u32>,
     pub providers_before: (Option<u32>, Vec<(u32, u32, u32)>),
     pub providers_after: (Option<u32>, Vec<(u32, u32, u32)>),
 }
 
 /// Run one person's chat through the actual agent and all channel layers.
 #[must_use]
-pub fn run(mut settings: Settings, script: Script) -> Outcome {
+pub fn run(settings: Settings, script: Script) -> Outcome {
+    let held_turn = if matches!(script.story, crate::stories::Story::DurableRestart) {
+        // Replay the identical prefix, releasing its first observed held turn instead of killing it.
+        Some(run_at(settings, script.clone(), None).held_turn_submissions.expect("first observed held turn"))
+    } else {
+        None
+    };
+    run_at(settings, script, held_turn)
+}
+
+fn run_at(mut settings: Settings, script: Script, held_turn: Option<u32>) -> Outcome {
     if matches!(script.story, crate::stories::Story::MidFrame) {
         settings.config.buffer = 64;
     }
     let store = Rc::new(RefCell::new(Store::new()));
     let views = Rc::new(RefCell::new(Views::default()));
-    let referee = make_referee(&script, store.clone(), views.clone());
+    let referee = make_referee(
+        &script,
+        store.clone(),
+        views.clone(),
+        matches!(script.story, crate::stories::Story::DurableRestart) && held_turn.is_none(),
+    );
     let mut machine = skein_fake_machine::Machine::new();
     let _store_root = machine.lay(&[]);
     let client_root = machine.lay(&[]);
     let root = (!matches!(script.story, crate::stories::Story::Opening(_))).then(|| machine.lay(&[]));
     let mut harness = skein_world::World::new(settings.seed, settings.config, referee, skein_world::Memory::Unchecked)
         .with_machine(Machine(machine));
-    launch(&mut harness, root, &script);
+    launch(&mut harness, root, &script, held_turn);
     harness.spawn_root(skein_sim::Handle::new(client_root.raw()), |root| {
         let mut client = jig_client_protocol_world::native::NativeClient::new(
             jig_client_protocol_world::native::settings(),
@@ -139,6 +155,7 @@ fn outcome(procs: &[Proc], store: &Store, views: &Views, reset_injected: bool, k
         durable_at_restart: views.durable_at_restart,
         held_at_restart: views.held_at_restart,
         query_submissions: views.query_submissions,
+        held_turn_submissions: views.held_turn_submissions,
         providers_before: views.providers_before.clone(),
         providers_after: views.providers_after.clone(),
         recovered_commits: store.recovered.iter().copied().collect(),
@@ -405,6 +422,7 @@ pub(crate) struct Views {
     pub(crate) durable_at_restart: u64,
     pub(crate) held_at_restart: Option<u64>,
     pub(crate) query_submissions: Option<u32>,
+    pub(crate) held_turn_submissions: Option<u32>,
     pub(crate) providers_before: (Option<u32>, Vec<(u32, u32, u32)>),
     pub(crate) providers_after: (Option<u32>, Vec<(u32, u32, u32)>),
 }
@@ -420,8 +438,14 @@ fn transcript_count(bytes: &[u8]) -> u32 {
     count
 }
 
-fn make_referee(script: &Script, store: Rc<RefCell<Store>>, views: Rc<RefCell<Views>>) -> crate::referee::Referee {
+fn make_referee(
+    script: &Script,
+    store: Rc<RefCell<Store>>,
+    views: Rc<RefCell<Views>>,
+    calibrating_held_turn: bool,
+) -> crate::referee::Referee {
     crate::referee::Referee {
+        calibrating_held_turn,
         store,
         accounts: crate::account_setup::Setup::default(),
         party: parties::Party::new(1, parties::Role::Owner, 100, fixtures::party_script(script)),
@@ -475,6 +499,7 @@ fn launch(
     harness: &mut skein_world::World<Proc, crate::referee::Referee, Machine>,
     root: Option<skein_fake_machine::Opened>,
     script: &Script,
+    held_turn: Option<u32>,
 ) {
     harness.host(skein_world::HostedProgram {
         program: b"agent-program".as_slice().into(),
@@ -523,8 +548,8 @@ fn launch(
     if matches!(script.story, crate::stories::Story::Refusals(crate::stories::MessageRefusal::Replay)) {
         harness.cut(0, 156, skein_world::Cut::Kill);
     }
-    if matches!(script.story, crate::stories::Story::DurableRestart) {
-        harness.cut(0, 143, skein_world::Cut::Kill);
+    if let Some(before) = held_turn {
+        harness.cut(0, before, skein_world::Cut::Kill);
     }
     if let crate::stories::Story::Restart { before } = script.story {
         harness.cut(0, before, skein_world::Cut::Kill);

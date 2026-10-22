@@ -4,7 +4,7 @@ use jig_core_world::{
 };
 use jig_domain_core::{
     self as core,
-    documents::{Count, Document, PhaseLine, Watched},
+    documents::{Count, Cursor, Document, PhaseCounts, PhaseLine, Watched, Window},
 };
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
@@ -46,6 +46,47 @@ fn a_slow_watcher_of_a_tree_sees_fewer_deliveries_and_the_last_state() {
     assert_eq!(tree.root.phase, PhaseLine::Active(tasks::Active::Idle));
     watches.finish();
     inbox_across_projects_stories();
+}
+
+#[test]
+fn a_tree_window_past_the_rows_is_clamped_and_cut() {
+    let seed = 706;
+    let (configuration, mut limits) = jig_core_world::faults::plan_fixture_with_document_rows(seed, 2);
+    limits.core.tasks.delegates = 4;
+    jig_core_world::peers::journal(&mut limits);
+    let mut world = jig_core_world::effects::World::configured(seed, false, configuration, limits);
+    let parent = world.assignments[0];
+    let mut delegates = Vec::new();
+    for completion in 1..=4 {
+        let mut child =
+            jig_core_world::fixtures::member(&world, tasks::Executor::Agent { charter: 1 }, b"live delegate");
+        child.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+        delegates.push(jig_core_world::fixtures::delegate(&mut world, parent, completion, child));
+    }
+    world.watches =
+        Some(jig_core_world::watches::Parties::new(seed, world.store.applied, true, world.sign_in.expect("signed in")));
+    world.send(root::Event::Core(core::Event::Watch {
+        watcher: Token::new(3),
+        sign_in: world.sign_in.expect("signed in"),
+        subject: Watched::Tree { task: parent.0 },
+        window: Window { rows: 32, after: None },
+    }));
+    let watches = world.watches.as_ref().expect("party's tree watch");
+    assert_eq!(watches.deliveries.len(), 1, "first delivery without reopening the watch");
+    let Document::Tree(tree) = &watches.deliveries[0].2 else { panic!("tree document") };
+    assert_eq!(tree.root.number, parent.0);
+    assert_eq!(tree.rows.len(), 2);
+    assert_eq!(tree.rows.get(0).expect("first row").chip.number, delegates[0]);
+    assert_eq!(tree.rows.get(1).expect("second row").chip.number, delegates[1]);
+    assert_eq!(tree.next, Some(Cursor::Number { number: delegates[1] }));
+    assert_eq!(tree.folded.len(), 1);
+    let folded = tree.folded.get(0).expect("omitted delegates folded at root");
+    assert_eq!(folded.parent, parent.0);
+    assert_eq!(folded.phases, PhaseCounts { starting: 2, ..PhaseCounts::ZERO });
+    assert_eq!(folded.held_below, 0);
+    assert!(watches.endings.is_empty());
+    assert!(world.busy_events.is_empty(), "no Busy or retry");
+    watches.finish();
 }
 
 #[test]

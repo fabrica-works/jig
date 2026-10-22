@@ -84,6 +84,15 @@ pub fn restart(world: &mut World, seed: u64, engine: bool) {
     ))));
 }
 
+/// The plan fixture with a story's own document row bound, set before the
+/// world prices its heap.
+#[must_use]
+pub fn plan_fixture_with_document_rows(seed: u64, rows: u32) -> (jig_test_domain::Config, jig_test_domain::Limits) {
+    let (configuration, mut limits) = plan_fixture(seed);
+    limits.core.documents.rows = rows;
+    (configuration, limits)
+}
+
 /// The bounded two-level plan fixture used by resource and failure stories.
 #[must_use]
 pub fn plan_fixture(seed: u64) -> (jig_test_domain::Config, jig_test_domain::Limits) {

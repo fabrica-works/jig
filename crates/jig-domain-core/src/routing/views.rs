@@ -177,6 +177,7 @@ pub(super) fn open_run(
     )
 }
 
+// Retain one clamped window for every construction (`client/domain/contract.md`, 7.2).
 fn open_follow(
     core: &mut Core,
     env: &Env<Limits>,
@@ -203,6 +204,7 @@ fn open_follow(
         };
     };
     let subject = named_subject(subject, party);
+    let window = Window { rows: window.rows.min(env.limits.documents.rows), ..window };
     if core.view_subjects.contains_key(&watcher) || core.view_subjects.len() >= env.limits.views.watchers {
         return refused_subject(watcher, &subject, WatchRefusal::Busy);
     }
@@ -268,6 +270,7 @@ fn open_follow(
 }
 
 // Construction authenticates jig's named values; connector values remain opaque.
+// Unmakeable documents refuse Unknown (`client/domain/contract.md`, 7.2).
 fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, window: &Window) -> Option<WatchRefusal> {
     match subject {
         Subject::Application { scope, connector, .. } => {
@@ -277,9 +280,6 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
             if *scope != jig_domain_people::ApplicationScope::Own && core.people.role(party, scope.project()).is_none()
             {
                 return Some(WatchRefusal::NotAllowed);
-            }
-            if window.rows > env.limits.documents.rows {
-                return Some(WatchRefusal::Busy);
             }
             None
         }
@@ -301,8 +301,7 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
         | Subject::Note { .. } => match documents::make(core, &env.limits, party, subject, window, env.wall) {
             Ok(_) => None,
             Err(Missing::NotAllowed) => Some(WatchRefusal::NotAllowed),
-            Err(Missing::Unknown | Missing::Ended) => Some(WatchRefusal::Unknown),
-            Err(Missing::TooLarge) => Some(WatchRefusal::Busy),
+            Err(Missing::Unknown | Missing::Ended | Missing::TooLarge) => Some(WatchRefusal::Unknown),
         },
     }
 }
