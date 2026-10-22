@@ -32,7 +32,7 @@ fn source(connectors: &[u16], lines: u32) -> (Core, Limits) {
             },
         },
         people::Stored::Roles {
-            project: 0,
+            project: u32::try_from(people::DEPLOYMENT).expect("deployment roster number"),
             holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
         },
     ] {
@@ -88,7 +88,7 @@ fn deployment_connector_references_keep_full_width_identifiers_and_configured_or
     let (empty, empty_limits) = source(&[], 5);
     assert_original_facts(&deployment(&empty, &empty_limits), &value);
     assert!(core.people.identity(2).is_some());
-    assert_eq!(core.people.role(2, 0), None);
+    assert_eq!(core.people.role(2, u32::try_from(people::DEPLOYMENT).expect("deployment roster number")), None);
     assert_eq!(core.people.identity(3), None);
     assert_eq!(make(&core, &limits, 2, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
     assert_eq!(make(&core, &limits, 3, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::Unknown));

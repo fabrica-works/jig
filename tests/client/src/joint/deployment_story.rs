@@ -2,35 +2,9 @@
 use super::*;
 
 fn world() -> World<Test, Joint> {
-    let mut config = jig_core_world::world::config(8511);
-    config.core.owners = Box::new([
-        people::InitialOwner {
-            project: 1,
-            identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
-        },
-        people::InitialOwner {
-            project: 0,
-            identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
-        },
-    ]);
-    config.core.projects = crate::test::list([1, 0]);
+    let config = jig_core_world::world::config(8511);
+    // First-start seeding supplies deployment ownership independently of projects.
     let mut owner = jig_core_world::world::limits();
-    owner.core.authority.projects = 2;
-    let policy = config.core.authority.policy(1).expect("configured project policy").clone();
-    let rules = config.core.authority.rules().clone();
-    config.core.authority =
-        jig_domain_authority::Domain::new(rules, owner.core.authority).expect("two configured projects");
-    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-    for project in [1, 0] {
-        jig_domain_authority::step(
-            &mut config.core.authority,
-            jig_domain_authority::Event::Policy { project, policy: policy.clone() },
-            &mut out,
-        );
-        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project }));
-    }
-    owner.core.people.initial_owners = 2;
-    owner.core.people.projects = 2;
     owner.core.documents.rows = 2;
     owner.core.documents.lines = 2;
     owner.core.documents.chips = 2;

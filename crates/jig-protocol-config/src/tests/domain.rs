@@ -29,6 +29,10 @@ pub(super) fn two_projects(number: u8) -> Box<[u8]> {
     writer.put(&second).unwrap();
     fixtures::with(fixtures::ENGINE_SMALL, project, &writer.finish())
 }
+const CONFIGURED_PROJECTS: u32 = 2; // two_projects seeds projects 1 and 2.
+const DEPLOYMENT_ROSTER: u32 = 1;
+const ALL_ROSTERS: u32 = CONFIGURED_PROJECTS + DEPLOYMENT_ROSTER;
+
 fn two_ownerless_projects(people_projects: u32) -> Box<[u8]> {
     let document = fixtures::with(
         &two_projects(b'2'),
@@ -44,7 +48,8 @@ fn two_ownerless_projects(people_projects: u32) -> Box<[u8]> {
 }
 #[test]
 fn configured_projects_above_the_overridden_people_capacity_are_refused() {
-    let problems = fixtures::engine(&two_ownerless_projects(1)).expect_err("two rosters exceed capacity one");
+    let problems = fixtures::engine(&two_ownerless_projects(ALL_ROSTERS - DEPLOYMENT_ROSTER))
+        .expect_err("three rosters exceed capacity two");
     assert_eq!(
         problems.problems.as_slice(),
         &[crate::Problem { path: crate::Path::root().member(b"projects"), what: What::Bound }]
@@ -52,14 +57,29 @@ fn configured_projects_above_the_overridden_people_capacity_are_refused() {
 }
 #[test]
 fn configured_projects_at_or_below_the_overridden_people_capacity_parse() {
-    for capacity in [2, 3] {
-        let engine = fixtures::engine(&two_ownerless_projects(capacity)).expect("two rosters fit");
+    for capacity in [ALL_ROSTERS, ALL_ROSTERS + DEPLOYMENT_ROSTER] {
+        let engine =
+            fixtures::engine(&two_ownerless_projects(capacity)).expect("two projects and the deployment roster fit");
         assert_eq!(engine.limits.core.people.projects, capacity);
         assert_eq!(engine.projects.len(), 2);
         assert_eq!([engine.projects[0].number, engine.projects[1].number], [1, 2]);
         assert!(engine.owners.is_empty(), "ownerless projects still need rosters");
     }
 }
+#[test]
+fn a_configured_project_numbered_zero_is_refused() {
+    let document =
+        fixtures::with(fixtures::ENGINE_SMALL, br#""projects": [{"number": 1"#, br#""projects": [{"number": 0"#);
+    let problems = fixtures::engine(&document).expect_err("zero is the deployment roster");
+    assert_eq!(
+        problems.problems.as_slice(),
+        &[crate::Problem {
+            path: fixtures::path(&[b"projects"]).child(crate::Segment::Index(0)).member(b"number"),
+            what: What::Bound,
+        }]
+    );
+}
+
 fn with_grants(connector: u8) -> Box<[u8]> {
     let grant = br#""grants": [{"connector": 1, "kind": 2, "pattern": {"segments": ["service"], "last": "open", "value": ""}}]"#;
     let grant = fixtures::with(

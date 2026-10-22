@@ -120,6 +120,18 @@ pub(crate) fn owners(
                     break;
                 }
             }
+            // With no projects, retain one bootstrap entry per owner for the deployment.
+            // initial_owners still bounds retained entries, not distinct identities.
+            if engine.projects.is_empty()
+                && owners
+                    .push(InitialOwner {
+                        project: u32::try_from(jig_domain_people::DEPLOYMENT).expect("deployment roster number"),
+                        identity: identity.clone(),
+                    })
+                    .is_err()
+            {
+                problems.push(path.clone(), What::Bound);
+            }
             for project in &engine.projects {
                 if owners.push(InitialOwner { project: project.number, identity: identity.clone() }).is_err() {
                     problems.push(path.clone(), What::Bound);
@@ -185,7 +197,7 @@ pub(crate) fn whole(engine: &crate::Engine, problems: &mut Problems) {
         problems.push(Path::root().member(b"limits").member(b"driver.url_bytes"), What::Bound);
     }
     let limits = &engine.limits.core;
-    if engine.projects.len() > usize::try_from(limits.people.projects).expect("project capacity fits usize") {
+    if engine.projects.len() >= usize::try_from(limits.people.projects).expect("project capacity fits usize") {
         problems.push(Path::root().member(b"projects"), What::Bound);
     }
     operations(limits, problems);

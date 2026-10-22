@@ -6,6 +6,9 @@ use jig_domain_tasks as tasks;
 use jig_protocol_store as store;
 use skein_lib::{ReplyTo, Token};
 
+const CONFIGURED_PROJECTS: u32 = 2; // The fixture seeds projects 1 and 2.
+const DEPLOYMENT_ROSTER: u32 = 1;
+
 fn started() -> Service {
     let document = f::engine_document();
     let mut parsed = crate::startup::parse(&document).expect("fixture configuration");
@@ -20,7 +23,7 @@ fn started() -> Service {
     parsed.engine.owners = Box::new([owner.clone(), people::InitialOwner { project: 2, ..owner }]);
     let core = &mut parsed.engine.limits.core;
     core.authority.projects = 2;
-    core.people.projects = 2;
+    core.people.projects = CONFIGURED_PROJECTS + DEPLOYMENT_ROSTER;
     core.people.holdings = 2;
     core.people.initial_owners = 2;
     core.people.requests = 4;

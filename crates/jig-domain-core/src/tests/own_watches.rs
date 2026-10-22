@@ -202,7 +202,7 @@ fn a_role_change_marks_an_open_accounts_watch() {
         &mut core,
         &limits,
         Event::People(people::Event::Roles {
-            project: 0,
+            project: u32::try_from(people::DEPLOYMENT).expect("deployment roster number"),
             holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
         }),
     ));

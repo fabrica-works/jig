@@ -138,7 +138,7 @@ fn readiness_rechecks_a_projects_current_members() {
         &mut core,
         &env,
         Event::People(people::Event::Roles {
-            project: 0,
+            project: 1,
             holdings: Box::new([
                 people::Holding { person: ALICE, role: people::Role::Owner },
                 people::Holding { person: BOB, role: people::Role::Member },

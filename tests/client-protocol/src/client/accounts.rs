@@ -5,7 +5,19 @@ use jig_domain_accounts as accounts;
 impl Story {
     #[must_use]
     pub fn account_sign_in(seed: u64, offered: bool) -> Self {
+        Self::account_sign_in_with_owner(seed, offered, 7)
+    }
+    #[must_use]
+    pub fn ordinary_account_party(seed: u64) -> Self {
+        // The printed link authenticates subject 7; this deployment’s first owner is 8.
+        const OTHER_FIRST_OWNER: u64 = 8;
+        Self::account_sign_in_with_owner(seed, true, OTHER_FIRST_OWNER)
+    }
+    fn account_sign_in_with_owner(seed: u64, offered: bool, owner: u64) -> Self {
         let mut config = jig_core_world::world::config(seed);
+        for initial in &mut config.core.owners {
+            initial.identity.subject = owner.to_be_bytes().into();
+        }
         config.core.settings.llm_providers = accounts::Providers {
             providers: Box::new([accounts::Provider {
                 name: b"Fake".as_slice().into(),

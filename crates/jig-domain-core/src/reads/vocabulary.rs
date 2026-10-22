@@ -5,6 +5,7 @@ use crate::{Core, CoreRecord, Key, Record};
 use alloc::boxed::Box;
 use core::mem::{size_of, size_of_val};
 use jig_domain_notes as notes;
+use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Wall};
 
@@ -413,7 +414,9 @@ pub(crate) fn row_visible(core: &Core, party: u64, row: &Row) -> bool {
             tasks::Funder::Task(_) | tasks::Funder::Recurring { .. } => false,
         },
         Record::Notes(notes::Record::Entry(entry)) => match &entry.scope {
-            notes::Scope::Deployment => core.people.role(party, 0).is_some(),
+            notes::Scope::Deployment => {
+                core.people.role(party, u32::try_from(people::DEPLOYMENT).expect("deployment roster number")).is_some()
+            }
             notes::Scope::Project { project }
             | notes::Scope::Goal { project, .. }
             | notes::Scope::Resources { project, .. } => core.people.role(party, *project).is_some(),

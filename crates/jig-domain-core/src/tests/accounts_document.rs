@@ -29,7 +29,7 @@ pub(super) fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
     limits.accounts.holder_accounts = 2;
     let mut config = config(73);
     config.owners = Box::new([people::InitialOwner {
-        project: 0,
+        project: u32::try_from(people::DEPLOYMENT).expect("deployment roster number"),
         identity: people::IdentityKey { provider: 0, subject: ALICE.to_be_bytes().into() },
     }]);
     config.settings.llm_providers = accounts::Providers {
@@ -65,17 +65,19 @@ pub(super) fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
             people::step(&mut core.people, &people_env, people::Event::Restore { record }, &mut out);
         }
     }
-    people::step(
-        &mut core.people,
-        &people_env,
-        people::Event::Restore {
-            record: people::Stored::Roles {
-                project: 0,
-                holdings: Box::new([people::Holding { person: ALICE, role: people::Role::Owner }]),
+    for project in [0, 1] {
+        people::step(
+            &mut core.people,
+            &people_env,
+            people::Event::Restore {
+                record: people::Stored::Roles {
+                    project,
+                    holdings: Box::new([people::Holding { person: ALICE, role: people::Role::Owner }]),
+                },
             },
-        },
-        &mut out,
-    );
+            &mut out,
+        );
+    }
     people::step(&mut core.people, &people_env, people::Event::Restored, &mut out);
     for record in records {
         drop(step(&mut core, &env, Event::Account(accounts::Event::Restore { record })));

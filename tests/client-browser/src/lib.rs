@@ -46,9 +46,14 @@ fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
 }
+const CONFIGURED_PROJECTS: u32 = 1; // configuration.json seeds project 1.
+const DEPLOYMENT_ROSTER: u32 = 1;
+
 fn configuration(directory: &Path, bundle: &Path) -> serde_json::Value {
     let mut value: serde_json::Value =
         serde_json::from_slice(include_bytes!("configuration.json")).expect("engine JSON");
+    value["engine"]["limits"]["overrides"]["people.projects"] =
+        serde_json::json!(CONFIGURED_PROJECTS + DEPLOYMENT_ROSTER);
     value["service"]["components"] = serde_json::json!(["clients"]);
     value["workers"] = serde_json::json!([]);
     value["application"]["server"] = serde_json::json!({"listener":{"socket":"127.0.0.1:0"},"bundle":bundle});

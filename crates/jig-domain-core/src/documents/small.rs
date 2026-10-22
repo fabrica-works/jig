@@ -2,6 +2,7 @@
 use super::{Chip, Count, ExecutorKind, Frame, FrameProjectRole, Missing, PhaseLine, Run, Text};
 use crate::{Core, Limits};
 use alloc::boxed::Box;
+use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::List;
 use skein_lib::bytes::copy_of;
@@ -141,7 +142,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         kind: core.people.kind(party).ok_or(Missing::Unknown)?,
         login: text(&identity.login, limits.documents.text_bytes),
         name: text(&identity.name, limits.documents.text_bytes),
-        deployment_role: core.people.role(party, 0),
+        deployment_role: core.people.role(party, u32::try_from(people::DEPLOYMENT).expect("deployment roster number")),
         cut: projects.len() < roles.len(),
         projects,
         needs: counts.needs,

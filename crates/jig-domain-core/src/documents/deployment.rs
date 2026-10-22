@@ -232,7 +232,7 @@ pub(super) fn deployment(
     party: u64,
     clock: Option<DocumentClock>,
 ) -> Result<Deployment, Missing> {
-    if core.people.role(party, 0).is_none() {
+    if core.people.role(party, u32::try_from(people::DEPLOYMENT).expect("deployment roster number")).is_none() {
         return Err(Missing::NotAllowed);
     }
     let source_hosts = core.fleet.host_views();

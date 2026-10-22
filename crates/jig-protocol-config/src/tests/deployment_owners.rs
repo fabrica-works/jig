@@ -1,6 +1,7 @@
 //! First owners hold the deployment's roles (domain/people.md, 3).
 #![expect(
     clippy::disallowed_types,
+    clippy::disallowed_macros,
     clippy::disallowed_methods,
     reason = "tests are ordinary Rust (programming-model.md, 10.2)"
 )]
@@ -13,7 +14,9 @@ use jig_domain_core::{Core, CoreRecord, Event, Record, Request, Requests, Restar
 use jig_domain_people as people;
 use skein_lib::{Env, ReplyTo, Time, Token, Wall};
 
-const DEPLOYMENT: u32 = 0;
+fn deployment() -> u32 {
+    u32::try_from(people::DEPLOYMENT).expect("deployment roster number")
+}
 const PROJECT: u32 = 1;
 const SECOND_PROJECT: u32 = 2;
 const OWNER: u64 = 1;
@@ -36,7 +39,7 @@ struct Row {
     document: Box<[u8]>,
     restart: bool,
     sign_in: bool,
-    roles: &'static [(u64, u32, Option<people::Role>)],
+    roles: Vec<(u64, u32, Option<people::Role>)>,
     deployment_saves: usize,
     deployment_policy: usize,
     deployment_owners: &'static [u64],
@@ -54,7 +57,7 @@ fn rows() -> [Row; 6] {
             document: ENGINE_SMALL.into(),
             restart: false,
             sign_in: false,
-            roles: &[(OWNER, DEPLOYMENT, Some(people::Role::Owner)), (OWNER, PROJECT, Some(people::Role::Owner))],
+            roles: vec![(OWNER, deployment(), Some(people::Role::Owner)), (OWNER, PROJECT, Some(people::Role::Owner))],
             deployment_saves: ONE_SAVE,
             deployment_policy: 0,
             deployment_owners: &[OWNER],
@@ -64,8 +67,8 @@ fn rows() -> [Row; 6] {
             document: two_projects(b'2'),
             restart: false,
             sign_in: false,
-            roles: &[
-                (OWNER, DEPLOYMENT, Some(people::Role::Owner)),
+            roles: vec![
+                (OWNER, deployment(), Some(people::Role::Owner)),
                 (OWNER, PROJECT, Some(people::Role::Owner)),
                 (OWNER, SECOND_PROJECT, Some(people::Role::Owner)),
             ],
@@ -78,22 +81,22 @@ fn rows() -> [Row; 6] {
             document: second_owner,
             restart: false,
             sign_in: false,
-            roles: &[
-                (OWNER, DEPLOYMENT, Some(people::Role::Owner)),
-                (SECOND_PERSON, DEPLOYMENT, Some(people::Role::Owner)),
+            roles: vec![
+                (OWNER, deployment(), Some(people::Role::Owner)),
+                (SECOND_PERSON, deployment(), Some(people::Role::Owner)),
             ],
             deployment_saves: ONE_SAVE,
             deployment_policy: 0,
             deployment_owners: &[OWNER, SECOND_PERSON],
         },
         Row {
-            shows: "configured project zero keeps exactly the loop's roster and policy",
-            document: two_projects(b'0'),
+            shows: "without projects the first owner still owns the deployment",
+            document: super::fixtures::without_projects(ENGINE_SMALL),
             restart: false,
             sign_in: false,
-            roles: &[(OWNER, DEPLOYMENT, Some(people::Role::Owner))],
+            roles: vec![(OWNER, deployment(), Some(people::Role::Owner))],
             deployment_saves: ONE_SAVE,
-            deployment_policy: ONE_SAVE,
+            deployment_policy: 0,
             deployment_owners: &[OWNER],
         },
         Row {
@@ -101,7 +104,7 @@ fn rows() -> [Row; 6] {
             document: ENGINE_SMALL.into(),
             restart: false,
             sign_in: true,
-            roles: &[(SECOND_PERSON, DEPLOYMENT, None)],
+            roles: vec![(SECOND_PERSON, deployment(), None)],
             deployment_saves: ONE_SAVE,
             deployment_policy: 0,
             deployment_owners: &[OWNER],
@@ -111,7 +114,7 @@ fn rows() -> [Row; 6] {
             document: ENGINE_SMALL.into(),
             restart: true,
             sign_in: false,
-            roles: &[(OWNER, DEPLOYMENT, Some(people::Role::Owner))],
+            roles: vec![(OWNER, deployment(), Some(people::Role::Owner))],
             deployment_saves: 0,
             deployment_policy: 0,
             deployment_owners: &[],
@@ -172,7 +175,7 @@ fn first_owners_hold_the_deployments_roles_across_start_and_restart() {
                 row.shows
             );
         }
-        for &(person, project, expected) in row.roles {
+        for &(person, project, expected) in &row.roles {
             assert_eq!(
                 core.people.role(person, project),
                 expected,
@@ -183,7 +186,11 @@ fn first_owners_hold_the_deployments_roles_across_start_and_restart() {
         let rosters: Vec<_> = records
             .iter()
             .filter_map(|record| match record {
-                Record::People(people::Stored::Roles { project: DEPLOYMENT, holdings }) => Some(holdings.as_ref()),
+                Record::People(people::Stored::Roles { project, holdings })
+                    if u64::from(*project) == people::DEPLOYMENT =>
+                {
+                    Some(holdings.as_ref())
+                }
                 Record::Core(_) | Record::People(_) | Record::Tasks(_) | Record::Accounts(_) | Record::Notes(_) => None,
             })
             .collect();
@@ -194,7 +201,9 @@ fn first_owners_hold_the_deployments_roles_across_start_and_restart() {
         assert_eq!(holdings, expected, "{}", row.shows);
         let mut policies = 0;
         for record in &records {
-            if let Record::People(people::Stored::Policy { project: DEPLOYMENT, .. }) = record {
+            if let Record::People(people::Stored::Policy { project, .. }) = record
+                && u64::from(*project) == people::DEPLOYMENT
+            {
                 policies += 1;
             }
         }

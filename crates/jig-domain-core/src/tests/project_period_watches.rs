@@ -3,9 +3,13 @@
 
 use super::*;
 
+const CONFIGURED_PROJECTS: u32 = 2; // The fixture seeds projects 1 and 2.
+const DEPLOYMENT_ROSTER: u32 = 1;
+
 fn period_core(configured: u64) -> (Core, Limits) {
     let (auth, mut limits) = watch_core();
-    limits.authority.projects = 2;
+    limits.authority.projects = CONFIGURED_PROJECTS;
+    limits.people.projects = CONFIGURED_PROJECTS + DEPLOYMENT_ROSTER;
     limits.tasks.funders = 8;
     limits.views.watchers = 4;
     limits.views.watchers_per_party = 4;

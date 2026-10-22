@@ -147,7 +147,7 @@ fn two_projects(people_projects: u32) -> (root::Config, root::Limits) {
 
 #[test]
 fn all_configured_projects_seed_together_at_or_below_people_capacity() {
-    for capacity in [2, 3] {
+    for capacity in [AT_ROSTER_BOUND, AT_ROSTER_BOUND + DEPLOYMENT_ROSTER] {
         let (configuration, limits) = two_projects(capacity);
         let mut world = World::first_start(configuration, limits);
         assert!(world.domain.ready());
@@ -202,7 +202,8 @@ fn with_models(seed: u64, models: Box<[core::Model]>, role: authority::Models) -
     configuration
 }
 
-fn frame_models(world: &mut World, sign_in: u64) -> authority::Models {
+// The core’s Frame is the source of the protocol’s me document.
+fn frame(world: &mut World, sign_in: u64) -> documents::Frame {
     world.send(root::Event::Core(core::Event::Read {
         reply: ReplyTo::new(Token::new(11_003)),
         sign_in,
@@ -214,7 +215,62 @@ fn frame_models(world: &mut World, sign_in: u64) -> authority::Models {
         panic!("frame document reply")
     };
     let documents::Document::Frame(frame) = *document else { panic!("frame document") };
-    frame.projects.as_slice()[0].models
+    frame
+}
+
+fn frame_models(world: &mut World, sign_in: u64) -> authority::Models {
+    frame(world, sign_in).projects.as_slice()[0].models
+}
+
+const FIRST_OWNER_SUBJECT: u64 = 7; // world::config’s configured owner.
+const OTHER_SUBJECT: u64 = 8;
+const CONFIGURED_PROJECTS: u32 = 2; // two_projects seeds 1 and 2.
+const DEPLOYMENT_ROSTER: u32 = 1;
+const AT_ROSTER_BOUND: u32 = CONFIGURED_PROJECTS + DEPLOYMENT_ROSTER;
+
+fn first_frame(subject: u64) -> documents::Frame {
+    let mut world = cold();
+    let (_, signed) = sign_in(&mut world, subject);
+    frame(&mut world, signed)
+}
+
+#[test]
+fn a_first_owner_holds_the_deployments_owner_role_from_the_first_start() {
+    assert_eq!(first_frame(FIRST_OWNER_SUBJECT).deployment_role, Some(people::Role::Owner));
+}
+
+#[test]
+fn a_party_who_is_no_first_owner_holds_no_deployment_role() {
+    assert_eq!(first_frame(OTHER_SUBJECT).deployment_role, None);
+}
+
+#[test]
+fn the_frame_and_me_list_no_project_for_the_deployments_roles() {
+    let (mut configuration, mut limits) = two_projects(AT_ROSTER_BOUND);
+    // The parser expands each configured first owner over both projects.
+    let owner = configuration.core.owners[0].clone();
+    configuration.core.owners = Box::new([owner.clone(), people::InitialOwner { project: 2, ..owner }]);
+    limits.core.people.initial_owners = CONFIGURED_PROJECTS;
+    jig_core_world::peers::journal(&mut limits);
+    let mut world = World::first_start(configuration, limits);
+    world.client_peer = Some(ClientPeer::default());
+    let (_, signed) = sign_in(&mut world, FIRST_OWNER_SUBJECT);
+    let value = frame(&mut world, signed);
+    assert_eq!(value.projects.as_slice().iter().map(|row| row.project).collect::<Vec<_>>(), [1, 2]);
+}
+
+#[test]
+fn with_no_project_configured_the_first_owner_owns_the_deployment() {
+    let mut configuration = world::config(11_030);
+    configuration.core.projects.clear();
+    // Configuration carries a deployment bootstrap entry when there is no project.
+    for owner in &mut configuration.core.owners {
+        owner.project = u32::try_from(people::DEPLOYMENT).expect("deployment roster number");
+    }
+    let mut world = World::first_start(configuration, world::limits());
+    world.client_peer = Some(ClientPeer::default());
+    let (_, signed) = sign_in(&mut world, FIRST_OWNER_SUBJECT);
+    assert_eq!(frame(&mut world, signed).deployment_role, Some(people::Role::Owner));
 }
 
 #[test]

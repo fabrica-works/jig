@@ -133,7 +133,7 @@ fn an_accounts_watch_delivers_the_partys_completed_sign_in() {
 
 #[test]
 fn an_ordinary_party_receives_the_public_catalogue() {
-    let mut story = Story::account_sign_in(fixtures::SEED, true);
+    let mut story = Story::ordinary_account_party(fixtures::SEED);
     let me = jig_client::Handle { asker: Asker(7), number: 2 };
     story.watch(me, jig_client::Watchable::Jig(c::Subject::Me));
     assert!(story.run_until(|s| s.client.document(me).is_some_and(|d| d.latest.is_some()), WAIT));

@@ -116,3 +116,11 @@ pub const WORKER_SMALL: &[u8] = br#"{
 "agent": {"program": "jig-test", "arguments": ["agent"], "configuration": "agent.json"},
 "limits": {"profile": "small"}, "memory_bytes": 1073741824
 }"#;
+
+/// `ENGINE_SMALL` ends with its projects array, which this fixture empties whole.
+pub fn without_projects(document: &[u8]) -> Box<[u8]> {
+    let prefix = br#""projects": ["#;
+    let start = skein_lib::bytes::find(document, prefix).unwrap().checked_add(prefix.len()).unwrap();
+    let end = document.len().checked_sub(3).unwrap();
+    with(document, &document[start..end], b"")
+}

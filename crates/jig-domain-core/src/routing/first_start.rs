@@ -11,6 +11,44 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
     let owners = core::mem::replace(&mut core.seed_owners, Box::new([]));
     let mut identities = Map::with_capacity(env.limits.people.initial_owners);
     let mut out = Queue::with_capacity(super::route_room(&env.limits));
+    let mut holdings = List::with_capacity(env.limits.people.holdings);
+    for owner in &owners {
+        if identities.get(&owner.identity).is_some() {
+            continue;
+        }
+        let person = fresh(&mut core.counters, Family::Person).expect("first-start person space");
+        let record = people::Stored::Person {
+            number: person,
+            identity: people::Identity { key: owner.identity.clone(), login: Box::new([]), name: Box::new([]) },
+        };
+        let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
+        people::step(
+            &mut core.people,
+            &Env { now: env.now, wall: env.wall, limits: env.limits.people },
+            people::Event::Restore { record: record.clone() },
+            &mut child,
+        );
+        assert!(child.is_empty(), "configured owner restores within people limits");
+        identities.insert(owner.identity.clone(), person).expect("bounded configured identities");
+        out.push(Request::Write(Write::Save(Record::People(record))));
+        holdings.push(people::Holding { person, role: people::Role::Owner }).expect("configured owner roster");
+    }
+    let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
+    people::step(
+        &mut core.people,
+        &Env { now: env.now, wall: env.wall, limits: env.limits.people },
+        people::Event::Roles {
+            project: u32::try_from(people::DEPLOYMENT).expect("deployment roster number"),
+            holdings: holdings.into_boxed(),
+        },
+        &mut child,
+    );
+    for _ in 0..child.len() {
+        let people::Request::Save { record } = child.pop().expect("seeded deployment role row") else {
+            unreachable!("configured deployment roster fits people limits");
+        };
+        out.push(Request::Write(Write::Save(Record::People(record))));
+    }
     for &project in &core.projects {
         let policy = core.authority.policy(project).expect("configured project policy");
         let permissions = match core.permission_roles.get(&project) {
@@ -28,31 +66,7 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
             if owner.project != project {
                 continue;
             }
-            let person = match identities.get(&owner.identity) {
-                Some(&person) => person,
-                None => {
-                    let person = fresh(&mut core.counters, Family::Person).expect("first-start person space");
-                    let record = people::Stored::Person {
-                        number: person,
-                        identity: people::Identity {
-                            key: owner.identity.clone(),
-                            login: Box::new([]),
-                            name: Box::new([]),
-                        },
-                    };
-                    let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
-                    people::step(
-                        &mut core.people,
-                        &Env { now: env.now, wall: env.wall, limits: env.limits.people },
-                        people::Event::Restore { record: record.clone() },
-                        &mut child,
-                    );
-                    assert!(child.is_empty(), "configured owner restores within people limits");
-                    identities.insert(owner.identity.clone(), person).expect("bounded configured identities");
-                    out.push(Request::Write(Write::Save(Record::People(record))));
-                    person
-                }
-            };
+            let person = *identities.get(&owner.identity).expect("configured owner person seeded");
             holdings.push(people::Holding { person, role: people::Role::Owner }).expect("configured owner roster");
         }
         let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
@@ -65,27 +79,6 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
         for _ in 0..child.len() {
             let people::Request::Save { record } = child.pop().expect("seeded role row") else {
                 unreachable!("configured roster fits people limits");
-            };
-            out.push(Request::Write(Write::Save(Record::People(record))));
-        }
-    }
-    if !core.projects.as_slice().contains(&0) {
-        let mut holdings = List::with_capacity(env.limits.people.holdings);
-        for owner in &owners {
-            if let Some(person) = identities.remove(&owner.identity) {
-                holdings.push(people::Holding { person, role: people::Role::Owner }).expect("configured owner roster");
-            }
-        }
-        let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
-        people::step(
-            &mut core.people,
-            &Env { now: env.now, wall: env.wall, limits: env.limits.people },
-            people::Event::Roles { project: 0, holdings: holdings.into_boxed() },
-            &mut child,
-        );
-        for _ in 0..child.len() {
-            let people::Request::Save { record } = child.pop().expect("seeded deployment role row") else {
-                unreachable!("configured deployment roster fits people limits");
             };
             out.push(Request::Write(Write::Save(Record::People(record))));
         }

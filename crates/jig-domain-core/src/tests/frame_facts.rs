@@ -123,17 +123,14 @@ fn frame_watch_receives_pool_ledger_changes_after_their_decision() {
     let Request::Held(value) = &changed[0] else { panic!("held frame") };
     let Held::Delivery { document, .. } = value.as_ref() else { panic!("frame delivery") };
     let Document::Frame(value) = document.as_ref() else { panic!("frame") };
-    assert_eq!(
-        value.projects.get(1).expect("project 1 follows deployment role").pool.expect("actual pool").numbers.budget,
-        177
-    );
+    assert_eq!(value.projects.get(0).expect("project 1").pool.expect("actual pool").numbers.budget, 177);
     watch_outputs(&mut core, &limits, Event::Delivered { watcher });
     watch_outputs(&mut core, &limits, Event::Period { project: 1, period: 2, budget: 1000, next: None });
     let next = finish_watch_outputs(&mut core, &limits);
     let Request::Held(value) = &next[0] else { panic!("changed frame") };
     let Held::Delivery { document, .. } = value.as_ref() else { panic!("frame delivery") };
     let Document::Frame(value) = document.as_ref() else { panic!("frame") };
-    assert_eq!(value.projects.get(1).expect("project 1").pool, None, "the new creation period has no pool yet");
+    assert_eq!(value.projects.get(0).expect("project 1").pool, None, "the new creation period has no pool yet");
     assert!(
         core.tasks.funding(tasks::Funder::Pool { project: 1, person: 1, period }).is_some(),
         "the prior pool remains an actual owner ledger"

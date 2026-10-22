@@ -6,6 +6,12 @@
 )]
 use super::*;
 
+fn deployment() -> u32 {
+    u32::try_from(people::DEPLOYMENT).expect("deployment roster number")
+}
+
+const ORDINARY_PROJECTS: u32 = 2; // Project 1 and the full-width project.
+
 fn source(deployment_role: Option<people::Role>) -> (Core, Limits) {
     let (mut core, mut limits) = core();
     limits.people.projects = 3;
@@ -25,7 +31,10 @@ fn source(deployment_role: Option<people::Role>) -> (Core, Limits) {
         },
     ];
     if let Some(role) = deployment_role {
-        rows.push(people::Stored::Roles { project: 0, holdings: Box::new([people::Holding { person: 1, role }]) });
+        rows.push(people::Stored::Roles {
+            project: deployment(),
+            holdings: Box::new([people::Holding { person: 1, role }]),
+        });
     }
     for record in rows {
         people::step(&mut core.people, &env, people::Event::Restore { record }, &mut out);
@@ -62,9 +71,9 @@ fn frame_deployment_role_preserves_every_builtin_and_admitted_policy_and_full_wi
         assert_eq!(value.name.bytes.as_ref(), b"A Person");
         assert_eq!(value.retention, limits.people.request_retention);
         assert!(!value.cut);
-        assert_eq!(value.projects.get(0).unwrap().role, role);
-        assert_eq!(value.projects.get(1).unwrap().role, people::Role::Policy { role: 4 });
-        assert_eq!(value.projects.get(2).unwrap().project, u32::MAX);
+        assert_eq!(value.projects.len(), ORDINARY_PROJECTS);
+        assert_eq!(value.projects.get(0).unwrap().role, people::Role::Policy { role: 4 });
+        assert_eq!(value.projects.get(1).unwrap().project, u32::MAX);
         let mut held = u64::try_from(size_of::<Document>()).unwrap()
             + List::<FrameProjectRole>::worst_case(value.projects.capacity()).unwrap()
             + u64::try_from(value.login.bytes.len() + value.name.bytes.len()).unwrap();
@@ -89,9 +98,9 @@ fn frame_deployment_role_is_independent_of_clipped_project_rows_and_never_inferr
         assert_eq!(value.projects.len(), 1);
         assert_eq!(value.projects.capacity(), 1);
         match supplied {
-            Some(role) => {
-                assert_eq!(value.projects.get(0).unwrap().project, 0);
-                assert_eq!(value.projects.get(0).unwrap().role, role);
+            Some(_) => {
+                assert_eq!(value.projects.get(0).unwrap().project, 1);
+                assert_eq!(value.projects.get(0).unwrap().role, people::Role::Policy { role: 4 });
                 let Ok(Document::Deployment(_)) = make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH)
                 else {
                     panic!("clipped deployment document admitted");
@@ -133,20 +142,27 @@ fn frame_deployment_role_changes_only_when_its_own_retained_membership_changes()
         &mut core.people,
         &env,
         people::Event::Roles {
-            project: 0,
+            project: deployment(),
             holdings: Box::new([people::Holding { person: 1, role: people::Role::Observer }]),
         },
         &mut out,
     );
-    let Some(people::Request::Save { record: people::Stored::Roles { project: 0, .. } }) = out.pop() else {
+    let Some(people::Request::Save { record: people::Stored::Roles { project, .. } }) = out.pop() else {
         panic!("deployment roles saved");
     };
+    assert_eq!(project, deployment());
     assert_eq!(out.pop(), None);
     assert_eq!(frame(&core, &limits).deployment_role, Some(people::Role::Observer));
-    people::step(&mut core.people, &env, people::Event::Roles { project: 0, holdings: Box::new([]) }, &mut out);
-    let Some(people::Request::Save { record: people::Stored::Roles { project: 0, .. } }) = out.pop() else {
+    people::step(
+        &mut core.people,
+        &env,
+        people::Event::Roles { project: deployment(), holdings: Box::new([]) },
+        &mut out,
+    );
+    let Some(people::Request::Save { record: people::Stored::Roles { project, .. } }) = out.pop() else {
         panic!("deployment roles released");
     };
+    assert_eq!(project, deployment());
     assert_eq!(out.pop(), None);
     assert_eq!(frame(&core, &limits).deployment_role, None);
     assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
@@ -161,16 +177,17 @@ fn frame_deployment_role_does_not_invent_a_reserved_policy_number_refused_by_its
         &mut core.people,
         &env,
         people::Event::Roles {
-            project: 0,
+            project: deployment(),
             holdings: Box::new([people::Holding { person: 1, role: people::Role::Policy { role: 0 } }]),
         },
         &mut out,
     );
-    let Some(people::Request::RolesRefused { project: 0, .. }) = out.pop() else {
+    let Some(people::Request::RolesRefused { project, .. }) = out.pop() else {
         panic!("reserved policy refused");
     };
+    assert_eq!(project, deployment());
     assert_eq!(out.pop(), None);
-    assert_eq!(core.people.role(1, 0), None);
+    assert_eq!(core.people.role(1, deployment()), None);
     assert_eq!(frame(&core, &limits).deployment_role, None);
     assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
 }

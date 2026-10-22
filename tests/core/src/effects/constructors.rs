@@ -227,7 +227,11 @@ impl World {
         let observer = crate::observations::Observer::new(&configuration);
         let heap = crate::observations::Heap::new(limits);
         let creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
-        let initial_ask = crate::fixtures::create_chat(&creating, 1, 0, b"make an effect".as_slice().into());
+        let initial_ask = if configuration.core.projects.is_empty() {
+            people::Ask::MarkSeen { seen: people::Seen::Results { through: 0 } }
+        } else {
+            crate::fixtures::create_chat(&creating, 1, 0, b"make an effect".as_slice().into())
+        };
         let store = Store::new(limits, &configuration.core.settings.models);
         World {
             bootstrap_owners: Vec::new(),

@@ -1876,7 +1876,7 @@ fn watch_core() -> (Core, Limits) {
             holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
         },
         people::Stored::Roles {
-            project: 0,
+            project: u32::try_from(people::DEPLOYMENT).expect("deployment roster number"),
             holdings: Box::new([people::Holding { person: 1, role: people::Role::Observer }]),
         },
     ];
