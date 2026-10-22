@@ -99,3 +99,21 @@ fn a_person_signs_in_at_the_fake_issuer_and_the_live_story_answers_and_signs_out
     let outcome = live_sign_in::run(directory.path(), started, peers);
     live_sign_in::check(directory.path(), &limits, outcome, peers);
 }
+
+/// A provider that refuses the plan's grant fails the live story at once, with the run's words.
+#[test]
+fn a_provider_refusing_the_plan_s_grant_fails_the_live_story_in_words() {
+    let directory = support::scratch();
+    let peers = live_sign_in::Peers::Refusing;
+    let clock = skein_shell::Clock::new();
+    let started = clock.now().now;
+    live_sign_in::configuration_at(directory.path(), "127.0.0.1:34443", peers);
+    let failed = std::panic::catch_unwind(|| live_sign_in::run(directory.path(), started, peers))
+        .expect_err("a refused grant fails the live story");
+    let why = failed.downcast_ref::<String>().expect("the judge's words");
+    assert!(why.starts_with("live chat task=1 can't answer: "), "{why}");
+    assert!(why.contains("retry=Some(OwnerFailed { class: Run"), "{why}");
+    let trace = support::trace::failures(directory.path());
+    eprintln!("{trace}");
+    assert!(trace.contains(r#""class":"unauthorized""#) && trace.contains(r#""status":401"#), "{trace}");
+}

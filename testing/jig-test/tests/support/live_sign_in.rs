@@ -14,6 +14,9 @@ use std::{fs, net::ToSocketAddrs, path::Path};
 const SIGN_IN: Key = Key { asker: Asker(77), number: 1 };
 const SIGN_OUT: Key = Key { asker: Asker(77), number: 2 };
 const ACCOUNTS: Handle = Handle { asker: Asker(77), number: 1 };
+const CHAT: Handle = Handle { asker: Asker(77), number: 2 };
+/// After the chat's run ends with a result, the person reads it within this.
+const READ: Duration = Duration::from_secs(5);
 const PROVIDER: u32 = 1;
 const MODEL: &str = "gpt-6-luna";
 /// smith's openai preset window. The engine's model asks no more than the agent holds, or the
@@ -107,6 +110,10 @@ struct Judge {
     received: usize,
     accounts: Option<c::OwnerAccounts>,
     state: String,
+    chat: Option<u64>,
+    task: Option<c::Task>,
+    run: String,
+    ended: Option<Time>,
 }
 fn client(procs: &mut [Process]) -> &mut NativeClient {
     let Process::Person(person) = &mut procs[1] else { panic!("native person") };
@@ -137,13 +144,73 @@ fn progress(previous: &mut String, document: &c::OwnerAccounts, source: u32) {
         *previous = state;
     }
 }
+/// The chat's run in words: its phase, attempt, retry, work, hold, ending and run wait. A
+/// result's words are the page's; no grant or credential is in the task document.
+fn run_line(task: &c::Task) -> String {
+    let c::ChipPhase::Owner { phase, details } = task.chip.details.as_ref() else {
+        return format!("phase={:?}; wait={:?}", task.chip.phase, task.run_wait);
+    };
+    format!(
+        "phase={phase:?}; attempt={:?}; retry={:?}; work={:?}; hold={:?}; ending={}; wait={:?}",
+        details.attempt,
+        details.retry,
+        details.observation.as_ref().map(|observation| &observation.work),
+        details.hold.as_ref().map(|hold| (&hold.reason, &hold.tries)),
+        details.ending.as_ref().map_or_else(|| "none".to_owned(), ending),
+        task.run_wait,
+    )
+}
+fn ending(ending: &c::OwnerChipEnding) -> String {
+    let text = |text: &c::DocumentText| String::from_utf8_lossy(text.bytes.bytes()).into_owned();
+    match ending {
+        c::OwnerChipEnding::Done(c::ResultValue::Report(words) | c::ResultValue::Words(words)) => {
+            format!("Done({:?})", text(words))
+        }
+        c::OwnerChipEnding::Done(c::ResultValue::Failure(words)) => format!("Done(Failure({:?}))", text(words)),
+        c::OwnerChipEnding::Done(_) => "Done(another result)".to_owned(),
+        c::OwnerChipEnding::Failed(words) => format!("Failed({:?})", text(words)),
+        c::OwnerChipEnding::Cancelled { reason, .. } => format!("Cancelled({:?})", text(reason)),
+    }
+}
+/// Whether the run can no longer bring the answer: any failed or refused attempt, a hold, an
+/// ending other than a report, or a host's refusal. Each fails the test at once, in words.
+fn failed(task: &c::Task) -> bool {
+    let refused = matches!(task.run_wait, Some(c::TaskRunWait::Refused(_)));
+    let c::ChipPhase::Owner { phase, details } = task.chip.details.as_ref() else { return refused };
+    refused
+        || details.retry.is_some()
+        || details.hold.is_some()
+        || matches!(phase, c::OwnerChipPhase::Held { .. })
+        || details.ending.as_ref().is_some_and(|ending| {
+            !matches!(ending, c::OwnerChipEnding::Done(c::ResultValue::Report(_) | c::ResultValue::Words(_)))
+        })
+}
+fn reported(task: &c::Task) -> bool {
+    matches!(task.chip.details.as_ref(), c::ChipPhase::Owner { details, .. } if details.ending.is_some())
+}
 impl Judge {
+    /// One line per change of the chat's run; a run that can't answer fails here, with its words.
+    fn running(&mut self, now: Time) {
+        let (Some(chat), Some(task)) = (self.chat, &self.task) else { return };
+        let line = run_line(task);
+        if line != self.run {
+            eprintln!("Live chat task={chat}: {line}");
+            self.run = line;
+        }
+        assert!(!failed(task), "live chat task={chat} can't answer: {}", self.run);
+        if reported(task) && self.ended.is_none() {
+            self.ended = Some(now);
+        }
+    }
     fn receive(&mut self, native: &NativeClient) -> Option<c::Answer> {
         let mut answer = None;
         for received in &native.received[self.received..] {
             match received {
                 Received::Delivery(c::Delivery::OwnerAccounts(document)) => {
                     self.accounts = Some(document.as_ref().clone());
+                }
+                Received::Delivery(c::Delivery::Task(document)) if Some(document.chip.task) == self.chat => {
+                    self.task = Some(document.as_ref().clone());
                 }
                 Received::Answer { answer: value, .. } => answer = Some(value.clone()),
                 Received::SignedIn { .. } | Received::Sent { .. } | Received::Delivery(_) | Received::Read(_) => {}
@@ -212,7 +279,23 @@ impl Referee<Process> for Judge {
             }
             Phase::Signing { source } => self.signing(procs, source),
             Phase::Answer { source } => {
+                match answer {
+                    Some(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::Created { first, .. })))
+                        if self.chat.is_none() =>
+                    {
+                        self.chat = Some(first);
+                        native.account_request(jig_client::Event::Watch {
+                            handle: CHAT,
+                            subject: jig_client::Watchable::Jig(c::Subject::Task { task: first }),
+                        });
+                    }
+                    Some(refused @ c::Answer::Refused { .. }) => panic!("live chat refused: {refused:?}"),
+                    Some(_) | None => {}
+                }
+                self.running(now);
                 if native.script_finished() {
+                    native.account_request(jig_client::Event::Unwatch { handle: CHAT });
+                    self.ended = None;
                     native.hold_for_account_sign_in();
                     native.ask_account_sign_in(SIGN_OUT, c::Ask::SignOut { holder: c::AccountHolder::Own, source });
                     self.phase = Phase::SignOut;
@@ -257,13 +340,14 @@ impl Referee<Process> for Judge {
         if matches!(self.phase, Phase::Ended) {
             None
         } else {
-            Some(self.sign_in_deadline.map_or(self.deadline, |at| at.min(self.deadline)))
+            let read = self.ended.map(|ended| ended.saturating_add(READ));
+            [Some(self.deadline), self.sign_in_deadline, read].into_iter().flatten().min()
         }
     }
     fn overdue(&self, now: Time) -> Option<String> {
         self.next_deadline()
             .filter(|at| now >= *at)
-            .map(|_| format!("live ChatGPT phase {:?}: {}", self.phase, self.state))
+            .map(|_| format!("live ChatGPT phase {:?}: {}; chat: {}", self.phase, self.state, self.run))
     }
     fn passed(&self) -> bool {
         matches!(self.phase, Phase::Ended)
@@ -286,6 +370,10 @@ pub fn run(directory: &Path, started: Time, peers: Peers) -> (u32, u32) {
         received: 0,
         accounts: None,
         state: String::new(),
+        chat: None,
+        task: None,
+        run: String::new(),
+        ended: None,
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds.into_iter().chain([root]).collect(), || {
@@ -391,6 +479,8 @@ pub fn check(directory: &Path, limits: &codec::Limits, outcome: (u32, u32), peer
 pub enum Peers {
     Real,
     Fake,
+    /// The fake peers, with a provider that refuses the plan's grant.
+    Refusing,
 }
 impl Peers {
     fn sign_in(self) -> serde_json::Value {
@@ -406,7 +496,7 @@ impl Peers {
                 "must_grant":["chatgpt.tokens.use.direct"], "resource":"https://api.openai.com/v1",
                 "name_hint":"jig", "redirect_path":"auth/callback", "redirect_port":1455
             }),
-            Self::Fake => serde_json::json!({
+            Self::Fake | Self::Refusing => serde_json::json!({
                 "issuer":"http://127.0.0.1:31000", "client":"client", "scopes":["openid","read"],
                 "name_hint":"jig-test", "authorization":"http://127.0.0.1:31000/authorize",
                 "token":"http://127.0.0.1:31000/token", "revocation":"http://127.0.0.1:31000/revoke",
@@ -418,7 +508,7 @@ impl Peers {
     fn server_name(self) -> &'static str {
         match self {
             Self::Real => "api.openai.com",
-            Self::Fake => "skein.test",
+            Self::Fake | Self::Refusing => "skein.test",
         }
     }
     fn trust(self, endpoint: &mut serde_json::Value, field: &str, directory: &Path) {
@@ -426,7 +516,7 @@ impl Peers {
             Self::Real => {
                 endpoint.as_object_mut().expect("endpoint").remove(field);
             }
-            Self::Fake => endpoint[field] = serde_json::json!(directory.join("root.der")),
+            Self::Fake | Self::Refusing => endpoint[field] = serde_json::json!(directory.join("root.der")),
         }
     }
     fn describe(self, address: &str) {
@@ -434,7 +524,7 @@ impl Peers {
             Self::Real => {
                 eprintln!("Live model={MODEL}; Responses={address}; TLS server_name=api.openai.com; machine trust");
             }
-            Self::Fake => {
+            Self::Fake | Self::Refusing => {
                 eprintln!("Live model={MODEL}; Responses={address}; TLS server_name=skein.test; fixture trust");
             }
         }
@@ -442,25 +532,25 @@ impl Peers {
     fn sign_in_wait(self) -> Duration {
         match self {
             Self::Real => SIGN_IN_WAIT,
-            Self::Fake => Duration::from_secs(10),
+            Self::Fake | Self::Refusing => Duration::from_secs(10),
         }
     }
     fn deadline(self) -> Duration {
         match self {
             Self::Real => Duration::from_secs(590),
-            Self::Fake => Duration::from_secs(10),
+            Self::Fake | Self::Refusing => Duration::from_secs(10),
         }
     }
     fn whole(self) -> Duration {
         match self {
             Self::Real => WHOLE,
-            Self::Fake => Duration::from_secs(15),
+            Self::Fake | Self::Refusing => Duration::from_secs(15),
         }
     }
     fn credential(self) -> Option<&'static [u8]> {
         match self {
             Self::Real => None,
-            Self::Fake => Some(fixtures::TOKEN_SECOND),
+            Self::Fake | Self::Refusing => Some(fixtures::TOKEN_SECOND),
         }
     }
     fn visit(self, procs: &mut [Process], address: &[u8]) {
@@ -469,14 +559,14 @@ impl Peers {
                 eprintln!("Sign in at: {}", std::str::from_utf8(address).expect("authorization URL"));
                 eprintln!("(the browser must reach 127.0.0.1:1455 on this machine: ssh -L 1455:127.0.0.1:1455 HOST)");
             }
-            Self::Fake => {
+            Self::Fake | Self::Refusing => {
                 let Process::Visitor(visitor) = &mut procs[3] else { panic!("browser") };
                 visitor.hand(address);
             }
         }
     }
     fn shutdown(self, procs: &mut [Process]) {
-        if let Self::Fake = self {
+        if let Self::Fake | Self::Refusing = self {
             for proc in procs {
                 match proc {
                     Process::Issuer(issuer) => issuer.shutdown(),
@@ -487,7 +577,7 @@ impl Peers {
         }
     }
     fn spawn(self, world: &mut real::World<Process, Judge>) {
-        if let Self::Fake = self {
+        if let Self::Fake | Self::Refusing = self {
             world.spawn(|| Process::Issuer(Box::new(support::issuer())));
             world.spawn(|| Process::Visitor(Box::default()));
             let mut script = jig_channel_world::fixtures::one_chat(WORDS.as_bytes());
@@ -498,7 +588,10 @@ impl Peers {
                         cue: Box::default(),
                         turns: jig_channel_world::fixtures::provider_turns(&script),
                     }]),
-                    skein_llm::Credential::bearer(fixtures::TOKEN_SECOND.into()),
+                    skein_llm::Credential::bearer(match self {
+                        Self::Refusing => b"not the plan's grant".as_slice().into(),
+                        Self::Real | Self::Fake => fixtures::TOKEN_SECOND.into(),
+                    }),
                     Duration::ZERO,
                     skein_fake_peers::Transport::Tls,
                     skein_fake_llm_protocol::documents::Provider::OpenAi,

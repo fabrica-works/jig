@@ -84,9 +84,11 @@ fn the_live_configurations_are_ones_jig_test_reads() {
     let sign_in = support::scratch();
     live_sign_in::configuration_at(sign_in.path(), "192.0.2.1:443", live_sign_in::Peers::Real);
     assert_eq!(jig_test::check(&sign_in.path().join("config.json")), Ok(()));
-    let fake = support::scratch();
-    live_sign_in::configuration_at(fake.path(), "127.0.0.1:34443", live_sign_in::Peers::Fake);
-    assert_eq!(jig_test::check(&fake.path().join("config.json")), Ok(()));
+    for peers in [live_sign_in::Peers::Fake, live_sign_in::Peers::Refusing] {
+        let fake = support::scratch();
+        live_sign_in::configuration_at(fake.path(), "127.0.0.1:34443", peers);
+        assert_eq!(jig_test::check(&fake.path().join("config.json")), Ok(()));
+    }
     let d2 = support::scratch();
     configuration_at(d2.path(), "gpt-6-luna", "192.0.2.1:443");
     assert_eq!(jig_test::check(&d2.path().join("config.json")), Ok(()));
@@ -134,6 +136,7 @@ fn a_person_signs_in_to_chatgpt_and_a_real_model_answers() {
     let wall_ms = clock.now().now.saturating_since(started).as_nanos() / 1_000_000;
     eprintln!("live ChatGPT wall={wall_ms}ms");
     if let Err(failed) = result {
+        eprintln!("{}", support::trace::failures(directory.path()));
         // The secrets' store holds the sign-in's record (store.md, section 2), and a
         // trace that failed its check may hold a credential.
         for secret in ["state/secrets", "secrets", "agent-trace.jsonl"] {
