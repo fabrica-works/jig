@@ -322,10 +322,10 @@ fn reloading_mixed_work_restores_only_the_actual_ordinary_record() {
     assert_eq!(c.machine.pending(SECOND), None);
 }
 #[test]
-fn legacy_seen_decodes_restores_and_erases_without_resaving() {
+fn a_kept_seen_record_decodes_restores_and_erases_without_resaving() {
     for first_sent in [None, Some(skein_lib::Wall::EPOCH)] {
         let mut records = skein_lib::List::with_capacity(1);
-        records.push(fixtures::legacy_seen(SECOND, SEEN_NAME, first_sent)).unwrap();
+        records.push(fixtures::kept_seen(SECOND, SEEN_NAME, first_sent)).unwrap();
         let mut c = Client::with_kept(records);
         assert_eq!(c.requests(), &[Request::Told { told: Told::Kept { key: SECOND, request: fixtures::seen() } },]);
         c.step(Event::SignIn { with: With::Held(skein_lib::Secret::new(Box::new([7; 40]))) });

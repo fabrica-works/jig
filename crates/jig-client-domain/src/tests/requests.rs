@@ -432,7 +432,7 @@ fn seen_past_retention_erases_and_answers_unknown_once() {
     assert!(c.downs().is_empty());
 }
 #[test]
-fn legacy_seen_restores_kept_without_resaving_then_erases() {
+fn a_kept_seen_record_restores_without_resaving_then_erases() {
     for first_sent in [None, Some(skein_lib::Wall::EPOCH)] {
         let mut record = record(KEY, NAME, PARTY);
         record.first_sent = first_sent;

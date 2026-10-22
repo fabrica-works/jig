@@ -505,7 +505,7 @@ pub fn seen_answer() -> Box<[u8]> {
     .unwrap();
     answer(&w::KeyedAnswer::FinalAnswer(owned))
 }
-pub fn legacy_seen(key: Key, name: skein_lib::RequestKey, first_sent: Option<Wall>) -> Record {
+pub fn kept_seen(key: Key, name: skein_lib::RequestKey, first_sent: Option<Wall>) -> Record {
     let limits = jig_client_protocol_link::Limits::new(domain_limits(), limits().exchanges).unwrap();
     let table = jig_client_protocol_link::translate::store::table(
         &skein_lib::RequestRecord { key: name, scope: PARTY, first_sent, request: Held { key, request: seen() } },
