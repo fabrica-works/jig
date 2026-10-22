@@ -6,9 +6,11 @@
   files only lands with `land --docs`. Run what compiles and the tests of
   the crates you touch through `heavy`.
 - The default test suite (unit tests and the worlds' focused tests under
-  `tests/`) takes at most 15 seconds; the fuzzy suite (the worlds'
-  `tests/fuzzy_*.rs`, randomized tests) at most 1 minute. Keep new tests
-  within these budgets: see the same document.
+  `tests/`) takes at most 30 seconds (15 seconds before the user's doubling
+  of 10-22, provisional); the fuzzy suite (the worlds' `tests/fuzzy_*.rs`,
+  randomized tests) at most 2 minutes (1 minute before the user's doubling
+  of 10-22, provisional). Keep new tests within these budgets: see the same
+  document.
 - **jig is a kit for agentic applications;** temper is its first
   application. Read [README.md](README.md), then
   [docs/design/README.md](docs/design/README.md).

@@ -40,21 +40,23 @@ The suites are those of skein's `docs/foundation/testing-strategy.md`
 (section 8); `docs/design/domain/testing.md` (section 9) says what they
 hold in jig.
 
-- **The default suite** is every crate's unit tests and each world's
-  focused tests (`tests/<name>/tests/*.rs`): focused tests of
-  expected behaviour (scenarios, referee tests, replay, facts changing
-  nothing, memory against the worst case), and a cheap random world as a
-  smoke test where one helps. It is what `NEXTEST_DOUBLE_SPAWN=0 cargo nextest run --workspace`
-  runs, and it takes at most **15 seconds**.
+- **The default suite** is every crate's unit tests and each world's focused
+  tests (`tests/<name>/tests/*.rs`): focused tests of expected behaviour
+  (scenarios, referee tests, replay, facts changing nothing, memory against
+  the worst case), and a cheap random world as a smoke test where one helps.
+  It is what `NEXTEST_DOUBLE_SPAWN=0 cargo nextest run --workspace` runs,
+  and it takes at most **30 seconds** (15 seconds before the user's doubling
+  of 10-22, provisional).
 - **The fuzzy suite** is the worlds' `tests/fuzzy_*.rs`: randomized tests,
   such as sweeps of random worlds and domains driven at random, over many
-  seeds. It is not run by default, only with `--profile fuzzy`, as the
-  gate before merging to main, and it takes at most **1 minute**.
+  seeds. It is not run by default, only with `--profile fuzzy`, as the gate
+  before merging to main, and it takes at most **2 minutes** (1 minute
+  before the user's doubling of 10-22, provisional).
 
-- **The browser suite** is Chromium against `jig-test`, run with
-  `--profile browser`, within **60 seconds**. Missing Chromium or a bundle
-  fails and names its setup command. The gate builds and bundles the test
-  application first:
+- **The browser suite** is Chromium against `jig-test`, run with `--profile
+  browser`, within **120 seconds** (60 seconds before the user's doubling of
+  10-22, provisional). Missing Chromium or a bundle fails and names its
+  setup command. The gate builds and bundles the test application first:
 
 ```sh
 cargo build --target wasm32-unknown-unknown -p jig-client-test-shell-web
@@ -102,10 +104,12 @@ repository's tools, `jig-boundary`, `skein-codegen` and
   enumerated, then draw seeds for the remaining faults and timing choices.
   Coverage markers prove every reach the sweep claims.
 - **Long runs are several tests.** Aim for each focused test to take at most
-  about 0.5 s, and each fuzzy test about 5 s, unoptimized on the idle
-  development machine. Split longer sweeps so the gate can share them
-  across threads, retaining their assertions and coverage. The nextest slow
-  periods flag these times; they do not fail a test.
+  about 1 s (0.5 s before the user's doubling of 10-22, provisional), and
+  each fuzzy test about 10 s (5 s before the user's doubling of 10-22,
+  provisional), unoptimized on the idle development machine. Split longer
+  sweeps so the gate can share them across threads, retaining their
+  assertions and coverage. The nextest slow periods flag these times; they
+  do not fail a test.
 
 The budgets are enforced, not advisory: `.config/nextest.toml` gives each
 profile a `global-timeout`, so a suite that runs past its budget fails,
