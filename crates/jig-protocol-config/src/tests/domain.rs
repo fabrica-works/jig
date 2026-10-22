@@ -305,6 +305,13 @@ fn memory_below_the_components_sum_is_refused() {
     // The 32-byte set header and 8-byte room cache are inline, outside this heap sum.
     const RECONCILIATION_GROWTH_PER_RUN: u64 = 24 - 8;
     const ENDING_SAVING_PER_WATCHER: u64 = 88 - 16;
+    // Canonical source deadlines retain both clocks: State and Hold grow 16 -> 24,
+    // Source 152 -> 168, and Fact 64 -> 80 bytes, all still aligned to 8 bytes.
+    // Small has 4 * 3 sources: (12 / 5 + 1) = 3 B-tree nodes, each with 11 slots.
+    // Node headers, keys and edges are unchanged; source slots add 3 * 11 * 16 = 528.
+    // The 32 queued facts and deployment's 4 account facts add (32 + 4) * 16 = 576.
+    // Inline container headers are unchanged; total growth is 528 + 576 = 1,104.
+    const SOURCE_DEADLINE_GROWTH: u64 = 3 * 11 * (168 - 152) + (32 + 4) * (80 - 64);
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
     // Worker program sources add 6,723,936 bytes: the hub's and the fleet's source records
@@ -430,7 +437,8 @@ fn memory_below_the_components_sum_is_refused() {
     let wall_expiry_index = skein_lib::Set::<(skein_lib::Wall, u64)>::worst_case(limits.people.sign_ins).unwrap();
     let reconciliation_growth = u64::from(limits.views.runs) * RECONCILIATION_GROWTH_PER_RUN;
     let ending_saving = u64::from(limits.views.watchers) * ENDING_SAVING_PER_WATCHER;
-    let over = BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving;
+    let over =
+        BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving + SOURCE_DEADLINE_GROWTH;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
