@@ -69,14 +69,14 @@ pub fn held(world: &mut Story, client: ClientId) {
 }
 #[must_use]
 pub fn pressure() -> jig_fake_parties::Party {
-    use jig_fake_parties::{Act, Ask, Party, Role};
+    use jig_fake_parties::{Act, Ask, Party, Role, Task};
     Party::new(
         1,
         Role::Owner,
         1_000_000,
         Box::new([
             Act::SignIn { provider: 0, subject: b"ordinary pressure".as_slice().into() },
-            Act::Request { key: [61; 16], ask: Ask::SeeResults { through: 0 } },
+            Act::Request { key: [61; 16], ask: Ask::Stop { task: Task::Number(u64::MAX) } },
         ]),
     )
 }

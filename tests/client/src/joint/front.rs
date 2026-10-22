@@ -456,14 +456,14 @@ mod tests {
     }
 
     fn pressure_party() -> jig_fake_parties::Party {
-        use jig_fake_parties::{Act, Ask, Party, Role};
+        use jig_fake_parties::{Act, Ask, Party, Role, Task};
         Party::new(
             1,
             Role::Owner,
             1_000_000,
             Box::new([
                 Act::SignIn { provider: 0, subject: b"ordinary pressure".as_slice().into() },
-                Act::Request { key: [61; 16], ask: Ask::SeeResults { through: 0 } },
+                Act::Request { key: [61; 16], ask: Ask::Stop { task: Task::Number(u64::MAX) } },
             ]),
         )
     }
@@ -487,7 +487,7 @@ mod tests {
         let party = &front.session.driver.world.peers.as_ref().expect("ordinary peers").parties[0];
         assert!(party.quiescent());
         assert_eq!(party.replies.len(), 2);
-        assert_eq!(party.replies[1], (1_000_001, jig_fake_parties::Reply::Done));
+        assert_eq!(party.replies[1], (1_000_001, jig_fake_parties::Reply::Refused(jig_fake_parties::Refusal::Unknown)));
         assert!(Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO)).is_empty());
         let pressure = Front::<Test>::observed(&mut front);
         assert!(pressure.iter().any(|value| matches!(value, Observed::Made { key, .. } if *key == [61; 16])));
