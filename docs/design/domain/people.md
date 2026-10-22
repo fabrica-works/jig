@@ -371,7 +371,13 @@ entry naming the task or proposal it is and its project:
   proposal is pending, its person task is active, its question is
   unanswered, or its result unread. The only state of the inbox's own is
   each party's read positions, one over results and one per conversation
-  over its turns, moved by their `Seen` (5.1), never by a read.
+  over its turns, moved by their `Seen` (5.1), never by a read. A question
+  waits for the person until it is answered, not until its task has read
+  it. The asked task keeps each question it heard and its first answer
+  (`../protocol/store.md`, 15.7). The person's inbox, a question's live
+  document and an answer's admission read those lines, so a task's run
+  reading a question leaves it open for its person. The task answering
+  it itself closes it as the person's answer does.
 - **A conversation** is a task its creator flagged so (tasks.md,
   section 3), whatever its charter, tracked or not (tasks.md, section
   7): its turns are entries for its requester, while that

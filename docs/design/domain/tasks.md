@@ -885,6 +885,13 @@ are entries of its own (section 9), which always wake it.
   - *refused at the sender's entrance:* words and questions, past the
     bound: a party is told the inbox is full, an agent's tool call
     answers so.
+- **Questions outlive their reads.** The asked task keeps each question
+  it heard and its first answer in its question positions
+  (`../protocol/store.md`, 15.7), untouched by a run's read. Positions
+  keep unanswered questions before answered ones; answered positions
+  are evicted first, and an unanswered position is never evicted. A
+  question past `inbox_messages` unanswered ones is refused at its
+  sender's entrance, as words past the inbox's bound are.
 - **Within what a run reads.** Every message an inbox admits fits a
   run's message bound as it is rendered (smith's `protocol/limits.md`,
   3.9), so no run refuses one as too large: words and questions larger
