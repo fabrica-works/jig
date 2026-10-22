@@ -1,4 +1,5 @@
-use jig_worker_link_world::{World, fixtures};
+use jig_protocol_worker_link::{REFUSED_FRAMING, REFUSED_LIMITS, Request};
+use jig_worker_link_world::{Trace, World, fixtures};
 use skein_channel::Closed;
 use skein_lib::Duration;
 
@@ -19,6 +20,11 @@ fn check_redial(world: &mut World, low: u64, high: u64) {
     assert_eq!(world.dials().len(), 2);
     let gap = world.dials()[1].saturating_since(world.dials()[0]);
     assert!(gap >= Duration::from_millis(low) && gap <= Duration::from_millis(high), "{gap:?}");
+}
+fn check_local_loss(world: &World, reason: u16) {
+    assert_eq!(world.facts(), [Closed::RefusedHere(reason)]);
+    assert!(!world.root().iter().any(|request| matches!(request, Request::Down { .. })));
+    assert!(world.values().is_empty());
 }
 #[test]
 fn the_worker_dials_at_once() {
@@ -72,7 +78,27 @@ fn engine_terms_below_the_largest_turn_are_refused_as_limits() {
     let mut world = engine_world(fixtures::engine_with_terms(0x0101, 1));
     world.run();
     assert_eq!(world.refusals(), [(2, Box::from(b"257".as_slice()))]);
+    check_local_loss(&world, REFUSED_LIMITS);
+    assert!(!world.has_channel());
     check_redial(&mut world, 50, 100);
+    check_local_loss(&world, REFUSED_LIMITS);
+}
+#[test]
+fn malformed_records_are_refused_as_framing_and_redialled() {
+    // Inbound and TurnBusy exercise the ordinary decoder and the Busy-specific path.
+    for kind in [0x0181, 0x0184] {
+        let mut world = accepting_world();
+        world.run();
+        world.play(fixtures::frame(kind, b""));
+        assert_eq!(world.refusals(), [(3, Box::from(b"".as_slice()))]);
+        check_local_loss(&world, REFUSED_FRAMING);
+        assert!(!world.trace().iter().any(|trace| matches!(trace, Trace::Busy(..))));
+        assert!(!world.has_channel());
+        check_redial(&mut world, 50, 100);
+        check_local_loss(&world, REFUSED_FRAMING);
+        assert_eq!(world.root().iter().filter(|request| matches!(request, Request::Lost)).count(), 1);
+        assert_eq!(world.root().iter().filter(|request| matches!(request, Request::Ready)).count(), 2);
+    }
 }
 #[test]
 fn an_opening_past_the_handshake_deadline_is_closed_and_redialled() {

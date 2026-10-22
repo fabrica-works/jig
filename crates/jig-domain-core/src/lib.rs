@@ -544,6 +544,7 @@ impl Core {
         charters::assert_configured(&config.settings, limits);
         templates::assert_configured(&config, limits);
         assert!(config.projects.capacity() <= limits.authority.projects, "core prices configured projects");
+        assert!(config.projects.len() <= limits.people.projects, "people prices configured project rosters");
         assert!(config.permission_roles.len() <= limits.authority.projects, "core prices project permissions");
         for (_, roles) in &config.permission_roles {
             let bytes = u64::try_from(roles.len())

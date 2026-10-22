@@ -112,6 +112,78 @@ fn a_restart_does_not_grant_new_configured_owners() {
     assert_eq!(world.store.rows[&roles], expected);
 }
 
+fn two_projects(people_projects: u32) -> (root::Config, root::Limits) {
+    let mut configuration = world::config(11_020);
+    let mut limits = world::limits();
+    limits.core.authority.projects = 2;
+    limits.core.people.projects = people_projects;
+    // Reprice this fixture's journal for the second policy, as world::limits does.
+    let room = core::room_max(&limits.core).expect("two-project route room");
+    let connectors = jig_test_connector::MAX_OUT * 2;
+    limits.journal.writes = room.writes + connectors;
+    limits.journal.held = limits.journal.held.max(room.held + connectors);
+    let mut authority = authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
+        .expect("two policies");
+    let mut projects = skein_lib::List::with_capacity(2);
+    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    for (project, spend) in [(1, 1000), (2, 700)] {
+        let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
+        policy.period_spend = spend;
+        authority::step(&mut authority, authority::Event::Policy { project, policy }, &mut facts);
+        assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
+        projects.push(project).expect("two configured projects");
+    }
+    configuration.core.authority = authority;
+    configuration.core.projects = projects;
+    let mut permissions = skein_lib::Map::with_capacity(limits.core.authority.projects);
+    for (&project, roles) in &configuration.core.permission_roles {
+        permissions.insert(project, roles.clone()).expect("two project permission maps");
+    }
+    configuration.core.permission_roles = permissions;
+    configuration.core.template_overrides = skein_lib::Map::with_capacity(limits.core.authority.projects);
+    // The fixture's sole owner belongs to project 1; project 2 still needs a roster.
+    (configuration, limits)
+}
+
+#[test]
+fn all_configured_projects_seed_together_at_or_below_people_capacity() {
+    for capacity in [2, 3] {
+        let (configuration, limits) = two_projects(capacity);
+        let mut world = World::first_start(configuration, limits);
+        assert!(world.domain.ready());
+        assert_eq!(world.store.applied, 1, "the whole seed is one atomic decision");
+        assert_eq!(world.commits.len(), 1);
+        for (project, spend, holdings) in
+            [(1, 1000, vec![people::Holding { person: 1, role: people::Role::Owner }]), (2, 700, vec![])]
+        {
+            assert_eq!(
+                world.store.rows[&root::Key::Core(core::Key::People(people::Key::Roles(project)))],
+                root::Record::Core(core::Record::People(people::Stored::Roles {
+                    project,
+                    holdings: holdings.into_boxed_slice(),
+                }))
+            );
+            let root::Record::Core(core::Record::People(people::Stored::Policy { project: saved_project, value })) =
+                &world.store.rows[&root::Key::Core(core::Key::People(people::Key::Policy(project)))]
+            else {
+                panic!("each configured project has a saved policy")
+            };
+            assert_eq!((*saved_project, value.period_spend), (project, spend));
+        }
+
+        let rows = world.store.rows.clone();
+        let commits = world.commits.len();
+        let (mut changed, _) = two_projects(capacity);
+        changed.core.owners = Box::new([]);
+        changed.core.projects.clear();
+        world.restart_with(changed);
+        assert!(world.domain.ready());
+        assert_eq!(world.store.rows, rows, "restart keeps every seeded policy and roster");
+        assert_eq!(world.store.applied, 1, "restart does not reseed");
+        assert_eq!(world.commits.len(), commits);
+    }
+}
+
 fn model(name: &[u8]) -> core::Model {
     core::Model { name: name.into(), ..world::scripted_model() }
 }

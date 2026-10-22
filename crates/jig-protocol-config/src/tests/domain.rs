@@ -29,6 +29,37 @@ fn two_projects(number: u8) -> Box<[u8]> {
     writer.put(&second).unwrap();
     fixtures::with(fixtures::ENGINE_SMALL, project, &writer.finish())
 }
+fn two_ownerless_projects(people_projects: u32) -> Box<[u8]> {
+    let document = fixtures::with(
+        &two_projects(b'2'),
+        br#""owners": [{"provider": 1, "subject": "owner-a"}]"#,
+        br#""owners": []"#,
+    );
+    let limits = fixtures::with(
+        br#""profile": "small", "overrides": {"people.projects": CAP}"#,
+        b"CAP",
+        skein_lib::Decimal::of(u64::from(people_projects)).as_bytes(),
+    );
+    fixtures::with(&document, br#""profile": "small""#, &limits)
+}
+#[test]
+fn configured_projects_above_the_overridden_people_capacity_are_refused() {
+    let problems = fixtures::engine(&two_ownerless_projects(1)).expect_err("two rosters exceed capacity one");
+    assert_eq!(
+        problems.problems.as_slice(),
+        &[crate::Problem { path: crate::Path::root().member(b"projects"), what: What::Bound }]
+    );
+}
+#[test]
+fn configured_projects_at_or_below_the_overridden_people_capacity_parse() {
+    for capacity in [2, 3] {
+        let engine = fixtures::engine(&two_ownerless_projects(capacity)).expect("two rosters fit");
+        assert_eq!(engine.limits.core.people.projects, capacity);
+        assert_eq!(engine.projects.len(), 2);
+        assert_eq!([engine.projects[0].number, engine.projects[1].number], [1, 2]);
+        assert!(engine.owners.is_empty(), "ownerless projects still need rosters");
+    }
+}
 fn with_grants(connector: u8) -> Box<[u8]> {
     let grant = br#""grants": [{"connector": 1, "kind": 2, "pattern": {"segments": ["service"], "last": "open", "value": ""}}]"#;
     let grant = fixtures::with(

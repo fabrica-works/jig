@@ -237,12 +237,12 @@ impl World {
         }
     }
     pub fn play(&mut self, frame: skein_channel::Frame) {
-        if frame.kind() == 0x0184 {
-            let record = jig_protocol_worker_wire::TurnBusy::decode(
+        if frame.kind() == 0x0184
+            && let Ok(record) = jig_protocol_worker_wire::TurnBusy::decode(
                 &fixtures::codec(),
                 &mut skein_lib::Reader::new(&frame.bytes()[8..]),
             )
-            .expect("scripted busy");
+        {
             self.trace.push(Trace::Busy(
                 self.now,
                 Token::new(record.task()),

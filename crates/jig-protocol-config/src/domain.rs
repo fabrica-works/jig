@@ -185,6 +185,9 @@ pub(crate) fn whole(engine: &crate::Engine, problems: &mut Problems) {
         problems.push(Path::root().member(b"limits").member(b"driver.url_bytes"), What::Bound);
     }
     let limits = &engine.limits.core;
+    if engine.projects.len() > usize::try_from(limits.people.projects).expect("project capacity fits usize") {
+        problems.push(Path::root().member(b"projects"), What::Bound);
+    }
     operations(limits, problems);
     if limits.people.words > limits.tasks.message_bytes
         || limits.tasks.result_bytes > limits.tasks.message_bytes

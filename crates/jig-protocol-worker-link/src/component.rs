@@ -1,6 +1,6 @@
 //! Opening, loss and redial transitions (protocol/channel.md, 4 and 10.1).
 use crate::{
-    Event, Limits, Request,
+    Event, Limits, REFUSED_FRAMING, REFUSED_LIMITS, Request,
     backoff::Backoff,
     busy::Busy,
     connection::{Connection, Phase},
@@ -438,10 +438,10 @@ impl Component {
                 let schema = wire::schema(&bodies).expect("checked schema");
                 if let Some(kind) = wire::terms_gap(&schema, Role::Initiator, &terms) {
                     self.command(channel::Request::Refuse {
-                        reason: 2,
+                        reason: REFUSED_LIMITS,
                         text: bytes::copy_of(Decimal::of(u64::from(kind)).as_bytes()),
                     });
-                    let started = self.begin_loss(now, Closed::RefusedHere(2), out);
+                    let started = self.begin_loss(now, Closed::RefusedHere(REFUSED_LIMITS), out);
                     assert!(started, "terms are checked during opening");
                 } else {
                     let phase = mem::replace(&mut self.phase, Phase::Connecting);
@@ -511,8 +511,8 @@ impl Component {
                 }
                 Ok(_) => self.lose(now, Closed::Owner, out),
                 Err(_) => {
-                    self.command(channel::Request::Refuse { reason: 3, text: Box::new([]) });
-                    self.begin_loss(now, Closed::RefusedHere(3), out);
+                    self.command(channel::Request::Refuse { reason: REFUSED_FRAMING, text: Box::new([]) });
+                    self.begin_loss(now, Closed::RefusedHere(REFUSED_FRAMING), out);
                 }
             }
             return;
@@ -544,8 +544,8 @@ impl Component {
                 self.command(channel::Request::Read);
             }
             None => {
-                self.command(channel::Request::Refuse { reason: 3, text: Box::new([]) });
-                let started = self.begin_loss(now, Closed::RefusedHere(3), out);
+                self.command(channel::Request::Refuse { reason: REFUSED_FRAMING, text: Box::new([]) });
+                let started = self.begin_loss(now, Closed::RefusedHere(REFUSED_FRAMING), out);
                 assert!(started, "a body arrives on an open channel");
             }
         }
