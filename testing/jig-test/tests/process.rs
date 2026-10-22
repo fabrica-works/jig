@@ -27,17 +27,6 @@ fn a_killed_jig_test_finds_its_work_after_restart() {
 }
 
 #[test]
-fn the_explicit_d2_preseed_reaches_the_shipped_driver_without_a_configured_account() {
-    let directory = support::scratch();
-    support::configuration(directory.path());
-    support::d2::preseed(directory.path(), br#"{"access_token":"token","expires_at":4102444800}"#);
-    assert_eq!(
-        support::run_d2(directory.path(), Script::answered_chat(b"Hello", support::ANSWER), Some(peer())),
-        (1, 1)
-    );
-}
-
-#[test]
 fn an_agent_trace_captures_content_without_the_grant_or_authorization_header() {
     let directory = support::scratch();
     support::configuration(directory.path());

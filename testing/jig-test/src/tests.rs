@@ -41,7 +41,7 @@ fn a_secret_file_readable_by_others_refuses_the_start() {
         agent.display()
     );
     let mut owned = Vec::new();
-    let error = prepare(bytes.as_bytes(), &mut owned, None).err().expect("start refused");
+    let error = prepare(bytes.as_bytes(), &mut owned).err().expect("start refused");
     assert!(error.contains("Unsafe"), "private read refusal: {error}");
     assert!(!error.contains("private-worker-value"), "diagnostic contains no secret");
     assert!(owned.is_empty(), "refusal happens before opening runtime descriptors");

@@ -23,8 +23,6 @@ const SWEEP: Token = Token::new(PREFIX | (1_u64 << 34));
 const KEY_EXCHANGE: u64 = PREFIX | (1_u64 << 33);
 #[derive(Debug)]
 pub struct AccountsRuntime {
-    /// D2: removed by JP13. Ordinary callers supply `D2::empty()`.
-    pub d2: crate::D2,
     /// LLM account sign-in endpoints and origins, keyed by provider number.
     pub providers: List<(u32, driver::Endpoint, List<driver::Origin>)>,
     /// Bounds of all prepared trust roots, supplied by their shell owner.
@@ -35,7 +33,6 @@ pub struct AccountsRuntime {
 enum Phase {
     Loading { crypto: CryptoRng },
     Running,
-    UnmatchedD2,
 }
 /// One durable erase per source; only sign-out continues to driver removal.
 #[derive(Debug)]
@@ -50,7 +47,6 @@ pub(super) struct Accounts {
     env: Env<driver::Limits>,
     ids: Map<u32, Secret>,
     providers: Map<u32, driver::Account>,
-    d2: crate::D2,
     required: Map<u32, Box<[u8]>>,
     erasing: Map<u32, Erasing>,
     records: records::Records,
@@ -205,20 +201,12 @@ impl Accounts {
             .ok_or(problem(Path::root().member(b"engine").member(b"llm").member(b"providers"), What::Bound))?;
         let providers = provider_templates(config, runtime.as_mut(), &limits, &crypto, &seeds.installation)?;
         let inventory = restart::Inventory::new(limits.accounts, secrets.page.rows);
-        let d2 = match runtime {
-            Some(runtime) => runtime.d2,
-            None => crate::D2::empty(),
-        };
-        if d2.sources.len() > limits.accounts {
-            return Err(problem(Path::root().member(b"D2"), What::Bound));
-        }
         Ok(Self {
             component: None,
             phase: Phase::Loading { crypto },
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             ids: Map::with_capacity(limits.accounts),
             providers,
-            d2,
             required: Map::with_capacity(limits.accounts),
             erasing: Map::with_capacity(limits.accounts),
             records: records::Records::new(limits.accounts),
@@ -309,11 +297,7 @@ impl Accounts {
                     }
                 }
                 translate::Down::Restored => {
-                    if self.d2.sources.is_empty() {
-                        self.inventory.restored();
-                    } else {
-                        self.phase = Phase::UnmatchedD2;
-                    }
+                    self.inventory.restored();
                 }
                 translate::Down::Keep { source, carried, replaces } => {
                     self.inventory.name(source);
@@ -395,7 +379,7 @@ impl Accounts {
     }
     pub fn work_pending(&self, now: Time) -> bool {
         let starting = match &self.phase {
-            Phase::Loading { .. } | Phase::UnmatchedD2 => true,
+            Phase::Loading { .. } => true,
             Phase::Running => !self.early.is_empty(),
         };
         starting
@@ -447,9 +431,6 @@ impl Accounts {
         self.clock(now, wall);
         self.answers(store, events);
         self.start(store, values);
-        if let Phase::UnmatchedD2 = self.phase {
-            return;
-        }
         self.key_steps(values, events, store);
         self.sweep(store);
         self.fire_driver();
@@ -556,54 +537,6 @@ impl Accounts {
         }
     }
     fn restore_signed_in(&mut self, source: u32, provider: u32, value: Option<Secret>) {
-        if let Some(record) = self.d2.sources.remove(&source) {
-            // D2: removed by JP13. Only an explicitly named, already durable fixture record.
-            let Some(value) = value else {
-                self.records.missing(source);
-                self.key_events.push(domain::FromComponent::Failed {
-                    account: source,
-                    failure: domain::Failure::Unloaded { at: domain::Place::File, why: domain::Unread::Unreadable },
-                });
-                return;
-            };
-            let expected =
-                oauth::encode_record(&record, &self.env.limits.client.document).expect("D2 helper checked record");
-            if expected.as_ref() != value.expose() {
-                self.records.missing(source);
-                self.key_events.push(domain::FromComponent::Failed {
-                    account: source,
-                    failure: domain::Failure::Unloaded { at: domain::Place::File, why: domain::Unread::Unreadable },
-                });
-                return;
-            }
-            let Some(record) = self.records.load(source, value.expose(), &self.env.limits.client.document) else {
-                self.key_events.push(domain::FromComponent::Failed {
-                    account: source,
-                    failure: domain::Failure::Unloaded { at: domain::Place::File, why: domain::Unread::Unreadable },
-                });
-                return;
-            };
-            let id = Secret::new(record.metadata.clone().unwrap_or_default());
-            let before = self.above.len();
-            self.component.as_mut().expect("running driver").add(
-                &self.env,
-                source,
-                driver::Account::HandedIn,
-                &mut self.above,
-            );
-            if self.above.len() != before {
-                return;
-            }
-            self.ids.insert(source, id).expect("D2 source fits driver");
-            self.required.insert(source, Box::default()).expect("D2 source fits driver");
-            let records::Next::Driver(request) =
-                self.records.hand_in(source, record, &self.env.limits.client.document).expect("D2 helper record")
-            else {
-                unreachable!("D2 preseed is durable");
-            };
-            self.down(request);
-            return;
-        }
         let Some(template) = self.providers.get(&provider) else {
             self.key_events.push(domain::FromComponent::Failed {
                 account: source,
@@ -894,19 +827,8 @@ impl Accounts {
                     }
                     let request = self.early.pop().expect("early requests");
                     self.dispatch(request, store, values);
-                    match self.phase {
-                        Phase::UnmatchedD2 => break,
-                        Phase::Loading { .. } | Phase::Running => (),
-                    }
                 }
             }
-            Phase::UnmatchedD2 => (),
-        }
-    }
-    pub fn startup_problem(&self) -> Option<Problems> {
-        match self.phase {
-            Phase::UnmatchedD2 => Some(problem(Path::root().member(b"D2"), What::Refers)),
-            Phase::Loading { .. } | Phase::Running => None,
         }
     }
 }

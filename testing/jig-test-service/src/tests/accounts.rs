@@ -275,101 +275,68 @@ fn aborting_does_not_submit_an_llm_key_adoption_to_the_closing_store() {
     };
 }
 
-struct D2Fixture {
-    service: crate::Service,
-    accounts: Accounts,
-    token: Box<[u8]>,
-}
-fn d2_fixture(restore: bool) -> D2Fixture {
-    use jig_protocol_accounts_world::world;
-    let issued = world::run(31, world::Story::SignIn);
-    assert!(world::owner(&issued).last_kept().is_some());
+fn restarted_signed_in_source() -> (crate::Service, Accounts) {
+    use jig_protocol_accounts_world::{fixtures as account_fixtures, world::Story};
     let mut service = fixtures::started(&fixtures::accounts_document());
     for _ in 0_u32..8 {
         fixtures::turn(&mut service);
     }
     let engine = fixtures::engine(&mut service);
-    let limits = engine.accounts.as_ref().unwrap().env.limits;
-    let issued_record =
-        oauth::decode_record(world::owner(&issued).last_kept().unwrap(), &limits.client.document).unwrap();
-    let expected_token = issued_record.access_token.clone();
-    let fixture = crate::d2_preseed(
-        70,
-        9001,
-        1,
-        domain::Holder::Party(1),
-        Secret::new(issued_record.access_token),
-        issued_record.expires_at,
-        Some(b"D2-only-account-id".as_slice().into()),
-        &limits.client.document,
-    )
-    .unwrap();
+    let limits = engine.accounts.as_ref().expect("accounts component").env.limits;
+    let mut saved = account_fixtures::kept();
+    saved.key = 9001;
+    saved.issued_client_id = Some(b"issued-client".as_slice().into());
+    saved.granted_scopes = Some(b"openid read".as_slice().into());
+    saved.subject = Some(b"subject".as_slice().into());
+    let value = oauth::encode_record(&saved, &limits.client.document).expect("signed-in record");
     let _later = engine.store.secrets(
         Token::new(123),
-        store::Secrets::Keep { owner: store::SecretOwner::Source, number: 9001, value: fixture.value },
+        store::Secrets::Keep { owner: store::SecretOwner::Source, number: 9001, value: Secret::new(value) },
     );
     while engine.store.above.pop().is_some() {}
-    let configuration = crate::startup::parse(&fixtures::accounts_document()).unwrap().engine;
-    let mut component = Accounts::new(
-        &configuration,
-        &fixtures::seeds(),
-        Some(AccountsRuntime {
-            d2: fixture.input,
-            providers: List::with_capacity(0),
-            trust_roots: 0,
-            trust_root_bytes: 0,
-        }),
-        64,
-        &configuration.limits.store.secrets,
-    )
-    .unwrap();
-    let providers = domain::Providers {
-        providers: Box::new([domain::Provider {
-            name: b"Fake".as_slice().into(),
-            signed_in_plan: false,
-            manage_usage: Some(b"https://usage.example/".as_slice().into()),
-            number: 1,
-            models: Box::new([]),
-            offers: domain::Offers { sign_in: false, key: true, programs: Box::new([]) },
-        }]),
-    };
-    let mut child = domain::Domain::new(&configuration.limits.core.accounts, providers);
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: configuration.limits.core.accounts };
-    let mut out = Queue::with_capacity(domain::max_out(&env.limits));
-    if restore {
-        for record in fixture.rows {
-            domain::step(&mut child, &env, domain::Event::Restore { record }, &mut out);
-        }
-    }
-    domain::step(&mut child, &env, domain::Event::Want, &mut out);
-    while let Some(request) = out.pop() {
-        component.request(request);
-    }
-    D2Fixture { service, accounts: component, token: expected_token }
+    let mut fresh = fixtures::started(&fixtures::accounts_document());
+    let mut accounts = fixtures::engine(&mut fresh).accounts.take().expect("restarted component");
+    let template = party::party_account(
+        &account_fixtures::party_registration(Story::SignIn),
+        driver::Endpoint {
+            address: ::core::net::SocketAddr::from(([127, 0, 0, 1], 31000)),
+            transport: driver::Transport::Plaintext,
+        },
+        List::with_capacity(0),
+        &fixtures::seeds().installation,
+    );
+    assert!(matches!(accounts.providers.insert(1, template), Ok(None)));
+    accounts.request(domain::Request::Signing(domain::Signing::Restore {
+        source: 9001,
+        provider: 1,
+        kind: domain::Kind::SignIn,
+    }));
+    accounts.request(domain::Request::Component(domain::ToComponent::Want { account: 9001 }));
+    accounts.request(domain::Request::Signing(domain::Signing::Restored));
+    (service, accounts)
 }
 
 #[test]
-fn a_d2_preseed_restores_the_handed_in_source_under_its_number() {
-    let D2Fixture { mut service, mut accounts, token } = d2_fixture(true);
+fn a_restart_restores_a_party_signed_in_source_under_its_number_and_lends_a_bearer() {
+    let (mut service, mut accounts) = restarted_signed_in_source();
     let engine = fixtures::engine(&mut service);
-    let mut granted = None;
-    for event in &pump_accounts(&mut accounts, engine) {
-        if let domain::FromComponent::Granted { account: 9001, form, .. } = event {
-            granted = Some(*form);
+    assert!(pump_accounts(&mut accounts, engine).iter().any(|event| matches!(
+        event,
+        domain::FromComponent::Granted {
+            account: 9001,
+            generation: 1,
+            form: domain::Form::Credential(domain::Scheme::Bearer),
+            ..
         }
-    }
-    assert_eq!(granted, Some(domain::Form::Withdrawn));
-    let value = engine.values.accounts.value(9001, 1, Time::from_nanos(1)).unwrap();
-    assert_eq!(value.token.expose(), token.as_ref());
-    let table::Scheme::Withdrawn { id } = &value.scheme else {
-        panic!("D2 withdrawn grant");
-    };
-    assert_eq!(id.expose(), b"D2-only-account-id");
+    )));
+    let value = engine.values.accounts.value(9001, 1, Time::from_nanos(1)).expect("restored grant");
+    assert_eq!(value.token.expose(), jig_protocol_accounts_world::fixtures::TOKEN_FIRST);
+    assert_eq!(value.scheme, table::Scheme::Bearer);
 }
 
 #[test]
-fn a_d2_preseed_source_is_named_in_the_sweep() {
-    let D2Fixture { mut service, mut accounts, .. } = d2_fixture(true);
+fn a_restart_keeps_the_named_signed_in_record_and_sweeps_an_unnamed_record() {
+    let (mut service, mut accounts) = restarted_signed_in_source();
     let engine = fixtures::engine(&mut service);
     let _later = engine.store.secrets(
         Token::new(123),
@@ -380,7 +347,7 @@ fn a_d2_preseed_source_is_named_in_the_sweep() {
         },
     );
     while engine.store.above.pop().is_some() {}
-    let _heard = pump_accounts(&mut accounts, engine);
+    pump_accounts(&mut accounts, engine);
     for (number, exists) in [(9001, true), (9002, false)] {
         let Some(store::Event::Secret { value, .. }) =
             engine.store.secrets(Token::new(123), store::Secrets::Get { owner: store::SecretOwner::Source, number })
@@ -389,30 +356,4 @@ fn a_d2_preseed_source_is_named_in_the_sweep() {
         };
         assert_eq!(value.is_some(), exists, "source {number}");
     }
-}
-
-#[test]
-fn an_unmatched_d2_source_refuses_startup() {
-    let D2Fixture { mut service, accounts, .. } = d2_fixture(false);
-    let engine = fixtures::engine(&mut service);
-    engine.accounts = Some(accounts);
-    for _ in 0_u32..2 {
-        crate::engine::iterate(engine, Time::from_nanos(1), Wall::from_nanos(1));
-    }
-    let Some(crate::End::Stopped(crate::Stop::Start(problems))) = &engine.end else {
-        panic!("unconsumed D2 input must refuse startup");
-    };
-    assert_eq!(problems, &problem(Path::root().member(b"D2"), What::Refers));
-}
-
-#[test]
-fn a_refused_d2_add_lends_no_value() {
-    let D2Fixture { mut service, mut accounts, .. } = d2_fixture(true);
-    let engine = fixtures::engine(&mut service);
-    accounts.opened(&engine.store.installation);
-    accounts.component.as_mut().unwrap().add(&accounts.env, 9001, driver::Account::HandedIn, &mut accounts.above);
-    assert!(accounts.above.is_empty(), "the first add was admitted");
-    let _heard = pump_accounts(&mut accounts, engine);
-    assert!(!accounts.ids.contains_key(&9001), "the refused add must not install its id");
-    assert!(engine.values.accounts.value(9001, 1, Time::from_nanos(1)).is_none());
 }

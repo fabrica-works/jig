@@ -1,5 +1,4 @@
 //! Binary, native person and independent provider on Skein's real ring.
-pub mod d2;
 pub mod trace;
 use crate::account_sign_in_visitor::Visitor;
 use jig_client_protocol_world::native::{NativeClient, Script};
@@ -86,19 +85,6 @@ pub fn start(directory: &Path) -> Binary {
         65536,
     )
     .expect("jig-test starts")
-}
-fn start_d2(directory: &Path) -> Binary {
-    Binary::start(
-        Command {
-            program: env!("CARGO_BIN_EXE_jig-test").into(),
-            arguments: vec!["serve-d2".into(), "config.json".into(), "d2.json".into()],
-            directory: directory.into(),
-            environment: std::env::vars_os().filter(|(name, _)| name == "PATH").collect(),
-        },
-        Mode::Pipes,
-        65536,
-    )
-    .expect("explicit D2 fixture starts")
 }
 pub fn printed_link(bytes: &[u8]) -> Option<&[u8]> {
     let end = bytes.iter().position(|byte| *byte == b'\n')?;
@@ -366,15 +352,9 @@ impl Referee<Process> for Judge {
     }
 }
 pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm::Peer>) -> (u32, u32) {
-    run_mode(directory, script, peer, false)
-}
-pub fn run_d2(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm::Peer>) -> (u32, u32) {
-    run_mode(directory, script, peer, true)
-}
-fn run_mode(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm::Peer>, d2: bool) -> (u32, u32) {
     let seconds = if std::env::var("NEXTEST_PROFILE").as_deref() == Ok("live") { 280 } else { 60 };
     let clock = Clock::new();
-    let mut binary = if d2 { start_d2(directory) } else { start(directory) };
+    let mut binary = start(directory);
     let streams = binary.take_streams().expect("binary pipes");
     let fds = streams.descriptors();
     let Streams::Pipes { input, output } = streams else { panic!("pipes mode") };
@@ -392,7 +372,7 @@ fn run_mode(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm
             root: Some(root),
             script: Some(script),
             account_sign_in: false,
-            llm_key: (!d2).then_some(false),
+            llm_key: Some(false),
             input: Some(input),
             output: Some(output),
             reading: false,

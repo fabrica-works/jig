@@ -26,9 +26,7 @@ mod stop;
 mod store;
 pub mod system;
 use alloc::boxed::Box;
-mod d2;
 pub use boundary::{End, Files, PartyOutput, Seeds, Stop};
-pub use d2::{D2, D2_ACCOUNT, D2_HOLDER, D2_PROVIDER, D2_SOURCE, D2Preseed, d2_preseed};
 pub use engine::Engine;
 pub use limits::Limits;
 use skein_io::{

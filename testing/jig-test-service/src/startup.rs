@@ -414,7 +414,7 @@ pub(super) fn engine_startup(
         Some(_) | None => Some(0),
     }
     .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
-    let configured = configuration_bytes(&parsed.engine, runtime.as_ref())?;
+    let configured = configuration_bytes(&parsed.engine)?;
     let bytes = limits::worst_case(&parsed.limits)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?
         .checked_add(trust)
@@ -720,19 +720,10 @@ pub(super) fn fixture_connectors(document: &[u8]) -> (config::Engine, [connector
     (parsed.engine, [parsed.first, parsed.second])
 }
 
-fn configuration_bytes(engine: &config::Engine, runtime: Option<&crate::AccountsRuntime>) -> Result<u64, Problems> {
-    let d2 = match runtime {
-        Some(runtime) => runtime.d2.worst_case(&engine.limits.driver.client.document),
-        None => Some(0),
-    }
-    .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+fn configuration_bytes(engine: &config::Engine) -> Result<u64, Problems> {
     let workers = crate::workers::configured_bytes(engine)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
     let accounts = crate::accounts::configured_bytes(engine)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
-    workers
-        .checked_add(accounts)
-        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?
-        .checked_add(d2)
-        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))
+    workers.checked_add(accounts).ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))
 }
