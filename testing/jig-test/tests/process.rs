@@ -88,9 +88,9 @@ fn a_party_adds_replaces_and_removes_a_key() {
 #[path = "support/live_sign_in.rs"]
 mod live_sign_in;
 
-/// The live sign-in story on fake peers: a deployment's sign-in made, used for an answer and signed out.
+/// The live sign-in story on fake peers: a person's plan signed in, used for an answer and signed out.
 #[test]
-fn a_deployment_signs_in_at_the_fake_issuer_and_the_live_story_answers_and_signs_out() {
+fn a_person_signs_in_at_the_fake_issuer_and_the_live_story_answers_and_signs_out() {
     let directory = support::scratch();
     let peers = live_sign_in::Peers::Fake;
     let clock = skein_shell::Clock::new();

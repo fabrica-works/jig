@@ -14,9 +14,11 @@ use std::{fs, net::ToSocketAddrs, path::Path};
 const SIGN_IN: Key = Key { asker: Asker(77), number: 1 };
 const SIGN_OUT: Key = Key { asker: Asker(77), number: 2 };
 const ACCOUNTS: Handle = Handle { asker: Asker(77), number: 1 };
-const DEPLOYMENT: Handle = Handle { asker: Asker(77), number: 2 };
 const PROVIDER: u32 = 1;
 const MODEL: &str = "gpt-6-luna";
+/// smith's openai preset window. The engine's model asks no more than the agent holds, or the
+/// worker's hello is refused.
+pub const WINDOW: u32 = 272_000;
 // configuration.md's small profile: 300 seconds, plus exchange/observation margin.
 const SIGN_IN_WAIT: Duration = Duration::from_secs(330);
 const WHOLE: Duration = Duration::from_secs(600);
@@ -51,6 +53,7 @@ pub fn configuration_at(directory: &Path, address: &str, peers: Peers) -> codec:
     engine["llm"]["models"][0]["name"] = MODEL.into();
     engine["llm"]["models"][0]["output"] = 4096.into();
     engine["llm"]["models"][0]["efforts"] = serde_json::json!(["low"]);
+    engine["llm"]["models"][0]["window"] = WINDOW.into();
     engine["charters"][0]["model"] = MODEL.into();
     engine["charters"][0]["turns"] = 5.into();
     engine["charters"][0]["time_ms"] = 240_000.into();
@@ -77,7 +80,7 @@ pub fn configuration_at(directory: &Path, address: &str, peers: Peers) -> codec:
     endpoint["models"][0]["output"] = 4096.into();
     endpoint["models"][0]["efforts"] = serde_json::json!(["low"]);
     endpoint["models"][0]["reasoning_item"] = 65_536.into();
-    endpoint["models"][0]["window"] = 272_000.into();
+    endpoint["models"][0]["window"] = WINDOW.into();
     endpoint["models"][0]["idle"] = 300_000.into();
     agent["trace"] = support::trace::settings(directory);
     support::private(&path, &serde_json::to_vec(&agent).expect("live agent JSON"));
@@ -103,14 +106,13 @@ struct Judge {
     sign_in_deadline: Option<Time>,
     received: usize,
     accounts: Option<c::OwnerAccounts>,
-    deployment: Option<c::OwnerDeployment>,
     state: String,
 }
 fn client(procs: &mut [Process]) -> &mut NativeClient {
     let Process::Person(person) = &mut procs[1] else { panic!("native person") };
     person.client.as_mut().expect("native client")
 }
-fn progress(previous: &mut String, document: &c::OwnerAccounts, deployment: Option<&c::OwnerDeployment>, source: u32) {
+fn progress(previous: &mut String, document: &c::OwnerAccounts, source: u32) {
     let state = if let Some(end) = document.last_end.as_ref().filter(|end| end.source == source) {
         format!("{:?}", end.end)
     } else if document.signing.iter().any(|signing| signing.source == source) {
@@ -118,21 +120,15 @@ fn progress(previous: &mut String, document: &c::OwnerAccounts, deployment: Opti
     } else {
         return;
     };
-    let facts = deployment.and_then(|document| {
-        document.accounts.iter().find_map(|account| {
-            account.sources.iter().find(|grant| grant.number == source).map(|grant| (account, grant))
-        })
-    });
+    let facts = document
+        .accounts
+        .iter()
+        .find_map(|account| account.sources.iter().find(|grant| grant.number == source).map(|grant| (account, grant)));
     let state = if let Some((account, grant)) = facts {
         format!(
             "{state}; account={}; plan={}; state={:?}; usable={}",
             account.number, account.plan, grant.state, grant.usable
         )
-    } else if let Some(c::OwnerAccountEnd::Made { account, .. } | c::OwnerAccountEnd::Renewed { account, .. }) =
-        document.last_end.as_ref().filter(|end| end.source == source).map(|end| &end.end)
-        && !deployment.is_some_and(|document| document.accounts.iter().any(|line| line.number == *account))
-    {
-        format!("{state}; account {account} not yet in the deployment document")
     } else {
         state
     };
@@ -149,12 +145,6 @@ impl Judge {
                 Received::Delivery(c::Delivery::OwnerAccounts(document)) => {
                     self.accounts = Some(document.as_ref().clone());
                 }
-                Received::Delivery(c::Delivery::OwnerDeployment(document)) => {
-                    self.deployment = Some(document.as_ref().clone());
-                }
-                Received::Delivery(c::Delivery::Deployment(_)) => {
-                    panic!("the signed-in party isn't the deployment's owner");
-                }
                 Received::Answer { answer: value, .. } => answer = Some(value.clone()),
                 Received::SignedIn { .. } | Received::Sent { .. } | Received::Delivery(_) | Received::Read(_) => {}
             }
@@ -164,27 +154,20 @@ impl Judge {
     }
     fn signing(&mut self, procs: &mut [Process], source: u32) {
         let Some(document) = &self.accounts else { return };
-        progress(&mut self.state, document, self.deployment.as_ref(), source);
+        progress(&mut self.state, document, source);
         let Some(end) = document.last_end.as_ref().filter(|end| end.source == source) else { return };
         match end.end {
             c::OwnerAccountEnd::Made { account, declined } | c::OwnerAccountEnd::Renewed { account, declined } => {
                 assert!(!declined, "ChatGPT sign-in made, but plan usage was declined");
-                let Some(account) = self
-                    .deployment
-                    .as_ref()
-                    .and_then(|document| document.accounts.iter().find(|line| line.number == account))
-                else {
-                    return;
-                };
+                let account = document.accounts.iter().find(|line| line.number == account).expect("made account");
                 let grant = account.sources.iter().find(|grant| grant.number == source).expect("signed-in source");
                 assert!(account.plan, "ChatGPT sign-in made without plan usage");
                 if grant.usable && grant.state == c::OwnerAccountState::Granted {
-                    assert_eq!(account.holder, c::OwnerAccountHolder::Deployment);
+                    assert!(matches!(account.holder, c::OwnerAccountHolder::Party(_)), "a plan is held by its person");
                     assert_eq!(grant.kind, c::OwnerAccountKind::SignIn);
                     self.sign_in_deadline = None;
                     let native = client(procs);
                     native.account_request(jig_client::Event::Unwatch { handle: ACCOUNTS });
-                    native.account_request(jig_client::Event::Unwatch { handle: DEPLOYMENT });
                     native.hold_after_script();
                     native.resume_after_account_setup();
                     self.phase = Phase::Answer { source };
@@ -207,13 +190,9 @@ impl Referee<Process> for Judge {
                         handle: ACCOUNTS,
                         subject: jig_client::Watchable::Jig(c::Subject::Accounts),
                     });
-                    native.account_request(jig_client::Event::Watch {
-                        handle: DEPLOYMENT,
-                        subject: jig_client::Watchable::Jig(c::Subject::Deployment),
-                    });
                     native.ask_account_sign_in(
                         SIGN_IN,
-                        c::Ask::SignIn { holder: c::AccountHolder::Deployment, provider: PROVIDER },
+                        c::Ask::SignIn { holder: c::AccountHolder::Own, provider: PROVIDER },
                     );
                     self.sign_in_deadline = Some(now.saturating_add(self.peers.sign_in_wait()));
                     self.phase = Phase::Address;
@@ -235,10 +214,7 @@ impl Referee<Process> for Judge {
             Phase::Answer { source } => {
                 if native.script_finished() {
                     native.hold_for_account_sign_in();
-                    native.ask_account_sign_in(
-                        SIGN_OUT,
-                        c::Ask::SignOut { holder: c::AccountHolder::Deployment, source },
-                    );
+                    native.ask_account_sign_in(SIGN_OUT, c::Ask::SignOut { holder: c::AccountHolder::Own, source });
                     self.phase = Phase::SignOut;
                 }
             }
@@ -309,7 +285,6 @@ pub fn run(directory: &Path, started: Time, peers: Peers) -> (u32, u32) {
         sign_in_deadline: None,
         received: 0,
         accounts: None,
-        deployment: None,
         state: String::new(),
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));

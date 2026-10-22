@@ -3,7 +3,7 @@
 mod support;
 use jig_client_protocol_world::native::Script;
 use jig_protocol_store::codec;
-use live_sign_in::{INSTRUCTIONS, WORDS, capture, completions, store_limits};
+use live_sign_in::{INSTRUCTIONS, WINDOW, WORDS, capture, completions, store_limits};
 use skein_lib::Duration;
 use skein_shell::Clock;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
@@ -40,6 +40,7 @@ fn configuration_at(directory: &Path, model: &str, address: &str) -> codec::Limi
     engine["llm"]["models"][0]["name"] = model.into();
     engine["llm"]["models"][0]["output"] = 4096.into();
     engine["llm"]["models"][0]["efforts"] = serde_json::json!(["low"]);
+    engine["llm"]["models"][0]["window"] = WINDOW.into();
     engine["charters"][0]["model"] = model.into();
     engine["charters"][0]["turns"] = 5.into();
     engine["charters"][0]["time_ms"] = 240_000.into();
@@ -68,7 +69,7 @@ fn configuration_at(directory: &Path, model: &str, address: &str) -> codec::Limi
     endpoint["models"][0]["output"] = 4096.into();
     endpoint["models"][0]["efforts"] = serde_json::json!(["low"]);
     endpoint["models"][0]["reasoning_item"] = 65_536.into();
-    endpoint["models"][0]["window"] = 272_000.into();
+    endpoint["models"][0]["window"] = WINDOW.into();
     endpoint["models"][0]["idle"] = 300_000.into();
     agent["trace"] =
         serde_json::json!({"path":directory.join("agent-trace.jsonl"),"capture":"everything","delivery":"complete"});
