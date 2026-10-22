@@ -12,10 +12,6 @@ pub enum Story {
     Granted,
     Refreshed,
     Closed,
-    HandedIn {
-        lapses_in: skein_lib::Duration,
-    },
-    HandedInRejected,
     RateLimitedRefresh,
     RefusedRefresh,
     RefusedGrant,

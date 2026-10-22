@@ -161,14 +161,7 @@ fn a_grant_refused_as_closed_is_cancelled() {
 }
 #[test]
 fn a_record_to_keep_goes_to_the_store_not_the_child() {
-    let record = crate::handed_in::record(
-        ACCOUNT_CHAT,
-        Secret::new(bytes::copy_of(TOKEN_FIRST)),
-        skein_lib::Wall::EPOCH,
-        None,
-        &fixtures::driver_limits().client.document,
-    )
-    .expect("record fits");
+    let record = fixtures::record(ACCOUNT_CHAT, TOKEN_FIRST, 1);
     let up = translate::up(driver::Event::Keep { account: ACCOUNT_CHAT, record: record.clone() }, fixtures::NOW, b"");
     assert_eq!(up, Up::Keep { account: ACCOUNT_CHAT, record: translate::Candidate(record) });
 }

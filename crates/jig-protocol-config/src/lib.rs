@@ -36,7 +36,7 @@ mod problem;
 pub mod read;
 pub use address::Address;
 pub use document::{DocumentLimits, document};
-pub use forms::{HandedIn, digest, handed_in, secret};
+pub use forms::{digest, secret};
 pub use problem::{PROBLEMS, Path, Problem, Problems, Segment, What};
 /// The engine's protocol configuration (configuration.md, 3).
 #[derive(Debug)]

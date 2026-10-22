@@ -82,28 +82,18 @@ pub fn driver_limits() -> driver::Limits {
     }
 }
 
-pub fn handed_request(token: &[u8], lapses: skein_lib::Wall) -> Result<driver::Request, crate::handed_in::Unfit> {
-    crate::handed_in::hand_in(
-        ACCOUNT_CHAT,
-        Secret::new(bytes::copy_of(token)),
-        lapses,
-        Some(bytes::copy_of(b"account-id")),
-        &driver_limits().client.document,
-    )
-}
-
-pub fn first_grant(request: driver::Request, wall: skein_lib::Wall) -> driver::Event {
-    let limits = driver_limits();
-    let env = skein_lib::Env { now: NOW, wall, limits };
-    let mut configured = skein_lib::List::with_capacity(1);
-    assert!(configured.push(driver::Account::HandedIn).is_ok());
-    let crypto = skein_lib::CryptoRng::new(&Secret::new(bytes::copy_of(&[7; 32])), 0).expect("crypto seed");
-    let mut component = driver::Component::new(configured, &limits, crypto).expect("driver");
-    let mut above = skein_lib::Queue::with_capacity(16);
-    let mut io = skein_lib::Queue::with_capacity(16);
-    let mut files = skein_lib::Queue::with_capacity(16);
-    component.down(&env, request, &mut above, &mut io, &mut files);
-    assert!(above.is_empty(), "checked HandIn is admitted");
-    component.down(&env, driver::Request::Grant { account: ACCOUNT_CHAT }, &mut above, &mut io, &mut files);
-    above.pop().expect("grant terminal")
+pub fn record(account: u32, token: &[u8], generation: u64) -> skein_oauth::SavedToken {
+    skein_oauth::SavedToken {
+        key: account,
+        generation,
+        access_token: bytes::copy_of(token),
+        refresh_token: Some(bytes::copy_of(b"refresh-token")),
+        metadata: None,
+        expires_at: skein_lib::Wall::from_nanos(Duration::from_secs(60).as_nanos()),
+        issued_client_id: None,
+        granted_scopes: None,
+        subject: None,
+        id_token: None,
+        earliest_refresh_at: None,
+    }
 }

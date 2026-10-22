@@ -327,7 +327,7 @@ fn memory_below_the_components_sum_is_refused() {
     // and 1,661,320 for native selector tags, name-list carriers and their derived
     // retained-storage and queue envelopes. People's pending clone is priced there.
     // x1c adds 0 bytes here: Account's alignment absorbs its now-required provider's
-    // removed Option tag. Provider registrations and the D2 input are priced by the service.
+    // removed Option tag. Provider registrations are priced by the service.
     // JP10c-b adds 248 bytes over f448c8d4: 240 inline bytes for the parser and
     // two runtime provider copies, plus 8 bytes for their two "Fake" names.
     // This fixture has no manage address; supplied addresses cost three copies.

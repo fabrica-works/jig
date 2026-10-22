@@ -172,7 +172,7 @@ pub fn refuse() -> fake::Plan {
 
 /// The record the store holds when a story starts: the kept record for a
 /// sign-in, bytes that decode as no record when it is damaged, and none
-/// before a handed-in record is first kept.
+/// before a new sign-in.
 #[must_use]
 pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
     use crate::world::Story;
@@ -184,8 +184,6 @@ pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
             Some(oauth::encode_record(&record, &limits().client.document).expect("expired record"))
         }
         Story::NoRecord
-        | Story::HandedIn { .. }
-        | Story::HandedInRejected
         | Story::SignIn
         | Story::AccountSignInMissingScope
         | Story::AccountSignInVaryingPort
@@ -202,35 +200,11 @@ pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
         }
     }
 }
-pub const ACCOUNT_HANDED: u32 = 0;
-#[must_use]
-pub fn handed_lapse(story: crate::world::Story) -> Option<Duration> {
-    match story {
-        crate::world::Story::HandedIn { lapses_in } => Some(lapses_in),
-        crate::world::Story::HandedInRejected => Some(Duration::from_secs(60)),
-        crate::world::Story::Granted
-        | crate::world::Story::Refreshed
-        | crate::world::Story::Closed
-        | crate::world::Story::RateLimitedRefresh
-        | crate::world::Story::RefusedRefresh
-        | crate::world::Story::RefusedGrant
-        | crate::world::Story::NoRecord
-        | crate::world::Story::RejectedClient
-        | crate::world::Story::DamagedRecord
-        | crate::world::Story::ClosedExchange
-        | crate::world::Story::SignIn
-        | crate::world::Story::AccountSignInMissingScope
-        | crate::world::Story::AccountSignInVaryingPort
-        | crate::world::Story::AccountSignOut { .. }
-        | crate::world::Story::AccountSignInFull => None,
-    }
-}
 #[must_use]
 pub fn rejects(story: crate::world::Story) -> bool {
     matches!(
         story,
         crate::world::Story::Refreshed
-            | crate::world::Story::HandedInRejected
             | crate::world::Story::RateLimitedRefresh
             | crate::world::Story::RefusedRefresh
             | crate::world::Story::RejectedClient
@@ -240,7 +214,6 @@ pub fn rejects(story: crate::world::Story) -> bool {
 #[must_use]
 pub fn wanted(story: crate::world::Story) -> usize {
     match story {
-        crate::world::Story::HandedIn { .. } => 3,
         // The visit's answer closes a sign-in's story.
         crate::world::Story::SignIn
         | crate::world::Story::AccountSignInMissingScope
@@ -253,7 +226,6 @@ pub fn wanted(story: crate::world::Story) -> usize {
         | crate::world::Story::RefusedGrant
         | crate::world::Story::NoRecord => 1,
         crate::world::Story::Refreshed
-        | crate::world::Story::HandedInRejected
         | crate::world::Story::RateLimitedRefresh
         | crate::world::Story::RefusedRefresh
         | crate::world::Story::RejectedClient
@@ -267,15 +239,6 @@ pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
         Story::Refreshed => vec![
             Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
             Heard::Granted { account: ACCOUNT_CHAT, generation: 2 },
-        ],
-        Story::HandedIn { .. } => vec![
-            Heard::Granted { account: ACCOUNT_HANDED, generation: 1 },
-            Heard::Expiring { account: ACCOUNT_HANDED, generation: 1 },
-            Heard::Failed { account: ACCOUNT_HANDED, failure: child::Failure::SignInAgain },
-        ],
-        Story::HandedInRejected => vec![
-            Heard::Granted { account: ACCOUNT_HANDED, generation: 1 },
-            Heard::Failed { account: ACCOUNT_HANDED, failure: child::Failure::SignInAgain },
         ],
         Story::RateLimitedRefresh => vec![
             Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
@@ -320,12 +283,7 @@ pub fn issuer_plans(story: crate::world::Story) -> Vec<fake::Plan> {
             plan.delay = Duration::from_secs(1);
             vec![plan]
         }
-        Story::Granted
-        | Story::Refreshed
-        | Story::Closed
-        | Story::HandedIn { .. }
-        | Story::HandedInRejected
-        | Story::DamagedRecord => vec![rotate()],
+        Story::Granted | Story::Refreshed | Story::Closed | Story::DamagedRecord => vec![rotate()],
         Story::SignIn
         | Story::AccountSignInMissingScope
         | Story::AccountSignInVaryingPort

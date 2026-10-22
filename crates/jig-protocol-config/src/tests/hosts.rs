@@ -40,22 +40,6 @@ fn files_list_each_digest_as_private() {
         assert_eq!(file.max, 65);
     }
 }
-fn handed_in(bytes: &[u8]) -> Result<crate::HandedIn, crate::Problems> {
-    crate::handed_in(bytes, &fixtures::LIMITS)
-}
-#[test]
-fn a_handed_in_file_reads_its_token_and_lapse() {
-    let record = handed_in(br#"{"access_token":"secret","expires_at":2,"account_id":"person"}"#).unwrap();
-    assert_eq!(record.token.expose(), b"secret");
-    assert_eq!(record.lapses, skein_lib::Wall::from_nanos(2_000_000_000));
-    assert_eq!(record.account_id.as_deref(), Some(&b"person"[..]));
-}
-#[test]
-fn a_handed_in_file_refuses_an_unknown_member() {
-    let problems = handed_in(br#"{"access_token":"secret","expires_at":2,"absent":1}"#).unwrap_err();
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Unknown);
-}
-
 #[test]
 fn hosts_configuration_problems_name_the_invalid_fields() {
     table([

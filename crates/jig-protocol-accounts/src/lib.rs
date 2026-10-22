@@ -2,11 +2,11 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
-pub mod handed_in;
 pub mod installation;
 pub mod keys;
 pub mod party;
 pub mod records;
+pub use records::Unfit;
 pub mod restart;
 pub mod table;
 #[cfg(test)]

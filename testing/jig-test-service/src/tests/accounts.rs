@@ -1,7 +1,6 @@
 //! Refusal cleanup through the service's actual handler and routed store answers.
 use super::*;
 use crate::tests::fixtures;
-use jig_protocol_accounts::handed_in;
 use skein_lib::{Duration, bytes};
 
 #[test]
@@ -107,15 +106,9 @@ fn a_revoked_record_waits_for_erased_and_coalesces_a_sign_out() {
     }
 }
 
-fn record(source: u32, limits: &oauth::Limits) -> oauth::SavedToken {
-    let mut record = handed_in::record(
-        source,
-        Secret::new(bytes::copy_of(b"fresh-token")),
-        Wall::from_nanos(Duration::from_secs(60).as_nanos()),
-        None,
-        limits,
-    )
-    .expect("record fits");
+fn record(source: u32, _limits: &oauth::Limits) -> oauth::SavedToken {
+    let mut record = jig_protocol_accounts_world::fixtures::kept();
+    record.key = source;
     record.generation = 2;
     record
 }

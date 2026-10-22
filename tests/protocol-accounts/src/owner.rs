@@ -6,7 +6,7 @@ use crate::world::{Installation, Story};
 use jig_domain_accounts as child;
 use jig_domain_core as core;
 use jig_protocol_accounts::{
-    handed_in, installation, party,
+    installation, party,
     records::{self, Records},
     table::Table,
     translate::{self, Up},
@@ -149,11 +149,7 @@ impl Owner {
             limits.accounts = 1;
         }
         let child_limits = fixtures::child_limits();
-        let account = if matches!(story, Story::HandedIn { .. } | Story::HandedInRejected) {
-            fixtures::ACCOUNT_HANDED
-        } else {
-            ACCOUNT_CHAT
-        };
+        let account = ACCOUNT_CHAT;
         let store_limits = fixtures::store_limits();
         let mut owner = Self {
             io: io::Io::new(&limits.io),
@@ -392,27 +388,21 @@ impl Owner {
             self.facts.push(fact);
         }
     }
-    /// The driver starts from the store's records (llm.md 5.1); a handed-in
-    /// record is kept before it is handed in, unless the store holds it.
+    /// The driver starts from the store's records (llm.md 5.1).
     fn start(&mut self, env: &Env<driver::Limits>) {
-        let handed = fixtures::handed_lapse(self.story);
         let mut configured = List::with_capacity(1);
         if !fixtures::account_sign_in(self.story) {
             assert!(
                 configured
-                    .push(if handed.is_some() {
-                        driver::Account::HandedIn
-                    } else {
-                        driver::Account::SignIn {
-                            shared: false,
-                            origins: List::with_capacity(0),
-                            registration: fixtures::registration(installation::terms(&self.installation)),
-                            endpoint: driver::Endpoint {
-                                address: self.address.expect("issuer address"),
-                                transport: driver::Transport::Plaintext,
-                            },
-                            keeper: driver::Keeper::Owner { kept: None },
-                        }
+                    .push(driver::Account::SignIn {
+                        shared: false,
+                        origins: List::with_capacity(0),
+                        registration: fixtures::registration(installation::terms(&self.installation)),
+                        endpoint: driver::Endpoint {
+                            address: self.address.expect("issuer address"),
+                            transport: driver::Transport::Plaintext,
+                        },
+                        keeper: driver::Keeper::Owner { kept: None },
                     })
                     .is_ok()
             );
@@ -421,29 +411,30 @@ impl Owner {
         let crypto = skein_lib::CryptoRng::new(&skein_world::crypto_seed(17), 0).expect("world crypto seed");
         self.component = Some(driver::Component::new(configured, &self.limits, crypto).expect("configured driver"));
         if self.story == Story::AccountSignInFull {
-            self.component.as_mut().expect("started account driver").add(
-                env,
-                999,
-                driver::Account::HandedIn,
-                &mut self.above,
+            let mut saved = fixtures::kept();
+            saved.key = 999;
+            saved.issued_client_id = Some(bytes::copy_of(b"issued-client"));
+            saved.granted_scopes = Some(bytes::copy_of(b"openid read"));
+            saved.subject = Some(bytes::copy_of(b"subject"));
+            let value = skein_oauth::encode_record(&saved, &self.limits.client.document).expect("saved source");
+            let template = party::party_account(
+                &fixtures::party_registration(self.story),
+                driver::Endpoint {
+                    address: self.address.expect("issuer address"),
+                    transport: driver::Transport::Plaintext,
+                },
+                List::with_capacity(0),
+                &self.installation,
             );
-            assert!(self.above.is_empty());
-        }
-        if let Some(lapses_in) = handed {
-            // A handed-in file states when its token lapses, the same at
-            // every start.
-            let record = handed_in::record(
-                self.account,
-                Secret::new(bytes::copy_of(fixtures::TOKEN_FIRST)),
-                Wall::from_nanos(Wall::EPOCH.as_nanos().saturating_add(lapses_in.as_nanos())),
-                None,
+            let restored = party::restore(
+                template,
+                999,
+                Some(Secret::new(value)),
+                &mut self.records,
                 &self.limits.client.document,
-            )
-            .expect("handed-in fixture");
-            match self.records.hand_in(self.account, record, &self.limits.client.document).expect("handed-in fixture") {
-                records::Next::Driver(request) => self.driver(env, request),
-                records::Next::Store(keep) => self.replace(env, keep),
-            }
+            );
+            self.component.as_mut().expect("started account driver").add(env, 999, restored, &mut self.above);
+            assert!(self.above.is_empty());
         }
         if fixtures::account_sign_in(self.story) {
             self.child_event(env.now, env.wall, child::Event::Want);

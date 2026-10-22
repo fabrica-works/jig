@@ -3,16 +3,17 @@
 //!
 //! The driver starts from the records the store holds; each renewed record
 //! goes to the store stating the digest of the one it replaces, and the
-//! driver hears `Kept` only once the store answers that it is durable. A
-//! handed-in record (llm.md 5.4) is kept the same way before it is handed
-//! in, so no token is lent before its record is kept (llm.md 8).
-use crate::handed_in::Unfit;
+//! driver hears `Kept` only once the store answers that it is durable.
 use crate::table::ACCOUNT_ID_BYTES;
-use crate::translate::{self, Candidate, Up};
+use crate::translate::{self, Up};
 use jig_domain_accounts as accounts;
 use skein_lib::{Map, Secret, Time, sha256};
 use skein_oauth as oauth;
 use skein_oauth_accounts as driver;
+
+/// A record place that cannot fit under the driver's account limit.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Unfit;
 
 /// What the store is asked for one source's record: keep `value` in place
 /// of the record whose digest is `replaces`, none when it holds none.
@@ -35,8 +36,6 @@ pub enum Next {
 enum Waiting {
     /// The driver's candidate; the store's answer goes back as its `Kept`.
     Candidate { generation: u64, digest: [u8; 32] },
-    /// A handed-in record, handed in once the store has kept it.
-    HandedIn { record: Candidate, digest: [u8; 32] },
 }
 
 #[derive(Debug)]
@@ -104,21 +103,6 @@ impl Records {
         slot.unread = true;
     }
 
-    /// A handed-in record at start (owner's decision D2): handed in now when
-    /// the store already holds it, else kept in place of what it holds and
-    /// handed in once kept.
-    pub fn hand_in(&mut self, account: u32, record: oauth::SavedToken, limits: &oauth::Limits) -> Result<Next, Unfit> {
-        let value = oauth::encode_record(&record, limits).or(Err(Unfit))?;
-        let digest = sha256::digest(&value);
-        self.admit(account)?;
-        let slot = self.slots.get_mut(&account).ok_or(Unfit)?;
-        if slot.held == Some(digest) {
-            return Ok(Next::Driver(driver::Request::HandIn { account, record }));
-        }
-        slot.waiting = Some(Waiting::HandedIn { record: Candidate(record), digest });
-        Ok(Next::Store(Keep { account, value: Secret::new(value), replaces: slot.held }))
-    }
-
     /// The driver's renewed record, for the store; a record that cannot be
     /// encoded, or one while another is on its way, is answered `NotKept`.
     pub fn keep(&mut self, account: u32, record: oauth::SavedToken, limits: &oauth::Limits) -> Next {
@@ -137,15 +121,13 @@ impl Records {
         Next::Store(Keep { account, value: Secret::new(value), replaces: slot.held })
     }
 
-    /// The store kept `account`'s record: the driver's answer, or the
-    /// handed-in record now kept.
+    /// The store kept `account`'s record: acknowledge the driver's candidate.
     pub fn kept(&mut self, account: u32) -> Option<driver::Request> {
         let slot = self.slots.get_mut(&account)?;
         let (request, digest) = match slot.waiting.take()? {
             Waiting::Candidate { generation, digest } => {
                 (driver::Request::Kept { account, generation, keeping: driver::Keeping::Kept }, digest)
             }
-            Waiting::HandedIn { record, digest } => (driver::Request::HandIn { account, record: record.0 }, digest),
         };
         slot.held = Some(digest);
         slot.unread = false;
@@ -153,14 +135,12 @@ impl Records {
     }
 
     /// The store holds another record than the one stated: the driver's
-    /// candidate is not kept; a handed-in record is not handed in, and its
-    /// source has no record until the next start reads the store again.
+    /// candidate is not kept.
     pub fn stale(&mut self, account: u32) -> Option<driver::Request> {
         match self.slots.get_mut(&account)?.waiting.take()? {
             Waiting::Candidate { generation, digest: _ } => {
                 Some(driver::Request::Kept { account, generation, keeping: driver::Keeping::NotKept })
             }
-            Waiting::HandedIn { record: _, digest: _ } => None,
         }
     }
 

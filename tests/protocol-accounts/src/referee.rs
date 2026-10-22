@@ -156,8 +156,6 @@ fn ends(story: Story, owner: &Owner, exchange_seen: bool, _answered: bool) -> bo
         Story::Granted
         | Story::Refreshed
         | Story::Closed
-        | Story::HandedIn { .. }
-        | Story::HandedInRejected
         | Story::RateLimitedRefresh
         | Story::RejectedClient
         | Story::DamagedRecord

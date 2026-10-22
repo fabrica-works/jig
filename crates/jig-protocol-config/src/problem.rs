@@ -49,7 +49,6 @@ pub enum What {
     Confidential,
     NoProvider,
     Digest,
-    HandedIn,
     Reserve {
         charter: u32,
     },
