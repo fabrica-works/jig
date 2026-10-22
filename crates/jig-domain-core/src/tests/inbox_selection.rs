@@ -311,19 +311,23 @@ fn assert_chat_replies(entries: &[InboxEntry], records: &[Record]) {
     assert_eq!(owner.last_reply, FINAL_REPLY);
 }
 
-fn mark_chat_seen(core: &mut Core, limits: &Limits, records: &[Record], seen: people::Seen) -> Box<[Request]> {
+fn start_chat_mark(core: &mut Core, limits: &Limits, seen: people::Seen, key: u8) -> Box<[Request]> {
     core.reclaim();
-    let outputs = watch_outputs(
+    watch_outputs(
         core,
         limits,
         Event::People(people::Event::Ask {
             models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(91)),
             sign_in: CHAT_SIGN_IN,
-            key: [1; 16],
+            key: [key; 16],
             ask: people::Ask::MarkSeen { seen },
         }),
-    );
+    )
+}
+
+fn mark_chat_seen(core: &mut Core, limits: &Limits, records: &[Record], seen: people::Seen) -> Box<[Request]> {
+    let outputs = start_chat_mark(core, limits, seen, 1);
     let mut request = None;
     for output in &outputs {
         if let Request::Held(held) = output
@@ -357,6 +361,107 @@ fn mark_chat_seen(core: &mut Core, limits: &Limits, records: &[Record], seen: pe
         limits,
         Event::EndedReadLoaded { request, task: CHAT, party: CHAT_PARTY, through: 0, busy: false },
     )
+}
+
+fn repeated_chat_mark() -> (Core, Limits, tasks::TaskRecord, Token) {
+    let (mut core, limits, records) = finished_chat();
+    let seen = people::Seen::Conversation { task: CHAT, through: FINAL_REPLY };
+    let _marked = mark_chat_seen(&mut core, &limits, &records, seen);
+    let outputs = start_chat_mark(&mut core, &limits, seen, 1);
+    let mut request = None;
+    for output in &outputs {
+        if let Request::Held(held) = output
+            && let Held::Load(load) = held.as_ref()
+            && let Now::SeenConversation { request: wanted, .. } = load.as_ref()
+        {
+            request = Some(*wanted);
+            break;
+        }
+    }
+    let request = request.expect("the completed key reprocesses through a fresh header load");
+    (core, limits, chat_owner(&records).clone(), request)
+}
+
+fn assert_refused_chat_mark(
+    core: &mut Core,
+    limits: &Limits,
+    row: tasks::TaskRecord,
+    request: Token,
+    held: Option<people::Role>,
+) {
+    let outputs =
+        watch_outputs(core, limits, Event::SeenConversationLoaded { request, row: Some(Box::new(row)), busy: false });
+    assert_mark_without_writes(
+        &outputs,
+        people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Role { held })),
+    );
+}
+
+fn assert_mark_without_writes(outputs: &[Request], expected: people::Reply) {
+    let mut wrote = false;
+    let mut replies = List::with_capacity(1);
+    for output in outputs {
+        if let Request::Write(_) = output {
+            wrote = true;
+        }
+        if let Request::Held(held) = output
+            && let Held::PeopleReply { reply, .. } = held.as_ref()
+        {
+            replies.push(reply.clone()).unwrap();
+        }
+    }
+    assert!(!wrote, "a refused repeat writes neither an answer nor a position");
+    assert_eq!(replies.as_slice(), [expected]);
+}
+
+#[test]
+fn a_repeated_seen_rechecks_role_after_its_header_load() {
+    let (mut core, limits, row, request) = repeated_chat_mark();
+    let _roles = watch_outputs(
+        &mut core,
+        &limits,
+        Event::People(people::Event::Roles { project: row.project, holdings: Box::new([]) }),
+    );
+    assert_refused_chat_mark(&mut core, &limits, row, request, None);
+}
+
+#[test]
+fn a_repeated_seen_rechecks_the_loaded_conversations_requester() {
+    let (mut core, limits, mut row, request) = repeated_chat_mark();
+    row.requester = tasks::Party::Person(2);
+    assert_refused_chat_mark(&mut core, &limits, row, request, Some(people::Role::Owner));
+}
+
+#[test]
+fn overlapping_seen_stays_busy_during_header_and_position_loads() {
+    let (mut core, limits, row, request) = repeated_chat_mark();
+    let seen = people::Seen::Conversation { task: CHAT, through: FINAL_REPLY };
+    let outputs = start_chat_mark(&mut core, &limits, seen, 2);
+    assert_mark_without_writes(&outputs, people::Reply::Again(people::Again::Busy));
+    let outputs = watch_outputs(
+        &mut core,
+        &limits,
+        Event::SeenConversationLoaded { request, row: Some(Box::new(row)), busy: false },
+    );
+    let mut loading = false;
+    for output in &outputs {
+        if let Request::Held(held) = output
+            && let Held::Load(load) = held.as_ref()
+            && let Now::LoadEndedRead { request: wanted, task: CHAT, party: CHAT_PARTY } = load.as_ref()
+        {
+            assert_eq!(*wanted, request);
+            loading = true;
+        }
+    }
+    assert!(loading);
+    let outputs = start_chat_mark(&mut core, &limits, seen, 2);
+    assert_mark_without_writes(&outputs, people::Reply::Again(people::Again::Busy));
+    let outputs = watch_outputs(
+        &mut core,
+        &limits,
+        Event::EndedReadLoaded { request, task: CHAT, party: CHAT_PARTY, through: 0, busy: true },
+    );
+    assert_mark_without_writes(&outputs, people::Reply::Again(people::Again::Busy));
 }
 
 #[test]

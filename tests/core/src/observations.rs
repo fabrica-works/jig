@@ -196,6 +196,60 @@ fn call(key: core::CallKey) -> r::Receipt {
     r::Receipt::Call(key.task, key.attempt, key.completion, key.position)
 }
 
+#[derive(Clone, Debug)]
+struct SeenFence {
+    after: u64,
+    position: Option<people::Seen>,
+}
+
+impl SeenFence {
+    fn new(store: &Store, person: u64, seen: people::Seen) -> Self {
+        let mut current = 0;
+        let mut ended = false;
+        let records = store.rows.values().chain(store.pending.iter().flat_map(|pending| {
+            pending.writes.iter().filter_map(|write| match write {
+                root::Write::Save(record) => Some(record),
+                root::Write::Erase(_) => None,
+            })
+        }));
+        for record in records {
+            match seen {
+                people::Seen::Results { .. } => {
+                    if let root::Record::Core(core::Record::People(people::Stored::ReadResults { party, through })) =
+                        record
+                        && *party == person
+                    {
+                        current = current.max(*through);
+                    }
+                }
+                people::Seen::Conversation { task, .. } => {
+                    if let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) = record {
+                        ended |= row.number == task;
+                    }
+                    if let root::Record::Core(core::Record::People(
+                        people::Stored::ReadConversation { party, task: chat, through }
+                        | people::Stored::EndedRead { party, task: chat, through },
+                    )) = record
+                        && *party == person
+                        && *chat == task
+                    {
+                        current = current.max(*through);
+                    }
+                }
+            }
+        }
+        // Results and live conversation marks at or below the current position
+        // write nothing. Ended marks always save max(old, wanted), even if
+        // forgetting erases that position in the same commit.
+        let position = match seen {
+            people::Seen::Results { through } => (through > current).then_some(seen),
+            people::Seen::Conversation { task, through } => (ended || through > current)
+                .then_some(people::Seen::Conversation { task, through: current.max(through) }),
+        };
+        Self { after: store.pending.back().map_or(store.applied, |pending| pending.number), position }
+    }
+}
+
 /// The testing root adapter, reusable with the ordinary referee by other worlds.
 #[derive(Clone, Debug)]
 pub struct Observer {
@@ -209,7 +263,8 @@ pub struct Observer {
     activity: BTreeMap<(u64, u64), tasks::ActivityLine>,
     effects: [usize; 2],
     reads: [usize; 2],
-    requests: BTreeMap<u64, (u64, [u8; 16])>,
+    // Seen uses a commit fence instead of a new Answer receipt.
+    requests: BTreeMap<u64, (u64, [u8; 16], Option<SeenFence>)>,
     proposals: BTreeMap<u64, (u16, connector::Effect)>,
     accepted: BTreeMap<(u16, connector::Key), r::Source>,
     settled_calls: BTreeSet<(u64, u64, u64)>,
@@ -365,7 +420,13 @@ impl Observer {
                     root::Record::Core(_) | root::Record::Connector { .. } => None,
                 });
                 if let Some(person) = person {
-                    self.requests.insert(destination(reply_to), (person, *key));
+                    let to = destination(reply_to);
+                    let seen = if let people::Ask::MarkSeen { seen } = ask {
+                        Some(SeenFence::new(store, person, *seen))
+                    } else {
+                        None
+                    };
+                    self.requests.insert(to, (person, *key, seen));
                     if let people::Ask::ChangePolicy { project, change } = ask {
                         self.policy_changes.insert((person, *key), (*project, change.clone()));
                     }
@@ -497,6 +558,7 @@ impl Observer {
 
     /// Compare the cold store with the receipts that outside observers saw.
     pub fn cold(&mut self, now: u64, store: &Store) {
+        self.requests.retain(|_, (_, _, seen)| seen.is_none());
         let receipts = store
             .rows
             .values()
@@ -556,6 +618,30 @@ impl Observer {
     pub fn submitted(&mut self, now: u64, store: &Store) {
         self.intents.submitted(store);
         if let Some(pending) = store.pending.back() {
+            for (person, _, seen) in self.requests.values_mut() {
+                let Some(fence) = seen else { continue };
+                let Some(position) = fence.position else { continue };
+                for write in &pending.writes {
+                    let moves_position = match position {
+                        people::Seen::Results { through } => matches!(write,
+                            root::Write::Save(root::Record::Core(core::Record::People(people::Stored::ReadResults { party, through: written })))
+                                if party == person && *written == through
+                        ),
+                        people::Seen::Conversation { task, through } => matches!(write,
+                            root::Write::Save(root::Record::Core(core::Record::People(
+                                people::Stored::ReadConversation { party, task: chat, through: written }
+                                | people::Stored::EndedRead { party, task: chat, through: written }
+                            ))) if party == person && *chat == task && *written == through
+                        ),
+                    };
+                    if moves_position {
+                        fence.after = fence.after.max(pending.number);
+                        // A later mark or live-to-ended copy cannot retag this reply.
+                        fence.position = None;
+                        break;
+                    }
+                }
+            }
             let mut tasks = Vec::new();
             for write in &pending.writes {
                 if let root::Write::Erase(root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))) = write {
@@ -944,10 +1030,23 @@ impl Observer {
                 people::Reply::SignedIn { sign_in, .. } => {
                     requires.push(r::Receipt::SignIn(*sign_in));
                 }
-                people::Reply::Again(_) | people::Reply::SignedOut | people::Reply::Refused(_) => {}
+                people::Reply::Again(_) | people::Reply::SignedOut | people::Reply::Refused(_) => {
+                    let to = destination(to);
+                    if self.requests.get(&to).is_some_and(|(_, _, seen)| seen.is_some()) {
+                        self.requests.remove(&to);
+                    }
+                }
                 people::Reply::Outcome(_) => {
-                    if let Some((person, key)) = self.requests.remove(&destination(to)) {
-                        requires.push(r::Receipt::Party(person, key));
+                    let to = destination(to);
+                    if let Some((person, key, seen)) = self.requests.remove(&to) {
+                        if let Some(fence) = seen {
+                            assert!(
+                                self.applied >= fence.after,
+                                "Seen reply preceded its durable position/forget commit"
+                            );
+                        } else {
+                            requires.push(r::Receipt::Party(person, key));
+                        }
                     }
                 }
             },

@@ -146,6 +146,169 @@ fn application_parts_refuse_explicit_model_selectors_before_routing() {
 }
 
 #[test]
+fn a_full_answer_table_still_routes_seen() {
+    let mut test = Test::new(Limits { requests: 1, sign_in_lifetime: Duration::from_secs(180), ..LIMITS });
+    test.member();
+    let request = route(&test.request(10, 1, ask(1)));
+    let ordinary = Outcome::Created { first: 90, last: 90, given: None };
+    test.send(Event::Decided { request, outcome: ordinary.clone() });
+    assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
+    let seen = Seen::Results { through: 1 };
+    for outcome in [
+        Outcome::MarkedSeen { seen },
+        Outcome::Refused(Refusal::Role { held: None }),
+        Outcome::Refused(Refusal::Unknown),
+    ] {
+        let rows = test.request(10, 3, Ask::MarkSeen { seen });
+        let request = route(&rows);
+        let completed = test.send(Event::Decided { request, outcome: outcome.clone() });
+        assert_eq!(reply(&completed), Reply::Outcome(outcome));
+        assert!(!completed.iter().any(is_answer));
+        assert_eq!(completed.iter().filter(|row| is_reply(row)).count(), 1);
+        assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
+        assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Outcome(ordinary.clone()));
+        assert_eq!(reply(&test.request(10, 1, Ask::MarkSeen { seen })), Reply::Refused(Refusal::KeyConflict));
+    }
+    // Only the original ordinary key has an answer expiry alarm.
+    test.env.now = Time::from_nanos(Duration::from_secs(120).as_nanos());
+    test.env.wall = Wall::from_nanos(Duration::from_secs(120).as_nanos());
+    let mut out = Queue::with_capacity(max_out(&test.env.limits));
+    fire(&mut test.d, &test.env, &mut out);
+    assert_eq!(out.pop(), Some(Request::Erase { key: Key::Answer(RequestKey { person: 1, key: [1; 16] }) }));
+    fire(&mut test.d, &test.env, &mut out);
+    assert!(out.is_empty(), "Seen left no answer alarm");
+    let _request = route(&test.request(10, 3, ask(1)));
+}
+
+#[test]
+fn seen_and_ordinary_flights_use_independent_room_in_both_completion_orders() {
+    for seen_first in [false, true] {
+        for finish_seen_first in [false, true] {
+            let mut test = Test::new(Limits { requests: 1, ..LIMITS });
+            test.member();
+            let seen = Seen::Results { through: 1 };
+            let mark = Ask::MarkSeen { seen };
+            let (seen_request, ordinary_request) = if seen_first {
+                let seen_request = route(&test.request(10, 1, mark.clone()));
+                (seen_request, route(&test.request(10, 2, ask(1))))
+            } else {
+                let ordinary_request = route(&test.request(10, 2, ask(1)));
+                (route(&test.request(10, 1, mark.clone())), ordinary_request)
+            };
+            assert_eq!(reply(&test.request(10, 3, ask(1))), Reply::Again(Again::Busy));
+            assert_eq!(test.d.capacity_refusals().get(0).unwrap().cause, CapacityCause::Requests { limit: 1 });
+            assert!(test.request(10, 1, mark.clone()).is_empty(), "the duplicate joins without routing");
+            let last_waiter = test.serial;
+            assert_eq!(reply(&test.request(10, 1, mark.clone())), Reply::Again(Again::Busy));
+            assert_eq!(test.d.capacity_refusals().get(0).unwrap().cause, CapacityCause::Waiters { limit: 2 });
+            assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Refused(Refusal::KeyConflict));
+            assert_eq!(reply(&test.request(10, 4, mark)), Reply::Again(Again::Busy));
+            assert_eq!(test.d.capacity_refusals().get(0).unwrap().cause, CapacityCause::Pending { limit: 2 });
+            let decided = Event::Decided { request: ordinary_request, outcome: Outcome::Refused(Refusal::Unknown) };
+            if !finish_seen_first {
+                assert!(test.send(decided).iter().any(is_answer));
+            }
+            let completed = test.send(Event::Decided { request: seen_request, outcome: Outcome::MarkedSeen { seen } });
+            assert!(!completed.iter().any(is_answer));
+            let replies: Vec<_> =
+                completed
+                    .into_iter()
+                    .filter_map(|row| {
+                        if let Request::Reply { to, reply } = row { Some((to.into_token(), reply)) } else { None }
+                    })
+                    .collect();
+            let first = if seen_first { 2 } else { 3 };
+            // member() signs in once; its role update has no reply destination.
+            assert_eq!(
+                replies,
+                [
+                    (Token::new(first), Reply::Outcome(Outcome::MarkedSeen { seen })),
+                    (Token::new(last_waiter), Reply::Outcome(Outcome::MarkedSeen { seen })),
+                ]
+            );
+            assert_eq!(reply(&test.request(10, 3, ask(1))), Reply::Again(Again::Busy));
+            if finish_seen_first {
+                let completed = test
+                    .send(Event::Decided { request: ordinary_request, outcome: Outcome::Refused(Refusal::Unknown) });
+                assert!(completed.iter().any(is_answer));
+            }
+            assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Outcome(Outcome::Refused(Refusal::Unknown)));
+            let request = route(&test.request(10, 1, Ask::MarkSeen { seen }));
+            test.send(Event::Decided { request, outcome: Outcome::Refused(Refusal::Unknown) });
+        }
+    }
+}
+
+#[test]
+fn a_completed_seen_key_accepts_a_different_ordinary_ask() {
+    let mut test = Test::new(Limits { requests: 1, ..LIMITS });
+    test.member();
+    let seen = Seen::Results { through: 1 };
+    let request = route(&test.request(10, 1, Ask::MarkSeen { seen }));
+    test.send(Event::Decided { request, outcome: Outcome::MarkedSeen { seen } });
+    let request = route(&test.request(10, 1, ask(1)));
+    let completed = test.send(Event::Decided { request, outcome: Outcome::Refused(Refusal::Unknown) });
+    assert!(completed.iter().any(is_answer));
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Outcome(Outcome::Refused(Refusal::Unknown)));
+    assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
+}
+
+#[test]
+fn kept_seen_answers_restore_replay_and_occupy_room_until_their_original_expiry() {
+    let limits = Limits { requests: 1, ..LIMITS };
+    let seen = Seen::Conversation { task: 99, through: 3 };
+    for outcome in [Outcome::MarkedSeen { seen }, Outcome::Refused(Refusal::Role { held: None })] {
+        let mut test = Test::new(limits);
+        test.d = Domain::new(&limits, Box::new([]), 2);
+        let key = RequestKey { person: 1, key: [1; 16] };
+        assert!(
+            test.send(Event::Restore {
+                record: Stored::Answer {
+                    key,
+                    ask: Box::new(Ask::MarkSeen { seen }),
+                    models: Box::new([]),
+                    outcome: outcome.clone(),
+                    at: Wall::EPOCH,
+                }
+            })
+            .is_empty(),
+            "no early erase of a kept Seen answer"
+        );
+        test.send(Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } });
+        test.send(Event::Restore {
+            record: Stored::SignIn {
+                number: 10,
+                person: 1,
+                expires: Wall::from_nanos(Duration::from_secs(180).as_nanos()),
+            },
+        });
+        test.send(Event::Restored);
+        assert!(test.d.ready());
+        // No task or current role is needed for replay of the kept answer.
+        for seconds in [0, 119] {
+            test.env.now = Time::from_nanos(Duration::from_secs(seconds).as_nanos());
+            test.env.wall = Wall::from_nanos(Duration::from_secs(seconds).as_nanos());
+            let replay = test.request(10, 1, Ask::MarkSeen { seen });
+            assert_eq!(replay.len(), 1);
+            assert_eq!(reply(&replay), Reply::Outcome(outcome.clone()));
+            assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Refused(Refusal::KeyConflict));
+            assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
+            let request = route(&test.request(10, 3, Ask::MarkSeen { seen }));
+            let completed = test.send(Event::Decided { request, outcome: Outcome::Refused(Refusal::Unknown) });
+            assert!(!completed.iter().any(is_answer));
+        }
+        test.env.now = Time::from_nanos(Duration::from_secs(120).as_nanos());
+        test.env.wall = Wall::from_nanos(Duration::from_secs(120).as_nanos());
+        let fresh = test.request(10, 1, Ask::MarkSeen { seen });
+        assert!(fresh.contains(&Request::Erase { key: Key::Answer(key) }));
+        let request = route(&fresh);
+        let completed = test.send(Event::Decided { request, outcome: Outcome::Refused(Refusal::Unknown) });
+        assert!(!completed.iter().any(is_answer));
+        let _request = route(&test.request(10, 1, ask(1)));
+    }
+}
+
+#[test]
 fn only_keyed_mark_seen_moves_results_and_restores_the_position() {
     let mut test = Test::new(LIMITS);
     test.signin(1, 10, identity(0, 1));
@@ -169,10 +332,16 @@ fn only_keyed_mark_seen_moves_results_and_restores_the_position() {
         Some(&[ResultRef { task: 4, project: 1, at: Wall::EPOCH, position: 4, forgettable: None }][..])
     );
     assert!(outputs.contains(&Request::Save { record: Stored::ReadResults { party: 1, through: 3 } }));
-    assert_eq!(reply(&test.request(10, 1, Ask::MarkSeen { seen })), Reply::Outcome(Outcome::MarkedSeen { seen }));
+    assert!(!outputs.iter().any(is_answer));
+    let request = route(&test.request(10, 1, Ask::MarkSeen { seen }));
+    let repeated = test.send(Event::Decided { request, outcome: Outcome::MarkedSeen { seen } });
+    assert_eq!(repeated.len(), 1, "an unchanged position emits only its reply");
+    assert_eq!(reply(&repeated), Reply::Outcome(Outcome::MarkedSeen { seen }));
     let backwards = Seen::Results { through: 1 };
-    let request = route(&test.request(10, 2, Ask::MarkSeen { seen: backwards }));
-    test.send(Event::Decided { request, outcome: Outcome::MarkedSeen { seen: backwards } });
+    let request = route(&test.request(10, 1, Ask::MarkSeen { seen: backwards }));
+    let repeated = test.send(Event::Decided { request, outcome: Outcome::MarkedSeen { seen: backwards } });
+    assert_eq!(repeated.len(), 1, "a smaller mark under the freed key writes nothing");
+    assert_eq!(reply(&repeated), Reply::Outcome(Outcome::MarkedSeen { seen: backwards }));
     assert_eq!(test.d.results_seen(1), Some(3));
     let mut restored = Test::new(LIMITS);
     restored.d = Domain::new(&LIMITS, Box::new([]), 2);

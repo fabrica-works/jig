@@ -1464,8 +1464,9 @@ fn admit_ask(
         flight.replies.push(to).expect("bounded list room checked");
         return;
     }
-    // An accepted flight reserves one answered record, even while pending.
-    if domain.answers.len().saturating_add(domain.flights.len()) >= env.limits.requests {
+    // Only ordinary flights reserve answers; Seen uses the existing pending room.
+    if reserves_answer(&ask) && domain.answers.len().saturating_add(answer_reservations(domain)) >= env.limits.requests
+    {
         room_pressure(domain, env, key, &ask, crate::CapacityCause::Requests { limit: env.limits.requests });
         return again(to, Again::Busy, out);
     }
@@ -1528,6 +1529,9 @@ fn save_answer(
     outcome: Outcome,
     out: &mut Queue<Request>,
 ) {
+    if !reserves_answer(&ask) {
+        return;
+    }
     out.push(Request::Save {
         record: Stored::Answer {
             key,
@@ -1543,6 +1547,49 @@ fn save_answer(
     let armed = domain.answer_alarms.arm(key, due);
     assert!(armed.is_ok(), "one expiry per retained completed key");
     fact(domain, Fact::Answered { person: key.person });
+}
+
+fn answer_reservations(domain: &Domain) -> u32 {
+    let mut reserved = 0_u32;
+    for (_, id) in &domain.flights {
+        let flight = domain.pending.get(*id).expect("key index names live pending request");
+        if reserves_answer(&flight.ask) {
+            reserved = reserved.saturating_add(1);
+        }
+    }
+    reserved
+}
+
+fn reserves_answer(ask: &Ask) -> bool {
+    match ask {
+        Ask::MarkSeen { .. } => false,
+        Ask::Application { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. }
+        | Ask::AccountChange { .. }
+        | Ask::Compound { .. }
+        | Ask::EditNote { .. }
+        | Ask::MakeService { .. }
+        | Ask::Adopt { .. }
+        | Ask::SetRoles { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetPool { .. }
+        | Ask::Create { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
+        | Ask::Say { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::Amend { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::Move { .. }
+        | Ask::TakePerson { .. }
+        | Ask::HandBackPerson { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Release { .. } => true,
+    }
 }
 
 fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Outcome, out: &mut Queue<Request>) {
