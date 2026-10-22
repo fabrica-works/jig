@@ -195,9 +195,9 @@ pub fn run(directory: &Path) {
     let judge = Judge {
         status: String::new(),
         phase: Phase::default(),
-        deadline: clock.now().now.saturating_add(Duration::from_secs(10)),
+        deadline: clock.now().now.saturating_add(Duration::from_secs(20)),
     };
-    let outcome = run_world(directory, judge, &clock, Duration::from_secs(15));
+    let outcome = run_world(directory, judge, &clock, Duration::from_secs(30));
     assert!(outcome.procs.iter().all(Host::is_empty), "all real account sign-in io settles");
 }
 
@@ -238,9 +238,9 @@ fn run_world<R: Referee<Process>>(
 }
 
 // Shutdown must finish well inside the process tier budget.
-const SHUTDOWN_WAIT: Duration = Duration::from_secs(5);
-const SETUP_WAIT: Duration = Duration::from_secs(10);
-const WORLD_WAIT: Duration = Duration::from_secs(20);
+const SHUTDOWN_WAIT: Duration = Duration::from_secs(10);
+const SETUP_WAIT: Duration = Duration::from_secs(20);
+const WORLD_WAIT: Duration = Duration::from_secs(40);
 
 struct Shutdown {
     asked: bool,

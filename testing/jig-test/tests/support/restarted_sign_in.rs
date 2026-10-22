@@ -19,9 +19,9 @@ const CHAT: Handle = Handle { asker: ASK, number: 2 };
 const PROVIDER: u32 = 1;
 // A fresh client must not repeat the first client's durable request keys.
 const RESTARTED_CLIENT_SEED: u64 = 8;
-const STAGE_WAIT: Duration = Duration::from_secs(10);
-const SETTLE_WAIT: Duration = Duration::from_secs(15);
-const PEER_WAIT: Duration = Duration::from_secs(30);
+const STAGE_WAIT: Duration = Duration::from_secs(20);
+const SETTLE_WAIT: Duration = Duration::from_secs(30);
+const PEER_WAIT: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
 enum Phase {

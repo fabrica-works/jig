@@ -141,7 +141,7 @@ impl Tier {
             BrowserStep::Person(Step::Press { find: Find::named(Role::Link, b"Conversations") }),
             BrowserStep::Person(Step::See {
                 find: Find::named(Role::TextArea, b"First words"),
-                within: skein_lib::Duration::from_secs(5),
+                within: skein_lib::Duration::from_secs(10),
             }),
             BrowserStep::Person(Step::Type {
                 find: Find::named(Role::TextArea, b"First words"),

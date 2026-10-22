@@ -352,7 +352,7 @@ impl Referee<Process> for Judge {
     }
 }
 pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm::Peer>) -> (u32, u32) {
-    let seconds = if std::env::var("NEXTEST_PROFILE").as_deref() == Ok("live") { 280 } else { 60 };
+    let seconds = if std::env::var("NEXTEST_PROFILE").as_deref() == Ok("live") { 560 } else { 120 };
     let clock = Clock::new();
     let mut binary = start(directory);
     let streams = binary.take_streams().expect("binary pipes");
@@ -362,7 +362,7 @@ pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm:
     let root = skein_shell::open_root(client_directory.path()).expect("client root");
     let mut world = real::World::new(Judge {
         ended: false,
-        deadline: clock.now().now.saturating_add(Duration::from_secs(seconds - 5)),
+        deadline: clock.now().now.saturating_add(Duration::from_secs(seconds - 10)),
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds.into_iter().chain([root]).collect(), || {

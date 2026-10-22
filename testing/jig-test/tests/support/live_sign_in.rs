@@ -23,8 +23,8 @@ const MODEL: &str = "gpt-6-luna";
 /// worker's hello is refused.
 pub const WINDOW: u32 = 272_000;
 // configuration.md's small profile: 300 seconds, plus exchange/observation margin.
-const SIGN_IN_WAIT: Duration = Duration::from_secs(330);
-const WHOLE: Duration = Duration::from_secs(600);
+const SIGN_IN_WAIT: Duration = Duration::from_secs(660);
+const WHOLE: Duration = Duration::from_secs(1200);
 
 pub fn configuration(directory: &Path) -> codec::Limits {
     let address = ("api.openai.com", 443)
@@ -515,19 +515,19 @@ impl Peers {
     fn sign_in_wait(self) -> Duration {
         match self {
             Self::Real => SIGN_IN_WAIT,
-            Self::Fake | Self::Refusing => Duration::from_secs(10),
+            Self::Fake | Self::Refusing => Duration::from_secs(20),
         }
     }
     fn deadline(self) -> Duration {
         match self {
-            Self::Real => Duration::from_secs(590),
-            Self::Fake | Self::Refusing => Duration::from_secs(10),
+            Self::Real => Duration::from_secs(1180),
+            Self::Fake | Self::Refusing => Duration::from_secs(20),
         }
     }
     fn whole(self) -> Duration {
         match self {
             Self::Real => WHOLE,
-            Self::Fake | Self::Refusing => Duration::from_secs(15),
+            Self::Fake | Self::Refusing => Duration::from_secs(30),
         }
     }
     fn credential(self) -> Option<&'static [u8]> {

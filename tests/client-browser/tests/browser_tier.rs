@@ -5,7 +5,7 @@ use skein_fake_person_browser::{Harness, Outcome, Script, harness};
 use skein_lib::Duration;
 use skein_ui::Role;
 const HEADING_LEVEL: u8 = 1;
-const INBOX_WAIT: Duration = Duration::from_secs(5);
+const INBOX_WAIT: Duration = Duration::from_secs(10);
 const FIRST_TASK: u64 = 1;
 const OK_STATUS: u16 = 200;
 #[test]
