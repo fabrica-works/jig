@@ -751,7 +751,12 @@ circle, each for another of the set, so that none of them could end.
     maintainer reaches any task of the project. A stub the working set
     keeps of it holds no place, and a live task naming it widens no
     reach: neither decides. One the store does not hold is refused as
-    unknown, naming it.
+    unknown, naming it. The core loads the row only for an agent's tool
+    and a party's own request. An amendment in a party's compound
+    request, one proposed (section 9) when it is proposed and when it is
+    accepted, and a procedure's step's are judged without it: there an
+    ended dependency the working set holds no live row of is refused as
+    unknown, naming it. That narrows reach, and widens none.
   - *By phase:* a waiting task waits for it as for any other, and leaves
     the queues it was in (6.2); an active one is kept (5.7); a held one
     is released, when it is, with it pending.
