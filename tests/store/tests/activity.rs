@@ -1,0 +1,167 @@
+use jig_domain_core::{self as core, reads};
+use jig_domain_tasks as tasks;
+use jig_protocol_store::{Event, Request, Write};
+use jig_store_world::{World, root};
+use skein_lib::{Token, Wall};
+
+const OWNER: u64 = 3;
+
+fn ended(number: u64) -> Box<tasks::TaskRecord> {
+    let core::Record::Tasks(tasks::Stored::Live(mut task)) = root::live_task(number) else {
+        unreachable!("live task fixture")
+    };
+    task.requester = tasks::Party::Task(1);
+    task.root = 1;
+    task.depth = 1;
+    task.phase = tasks::Phase::Ended(tasks::Ending::Failed { reason: Box::new([]) });
+    task.ended_at = Some(Wall::EPOCH);
+    task
+}
+
+fn fixture(joins: u32, turns: [u64; 3]) -> World {
+    let mut world = World::with_joins(18, joins);
+    let dependency = ended(2);
+    let mut dependent = ended(OWNER);
+    dependent.dependencies = Box::new([2]);
+    dependent.activity = 8;
+    dependent.turn = 3;
+    dependent.ever_turned = true;
+    let mut writes = vec![
+        Write::Save(root::header(1)),
+        Write::Save(root::live_task(1)),
+        Write::Save(core::Record::Tasks(tasks::Stored::Ended(dependency))),
+        Write::Save(core::Record::Tasks(tasks::Stored::Ended(dependent))),
+    ];
+    for position in 1..=8 {
+        let line = match turns.iter().position(|&turn| turn == position) {
+            Some(index) => tasks::Line::Turn {
+                reply: 1,
+                attempt: 1,
+                turn: u32::try_from(index + 1).expect("three turns"),
+                read: None,
+            },
+            None => tasks::Line::Decided { revision: position },
+        };
+        writes.push(Write::Save(core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+            task: OWNER,
+            position,
+            at: Wall::EPOCH,
+            line,
+        }))));
+    }
+    assert_eq!(world.commit(writes.into_boxed_slice()), Some(1));
+    for number in 1..=3 {
+        assert_eq!(
+            world.commit(root::turn_commit(u64::from(number) + 1, OWNER, number, b"turn")),
+            Some(u64::from(number) + 1)
+        );
+    }
+    world
+}
+
+fn activity(world: &mut World, after: Option<reads::Position>) -> (Box<[reads::Row]>, Option<reads::Position>) {
+    bounded_activity(world, after, 32, 1_048_576)
+}
+
+fn bounded_activity(
+    world: &mut World,
+    after: Option<reads::Position>,
+    rows: u32,
+    bytes: u64,
+) -> (Box<[reads::Row]>, Option<reads::Position>) {
+    let events = world.request(Request::Read {
+        owner: Token::new(1),
+        range: reads::Range {
+            party: 1,
+            scope: reads::Scope::Activity { task: OWNER },
+            after,
+            backwards: true,
+            rows,
+            bytes,
+        },
+    });
+    let mut events = events.into_iter();
+    let Some(Event::Read { result: reads::Loaded::Page { rows, next }, .. }) = events.next() else {
+        panic!("activity page terminal")
+    };
+    assert!(events.next().is_none(), "one read terminal");
+    (rows, next)
+}
+
+fn positions(rows: &[reads::Row]) -> Vec<u64> {
+    rows.iter()
+        .map(|row| {
+            let core::Record::Tasks(tasks::Stored::Activity(line)) = &row.value else { panic!("activity line") };
+            assert_eq!(row.owner.as_ref().expect("page owner").number, OWNER);
+            assert!(row.ancestors.is_empty());
+            assert!(row.linked.is_empty());
+            if let tasks::Line::Turn { attempt, turn, .. } = line.line {
+                let Some(core::Record::Core(core::CoreRecord::Turn(record))) = &row.related else {
+                    panic!("turn line carries its transcript")
+                };
+                assert_eq!((record.task, record.attempt, record.turn), (OWNER, attempt, turn));
+                assert_eq!(record.transcript.as_ref(), b"turn");
+            }
+            line.position
+        })
+        .collect()
+}
+
+#[test]
+fn ended_dependent_activity_is_not_false_eof() {
+    let mut world = fixture(4, [1, 4, 7]);
+    let (rows, mut next) = activity(&mut world, None);
+    let mut found = positions(&rows);
+    assert_eq!(found.first(), Some(&8));
+    assert!(next.is_some(), "third turn exceeds the page's two remaining joins");
+    for _ in 0..8 {
+        let Some(after) = next.take() else { break };
+        let (rows, continuation) = activity(&mut world, Some(after));
+        assert!(!rows.is_empty(), "sufficient joins make progress");
+        found.extend(positions(&rows));
+        next = continuation;
+    }
+    assert!(next.is_none(), "activity ends");
+    assert_eq!(found, (1..=8).rev().collect::<Vec<_>>());
+}
+
+#[test]
+fn an_activity_page_cut_before_its_first_row_says_cut() {
+    let mut bounded = fixture(2, [2, 5, 8]);
+    let (rows, next) = activity(&mut bounded, None);
+    assert!(rows.is_empty());
+    let next = next.expect("the owner used both joins; retry the unaccepted newest turn");
+    assert_eq!(next, reads::Position::Owner(core::Key::Tasks(tasks::Key::Activity { task: OWNER, position: 9 })));
+    let (rows, repeated) = activity(&mut bounded, Some(next.clone()));
+    assert!(rows.is_empty());
+    assert_eq!(repeated, Some(next.clone()), "another cut preserves the retry position");
+
+    // The same committed records, served with enough joins to accept the turn.
+    let mut sufficient = fixture(4, [2, 5, 8]);
+    let (rows, _) = activity(&mut sufficient, Some(next));
+    assert_eq!(positions(&rows).first(), Some(&8));
+}
+
+#[test]
+fn activity_row_and_byte_bounds_before_the_first_row_preserve_its_position() {
+    let mut world = fixture(4, [1, 4, 7]);
+    for (rows, bytes) in [(0, 1_048_576), (32, 0)] {
+        for before in [None, Some(8)] {
+            let after = before.map(|position| {
+                reads::Position::Owner(core::Key::Tasks(tasks::Key::Activity { task: OWNER, position }))
+            });
+            let (found, next) = bounded_activity(&mut world, after, rows, bytes);
+            assert!(found.is_empty());
+            let next = next.expect("row or byte bound retains the starting position");
+            assert_eq!(
+                next,
+                reads::Position::Owner(core::Key::Tasks(tasks::Key::Activity {
+                    task: OWNER,
+                    position: before.unwrap_or(9),
+                }))
+            );
+            let (found, _) = activity(&mut world, Some(next));
+            assert_eq!(positions(&found).first(), Some(&before.unwrap_or(9).saturating_sub(1)));
+        }
+    }
+}

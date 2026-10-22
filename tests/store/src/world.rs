@@ -73,12 +73,18 @@ fn below() -> Below {
 impl World {
     #[must_use]
     pub fn new(seed: u64) -> World {
+        Self::with_joins(seed, root::limits().joins)
+    }
+
+    #[must_use]
+    pub fn with_joins(seed: u64, joins: u32) -> World {
         let mut machine = Machine::for_user(0);
         let handle = machine.lay(&[]);
         let mut sim = Sim::new(seed, Config::calm());
         let pid = sim.spawn_process();
         let fd = sim.root(pid, Handle::new(handle.raw()));
-        let limits = root::limits();
+        let mut limits = root::limits();
+        limits.joins = joins;
         let mut world = World {
             machine,
             sim,

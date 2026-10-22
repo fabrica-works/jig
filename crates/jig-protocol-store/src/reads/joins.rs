@@ -52,6 +52,26 @@ pub(super) fn owner(
     Ok(None)
 }
 
+pub(super) fn activity_row(
+    value: core::Record,
+    owner: &tasks::TaskRecord,
+    spent: &mut Spent,
+) -> Result<reads::Row, Failure> {
+    let row = reads::Row {
+        value,
+        owner: Some(Box::new(owner.clone())),
+        ancestors: Box::new([]),
+        related: None,
+        unjoined: None,
+        ended_read: None,
+        linked: Box::new([]),
+        inbox: None,
+    };
+    spent.bytes = spent.bytes.checked_sub(row.owned_bytes().ok_or(Failure::Corrupt)?).ok_or(Failure::Cut)?;
+    spent.rows = spent.rows.checked_sub(1).ok_or(Failure::Cut)?;
+    Ok(row)
+}
+
 pub(super) fn row(
     store: &mut Store,
     value: core::Record,

@@ -40,11 +40,8 @@ pub(super) fn activity(
     task: u64,
     spent: &mut Spent,
 ) -> Result<reads::Loaded, Failure> {
-    if spent.rows == 0 {
-        return Ok(empty());
-    }
     let Some(owner) = joins::owner(store, task, spent)? else { return Ok(empty()) };
-    let capacity = spent.rows.min(store.limits.store.page.bytes);
+    let capacity = spent.rows.max(1).min(store.limits.store.page.bytes);
     let before = activity_before(range, task)?;
     let interval = backwards_interval(task, owner.activity, before, capacity);
     let high = match before {
@@ -52,7 +49,17 @@ pub(super) fn activity(
         None => owner.activity,
     };
     let mut found = List::with_capacity(capacity);
+    // An exclusive cursor just before this window retries its first row when
+    // a bound prevents taking even that row. Overflow leaves no continuation,
+    // as before; it is unreachable because activity counts committed rows.
+    let start = match before {
+        Some(before) => Some(before),
+        None => owner.activity.checked_add(1),
+    };
     let mut last = None;
+    if let Some(position) = start {
+        last = Some(reads::Position::Owner(core::Key::Tasks(tasks::Key::Activity { task, position })));
+    }
     let mut encoded = 0_u64;
     let mut more = high.saturating_sub(u64::from(capacity)) > 0;
     // Walk only the requested dense window, with exact forward intervals in
@@ -93,7 +100,7 @@ pub(super) fn activity(
             }
             spent.joins = spent.joins.checked_sub(1).expect("turn join checked");
         }
-        match joins::row(store, value, Some(&owner), None, spent) {
+        match joins::activity_row(value, &owner, spent) {
             Ok(row) => {
                 last = Some(reads::Position::Owner(key));
                 found.push(row).expect("bounded activity window");

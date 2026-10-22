@@ -385,10 +385,12 @@ pub(super) fn from_store(
         }
         previous = Some(key);
     }
+    let empty_page = raw.is_empty() && is_page(&range.scope);
     if let Some(next) = &next
         && (!position_allowed(&range.scope, next)
-            || (!positions::examined(range, previous.as_ref(), next) && previous.as_ref() != Some(next))
-            || !positions::later(range, range.after.as_ref(), next))
+            || (!empty_page && !positions::examined(range, previous.as_ref(), next) && previous.as_ref() != Some(next))
+            || !(positions::later(range, range.after.as_ref(), next)
+                || empty_page && range.after.as_ref() == Some(next)))
     {
         return Answer::None(Why::Unknown);
     }
@@ -437,9 +439,7 @@ pub(super) fn from_store(
         }
     }
     if is_page(&range.scope) {
-        if let Scope::Tasks { .. } = range.scope {
-            page.cut = page.rows.is_empty() && page.next.is_some();
-        }
+        page.cut = page.rows.is_empty() && page.next.is_some();
         Answer::Page(Box::new(page))
     } else if let Scope::Reply { .. } = &range.scope {
         Answer::None(Why::Gone)

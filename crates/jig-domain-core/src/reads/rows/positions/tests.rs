@@ -99,7 +99,102 @@ fn a_page_that_returned_none_within_its_bound_is_cut_not_ended() {
         super::super::from_store(&core, &limits, &range(scope.clone()), Box::new([]), Some(next.clone()), Wall::EPOCH);
     let Answer::Page(page) = answer else { panic!("empty filtered page is retained") };
     assert!(page.rows.is_empty());
+    assert!(page.cut);
     assert_eq!(page.next, Some(Cursor::Store { scope, after: Some(next) }));
+}
+
+#[test]
+fn an_empty_activity_page_is_cut_only_with_a_continuation() {
+    let (core, limits) = fixture();
+    let scope = Scope::Activity { task: 1 };
+    let next = Position::Owner(Key::Tasks(tasks::Key::Activity { task: 1, position: 9 }));
+    let mut range = range(scope.clone());
+    range.backwards = true;
+    for after in [None, Some(next.clone())] {
+        range.after = after;
+        let answer = super::super::from_store(&core, &limits, &range, Box::new([]), Some(next.clone()), Wall::EPOCH);
+        let Answer::Page(page) = answer else { panic!("empty cut page accepted") };
+        assert!(page.rows.is_empty());
+        assert!(page.cut);
+        assert_eq!(page.next, Some(Cursor::Store { scope: scope.clone(), after: Some(next.clone()) }));
+    }
+    let answer = super::super::from_store(&core, &limits, &range, Box::new([]), None, Wall::EPOCH);
+    let Answer::Page(page) = answer else { panic!("empty ended page accepted") };
+    assert!(!page.cut);
+    assert!(page.next.is_none());
+}
+
+#[test]
+fn a_history_page_with_no_visible_rows_is_cut_only_with_a_continuation() {
+    let (core, limits) = fixture();
+    let scope = Scope::History { task: 1, subtree: false };
+    let mut owner = core.tasks.task(1).unwrap().clone();
+    owner.project = 2;
+    for continuing in [true, false] {
+        let row = stored_row(
+            Record::Tasks(tasks::Stored::History(tasks::History {
+                task: 1,
+                revision: 1,
+                at: Wall::EPOCH,
+                by: tasks::Party::Person(1),
+                change: tasks::Change::Amended,
+                reason: Box::new([]),
+                proposal: None,
+                amendment: None,
+            })),
+            Some(owner.clone()),
+        );
+        let position = reads::row_key(&row).unwrap();
+        let next = if continuing { Some(position) } else { None };
+        let answer =
+            super::super::from_store(&core, &limits, &range(scope.clone()), Box::new([row]), next.clone(), Wall::EPOCH);
+        let Answer::Page(page) = answer else { panic!("stored history page accepted") };
+        assert!(page.rows.is_empty());
+        assert_eq!(page.cut, next.is_some());
+        match next {
+            Some(after) => assert_eq!(page.next, Some(Cursor::Store { scope: scope.clone(), after: Some(after) })),
+            None => assert!(page.next.is_none()),
+        }
+    }
+}
+
+#[test]
+fn a_continuation_outside_the_scope_or_behind_the_page_is_unknown() {
+    let (core, limits) = fixture();
+    let mut range = range(Scope::Activity { task: 1 });
+    range.backwards = true;
+    range.after = Some(Position::Owner(Key::Tasks(tasks::Key::Activity { task: 1, position: 9 })));
+    for next in [
+        Position::Owner(Key::Tasks(tasks::Key::Activity { task: 2, position: 8 })),
+        Position::Owner(Key::Tasks(tasks::Key::Activity { task: 1, position: 10 })),
+        Position::Owner(Key::Tasks(tasks::Key::History { task: 1, revision: 0 })),
+    ] {
+        assert_eq!(
+            super::super::from_store(&core, &limits, &range, Box::new([]), Some(next), Wall::EPOCH),
+            Answer::None(Why::Unknown),
+        );
+    }
+}
+
+#[test]
+fn a_nonempty_activity_page_cannot_continue_from_an_unexamined_position() {
+    let (core, limits) = fixture();
+    let mut range = range(Scope::Activity { task: 1 });
+    range.backwards = true;
+    let row = stored_row(
+        Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+            task: 1,
+            position: 8,
+            at: Wall::EPOCH,
+            line: tasks::Line::Decided { revision: 1 },
+        })),
+        Some(core.tasks.task(1).unwrap().clone()),
+    );
+    let next = Position::Owner(Key::Tasks(tasks::Key::Activity { task: 1, position: 7 }));
+    assert_eq!(
+        super::super::from_store(&core, &limits, &range, Box::new([row]), Some(next), Wall::EPOCH),
+        Answer::None(Why::Unknown),
+    );
 }
 
 #[test]
