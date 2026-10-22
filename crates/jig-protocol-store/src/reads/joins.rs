@@ -44,8 +44,11 @@ pub(super) fn owner(
     task: u64,
     spent: &mut Spent,
 ) -> Result<Option<Box<tasks::TaskRecord>>, Failure> {
+    spent.joins = spent.joins.checked_sub(1).ok_or(Failure::Cut)?;
+    // A miss decodes nothing, so probing live then ended needs only one
+    // join's decoded-record memory, even when neither key is found.
     for key in [tasks::Key::Live(task), tasks::Key::Ended(task)] {
-        let Some(record) = get(store, &core::Key::Tasks(key), spent)? else { continue };
+        let Some(record) = point::record(store, &core::Key::Tasks(key))? else { continue };
         let Some(task) = as_task(&record) else { return Err(Failure::Corrupt) };
         return Ok(Some(Box::new(task.clone())));
     }
@@ -133,4 +136,32 @@ pub(super) fn row(
     spent.bytes = spent.bytes.checked_sub(row.owned_bytes().ok_or(Failure::Corrupt)?).ok_or(Failure::Cut)?;
     spent.rows = spent.rows.checked_sub(1).ok_or(Failure::Cut)?;
     Ok(row)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Spent, owner};
+    use crate::tests::fixtures::{self, ENDED, LIVE};
+
+    #[test]
+    fn every_owner_lookup_spends_exactly_one_join() {
+        const MISSING: u64 = 99;
+        // One lookup must use the one available join, including on a miss.
+        const LOOKUP_JOINS: u32 = 1;
+        let mut store = fixtures::opened();
+        fixtures::committed(
+            &mut store,
+            Box::new([
+                fixtures::header(1),
+                fixtures::save(fixtures::live_task(LIVE)),
+                fixtures::save(fixtures::ended_task(ENDED)),
+            ]),
+        );
+        for (number, present) in [(LIVE, true), (ENDED, true), (MISSING, false)] {
+            let mut spent = Spent { rows: 1, bytes: u64::MAX, joins: LOOKUP_JOINS };
+            let Ok(found) = owner(&mut store, number, &mut spent) else { panic!("lookup fits one join: {number}") };
+            assert_eq!(found.is_some(), present, "owner {number}");
+            assert_eq!(spent.joins, 0, "owner {number}");
+        }
+    }
 }

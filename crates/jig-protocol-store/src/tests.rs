@@ -2,7 +2,7 @@
 mod codec;
 mod commits;
 mod directory;
-mod fixtures;
+pub(crate) mod fixtures;
 mod format;
 mod frames;
 mod gets;

@@ -28,8 +28,10 @@ fn a_turn_row_counts_its_joined_owner_against_the_byte_budget() {
 
 #[test]
 fn a_reply_turn_counts_against_the_join_budget() {
+    // The reply's turn consumes the only join, before its owner.
+    const TURN_JOINS: u32 = 1;
     let (mut store, disk) = party_store();
-    store.limits.joins = 2;
+    store.limits.joins = TURN_JOINS;
     let below = waiting_party(&mut store, reply_range());
     assert_empty(&read_disk(&mut store, below, &disk));
 }
@@ -86,10 +88,12 @@ fn an_oversized_turn_keeps_its_payload_size() {
 
 #[test]
 fn a_turn_past_the_join_budget_is_busy() {
+    // Even the owner's single join is unavailable.
+    const NO_JOINS: u32 = 0;
     let (mut store, disk) = party_store();
-    store.limits.joins = 1;
+    store.limits.joins = NO_JOINS;
     let below = waiting_party(&mut store, turn_range());
-    let reads::Loaded::Busy = read_disk(&mut store, below, &disk) else { panic!("owner evidence requires two gets") };
+    let reads::Loaded::Busy = read_disk(&mut store, below, &disk) else { panic!("owner evidence requires one join") };
 }
 
 #[test]

@@ -123,8 +123,10 @@ fn a_page_stops_before_the_row_past_its_bytes() {
 
 #[test]
 fn a_page_stops_before_the_row_past_its_joins() {
+    // The ancestor fits, but the task's terminal needs a second join.
+    const ANCESTOR_JOINS: u32 = 1;
     let mut store = child_store();
-    store.limits.joins = 2;
+    store.limits.joins = ANCESTOR_JOINS;
     let result = load(&mut store, fixtures::read(ALICE, reads::Scope::Task { task: CHILD }));
     assert_empty(&result);
 }
@@ -738,6 +740,8 @@ fn an_encoded_activity_cut_keeps_the_newest_prefix() {
 
 #[test]
 fn a_paged_join_cut_keeps_its_accepted_prefix() {
+    // One owner and one row's ancestor fit; the next row cuts.
+    const PAGE_JOINS: u32 = 2;
     let mut store = child_store();
     fixtures::committed(
         &mut store,
@@ -747,7 +751,7 @@ fn a_paged_join_cut_keeps_its_accepted_prefix() {
             fixtures::save(fixtures::history(CHILD, 2)),
         ]),
     );
-    store.limits.joins = 4;
+    store.limits.joins = PAGE_JOINS;
     let range = fixtures::read(ALICE, reads::Scope::History { task: CHILD, subtree: false });
     let (rows, next) = page(load(&mut store, range));
     assert_eq!(values(&rows).as_ref(), [fixtures::history(CHILD, 1)]);

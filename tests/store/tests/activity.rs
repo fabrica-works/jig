@@ -109,7 +109,9 @@ fn positions(rows: &[reads::Row]) -> Vec<u64> {
 
 #[test]
 fn ended_dependent_activity_is_not_false_eof() {
-    let mut world = fixture(4, [1, 4, 7]);
+    // One owner and two turns fit; the third turn cuts the page.
+    const PAGE_JOINS: u32 = 3;
+    let mut world = fixture(PAGE_JOINS, [1, 4, 7]);
     let (rows, mut next) = activity(&mut world, None);
     let mut found = positions(&rows);
     assert_eq!(found.first(), Some(&8));
@@ -127,10 +129,12 @@ fn ended_dependent_activity_is_not_false_eof() {
 
 #[test]
 fn an_activity_page_cut_before_its_first_row_says_cut() {
-    let mut bounded = fixture(2, [2, 5, 8]);
+    // The owner consumes the only join, before the newest turn.
+    const OWNER_JOINS: u32 = 1;
+    let mut bounded = fixture(OWNER_JOINS, [2, 5, 8]);
     let (rows, next) = activity(&mut bounded, None);
     assert!(rows.is_empty());
-    let next = next.expect("the owner used both joins; retry the unaccepted newest turn");
+    let next = next.expect("the owner used its join; retry the unaccepted newest turn");
     assert_eq!(next, reads::Position::Owner(core::Key::Tasks(tasks::Key::Activity { task: OWNER, position: 9 })));
     let (rows, repeated) = activity(&mut bounded, Some(next.clone()));
     assert!(rows.is_empty());
