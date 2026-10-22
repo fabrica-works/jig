@@ -56,6 +56,7 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
         w::Owner::Jig => {
             let ask = w::Ask::decode(&w::CEILINGS, &mut Reader::new(keyed.request())).expect("jig ask bytes");
             let decided = match ask {
+                w::Ask::Seen(_) => return None,
                 w::Ask::Compound(value) => {
                     let mut reader = Reader::new(value.operations());
                     let length = reader.u32().expect("piece length");
@@ -114,7 +115,6 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
                 | w::Ask::Stop(_)
                 | w::Ask::Cancel(_)
                 | w::Ask::MoveTask(_)
-                | w::Ask::Seen(_)
                 | w::Ask::ChangePolicy(_)
                 | w::Ask::SetRoles(_)
                 | w::Ask::MakeService(_)
@@ -174,4 +174,129 @@ pub fn receipts(fact: &Received) -> Vec<Receipt> {
         Received::SignedIn { .. } | Received::Sent { .. } => return Vec::new(),
     };
     jig_client_world::observe::received(&event)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use skein_lib::{Overflow, Writer};
+
+    const ATTEMPT: Token = Token::new(7);
+    const REQUEST_KEY: [u8; 16] = [3; 16];
+    const PROJECT: u32 = 1;
+    const TASK: u64 = 8;
+
+    fn encoded<T>(value: &T, measure: fn(&T) -> u32, encode: fn(&T, &mut Writer) -> Result<(), Overflow>) -> Box<[u8]> {
+        let mut writer = Writer::new(usize::try_from(measure(value)).expect("bounded wire fixture"));
+        encode(value, &mut writer).expect("measured wire fixture");
+        writer.finish()
+    }
+
+    fn request(owner: w::Owner, version: u32, bytes: Box<[u8]>) -> ClientRequest {
+        let keyed = w::Keyed::new(
+            &w::CEILINGS,
+            w::KeyedParts { key: REQUEST_KEY, owner, version, request: bytes, value: None },
+        )
+        .expect("bounded keyed fixture");
+        ClientRequest::Exchange {
+            exchange: ATTEMPT,
+            credential: None,
+            message: Message::Request(encoded(&keyed, w::Keyed::measure, w::Keyed::encode)),
+        }
+    }
+
+    fn jig_request(ask: &c::Ask) -> ClientRequest {
+        let ask = jig_client_protocol_link::translate::asks::ask(ask, &w::CEILINGS).expect("bounded jig fixture");
+        request(w::Owner::Jig, jig_client_protocol_wire::VERSION, encoded(&ask, w::Ask::measure, w::Ask::encode))
+    }
+
+    #[test]
+    fn encoded_top_level_seen_has_no_retained_answer_observation() {
+        for through in [c::SeenThrough::Results { through: 1 }, c::SeenThrough::Conversation { task: TASK, through: 1 }]
+        {
+            assert!(client_sent(&jig_request(&c::Ask::Seen { through })).is_none(), "{through:?}");
+        }
+    }
+
+    #[test]
+    fn encoded_ordinary_requests_without_cards_keep_their_observations() {
+        use jig_client_world::test::list;
+        let words = c::Text::new(b"continue".as_slice().into(), 32).expect("fixture text");
+        let asks = [
+            (c::Ask::Stop { project: PROJECT, task: TASK }, None),
+            (c::Ask::Take { project: PROJECT, task: TASK }, None),
+            (
+                c::Ask::Message { project: PROJECT, task: TASK, words: words.clone() },
+                Some((TASK, b"continue".to_vec())),
+            ),
+            (
+                c::Ask::Compound {
+                    project: PROJECT,
+                    operations: list([
+                        c::Operation::Stop { project: PROJECT, task: TASK },
+                        c::Operation::Message { project: PROJECT, task: TASK, words: words.clone() },
+                    ]),
+                },
+                None,
+            ),
+            (
+                c::Ask::Compound {
+                    project: PROJECT,
+                    operations: list([
+                        c::Operation::Message { project: PROJECT, task: TASK, words },
+                        c::Operation::Stop { project: PROJECT, task: TASK },
+                    ]),
+                },
+                Some((TASK, b"continue".to_vec())),
+            ),
+        ];
+        for (ask, words) in asks {
+            let sent = client_sent(&jig_request(&ask)).expect("ordinary request observed");
+            assert_eq!(
+                (sent.attempt, sent.key, sent.card, sent.revision, sent.words),
+                (ATTEMPT, REQUEST_KEY, None, None, words),
+                "{ask:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn encoded_family_requests_keep_their_card_and_revision() {
+        let record = crate::family::request(&jig_client_test_domain::family::Ask::Touch {
+            project: PROJECT,
+            item: TASK,
+            revision: c::Revision { value: 5 },
+            parameters: None,
+        });
+        let envelope = w::FamilyRequest::new(
+            &w::CEILINGS,
+            w::FamilyRequestParts {
+                scope: w::Scope::Project(
+                    w::ScopeProject::new(&w::CEILINGS, w::ScopeProjectParts { value: PROJECT })
+                        .expect("bounded project fixture"),
+                ),
+                record: record.bytes,
+            },
+        )
+        .expect("bounded family fixture");
+        let owner = w::Owner::Family(
+            w::Family::new(&w::CEILINGS, w::FamilyParts { number: record.family }).expect("bounded family fixture"),
+        );
+        let sent = client_sent(&request(
+            owner,
+            record.version,
+            encoded(&envelope, w::FamilyRequest::measure, w::FamilyRequest::encode),
+        ))
+        .expect("family request observed");
+        let card = jig_client_world::harness::CardKey::of(jig_client_test_view::family_key(
+            &jig_client_test_domain::family::Subject {
+                scope: jig_client_test_domain::family::Scope::Project(PROJECT),
+                kind: jig_client_test_domain::family::Kind::Item(TASK),
+            },
+        ));
+        assert_eq!(
+            (sent.attempt, sent.key, sent.card, sent.revision, sent.words),
+            (ATTEMPT, REQUEST_KEY, Some(card), Some((0, 5)), None)
+        );
+    }
 }

@@ -34,6 +34,7 @@ pub fn sent(request: &Request) -> Option<Sent> {
         return None;
     };
     let (card, revision, words) = match ask {
+        jig_client::Ask::Jig(ask) if matches!(ask.as_ref(), Ask::Seen { .. }) => return None,
         jig_client::Ask::Jig(ask) => return Some(jig_sent(*attempt, *k, ask)),
         jig_client::Ask::Family { record, .. } => {
             let ask = crate::test::family_request(record);
@@ -506,8 +507,111 @@ pub fn jig_window_changed(act: &jig_client_view::action::Act) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{CardKey, CardSeen, Key, Owner, Role, Seen, jig_seen};
+    use jig_client_domain::contract as c;
     use skein_lib::Queue;
     use skein_ui::View;
+
+    const ATTEMPT: skein_lib::Token = skein_lib::Token::new(7);
+    const REQUEST_KEY: [u8; 16] = [3; 16];
+    const PROJECT: u32 = 1;
+    const TASK: u64 = 8;
+
+    fn send(ask: jig_client::Ask) -> jig_client_test_domain::Request {
+        jig_client_test_domain::Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send { attempt: ATTEMPT, key: REQUEST_KEY, request: ask, value: None },
+            },
+        }
+    }
+
+    #[test]
+    fn top_level_seen_has_no_retained_answer_observation() {
+        for through in [c::SeenThrough::Results { through: 1 }, c::SeenThrough::Conversation { task: TASK, through: 1 }]
+        {
+            assert!(
+                super::sent(&send(jig_client::Ask::Jig(Box::new(c::Ask::Seen { through })))).is_none(),
+                "{through:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_requests_without_cards_keep_their_observations() {
+        use crate::test::list;
+        let reason = c::Text::new(b"because".as_slice().into(), 32).expect("fixture text");
+        let asks = [
+            c::Ask::Create { project: PROJECT, tasks: list([]) },
+            c::Ask::Take { project: PROJECT, task: TASK },
+            c::Ask::HandBack { project: PROJECT, task: TASK },
+            c::Ask::Stop { project: PROJECT, task: TASK },
+            c::Ask::Cancel { project: PROJECT, task: TASK, reason: reason.clone(), grace: None },
+            c::Ask::Move { project: PROJECT, task: TASK, reason: reason.clone() },
+            c::Ask::Withdraw { project: PROJECT, proposal: 1 },
+            c::Ask::Propose { project: PROJECT, action: c::ProposeAction::Batch { tasks: list([]) }, reason },
+            c::Ask::ChangePolicy { project: PROJECT, edit: c::PolicyEdit::ProjectSpend { period_spend: 10 } },
+            c::Ask::SetRoles { project: PROJECT, holdings: list([]) },
+            c::Ask::MakeService {
+                project: PROJECT,
+                name: c::Text::new(b"service".as_slice().into(), 32).expect("fixture text"),
+                role: c::HeldRole::Member,
+            },
+            c::Ask::SetPool { project: PROJECT, party: 1, budget: 10 },
+            c::Ask::SignIn { holder: c::AccountHolder::Own, provider: 1 },
+            c::Ask::AccountChange {
+                holder: c::AccountHolder::Own,
+                change: c::AccountChange::CheckProgram { source: 1 },
+            },
+            c::Ask::SignOut { holder: c::AccountHolder::Own, source: 1 },
+            c::Ask::Compound {
+                project: PROJECT,
+                operations: list([
+                    c::Operation::Stop { project: PROJECT, task: TASK },
+                    c::Operation::Message {
+                        project: PROJECT,
+                        task: TASK,
+                        words: c::Text::new(b"continue".as_slice().into(), 32).expect("fixture text"),
+                    },
+                ]),
+            },
+        ];
+        for ask in asks {
+            let sent =
+                super::sent(&send(jig_client::Ask::Jig(Box::new(ask.clone())))).expect("ordinary request observed");
+            assert_eq!(
+                (sent.attempt, sent.key, sent.card, sent.revision, sent.words),
+                (ATTEMPT, REQUEST_KEY, None, None, None),
+                "{ask:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn family_requests_keep_their_card_and_revision() {
+        let (project, value) =
+            jig_client_test_domain::family::wire::request(&jig_client_test_domain::family::Ask::Touch {
+                project: PROJECT,
+                item: TASK,
+                revision: c::Revision { value: 5 },
+                parameters: None,
+            });
+        let sent = super::sent(&send(jig_client::Ask::Family {
+            scope: c::Scope::Project(project),
+            record: jig_client::Family {
+                family: 1,
+                version: jig_client_test_protocol_wire::VERSION,
+                bytes: jig_client_test_protocol_wire::codec::family::request_record(project, value),
+            },
+        }))
+        .expect("family request observed");
+        let card = CardKey::of(jig_client_test_view::family_key(&jig_client_test_domain::family::Subject {
+            scope: jig_client_test_domain::family::Scope::Project(PROJECT),
+            kind: jig_client_test_domain::family::Kind::Item(TASK),
+        }));
+        assert_eq!(
+            (sent.attempt, sent.key, sent.card, sent.revision, sent.words),
+            (ATTEMPT, REQUEST_KEY, Some(card), Some((0, 5)), None)
+        );
+    }
 
     #[test]
     fn a_nested_application_status_cannot_decide_a_jig_card() {

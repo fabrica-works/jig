@@ -208,6 +208,14 @@ or the engine's store), never a client's state.
 
 ### 6.1 On the client's surface
 
+The client referee excludes only top-level `Seen` from retained-Answer
+request observations. In the same joint runs, the core observer checks
+the watermark/forget commit before client capture
+(`../../domain/testing.md`, section 4); the lower client-domain and
+composed-store proofs below own the memory-only pending lifecycle.
+The upper client referee does not check `Seen` liveness or observe its
+translation-layer refusals.
+
 In every world, whatever stands in front of the client:
 
 - **Nothing reported done before it was durable:** no answer to a

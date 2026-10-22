@@ -321,6 +321,7 @@ impl App for Ops {
             return None;
         };
         let ask = match request {
+            jig_client::Ask::Jig(ask) if matches!(ask.as_ref(), Ask::Seen { .. }) => return None,
             jig_client::Ask::Jig(value) => domain::Ask::Jig(value.clone()),
             jig_client::Ask::Family { record, .. } => {
                 domain::Ask::Infrastructure(domain::wire::ask_value(&record.bytes).expect("whole environment ask"))
@@ -486,6 +487,131 @@ fn infrastructure_sent(attempt: skein_lib::Token, key: [u8; 16], ask: &infra::As
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jig_client_protocol_wire::v11 as w;
+    use skein_lib::{Overflow, Token, Writer};
+
+    const ATTEMPT: Token = Token::new(7);
+    const REQUEST_KEY: [u8; 16] = [3; 16];
+    const PROJECT: u32 = 1;
+    const TASK: u64 = 8;
+
+    fn encoded<T>(
+        value: &T,
+        measure: fn(&T) -> u32,
+        encode: fn(&T, &mut Writer) -> std::result::Result<(), Overflow>,
+    ) -> Box<[u8]> {
+        let mut writer = Writer::new(usize::try_from(measure(value)).expect("bounded wire fixture"));
+        encode(value, &mut writer).expect("measured wire fixture");
+        writer.finish()
+    }
+
+    fn requests(ask: jig_client::Ask) -> [Request; 2] {
+        let (owner, version, bytes) = match &ask {
+            jig_client::Ask::Jig(ask) => {
+                let ask =
+                    jig_client_protocol_link::translate::asks::ask(ask, &w::CEILINGS).expect("bounded jig fixture");
+                (w::Owner::Jig, jig_client_protocol_wire::VERSION, encoded(&ask, w::Ask::measure, w::Ask::encode))
+            }
+            jig_client::Ask::Family { scope: Scope::Project(project), record } => {
+                let owner =
+                    w::Family::new(&w::CEILINGS, w::FamilyParts { number: record.family }).expect("family fixture");
+                let scope = w::ScopeProject::new(&w::CEILINGS, w::ScopeProjectParts { value: *project })
+                    .expect("project fixture");
+                let envelope = w::FamilyRequest::new(
+                    &w::CEILINGS,
+                    w::FamilyRequestParts { scope: w::Scope::Project(scope), record: record.bytes.clone() },
+                )
+                .expect("bounded family fixture");
+                (
+                    w::Owner::Family(owner),
+                    record.version,
+                    encoded(&envelope, w::FamilyRequest::measure, w::FamilyRequest::encode),
+                )
+            }
+            jig_client::Ask::Family { .. } => panic!("fixture uses a project scope"),
+        };
+        let keyed = w::Keyed::new(
+            &w::CEILINGS,
+            w::KeyedParts { key: REQUEST_KEY, owner, version, request: bytes, value: None },
+        )
+        .expect("bounded keyed fixture");
+        [
+            Request::Client {
+                request: jig_client::Request::Down {
+                    down: jig_client::Down::Send { attempt: ATTEMPT, key: REQUEST_KEY, request: ask, value: None },
+                },
+            },
+            Request::Client {
+                request: jig_client::Request::Exchange {
+                    exchange: ATTEMPT,
+                    credential: None,
+                    message: jig_client::Message::Request(encoded(&keyed, w::Keyed::measure, w::Keyed::encode)),
+                },
+            },
+        ]
+    }
+
+    #[test]
+    fn both_ops_routes_exclude_top_level_seen() {
+        for through in [SeenThrough::Results { through: 1 }, SeenThrough::Conversation { task: TASK, through: 1 }] {
+            for request in requests(jig_client::Ask::Jig(Box::new(Ask::Seen { through }))) {
+                assert!(Ops::sent(&request).is_none(), "{request:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn both_ops_routes_keep_ordinary_no_card_requests() {
+        for ask in [
+            Ask::Stop { project: PROJECT, task: TASK },
+            Ask::Take { project: PROJECT, task: TASK },
+            Ask::Compound {
+                project: PROJECT,
+                operations: jig_client_world::test::list([
+                    Operation::Stop { project: PROJECT, task: TASK },
+                    Operation::Message {
+                        project: PROJECT,
+                        task: TASK,
+                        words: Text::new(b"continue".as_slice().into(), 32).expect("fixture text"),
+                    },
+                ]),
+            },
+        ] {
+            for request in requests(jig_client::Ask::Jig(Box::new(ask))) {
+                let sent = Ops::sent(&request).expect("ordinary request observed");
+                assert_eq!(
+                    (sent.attempt, sent.key, sent.card, sent.revision, sent.words),
+                    (ATTEMPT, REQUEST_KEY, None, None, None),
+                    "{request:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn both_ops_routes_keep_infrastructure_requests() {
+        let ask = infra::Ask::MoveEnd {
+            project: PROJECT,
+            environment: TASK,
+            revision: Revision { value: 5 },
+            until: skein_lib::Wall::from_nanos(100),
+        };
+        for request in requests(jig_client::Ask::Family {
+            scope: Scope::Project(PROJECT),
+            record: jig_client::Family {
+                family: number(Connector::Infrastructure),
+                version: jig_ops_client_protocol_wire::VERSION,
+                bytes: domain::wire::ask(&ask).expect("bounded infrastructure fixture"),
+            },
+        }) {
+            let sent = Ops::sent(&request).expect("infrastructure request observed");
+            assert_eq!(
+                (sent.attempt, sent.key, sent.card, sent.revision, sent.words),
+                (ATTEMPT, REQUEST_KEY, Some(environment_key(PROJECT, TASK)), Some((0, 5)), None),
+                "{request:?}"
+            );
+        }
+    }
 
     #[test]
     fn application_read_receipt_unwraps_its_versioned_read_answer() {
