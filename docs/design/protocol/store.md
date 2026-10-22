@@ -484,9 +484,10 @@ alone, once a page, and each turn's line its turn (below).
   subtree's history is in its scope's order, task by task,
   its position the task and the row.
 - **Joins are point reads** in the same step, priced within the read's
-  bounds: a page's rows times the joins each may need. A join is charged
-  once for each record it finds by number: an owner found live, or ended
-  after its live record is missed, costs one, since a miss decodes nothing.
+  bounds: a page's rows times the joins each may need. An owner lookup
+  is charged one join, whether the owner is found live, found ended
+  after its live record is missed, or not found: a miss decodes
+  nothing, so the second probe needs no join of its own.
   A turn's is read from its transcript, and answers once its frame is read.
   An activity page's joins are its owner's, once, and one for each turn, so its
   first row needs at most the owner's and a turn's.
