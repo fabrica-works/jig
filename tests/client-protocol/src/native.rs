@@ -115,6 +115,10 @@ pub struct NativeClient {
     pub chats_made: u32,
 }
 impl NativeClient {
+    /// The provisional text retained by the client's run watch.
+    pub fn text(&self, handle: jig_client::Handle) -> Option<&jig_client::contract::RunText> {
+        self.root.client().text(handle)
+    }
     #[must_use]
     pub fn new(settings: Settings, root: Fd, user: u32, seed: u64, script: Script) -> Self {
         let mut shell = Shell::new(settings);

@@ -49,6 +49,8 @@ pub struct Outcome {
     pub agent_starts: u32,
     pub activity_seen: bool,
     pub text_bytes: usize,
+    pub text_prefixes: Vec<Box<[u8]>>,
+    pub text_committed: bool,
     pub start_messages: u32,
     pub waited: bool,
     pub windows: u32,
@@ -175,6 +177,8 @@ fn outcome(procs: &[Proc], store: &Store, views: &Views, reset_injected: bool, k
         identity_kept: assignments.last().is_some_and(|next| assignments[0].identity() == next.identity()),
         activity_seen: views.activity_seen,
         text_bytes: views.text_bytes,
+        text_prefixes: views.reply.prefixes.clone(),
+        text_committed: views.reply.committed,
         verdict: Verdict::Passed,
         turns_committed: u32::try_from(turns.len()).expect("bounded turns"),
         answers_acknowledged: worker.map_or(0, |wire| u32::try_from(wire.acknowledgements.len()).expect("bounded answers")),
@@ -327,8 +331,10 @@ pub(crate) fn answer_parties(engine: &mut jig_test_service::Engine, party: &mut 
                 if let core::documents::Document::Task(task) = &*document {
                     views.activity_seen |= task.chip.details.observation.is_some();
                 }
-                if let core::documents::Document::Run(run) = &*document {
-                    assert!(run.writing.is_none(), "process facts contain no provisional text");
+                if let core::documents::Document::Run(run) = &*document
+                    && let Some(writing) = &run.writing
+                {
+                    assert!(writing.turn.turn > run.committed_turn, "committed turns have no writing");
                 }
                 engine.parties_in().push(core::Event::Delivered { watcher });
             }
@@ -415,6 +421,7 @@ pub(crate) fn worker_wire(procs: &[Proc]) -> &processes::Wire {
 pub(crate) struct Views {
     pub(crate) activity_seen: bool,
     pub(crate) text_bytes: usize,
+    pub(crate) reply: crate::live_text::Reply,
     pub(crate) messages_ended: usize,
     pub(crate) refusals_kept: bool,
     pub(crate) engine_drained: bool,
@@ -460,6 +467,7 @@ fn make_referee(
             | crate::stories::Story::Shutdown => 0,
             crate::stories::Story::InvalidTranscript => 1,
             crate::stories::Story::Window => 7,
+            crate::stories::Story::Facts => 2,
             crate::stories::Story::Drain
             | crate::stories::Story::ApplicationGeneration
             | crate::stories::Story::Key { .. }
@@ -472,7 +480,6 @@ fn make_referee(
             | crate::stories::Story::Refusals(_)
             | crate::stories::Story::Opening(_)
             | crate::stories::Story::Progress
-            | crate::stories::Story::Facts
             | crate::stories::Story::Inbox
             | crate::stories::Story::Call
             | crate::stories::Story::Wait
