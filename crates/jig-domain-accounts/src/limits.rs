@@ -15,12 +15,14 @@ pub struct Limits {
     pub program_names: u32,
     /// Hosts a program sign-out can await; at most `PROGRAM_HOSTS`.
     pub program_hosts: u32,
-    /// Sign-ins and LLM-key keeps under way at once; the driver admits as many redirect listeners.
+    /// Sign-ins, LLM-key keeps, moves out and moves in under way at once.
     pub sign_ins: u32,
     pub credentials: u32,
     pub backoff_base: Duration,
     pub backoff_max: Duration,
     pub retry: Duration,
+    /// How long a move out waits for Written after its answer (configuration.md, section 6).
+    pub move_deadline: Duration,
     pub spent_attention: Duration,
     pub facts: u32,
 }
@@ -42,6 +44,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.sources == 0
         || limits.sign_ins == 0
         || limits.retry == Duration::ZERO
+        || limits.move_deadline == Duration::ZERO
         || limits.backoff_base == Duration::ZERO
         || limits.backoff_max < limits.backoff_base
     {
@@ -81,6 +84,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Deadlines::<u32>::worst_case(sources)?)?
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)?
         .checked_add(Map::<u32, UnderWay>::worst_case(limits.sign_ins)?)?
+        .checked_add(Map::<u32, crate::signing::Move>::worst_case(limits.sign_ins)?)?
+        .checked_add(Deadlines::<u32>::worst_case(limits.sign_ins)?)?
+        .checked_add(Map::<u32, crate::signing::Arriving>::worst_case(limits.sign_ins)?)?
+        .checked_add(u64::from(SUBJECT).checked_add(u64::from(DISPLAY))?.checked_mul(u64::from(limits.sign_ins))?)?
+        // A withdraw request owns a copy of the account's display name.
+        .checked_add(u64::from(DISPLAY).checked_mul(u64::from(limits.sign_ins))?)?
         // Each account sign-in can emit one answer owning its bounded visit address.
         .checked_add(u64::from(limits.sign_ins).checked_mul(u64::from(crate::ADDRESS))?)?
         .checked_add(Map::<u32, crate::changes::Leaving>::worst_case(sources)?)?

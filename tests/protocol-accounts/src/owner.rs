@@ -605,7 +605,12 @@ impl Owner {
                         | child::Signing::Forget { .. }
                         | child::Signing::Restore { .. }
                         | child::Signing::Restored => continue,
-                        child::Signing::CancelSignIn { .. }
+                        child::Signing::Withdraw { .. }
+                        | child::Signing::Return { .. }
+                        | child::Signing::Refresh { .. }
+                        | child::Signing::Open { .. }
+                        | child::Signing::Adopt { .. }
+                        | child::Signing::CancelSignIn { .. }
                         | child::Signing::SignIn { .. }
                         | child::Signing::SignOut { .. }
                         | child::Signing::Replaced { .. } => {}
@@ -617,6 +622,12 @@ impl Owner {
                         | translate::Down::Restored => {
                             unreachable!("LLM key tests use their component harness")
                         }
+                        // The move's routing: T3 of accounts-move M1.
+                        translate::Down::Withdraw { .. }
+                        | translate::Down::Return { .. }
+                        | translate::Down::Refresh { .. }
+                        | translate::Down::Open { .. }
+                        | translate::Down::Adopt { .. } => {}
                         translate::Down::SignIn { source, provider: 1 } => {
                             self.account = source;
                             let registration = fixtures::party_registration(self.story);

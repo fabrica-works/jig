@@ -144,6 +144,27 @@ pub enum Event {
         source: u32,
         confirmed: bool,
     },
+    /// The withdrawn source's latest record was read into the move's file.
+    Withdrawn {
+        source: u32,
+        readable: bool,
+    },
+    /// The carried file belongs to this application; its parts obey SUBJECT and DISPLAY.
+    Opened {
+        source: u32,
+        provider: u32,
+        subject: Box<[u8]>,
+        display: Box<[u8]>,
+    },
+    /// The carried file does not read or belongs to another application.
+    NotOurs {
+        source: u32,
+    },
+    /// The opened record was adopted and its carried value erased in one secrets' commit.
+    Adopted {
+        source: u32,
+        kept: bool,
+    },
     Close,
 }
 
@@ -206,8 +227,31 @@ pub enum ToComponent {
 
 /// What the child asks of the component for a party's sign-in and sign-out (protocol/llm.md,
 /// 5.2), each naming a source by the number the child gives it.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Signing {
+    /// Withdraw and read the latest record for a move (accounts.md, section 6).
+    Withdraw {
+        source: u32,
+        display: Box<[u8]>,
+    },
+    /// Return a cancelled move's source to the driver with its kept record.
+    Return {
+        source: u32,
+    },
+    /// Refresh once before lending any generation of a returned or adopted record.
+    Refresh {
+        source: u32,
+    },
+    /// Read the carried move file for this new source number.
+    Open {
+        source: u32,
+        carried: u64,
+    },
+    /// Adopt the opened record into the source row and erase the carried value.
+    Adopt {
+        source: u32,
+        carried: u64,
+    },
     Keep {
         source: u32,
         carried: u64,
@@ -247,6 +291,18 @@ pub enum Signing {
 /// The child's answer to a holder's sign-in, sign-out or account change.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    /// Withdrawn and read; the protocol layer hands its bytes to the asking client beside
+    /// this answer. Written names the move's own number (accounts.md, section 6).
+    MovingOut {
+        account: u32,
+        number: u32,
+        source: u32,
+    },
+    /// The adopted record is durable; renewed when the holder already held its subject.
+    MovedIn {
+        account: u32,
+        renewed: bool,
+    },
     ProgramDeclared {
         source: u32,
         name: Box<[u8]>,
@@ -393,16 +449,57 @@ pub struct Fact {
 /// A holder's account change; an LLM key is named only by its carried number.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Change {
-    DeclareProgram { provider: u32, join: Option<u32>, name: Box<[u8]> },
-    CheckProgram { source: u32 },
-    AddKey { provider: u32, join: Option<u32>, carried: u64 },
-    ReplaceKey { source: u32, carried: u64 },
-    RemoveKey { source: u32 },
-    Resume { source: u32 },
-    Remove { account: u32 },
-    MoveAccount { account: u32, place: u32 },
-    MoveSource { account: u32, source: u32, place: u32 },
-    SetUses { account: u32, uses: Option<Box<[Use]>> },
+    /// Move the account's signed-in source out (accounts.md, section 6).
+    MoveOut {
+        account: u32,
+    },
+    /// The client wrote the move's file, naming the move's number.
+    Written {
+        number: u32,
+    },
+    /// Move in from a file's bytes, carried as an LLM key's value is.
+    MoveIn {
+        carried: u64,
+    },
+    DeclareProgram {
+        provider: u32,
+        join: Option<u32>,
+        name: Box<[u8]>,
+    },
+    CheckProgram {
+        source: u32,
+    },
+    AddKey {
+        provider: u32,
+        join: Option<u32>,
+        carried: u64,
+    },
+    ReplaceKey {
+        source: u32,
+        carried: u64,
+    },
+    RemoveKey {
+        source: u32,
+    },
+    Resume {
+        source: u32,
+    },
+    Remove {
+        account: u32,
+    },
+    MoveAccount {
+        account: u32,
+        place: u32,
+    },
+    MoveSource {
+        account: u32,
+        source: u32,
+        place: u32,
+    },
+    SetUses {
+        account: u32,
+        uses: Option<Box<[Use]>>,
+    },
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum KeyFailure {

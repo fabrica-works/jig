@@ -45,7 +45,7 @@ fn ready(domain: &Domain, limits: &Limits) -> Result<(), Refusal> {
     if !domain.wanted() {
         return Err(Refusal::Closing);
     }
-    crate::room_for_sign_in(limits, domain.signing.len().saturating_add(domain.keeping.len()))
+    crate::room_for_sign_in(limits, domain.sign_ins())
 }
 fn addable(domain: &Domain, limits: &Limits, holder: Holder, provider: u32, join: Option<u32>) -> Result<(), Refusal> {
     if !domain.wanted() {
@@ -62,6 +62,11 @@ fn addable(domain: &Domain, limits: &Limits, holder: Holder, provider: u32, join
                 return Err(Refusal::Unknown);
             }
             crate::changes::account(domain, holder, account)?;
+            for (_, source) in &entry.sources {
+                if domain.moves.contains_key(source) {
+                    return Err(Refusal::Moving);
+                }
+            }
             domain.room_for_source(limits, account)?;
         }
         None => domain.room_for_account(limits, holder)?,

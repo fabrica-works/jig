@@ -41,6 +41,13 @@ pub(super) fn key_failure(value: a::KeyFailure) -> c::OwnerAccountKeyFailure {
 }
 pub(super) fn refusal(value: a::Refusal) -> c::OwnerAccountRefusal {
     match value {
+        // M2 (the account's move through the client) replaces this arm.
+        // Only the move variants are unreachable in M1: accounts' people_changes_never_emit_move_values.
+        a::Refusal::NotSignedIn
+        | a::Refusal::NotOurs
+        | a::Refusal::Cancelled
+        | a::Refusal::Moving
+        | a::Refusal::Unknown => c::OwnerAccountRefusal::Unknown,
         a::Refusal::NotLimited => c::OwnerAccountRefusal::NotLimited,
         a::Refusal::Uses => c::OwnerAccountRefusal::Uses,
         a::Refusal::NotKept { why } => c::OwnerAccountRefusal::NotKept { why: self::key_failure(why) },
@@ -48,7 +55,6 @@ pub(super) fn refusal(value: a::Refusal) -> c::OwnerAccountRefusal {
         a::Refusal::Held { provider } => c::OwnerAccountRefusal::Held { provider },
         a::Refusal::Provider { provider } => c::OwnerAccountRefusal::Provider { provider },
         a::Refusal::Subject => c::OwnerAccountRefusal::Subject,
-        a::Refusal::Unknown => c::OwnerAccountRefusal::Unknown,
         a::Refusal::Numbers => c::OwnerAccountRefusal::Numbers,
         a::Refusal::Kind { kind } => c::OwnerAccountRefusal::Kind { kind: self::kind(kind) },
         a::Refusal::Closing => c::OwnerAccountRefusal::Closing,

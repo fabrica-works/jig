@@ -489,7 +489,10 @@ fn memory_below_the_components_sum_is_refused() {
         + 82_400
         // Deployment acts add connector grants, retained rows, alarms and key indexes;
         // the shared pending slab prices either party or deployment flights (people.md, 5.3).
-        + DEPLOYMENT_ACTS_GROWTH;
+        + DEPLOYMENT_ACTS_GROWTH
+        // Account moves add bounded move/arrival tables, payloads and deadlines,
+        // and enlarge the accounts output bound and the core's routed envelopes.
+        + 14_560_734;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

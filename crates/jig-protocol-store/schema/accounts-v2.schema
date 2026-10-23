@@ -1,4 +1,4 @@
-family jig-store-accounts 1
+family jig-store-accounts 2
 
 # The installation's identifier (store.md 4.4), kept at the first start.
 versioned record Installation { id: fixed 16 }
@@ -13,7 +13,7 @@ enum Use { party: Party, project: Project }
 record Account { number: u32 provider: u32 holder: Holder place: u32 uses: option list 16 Use subject: bytes 255 display: bytes 64 }
 enum Kind { sign_in, key, program, none }
 record Limited { reset: option u64 }
-enum Held { limited: Limited, refused }
+enum Held { limited: Limited, refused, moving }
 record Source { account: u32 number: u32 place: u32 kind: Kind name: bytes 32 held: option Held }
 record Issued { number: u32 holder: Holder name: bytes 32 signed_out: bool }
 enum Value { next: Next, account: Account, source: Source, issued: Issued }

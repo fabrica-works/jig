@@ -651,6 +651,7 @@ pub const CORE_LIMITS: core::Limits = core::Limits {
         backoff_base: skein_lib::Duration::from_nanos(2_000_000_000),
         backoff_max: skein_lib::Duration::from_nanos(8_000_000_000),
         retry: skein_lib::Duration::from_nanos(30_000_000_000),
+        move_deadline: skein_lib::Duration::from_secs(60),
         spent_attention: skein_lib::Duration::from_nanos(1_000_000_000),
         facts: 2,
     },

@@ -43,7 +43,7 @@ fn the_component_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_accounts_familys_code_and_goldens_have_no_drift() {
-    check("accounts", 1);
+    check("accounts", 2);
 }
 
 #[test]

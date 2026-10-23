@@ -1,6 +1,6 @@
 //! The accounts family's rows (protocol/store.md, 4.4): the installation's
 //! identifier, and the accounts child's counter, accounts and sources (item 9).
-use crate::accounts_v1 as wire;
+use crate::accounts_v2 as wire;
 use alloc::boxed::Box;
 use jig_domain_accounts as domain;
 use skein_lib::{List, Reader, Wall, Writer};
@@ -88,6 +88,7 @@ pub fn encode(row: &domain::Stored) -> Result<Box<[u8]>, wire::Problem> {
                     Some(wire::Held::Limited(wire::Limited::new(limits, wire::LimitedParts { reset })?))
                 }
                 Some(domain::Held::Refused) => Some(wire::Held::Refused),
+                Some(domain::Held::Moving) => Some(wire::Held::Moving),
             };
             wire::Value::Source(wire::Source::new(
                 limits,
@@ -145,6 +146,7 @@ pub fn decode(bytes: &[u8]) -> Result<domain::Stored, wire::Problem> {
                     Some(domain::Held::Limited { reset })
                 }
                 Some(wire::Held::Refused) => Some(domain::Held::Refused),
+                Some(wire::Held::Moving) => Some(domain::Held::Moving),
             };
             domain::Stored::Source { account, number, place, kind, name, held }
         }

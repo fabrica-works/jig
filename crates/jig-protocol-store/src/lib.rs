@@ -130,7 +130,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(tasks_v9::Row::worst_case_heap(&codec.tasks)?)?
         .checked_add(people_v10::Row::worst_case_heap(&codec.people)?)?
         .checked_add(notes_v1::Row::worst_case_heap(&codec.notes)?)?
-        .checked_add(accounts_v1::Row::worst_case_heap(&accounts_v1::CEILINGS)?)?
+        .checked_add(accounts_v2::Row::worst_case_heap(&accounts_v2::CEILINGS)?)?
         .checked_add(u64::try_from(size_of::<jig_domain_tasks::TaskRecord>()).ok()?)?
         .checked_mul(2)?;
     // One byte per encoded row bounds carrier counts. Count wire values and
@@ -228,8 +228,8 @@ fn memory_env(limits: skein_kv::Limits) -> Env<skein_kv::Limits> {
 }
 
 #[rustfmt::skip]
-#[path = "generated/accounts_v1.rs"]
-pub mod accounts_v1;
+#[path = "generated/accounts_v2.rs"]
+pub mod accounts_v2;
 #[rustfmt::skip]
 #[path = "generated/component_v2.rs"]
 pub mod component_v2;

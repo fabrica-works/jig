@@ -17,6 +17,11 @@ pub(super) const fn holder(holder: people::AccountHolder, person: u64) -> accoun
 /// so the subject's refusals (another holder's, or not well formed) are never an answer here.
 pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::Outcome {
     let refusal = match answer {
+        // M2 (the account's move through the client) replaces this arm.
+        // Only the move variants are unreachable in M1: accounts' people_changes_never_emit_move_values.
+        accounts::Answer::MovingOut { .. } | accounts::Answer::MovedIn { .. } | accounts::Answer::Done => {
+            return people::Outcome::AccountChanged;
+        }
         accounts::Answer::Started { source, address } => {
             return people::Outcome::AccountSignInStarted { source, address };
         }
@@ -28,7 +33,6 @@ pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::O
         }
         accounts::Answer::Refused { refusal } => refusal,
         accounts::Answer::KeyKept { source } => return people::Outcome::AccountKeyKept { source },
-        accounts::Answer::Done => return people::Outcome::AccountChanged,
         accounts::Answer::Removed { confirmed, failed_hosts } => {
             return people::Outcome::AccountRemoved { confirmed, failed_hosts: hosts(core, failed_hosts) };
         }
@@ -43,7 +47,13 @@ pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::O
         accounts::Refusal::Limit { bound } => people::Refusal::Limit { which: limit(bound) },
         accounts::Refusal::Numbers => people::Refusal::Limit { which: people::LimitKind::Arithmetic },
         // A provider or source kind that does not offer the requested change.
-        accounts::Refusal::Provider { .. }
+        // M2 (the account's move through the client) replaces this arm.
+        // Only the move variants are unreachable in M1: accounts' people_changes_never_emit_move_values.
+        accounts::Refusal::NotSignedIn
+        | accounts::Refusal::NotOurs
+        | accounts::Refusal::Cancelled
+        | accounts::Refusal::Moving
+        | accounts::Refusal::Provider { .. }
         | accounts::Refusal::Kind { .. }
         | accounts::Refusal::NotLimited
         | accounts::Refusal::Uses => people::Refusal::NotOffered,

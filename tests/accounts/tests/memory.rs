@@ -381,3 +381,125 @@ fn full_program_operations_stay_below_the_accounts_bound() {
     }
     let _last = run.step(&mut domain, Event::Close, "close pending programs");
 }
+
+/// Full account rows and source alarms stay resident while the move tables saturate.
+fn move_tables() -> (Domain, Run) {
+    let limits = Limits { sign_ins: LIMITS.accounts, ..LIMITS };
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let bound = worst_case(&limits).expect("move world limits fit");
+    let offered = providers(vec![provider(1, true, true)]);
+    let meter = Meter::new();
+    let domain = Domain::new(&limits, offered);
+    let out = Queue::with_capacity(max_out(&limits));
+    (domain, Run { meter, env, bound, out, request: 0 })
+}
+fn restore_move_accounts(domain: &mut Domain, run: &mut Run) {
+    for account in 0..run.env.limits.accounts {
+        run.step(
+            domain,
+            Event::Restore {
+                record: Stored::Account {
+                    number: number(account, None),
+                    provider: 1,
+                    holder: Holder::Party(u64::from(account)),
+                    place: 0,
+                    subject: longest(SUBJECT, account),
+                    display: longest(DISPLAY, account),
+                    uses: Some(
+                        (0..jig_domain_accounts::USES).map(|n| jig_domain_accounts::Use::Party(u64::from(n))).collect(),
+                    ),
+                },
+            },
+            "full move account",
+        );
+        for place in 0..run.env.limits.sources {
+            run.step(
+                domain,
+                Event::Restore {
+                    record: Stored::Source {
+                        account: number(account, None),
+                        number: number(account, Some(place)),
+                        place,
+                        kind: if place == 0 { Kind::SignIn } else { Kind::Key },
+                        name: Box::new([]),
+                        held: Some(Held::Limited { reset: Some(Wall::from_nanos(120_000_000_000)) }),
+                    },
+                },
+                "full move sources and alarms",
+            );
+        }
+    }
+    run.step(domain, Event::Want, "move accounts restored");
+    for number in 0..run.env.limits.credentials {
+        run.step(
+            domain,
+            Event::Credential { number, generation: 1, valid: Duration::from_secs(100) },
+            "move credentials",
+        );
+    }
+    assert_eq!(domain.unrestored(), 0);
+    assert_eq!(domain.accounts(), run.env.limits.accounts);
+}
+#[test]
+fn full_moves_and_their_deadlines_stay_within_the_worst_case() {
+    use jig_domain_accounts::Change;
+    let (mut domain, mut run) = move_tables();
+    restore_move_accounts(&mut domain, &mut run);
+    for account in 0..run.env.limits.sign_ins {
+        let source = number(account, Some(0));
+        let request = run.token();
+        assert_eq!(
+            run.step(
+                &mut domain,
+                Event::Change {
+                    request,
+                    holder: Holder::Party(u64::from(account)),
+                    change: Change::MoveOut { account: number(account, None) },
+                },
+                "move withdrawn with longest display"
+            ),
+            Some(Signing::Withdraw { source, display: longest(DISPLAY, account) })
+        );
+        run.step(&mut domain, Event::Withdrawn { source, readable: true }, "move deadline armed");
+        assert_eq!(domain.source(source).expect("moving source").state, jig_domain_accounts::State::Asking);
+    }
+    assert_eq!(domain.next_deadline(), Some(Time::ZERO.saturating_add(run.env.limits.move_deadline)));
+    run.step(&mut domain, Event::Close, "full moves close");
+}
+#[test]
+fn full_opened_arrivals_stay_within_the_worst_case() {
+    use jig_domain_accounts::Change;
+    let (mut domain, mut run) = move_tables();
+    restore_move_accounts(&mut domain, &mut run);
+    for account in 0..run.env.limits.sign_ins {
+        let request = run.token();
+        let Some(Signing::Open { source, carried }) = run.step(
+            &mut domain,
+            Event::Change {
+                request,
+                holder: Holder::Party(u64::from(account)),
+                change: Change::MoveIn { carried: 1 << 63 },
+            },
+            "arrival opened",
+        ) else {
+            panic!("the arrival starts");
+        };
+        run.meter.start();
+        step(
+            &mut domain,
+            &run.env,
+            Event::Opened {
+                source,
+                provider: 1,
+                subject: longest(SUBJECT, account),
+                display: longest(DISPLAY, account),
+            },
+            &mut run.out,
+        );
+        let measured = run.meter.end();
+        assert_eq!(run.out.pop(), Some(Request::Signing(Signing::Adopt { source, carried })));
+        assert!(run.out.pop().is_none());
+        run.meter.check(measured, run.bound, &"every opened subject and display retained");
+    }
+    run.step(&mut domain, Event::Close, "full arrivals close");
+}

@@ -304,6 +304,12 @@ impl Accounts {
                         domain::Kind::Program | domain::Kind::None => (),
                     }
                 }
+                // The move's routing: T3 of accounts-move M1.
+                translate::Down::Withdraw { .. }
+                | translate::Down::Return { .. }
+                | translate::Down::Refresh { .. }
+                | translate::Down::Open { .. }
+                | translate::Down::Adopt { .. } => {}
                 translate::Down::Restored => {
                     self.inventory.restored();
                 }

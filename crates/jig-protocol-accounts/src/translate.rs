@@ -207,6 +207,11 @@ pub const fn form(scheme: &table::Scheme) -> accounts::Form {
 /// A child's LLM account sign-in asks for an add before its driver request.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Down {
+    Withdraw { source: u32, display: Box<[u8]> },
+    Return { source: u32 },
+    Refresh { source: u32 },
+    Open { source: u32, carried: u64 },
+    Adopt { source: u32, carried: u64 },
     Restore { source: u32, provider: u32, kind: accounts::Kind },
     Restored,
     Keep { source: u32, carried: u64, replaces: bool },
@@ -218,6 +223,11 @@ pub enum Down {
 #[must_use]
 pub fn down_signing(signing: accounts::Signing) -> Down {
     match signing {
+        accounts::Signing::Withdraw { source, display } => Down::Withdraw { source, display },
+        accounts::Signing::Return { source } => Down::Return { source },
+        accounts::Signing::Refresh { source } => Down::Refresh { source },
+        accounts::Signing::Open { source, carried } => Down::Open { source, carried },
+        accounts::Signing::Adopt { source, carried } => Down::Adopt { source, carried },
         accounts::Signing::Keep { source, carried, replaces } => Down::Keep { source, carried, replaces },
         accounts::Signing::Forget { source } => Down::Forget { source },
         accounts::Signing::Restore { source, provider, kind } => Down::Restore { source, provider, kind },
