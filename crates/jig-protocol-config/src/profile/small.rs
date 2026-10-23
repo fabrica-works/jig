@@ -364,7 +364,6 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 // the optional wait-bound wall adds nine bytes, so the largest row grows by 213 bytes.
 // Ending authority adds (batch + 1)^2 = (2 + 1)^2 = 9 bytes: the row,
 // its recurring members and its proposed creations with their recurring members.
-// Exceeded adds one byte to the largest inline hold encoding.
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
     value: 1_567_829,
