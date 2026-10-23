@@ -164,8 +164,8 @@ fn a_store_of_another_tasks_version_refuses_naming_tasks() {
 
 #[test]
 fn a_store_of_another_people_version_refuses_naming_people() {
-    let mut store = planted(&[version_put(9, 6, 5), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::People, found: 6, wanted: 9 });
+    let mut store = planted(&[version_put(9, 9, 5), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::People, found: 9, wanted: 10 });
 }
 
 #[test]

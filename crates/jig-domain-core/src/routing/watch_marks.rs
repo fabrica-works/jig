@@ -290,7 +290,7 @@ pub(super) fn touch_people_row(core: &mut Core, row: &people::Stored) {
                 core.touch_party(holding.person);
             }
         }
-        people::Stored::Answer { .. } => core.touch_deployment(),
+        people::Stored::Answer { .. } | people::Stored::Acted { .. } => core.touch_deployment(),
         people::Stored::SignIn { .. } | people::Stored::Policy { .. } => {}
     }
 }
@@ -354,6 +354,7 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
         | people::Event::ApplyRoles { .. }
         | people::Event::SignedIn { .. }
         | people::Event::SignOut { .. }
+        | people::Event::Act { .. }
         | people::Event::Ask { .. }
         | people::Event::Decided { .. }
         | people::Event::Restore { .. }

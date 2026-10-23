@@ -3,3 +3,5 @@ pub mod closing_chat;
 pub mod instructions;
 pub mod offers;
 pub mod reads;
+
+pub mod delegates;

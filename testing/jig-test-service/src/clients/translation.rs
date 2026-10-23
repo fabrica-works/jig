@@ -13,7 +13,8 @@ pub(crate) fn to_component(held: core::Held) -> Option<kit::Event> {
         core::Held::Delivery { watcher, document } => Some(kit::Event::Delivery { watcher, document }),
         core::Held::WatchEnded { watcher, why } => Some(kit::Event::WatchEnded { watcher, why }),
         core::Held::CarriedUnused { number } => Some(kit::Event::Application(kit::FromApplication::Unused { number })),
-        core::Held::Drained
+        core::Held::Acted { .. }
+        | core::Held::Drained
         | core::Held::ApplicationDelivery { .. }
         | core::Held::ApplicationWatchEnded { .. }
         | core::Held::ReadLoad { .. }
@@ -131,6 +132,7 @@ pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }
         | core::Event::Read { .. }
+        | core::Event::Act { .. }
         | core::Event::Key { .. }
         | core::Event::Application { .. }
         | core::Event::ApplicationPart { .. }
@@ -210,6 +212,7 @@ pub(crate) fn starting(value: core::Event) -> Option<kit::Event> {
         | core::Event::Stopping
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }
+        | core::Event::Act { .. }
         | core::Event::Key { .. }
         | core::Event::Application { .. }
         | core::Event::ApplicationPart { .. }

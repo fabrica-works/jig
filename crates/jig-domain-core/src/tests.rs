@@ -283,6 +283,7 @@ fn config(seed: u64) -> Config {
         seed,
         workers_in_process: false,
         hub_turns: 2,
+        grants: Box::new([]),
         owners: Box::new([people::InitialOwner {
             project: 1,
             identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
@@ -1453,7 +1454,7 @@ fn documents_project_exposes_two_roles_members_pool_and_resource_parts() {
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     let first_identity = core.people.identity(1).unwrap().clone();
-    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider, Box::new([]));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     let mut restored = Queue::with_capacity(people::max_out(&limits.people));
     for record in [
@@ -1559,7 +1560,7 @@ fn documents_lifecycle_history_keeps_holds_and_endings() {
 
 fn restore_document_party(core: &mut Core, limits: &Limits, projects: &[u32]) {
     let identity = core.people.identity(1).unwrap().clone();
-    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider, Box::new([]));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     people::step(
@@ -1868,7 +1869,7 @@ fn watch_core() -> (Core, Limits) {
         )
         .unwrap();
     let identity = core.people.identity(1).unwrap().clone();
-    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider, Box::new([]));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let records = [
@@ -2943,7 +2944,9 @@ fn deployment_capacity_carries_keyed_refusal_identity_time_and_bounded_omissions
         while let Some(request) = out.pop() {
             match request {
                 people::Request::Route { request, .. } => routed = Some(request),
-                people::Request::Save { .. }
+                people::Request::Act { .. }
+                | people::Request::Acted { .. }
+                | people::Request::Save { .. }
                 | people::Request::Erase { .. }
                 | people::Request::Reply { .. }
                 | people::Request::ServiceMade { .. }

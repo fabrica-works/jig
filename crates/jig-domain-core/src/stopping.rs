@@ -50,6 +50,13 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
     }
     match event {
         Event::SignIn { reply_to, .. } => Err(party(reply_to)),
+        Event::Act { reply_to, carried, .. } => Err(crate::routing::application_routes::first(
+            crate::routing::application_routes::number(carried),
+            answer(Some(Request::Held(Box::new(Held::Acted {
+                to: reply_to,
+                outcome: people::Outcome::Again(people::Again::NotReady),
+            })))),
+        )),
         Event::Key { reply_to, carried, .. } => {
             Err(crate::routing::application_routes::first(Some(carried.number), party(reply_to)))
         }
@@ -131,6 +138,10 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
 }
 fn people_gate(event: people::Event) -> Result<Event, Requests> {
     match event {
+        people::Event::Act { reply_to, .. } => Err(answer(Some(Request::Held(Box::new(Held::Acted {
+            to: reply_to,
+            outcome: people::Outcome::Again(people::Again::NotReady),
+        }))))),
         people::Event::Ask { reply_to, .. } | people::Event::SignOut { reply_to, .. } => Err(party(reply_to)),
         people::Event::ConversationSeen { .. } => Err(empty()),
         event @ (people::Event::ChatState { .. }

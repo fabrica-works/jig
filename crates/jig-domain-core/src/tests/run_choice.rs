@@ -491,7 +491,7 @@ fn placement_with_accounts(
     }
     account(&mut core, &limits, accounts::Event::Want);
     granted(&mut core, &limits, 1);
-    core.people = people::Domain::new(&limits.people, Box::new([]), u16::MAX);
+    core.people = people::Domain::new(&limits.people, Box::new([]), u16::MAX, Box::new([]));
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     for person in [OWNER, OTHER_PERSON] {

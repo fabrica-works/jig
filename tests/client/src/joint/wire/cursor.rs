@@ -703,6 +703,7 @@ fn take_projection_key(r: &mut Reader<'_>) -> Option<ProjectionKey> {
 
 fn put_people_key(w: &mut Writer, value: &people::Key) -> Option<()> {
     match value {
+        people::Key::Acted(_) => return None,
         people::Key::Person(value) => {
             w.byte(0)?;
             w.u64(*value)?;

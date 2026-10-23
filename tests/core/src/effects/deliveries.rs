@@ -25,6 +25,9 @@ impl World {
             }
         }
         match delivery {
+            root::Delivery::Core(core::Held::Acted { to, outcome }) => {
+                self.act_answers.push((to.into_token(), outcome));
+            }
             root::Delivery::Core(core::Held::Sources { channel, sources }) => {
                 self.events.push_back(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Logins {
                     channel,
@@ -68,7 +71,11 @@ impl World {
                 self.application_answers.push((to.into_token(), number, outcome));
             }
             root::Delivery::Core(core::Held::CarriedUnused { number }) => {
-                let before = self.people_answers.len().checked_add(self.application_answers.len());
+                let before = self
+                    .people_answers
+                    .len()
+                    .checked_add(self.application_answers.len())
+                    .and_then(|count| count.checked_add(self.act_answers.len()));
                 self.carried_unused.push((before.expect("bounded story answers"), number));
             }
             root::Delivery::Projection { connector, feed } => {

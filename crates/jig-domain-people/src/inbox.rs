@@ -207,7 +207,7 @@ impl Domain {
     /// Recover the authenticated owner and exact scope of one still pending keyed mark.
     #[must_use]
     pub fn seen_context(&self, request: Token) -> Option<(u64, Seen)> {
-        let flight = self.pending.get(Id::<Pending>::from_token(request))?;
+        let flight = self.pending.get(Id::<Pending>::from_token(request))?.party()?;
         if let Ask::MarkSeen { seen } = flight.ask { Some((flight.key.person, seen)) } else { None }
     }
 

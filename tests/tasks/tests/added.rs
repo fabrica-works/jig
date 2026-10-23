@@ -876,7 +876,7 @@ fn dependency_compound(world: &mut World, operations: Vec<tasks::Operation>) -> 
     }
     response(world, |reply_to| Event::Compound {
         reply_to,
-        person: 9,
+        by: jig_domain_tasks::Party::Person(9),
         project: 1,
         operations: staged,
         period: 0,

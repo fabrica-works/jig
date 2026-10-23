@@ -245,7 +245,7 @@ fn an_observers_core_role_refusals_match_their_offers() {
     for act in [Act::Reorder, Act::Adopt, Act::ChangePolicy, Act::SetRoles, Act::MakeService, Act::SetPool] {
         assert_eq!(offers::admit(&core, &limits, 1, act, &project, Wall::EPOCH), Admission::Refused(expected.clone()));
     }
-    core.people = people::Domain::new(&limits.people, Box::new([]), 2);
+    core.people = people::Domain::new(&limits.people, Box::new([]), 2, Box::new([]));
     let mut child = Queue::with_capacity(people::max_out(&limits.people));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     people::step(

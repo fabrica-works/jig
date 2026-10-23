@@ -278,7 +278,7 @@ fn compound(w: &mut World, operations: Vec<Operation>) {
     let call = reply_to.into_token();
     w.send(Event::Compound {
         reply_to: ReplyTo::new(call),
-        person: PERSON,
+        by: jig_domain_tasks::Party::Person(PERSON),
         project: 1,
         operations: staged,
         period: 0,

@@ -20,7 +20,7 @@ pub(super) fn compound(test: &mut Harness, operations: Vec<Operation>, pool_budg
     }
     test.send(Event::Compound {
         reply_to: to(),
-        person: REQUESTER,
+        by: Party::Person(REQUESTER),
         project: PROJECT,
         operations: bounded,
         period: 0,

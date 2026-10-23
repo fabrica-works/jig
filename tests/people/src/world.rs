@@ -144,6 +144,8 @@ pub struct World {
     env: Env<Limits>,
     out: Queue<Request>,
     owners: Box<[InitialOwner]>,
+    grants: Box<[people::ActGrant]>,
+    pub acts: Vec<(Token, u16, people::Act)>,
     records: BTreeMap<Key, Stored>,
     durable_tasks: BTreeMap<RequestKey, u64>,
     ended_chats: BTreeMap<u64, (u64, u64)>,
@@ -187,13 +189,20 @@ impl World {
 
     #[must_use]
     pub fn with_owners(settings: Settings, owners: Box<[InitialOwner]>) -> World {
-        let domain = Domain::new(&settings.limits, owners.clone(), 1);
+        Self::configured(settings, owners, Box::new([]))
+    }
+
+    #[must_use]
+    pub fn configured(settings: Settings, owners: Box<[InitialOwner]>, grants: Box<[people::ActGrant]>) -> World {
+        let domain = Domain::new(&settings.limits, owners.clone(), 1, grants.clone());
         let mut world = World {
             settings,
             domain,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: settings.limits },
             out: Queue::with_capacity(people::max_out(&settings.limits)),
             owners,
+            grants,
+            acts: Vec::new(),
             records: BTreeMap::new(),
             durable_tasks: BTreeMap::new(),
             ended_chats: BTreeMap::new(),
@@ -430,6 +439,21 @@ impl World {
         self.request(sign_in, key, crate::fixtures::create(words, None))
     }
 
+    pub fn act(&mut self, connector: u16, key: [u8; 16], act: people::Act) -> u64 {
+        let (call, reply_to) = self.call();
+        self.send(Event::Act { reply_to, connector, key, act: Box::new(act) });
+        call
+    }
+    pub fn decide_acts(&mut self, outcome: &Outcome) {
+        for (request, _, _) in std::mem::take(&mut self.acts) {
+            self.send(Event::Decided { request, outcome: outcome.clone() });
+        }
+    }
+    pub fn reconfigure(&mut self, owners: Box<[InitialOwner]>, grants: Box<[people::ActGrant]>) {
+        self.owners = owners;
+        self.grants = grants;
+        self.restart();
+    }
     pub fn request(&mut self, sign_in: u64, key: [u8; 16], ask: Ask) -> u64 {
         let (call, reply_to) = self.call();
         let person = self
@@ -449,6 +473,7 @@ impl World {
                 | Stored::EndedRead { .. }
                 | Stored::ReadConversation { .. }
                 | Stored::Roles { .. }
+                | Stored::Acted { .. }
                 | Stored::Answer { .. }
                 | Stored::Policy { .. } => None,
             })
@@ -519,6 +544,11 @@ impl World {
         while let Some(request) = self.out.pop() {
             self.trace.log(self.env.now, format_args!("{request:?}"));
             match request {
+                Request::Act { request, connector, act } => {
+                    self.stats.routes += 1;
+                    self.acts.push((request, connector, *act));
+                }
+                Request::Acted { to, outcome } => replies.push((to.into_token().raw(), Reply::Outcome(outcome))),
                 Request::Save { record } => changes.push(Change::Save(record)),
                 Request::Erase { key } => changes.push(Change::Erase(key)),
                 Request::Reply { to, reply } => {
@@ -1080,8 +1110,9 @@ impl World {
         self.commits.clear();
         self.held.clear();
         self.deferred.clear();
+        self.acts.clear();
         self.issued = self.durable;
-        self.domain = Domain::new(&self.env.limits, self.owners.clone(), 1);
+        self.domain = Domain::new(&self.env.limits, self.owners.clone(), 1, self.grants.clone());
         for record in self.records.values().filter(|record| record.key().live()).cloned().collect::<Vec<_>>() {
             self.send(Event::Restore { record });
         }

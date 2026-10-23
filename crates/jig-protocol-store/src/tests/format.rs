@@ -69,7 +69,8 @@ fn another_family_is_refused_naming_the_first_difference() {
                 },
                 wanted: match family {
                     Family::Core => 5,
-                    Family::Tasks | Family::People => 9,
+                    Family::Tasks => 9,
+                    Family::People => 10,
                     Family::Component => 2,
                     Family::Notes | Family::Accounts | Family::Application => 1,
                 }

@@ -127,7 +127,7 @@ impl Staged {
 
 pub(crate) struct Compound {
     pub reply_to: ReplyTo,
-    pub person: u64,
+    pub by: Party,
     pub project: u32,
     pub operations: List<Operation>,
     pub period: u64,
@@ -144,7 +144,7 @@ pub(crate) fn compound(domain: &mut Domain, env: &Env<Limits>, request: Compound
         });
     }
     let context = CompoundContext {
-        person: request.person,
+        by: request.by,
         project: request.project,
         period: request.period,
         pool_budget: request.pool_budget,
@@ -163,7 +163,7 @@ pub(crate) fn compound(domain: &mut Domain, env: &Env<Limits>, request: Compound
     let staged = admission.staged;
     let reroute = !staged.moved.is_empty();
     for plan in staged.plans.into_boxed() {
-        apply(domain, env, request.person, plan, out);
+        apply(domain, env, request.by, plan, out);
     }
     if reroute {
         crate::moving::reroute(domain, env, out);
@@ -174,7 +174,7 @@ pub(crate) fn compound(domain: &mut Domain, env: &Env<Limits>, request: Compound
 /// Authenticated project and funding context shared by all compound operations.
 #[derive(Clone, Copy, Debug)]
 pub struct CompoundContext {
-    pub person: u64,
+    pub by: Party,
     pub project: u32,
     pub period: u64,
     pub pool_budget: u64,
@@ -250,7 +250,7 @@ impl<'a> CompoundAdmission<'a> {
         if self.staged.plans.len() >= self.bound {
             return Err(Box::new(Problem::new(None, Refusal::Batch)));
         }
-        let problem = if context.person == 0 {
+        let problem = if !maker_allowed(context.by, context.project, &operation, self.domain) {
             Some(Refusal::Reference)
         } else if !self.domain.ready() {
             Some(Refusal::NotReady)
@@ -273,6 +273,35 @@ impl<'a> CompoundAdmission<'a> {
     }
 }
 
+fn maker_allowed(by: Party, project: u32, operation: &Operation, domain: &Domain) -> bool {
+    match by {
+        Party::Person(person) => person != 0,
+        Party::Task(_) => false,
+        Party::Deployment { project: held } => {
+            if held != project {
+                return false;
+            }
+            match operation {
+                Operation::Cancel { task, .. } => match domain.task(*task) {
+                    Some(row) => row.project == project,
+                    None => false,
+                },
+                Operation::Move { .. }
+                | Operation::Amend { .. }
+                | Operation::Release { .. }
+                | Operation::Message { .. }
+                | Operation::Stop { .. } => false,
+            }
+        }
+    }
+}
+fn person(by: Party) -> Result<u64, Box<Problem>> {
+    match by {
+        Party::Person(person) => Ok(person),
+        Party::Task(_) | Party::Deployment { .. } => Err(Box::new(Problem::new(None, Refusal::Reference))),
+    }
+}
+
 fn check(
     domain: &Domain,
     staged: &Staged,
@@ -280,7 +309,7 @@ fn check(
     request: CompoundContext,
     operation: Operation,
 ) -> Result<Plan, Box<Problem>> {
-    let by = Party::Person(request.person);
+    let by = request.by;
     match operation {
         Operation::Cancel { task, reason, grace, message } => Ok(Plan::Cancel(Box::new(crate::control::check_cancel(
             domain,
@@ -329,7 +358,7 @@ fn check(
                 staged,
                 env,
                 task,
-                crate::Hold::StoppedBy { party: request.person },
+                crate::Hold::StoppedBy { party: person(request.by)? },
                 None,
             );
             match plan {
@@ -343,7 +372,7 @@ fn check(
             env,
             crate::moving::Move {
                 number: task,
-                person: request.person,
+                person: person(request.by)?,
                 period: request.period,
                 pool_budget: request.pool_budget,
                 period_budget: request.period_budget,
@@ -356,8 +385,7 @@ fn check(
     }
 }
 
-fn apply(domain: &mut Domain, env: &Env<Limits>, person: u64, plan: Plan, out: &mut Queue<Request>) {
-    let by = Party::Person(person);
+fn apply(domain: &mut Domain, env: &Env<Limits>, by: Party, plan: Plan, out: &mut Queue<Request>) {
     match plan {
         Plan::Cancel(plan) => crate::control::apply_cancel(domain, env, by, *plan, out),
         Plan::Move { plan, reason } => crate::moving::make(domain, env, *plan, &reason, out),

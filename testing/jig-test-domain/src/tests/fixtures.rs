@@ -112,6 +112,7 @@ pub fn domain() -> Domain {
                 seed: 1,
                 workers_in_process: false,
                 hub_turns: 2,
+                grants: Box::new([]),
                 owners: Box::new([]),
                 authority,
                 projects: List::with_capacity(0),

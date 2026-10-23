@@ -15,7 +15,7 @@ fn source(deployment_role: Option<people::Role>) -> (Core, Limits) {
     core.names.insert(1, Box::from("Project 1")).expect("first project name");
     core.names.insert(u32::MAX, Box::from("Project 4294967295")).expect("full-width project name");
     let identity = core.people.identity(1).unwrap().clone();
-    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider, Box::new([]));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let mut rows = vec![

@@ -500,6 +500,54 @@ pub struct RequestKey {
     pub key: [u8; 16],
 }
 
+/// A connector's key space for the deployment's acts (people.md, 5.3).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct ActKey {
+    pub connector: u16,
+    pub key: [u8; 16],
+}
+
+/// One act a connector makes in the deployment's name (people.md, 5.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Act {
+    Close {
+        project: u32,
+        task: u64,
+        grace: Option<Duration>,
+        reason: Box<[u8]>,
+    },
+    /// The value travels beside the act, carried as a client's key is.
+    AddKey {
+        provider: u32,
+        join: Option<u32>,
+        digest: [u8; 32],
+    },
+    RemoveAccount {
+        account: u32,
+    },
+    Adopt {
+        project: u32,
+        adoption: Adoption,
+    },
+}
+
+/// Which acts the configuration grants a connector (people.md, 5.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ActKind {
+    Close,
+    AddKey,
+    RemoveAccount,
+    Adopt,
+    MakeProject,
+}
+
+/// A connector's configured deployment authority (people.md, 5.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ActGrant {
+    pub connector: u16,
+    pub may: Box<[ActKind]>,
+}
+
 /// Logical store key for a people record; the protocol handles bytes and secrets outside this
 /// domain. (domain/people.md, sections 3–5).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -520,6 +568,8 @@ pub enum Key {
     Answer(RequestKey),
     /// Ended positions are point reads, never restored at start.
     EndedRead { task: u64, party: u64 },
+    /// One durable deployment act.
+    Acted(ActKey),
 }
 
 impl Key {
@@ -534,7 +584,8 @@ impl Key {
             | Self::SignIn(_)
             | Self::Roles(_)
             | Self::Policy(_)
-            | Self::Answer(_) => true,
+            | Self::Answer(_)
+            | Self::Acted(_) => true,
         }
     }
 }
@@ -543,6 +594,8 @@ impl Key {
 /// bytes are checked when admitted. (domain/people.md, sections 3–5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Stored {
+    /// Connector-scoped act and its permanent answer (people.md, 5.3).
+    Acted { key: ActKey, act: Act, outcome: Outcome, at: Wall },
     /// Persistent party identity; provider/subject and party numbers must be unique on restore.
     Person {
         /** Stable person number, unique among restored people. */
@@ -604,6 +657,7 @@ impl Stored {
             Stored::Roles { project, .. } => Key::Roles(*project),
             Stored::Policy { project, .. } => Key::Policy(*project),
             Stored::Answer { key, .. } => Key::Answer(*key),
+            Stored::Acted { key, .. } => Key::Acted(*key),
         }
     }
 }
@@ -616,6 +670,8 @@ impl Stored {
     reason = "bounded whole keyed requests stay inline and event storage is priced by size_of"
 )]
 pub enum Event {
+    /// Admit a connector's deployment act without a sign-in.
+    Act { reply_to: ReplyTo, connector: u16, key: [u8; 16], act: Box<Act> },
     /// Move a live conversation and start its new requester with nothing read.
     MoveChat { task: u64, project: u32, from: u64, to: u64 },
     /// Authentic committed chat header; live headers replace their previous contribution.
@@ -723,6 +779,10 @@ pub enum Event {
 /// replies until required writes are durable. (domain/people.md, section 5.1).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// A deployment flight; the root owes one Decided.
+    Act { request: Token, connector: u16, act: Box<Act> },
+    /// Terminal answer held by the parent until durable.
+    Acted { to: ReplyTo, outcome: Outcome },
     /// Terminal for one service creation after its person and role saves.
     ServiceMade { request: Token, outcome: Outcome },
     /// Terminal for `ApplyRoles`; success `Save` precedes this output, but the root completes the

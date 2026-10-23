@@ -100,6 +100,7 @@ fn has_watch_end(out: &[Request]) -> bool {
                 | Held::Relayed { .. }
                 | Held::Inbound { .. }
                 | Held::Relay { .. }
+                | Held::Acted { .. }
                 | Held::PeopleReply { .. }
                 | Held::CallAnswer { .. }
                 | Held::Result { .. }

@@ -315,6 +315,8 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
 }
 #[test]
 fn memory_below_the_components_sum_is_refused() {
+    // Connector grants and acted tables/alarms are priced alongside party flights (people.md, 5.3).
+    const DEPLOYMENT_ACTS_GROWTH: u64 = 12_599_136;
     const BEFORE_FINISHING_OVER: u64 = 18_729_868_387;
     // Small's two pending sign-ins need two additional close outputs for cancellation
     // (protocol/llm.md, 5.2). Propagating that room through the core and journal
@@ -484,7 +486,10 @@ fn memory_below_the_components_sum_is_refused() {
         // a 336-byte map and two 64-byte names, plus two codec scratch copies.
         + 1_189_328
         // Owner project name: 20 document reservations * (24-byte Text + 4,096 payload bytes).
-        + 82_400;
+        + 82_400
+        // Deployment acts add connector grants, retained rows, alarms and key indexes;
+        // the shared pending slab prices either party or deployment flights (people.md, 5.3).
+        + DEPLOYMENT_ACTS_GROWTH;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

@@ -130,6 +130,8 @@ pub struct Config {
     pub hub_turns: u32,
     /// Initial authenticated owners.
     pub owners: Box<[people::InitialOwner]>,
+    /// Configured deployment acts for each connector (people.md, 5.3).
+    pub grants: Box<[people::ActGrant]>,
     /// Configured authority and policy.
     pub authority: authority::Domain,
     /// Deployment and run settings retained by the core.
@@ -544,6 +546,9 @@ impl Core {
             "core prices every configured connector number"
         );
         assert_connector_registry(&config.connectors);
+        for grant in &config.grants {
+            assert!(config.connectors.contains(&grant.connector), "acts name configured connectors");
+        }
         assert!(
             config.settings.resume_bytes > 0 && config.settings.resume_bytes <= limits.resume_bytes,
             "core prices its transcript retention"
@@ -677,7 +682,12 @@ impl Core {
                 charters::efforts(&config.settings),
             ),
             authority: config.authority,
-            people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
+            people: people::Domain::new(
+                &limits.people,
+                config.owners,
+                config.settings.deployment_provider,
+                config.grants,
+            ),
             fleet: {
                 let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs);
                 fleet.configure_workers(worker_names);

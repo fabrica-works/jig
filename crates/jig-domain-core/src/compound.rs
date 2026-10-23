@@ -32,7 +32,7 @@ pub(crate) fn route(
     inputs: List<people::Operation>,
 ) {
     let context = tasks::CompoundContext {
-        person: route.person,
+        by: tasks::Party::Person(route.person),
         project: route.project,
         period: core.period(route.project),
         pool_budget: core.pool_budget(route.project, route.person),
@@ -79,7 +79,7 @@ pub(crate) fn route(
     );
     work.push(Event::Tasks(tasks::Event::Compound {
         reply_to: ReplyTo::new(route.request),
-        person: context.person,
+        by: context.by,
         project: context.project,
         operations,
         period: context.period,

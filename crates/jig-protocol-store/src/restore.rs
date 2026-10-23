@@ -123,7 +123,10 @@ fn people_interval(range: &Restore) -> Option<u32> {
             let mut people = None;
             for range in ranges {
                 match range {
-                    jig_domain_core::RestoreRange::People => people = Some(interval),
+                    jig_domain_core::RestoreRange::People => {
+                        let count = u32::try_from(intervals::restore(range).len()).ok()?;
+                        people = Some(interval.checked_add(count.checked_sub(1)?)?);
+                    }
                     jig_domain_core::RestoreRange::Deployment
                     | jig_domain_core::RestoreRange::Accounts
                     | jig_domain_core::RestoreRange::Tasks

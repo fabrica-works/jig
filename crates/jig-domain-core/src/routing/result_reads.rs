@@ -18,6 +18,7 @@ pub(crate) struct ResultRead {
 
 #[derive(Debug)]
 pub(crate) enum ReadFor {
+    DeploymentClose { request: Token, project: u32 },
     Preparation { task: u64, last_message: u64 },
     Amendment(Box<AmendmentRead>),
 }
@@ -28,6 +29,7 @@ pub(crate) fn clear(core: &mut Core, task: u64) {
         let mut request = None;
         for (&token, read) in &core.result_reads {
             let owner = match &read.why {
+                ReadFor::DeploymentClose { .. } => None,
                 ReadFor::Preparation { task, .. } => Some(*task),
                 ReadFor::Amendment(read) => match &read.replay {
                     Replay::Agent { key, .. } => Some(key.task),
@@ -42,7 +44,7 @@ pub(crate) fn clear(core: &mut Core, task: u64) {
         let Some(request) = request else { break };
         if let Some(read) = core.result_reads.remove(&request) {
             match read.why {
-                ReadFor::Preparation { .. } => {}
+                ReadFor::DeploymentClose { .. } | ReadFor::Preparation { .. } => {}
                 ReadFor::Amendment(amendment) => match amendment.replay {
                     Replay::Agent { key, .. } => {
                         let _pending = core.pending_calls.remove(&key);
@@ -62,7 +64,7 @@ pub(super) fn begin(core: &mut Core, work: &mut Queue<Event>, task: u64, ids: Bo
                 out.push(Request::Decided);
                 return Requests::Out(out);
             }
-            ReadFor::Preparation { .. } | ReadFor::Amendment(_) => {}
+            ReadFor::DeploymentClose { .. } | ReadFor::Preparation { .. } | ReadFor::Amendment(_) => {}
         }
     }
     if core.result_reads.len() == core.result_reads.capacity() {
@@ -106,6 +108,10 @@ pub(super) fn loaded(
     out.push(Request::Decided);
     let Some(mut read) = core.result_reads.remove(&request) else { return Requests::Out(out) };
     match read.why {
+        ReadFor::DeploymentClose { request, project } => {
+            let outcome = closed_outcome(project, *read.ids.first().expect("one close subject"), row, busy);
+            work.push(Event::People(jig_domain_people::Event::Decided { request, outcome }));
+        }
         ReadFor::Amendment(mut amendment) => {
             if !amendment_reads::current(core, &amendment.replay) {
                 return Requests::Out(out);
@@ -229,10 +235,61 @@ pub(super) fn clear_person(core: &mut Core, person: u64) {
                     }
                     Replay::Person { .. } | Replay::Agent { .. } => {}
                 },
-                ReadFor::Preparation { .. } => {}
+                ReadFor::DeploymentClose { .. } | ReadFor::Preparation { .. } => {}
             }
         }
         let Some(request) = found else { break };
         drop(core.result_reads.remove(&request));
+    }
+}
+
+/// A close of an archived chat uses the existing durable ended-task point load.
+pub(super) fn closed_subject(
+    core: &mut Core,
+    work: &mut Queue<Event>,
+    out: &mut Queue<Request>,
+    request: Token,
+    project: u32,
+    task: u64,
+) {
+    if core.result_reads.len() == core.result_reads.capacity() {
+        work.push(Event::People(jig_domain_people::Event::Decided {
+            request,
+            outcome: jig_domain_people::Outcome::Again(jig_domain_people::Again::Busy),
+        }));
+        return;
+    }
+    let load = Token::new(core.next_result_request);
+    core.next_result_request = core.next_result_request.checked_add(1).expect("transient result request space");
+    let read = ResultRead {
+        why: ReadFor::DeploymentClose { request, project },
+        ids: Box::new([task]),
+        at: 0,
+        results: List::with_capacity(0),
+    };
+    ask(out, load, &read);
+    assert!(core.result_reads.insert(load, read).is_ok(), "admitted close subject load");
+}
+
+fn closed_outcome(
+    project: u32,
+    wanted: u64,
+    row: Option<Box<tasks::TaskRecord>>,
+    busy: bool,
+) -> jig_domain_people::Outcome {
+    if busy {
+        jig_domain_people::Outcome::Again(jig_domain_people::Again::Busy)
+    } else {
+        let why = match row {
+            Some(row) if row.project == project && row.number == wanted => match &row.phase {
+                tasks::Phase::Ended(ending) => super::refusals::ended(ending),
+                tasks::Phase::Closing(closing) => super::refusals::ended(&closing.ending),
+                tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Held { .. } => {
+                    jig_domain_people::Refusal::Unknown
+                }
+            },
+            Some(_) | None => jig_domain_people::Refusal::Unknown,
+        };
+        jig_domain_people::Outcome::Refused(why)
     }
 }

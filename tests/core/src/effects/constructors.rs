@@ -269,6 +269,7 @@ impl World {
             initial_ask,
             creating,
             people_answers: Vec::new(),
+            act_answers: Vec::new(),
             application_answers: Vec::new(),
             carried_unused: Vec::new(),
             procedure: None,

@@ -68,6 +68,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
         workers_in_process: false,
         hub_turns: 2,
         owners: Box::new([]),
+        grants: Box::new([]),
         authority: authority::Domain::new(rules, limits.authority).expect("bounded authority"),
         projects: List::with_capacity(0),
         names: Map::with_capacity(limits.authority.projects),

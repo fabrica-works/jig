@@ -48,7 +48,7 @@ fn a_compound_sent_twice_under_one_key_is_routed_once() {
 #[test]
 fn a_made_compound_with_a_zero_first_message_cannot_restore() {
     let mut test = Test::new(LIMITS);
-    test.d = Domain::new(&LIMITS, Box::new([]), 2);
+    test.d = Domain::new(&LIMITS, Box::new([]), 2, Box::new([]));
     let outcome = Outcome::Compound { project: 1, operations: 2, first_message: 0 };
     assert_eq!(
         test.send(Event::Restore {

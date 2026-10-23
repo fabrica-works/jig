@@ -17,7 +17,7 @@ impl Domain {
     #[must_use]
     pub fn conversation_mark_loading(&self, task: u64, except: Token) -> bool {
         for (_, id) in &self.flights {
-            let flight = self.pending.get(*id).expect("pending flight");
+            let flight = self.party_pending(*id).expect("pending flight");
             if id.token() != except
                 && let Ask::MarkSeen { seen: Seen::Conversation { task: number, .. } } = flight.ask
                 && number == task

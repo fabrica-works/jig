@@ -80,6 +80,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
         workers_in_process,
         hub_turns: engine.limits.hub.turns,
         owners: engine.owners.clone(),
+        grants: engine.acts.clone(),
         authority,
         settings: domain::Settings {
             templates: engine.templates.clone(),

@@ -127,3 +127,15 @@ fn a_shorter_pattern_sorts_before_its_extension() {
     assert!(short < longer, "derived list order puts an empty list first");
     assert!(short_bytes < longer_bytes, "end mark sorts before a segment mark");
 }
+
+#[test]
+fn acted_keys_round_trip_after_the_ended_read_tag() {
+    use jig_domain_people::{ActKey, Key as PeopleKey};
+    let key = Key::People(PeopleKey::Acted(ActKey { connector: u16::MAX, key: [255; 16] }));
+    let bytes = keys::encode(&key, fixtures::KEY_LIMIT).expect("bounded acted key");
+    assert_eq!(bytes.get(2), Some(&8));
+    assert_eq!(keys::decode(&bytes), Some(key.clone()));
+    let ended = Key::People(PeopleKey::EndedRead { task: u64::MAX, party: u64::MAX });
+    assert!(ended < key);
+    assert!(keys::encode(&ended, fixtures::KEY_LIMIT).expect("bounded ended key") < bytes);
+}

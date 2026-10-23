@@ -322,6 +322,8 @@ pub(super) fn roles_route(
                 terminal = Some(result);
             }
             people::Request::Erase { .. }
+            | people::Request::Act { .. }
+            | people::Request::Acted { .. }
             | people::Request::Route { .. }
             | people::Request::Reply { .. }
             | people::Request::RolesRefused { .. }

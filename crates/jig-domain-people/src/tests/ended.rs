@@ -43,7 +43,7 @@ fn an_ended_conversation_moves_its_position_to_the_ended_family() {
 
 #[test]
 fn an_ended_read_position_is_refused_at_restore() {
-    let mut domain = Domain::new(&LIMITS, Box::new([]), 2);
+    let mut domain = Domain::new(&LIMITS, Box::new([]), 2, Box::new([]));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
     let mut out = Queue::with_capacity(max_out(&LIMITS));
     step(

@@ -323,6 +323,7 @@ pub fn config(seed: u64) -> root::Config {
             seed,
             workers_in_process: false,
             hub_turns: 2,
+            grants: Box::new([]),
             owners: Box::new([people::InitialOwner {
                 project: 1,
                 identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },

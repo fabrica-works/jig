@@ -88,7 +88,8 @@ impl ClientPeer {
                 | core::Held::Delivery { .. }
                 | core::Held::WatchEnded { .. }
                 | core::Held::CarriedUnused { .. } => true,
-                core::Held::ApplicationDelivery { .. }
+                core::Held::Acted { .. }
+                | core::Held::ApplicationDelivery { .. }
                 | core::Held::ApplicationWatchEnded { .. }
                 | core::Held::Applied { .. }
                 | core::Held::ReadLoad { .. }

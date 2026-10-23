@@ -453,8 +453,12 @@ impl World {
                 self.accounting_referee.moving(*task, *person, *period);
                 None
             }
-            Event::Compound { person, period, operations, .. } => {
-                self.remember_compound(*person, *period, operations);
+            Event::Compound { by, period, operations, .. } => {
+                let person = match by {
+                    Party::Person(person) => *person,
+                    Party::Task(_) | Party::Deployment { .. } => 0,
+                };
+                self.remember_compound(person, *period, operations);
                 None
             }
             Event::Turn { task, cumulative, .. }

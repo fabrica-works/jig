@@ -135,6 +135,8 @@ pub enum Write {
 /// Core output that must follow the decision's commit.
 #[derive(Debug)]
 pub enum Held {
+    /// Terminal deployment act answer, released once its decision is durable.
+    Acted { to: ReplyTo, outcome: people::Outcome },
     /// Every earlier commit is durable when the journal releases this terminal.
     Drained,
     /// A point load sent once every earlier commit is durable.
@@ -388,6 +390,8 @@ pub struct CoreBriefBudgets {
 /// One event routed to a child of the core.
 #[derive(Debug)]
 pub enum Event {
+    /// A connector's deployment act, without a party or sign-in (people.md, 5.3).
+    Act { reply_to: ReplyTo, connector: u16, key: [u8; 16], act: Box<people::Act>, carried: Option<Carried> },
     /// Store map bytes from each commit answer; needs no commit (store.md, 11.2).
     Fill { bytes: u64 },
     /// Refuse new decisions while the service drains (engine.md, 6.1).

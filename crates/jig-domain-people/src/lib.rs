@@ -95,10 +95,11 @@ pub use amendment::{
     ResourceScope, ResultsWake, Spec, Tracking, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
-    ADDRESS, AccountChange, AccountHolder, AccountHostFailure, AccountHostWhy, Adoption, Ask, Counts, Entry, EntryKind,
-    EscalationChoice, EscalationDecision, Event, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, Needs,
-    NoteChange, NoteScope, Outcome, PersonResult, ProjectRole, ProposalChoice, ProposalDecision, Proposer, Reply,
-    Request, RequestKey, ResourceName, ResourceRole, Role, Seed, Stored, USES, Use, Whom,
+    ADDRESS, AccountChange, AccountHolder, AccountHostFailure, AccountHostWhy, Act, ActGrant, ActKey, ActKind,
+    Adoption, Ask, Counts, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity,
+    IdentityKey, InitialOwner, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole,
+    ProposalChoice, ProposalDecision, Proposer, Reply, Request, RequestKey, ResourceName, ResourceRole, Role, Seed,
+    Stored, USES, Use, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{Bound, Exceeded, FailureClass, HoldReason, Moved};

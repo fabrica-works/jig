@@ -21,7 +21,12 @@ pub fn restore(range: &RestoreRange) -> Box<[Range]> {
                 },
             ]);
         }
-        RestoreRange::People => Range { start: Box::new([keys::JIG, 2, 0]), end: Some(Box::new([keys::JIG, 2, 7])) },
+        RestoreRange::People => {
+            return Box::new([
+                Range { start: Box::new([keys::JIG, 2, 0]), end: Some(Box::new([keys::JIG, 2, 7])) },
+                Range::prefix(&[keys::JIG, 2, 8]),
+            ]);
+        }
         RestoreRange::Tasks => Range { start: Box::new([keys::JIG, 1, 0]), end: Some(Box::new([keys::JIG, 1, 6])) },
         RestoreRange::Core => Range { start: Box::new([keys::JIG, 0, 1]), end: Some(Box::new([keys::JIG, 0, 4])) },
         RestoreRange::Census(census) => return census_ranges(census),

@@ -15,7 +15,7 @@ const WORDS: &[u8] = b"open request";
 
 fn restoring() -> (Domain, Env<people::Limits>, Queue<Request>) {
     (
-        Domain::new(&LIMITS, Box::new([]), 1),
+        Domain::new(&LIMITS, Box::new([]), 1, Box::new([])),
         Env { limits: LIMITS, now: Time::ZERO, wall: Wall::EPOCH },
         Queue::with_capacity(max_out(&LIMITS)),
     )
@@ -108,4 +108,62 @@ fn a_restored_open_answer_replays_its_batch_once() {
         assert_eq!(out.len(), 1, "one retained answer expires");
         assert_eq!(out.pop(), Some(Request::Erase { key: Key::Answer(KEY) }));
     }
+}
+
+#[test]
+fn acted_rows_restore_without_a_person_or_grant_and_expire() {
+    let (mut domain, mut env, mut out) = restoring();
+    let key = people::ActKey { connector: 1, key: KEY.key };
+    let act = people::Act::Close { project: PROJECT, task: TASK, reason: Box::new([]), grace: None };
+    let outcome = Outcome::Compound { project: PROJECT, operations: 1, first_message: 1 };
+    step(
+        &mut domain,
+        &env,
+        Event::Restore { record: Stored::Acted { key, act: act.clone(), outcome: outcome.clone(), at: Wall::EPOCH } },
+        &mut out,
+    );
+    step(&mut domain, &env, Event::Restored, &mut out);
+    assert!(domain.ready());
+    let to = Token::new(1);
+    step(
+        &mut domain,
+        &env,
+        Event::Act { reply_to: ReplyTo::new(to), connector: key.connector, key: key.key, act: Box::new(act.clone()) },
+        &mut out,
+    );
+    assert_eq!(out.pop(), Some(Request::Acted { to: ReplyTo::new(to), outcome }));
+    env.now = env.now.saturating_add(LIMITS.request_retention);
+    fire(&mut domain, &env, &mut out);
+    assert_eq!(out.pop(), Some(Request::Erase { key: Key::Acted(key) }));
+    step(
+        &mut domain,
+        &env,
+        Event::Act { reply_to: ReplyTo::new(to), connector: key.connector, key: key.key, act: Box::new(act) },
+        &mut out,
+    );
+    assert_eq!(
+        out.pop(),
+        Some(Request::Acted { to: ReplyTo::new(to), outcome: Outcome::Refused(Refusal::NotOffered) })
+    );
+}
+#[test]
+fn not_ready_acts_are_not_saved() {
+    let (mut domain, env, mut out) = restoring();
+    let to = Token::new(1);
+    step(
+        &mut domain,
+        &env,
+        Event::Act {
+            reply_to: ReplyTo::new(to),
+            connector: 1,
+            key: KEY.key,
+            act: Box::new(people::Act::RemoveAccount { account: 1 }),
+        },
+        &mut out,
+    );
+    assert_eq!(
+        out.pop(),
+        Some(Request::Acted { to: ReplyTo::new(to), outcome: Outcome::Again(people::Again::NotReady) })
+    );
+    assert!(out.is_empty());
 }

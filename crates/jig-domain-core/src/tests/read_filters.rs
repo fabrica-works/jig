@@ -324,7 +324,7 @@ fn stored_inbox_kind_filter_keeps_an_empty_page_cursor_and_refuses_a_different_k
 #[test]
 fn a_read_before_the_people_child_is_ready_stays_unknown() {
     let (mut core, limits) = watch_core();
-    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider, Box::new([]));
     let Held::Read { answer, .. } = read_start(&mut core, &limits, 10, reads::Read::Frame) else {
         panic!("read refused before people restore")
     };

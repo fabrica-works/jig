@@ -1,4 +1,5 @@
 use jig_core_world::fixtures::{live_row, person_unchanged};
+use jig_core_world::stories::delegates::delegate_pair;
 use jig_core_world::stories::reads::{request, world};
 use jig_domain_core as core;
 use jig_domain_people as people;
@@ -107,16 +108,6 @@ fn compound_world(seed: u64) -> jig_core_world::effects::World {
     let (config, mut limits) = jig_core_world::faults::plan_fixture(seed);
     limits.core.people.operations = 3;
     jig_core_world::effects::World::configured(seed, false, config, limits)
-}
-
-fn delegate_pair(world: &mut jig_core_world::effects::World) -> (u64, u64) {
-    use jig_core_world::fixtures::{delegate, member};
-    let parent = world.assignments[0];
-    let first = member(world, tasks::Executor::Agent { charter: 1 }, b"first");
-    let first = delegate(world, parent, 1, first);
-    let second = member(world, tasks::Executor::Agent { charter: 1 }, b"second");
-    let second = delegate(world, parent, 2, second);
-    (first, second)
 }
 
 fn closing(chat: u64, cancelled: u64, moved: u64) -> people::Ask {

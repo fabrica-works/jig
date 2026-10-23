@@ -73,6 +73,7 @@ pub(super) fn route_people(
         | people::Event::ApplyRoles { .. }
         | people::Event::SignedIn { .. }
         | people::Event::Roles { .. }
+        | people::Event::Act { .. }
         | people::Event::Ask { .. }
         | people::Event::Restore { .. }
         | people::Event::Restored) => other,
@@ -135,6 +136,16 @@ pub(super) fn tag_people(
     for _ in 0..room {
         let Some(next) = pending.pop() else { break };
         let request = match next {
+            people::Request::Act { request, connector: _, act } => {
+                super::deployment_acts::route(core, work, &mut out, request, *act);
+                continue;
+            }
+            people::Request::Acted { to, outcome } => {
+                if outcome == people::Outcome::Again(people::Again::Busy) {
+                    core.touch_deployment();
+                }
+                Request::Held(Box::new(Held::Acted { to, outcome }))
+            }
             people::Request::ServiceMade { request, outcome } => {
                 work.push(Event::People(people::Event::Decided { request, outcome }));
                 continue;
@@ -145,7 +156,7 @@ pub(super) fn tag_people(
             }
             people::Request::Erase { key } => {
                 match key {
-                    people::Key::Answer(_) => core.touch_deployment(),
+                    people::Key::Answer(_) | people::Key::Acted(_) => core.touch_deployment(),
                     people::Key::Person(_)
                     | people::Key::ReadResults { .. }
                     | people::Key::EndedRead { .. }

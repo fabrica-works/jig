@@ -30,7 +30,7 @@ fn fixture() -> (Core, Limits) {
     }
     send_task(&mut core, &limits, tasks::Event::Restored);
     let identity = core.people.identity(1).unwrap().clone();
-    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider, Box::new([]));
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     for record in [

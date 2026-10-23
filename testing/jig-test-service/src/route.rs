@@ -234,7 +234,7 @@ fn core_held(engine: &mut Engine, held: core::Held) {
                 engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
             }
         }
-        held @ (core::Held::Result { .. } | core::Held::SourceSignedOut { .. }) => {
+        held @ (core::Held::Acted { .. } | core::Held::Result { .. } | core::Held::SourceSignedOut { .. }) => {
             engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
         }
         core::Held::MakeEffect { connector: number, entry } => {

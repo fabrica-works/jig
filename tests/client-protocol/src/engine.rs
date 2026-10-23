@@ -382,7 +382,8 @@ pub fn held_event(held: core::Held) -> Option<Event> {
         core::Held::Delivery { watcher, document } => Event::Delivery { watcher, document },
         core::Held::WatchEnded { watcher, why } => Event::WatchEnded { watcher, why },
         core::Held::CarriedUnused { number } => Event::Application(clients::FromApplication::Unused { number }),
-        core::Held::Drained
+        core::Held::Acted { .. }
+        | core::Held::Drained
         | core::Held::ApplicationDelivery { .. }
         | core::Held::ApplicationWatchEnded { .. }
         | core::Held::ReadLoad { .. }
@@ -469,6 +470,7 @@ pub fn watcher(event: &core::Event) -> Option<Token> {
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }
         | core::Event::Read { .. }
+        | core::Event::Act { .. }
         | core::Event::Key { .. }
         | core::Event::Application { .. }
         | core::Event::ApplicationPart { .. }

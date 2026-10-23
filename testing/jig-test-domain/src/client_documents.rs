@@ -99,6 +99,7 @@ pub(crate) fn document(
                 | core::Held::Load(..)
                 | core::Held::NotesLoad { .. }
                 | core::Held::NotesWritten { .. }
+                | core::Held::Acted { .. }
                 | core::Held::NotesDeleted { .. }) => {
                     forward(domain, env, decision, core::Request::Held(Box::new(held)), work);
                 }

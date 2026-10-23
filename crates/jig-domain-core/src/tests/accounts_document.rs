@@ -514,7 +514,7 @@ fn the_providers_uses_rule_checks_people_and_projects_for_plans_and_llm_keys() {
         limits.people = 3;
         limits.projects = 3;
         limits.holdings = 3;
-        core.people = people::Domain::new(&limits, Box::new([]), core.settings.deployment_provider);
+        core.people = people::Domain::new(&limits, Box::new([]), core.settings.deployment_provider, Box::new([]));
         let penv = Env { now: env.now, wall: env.wall, limits };
         let mut out = Queue::with_capacity(people::max_out(&limits));
         for (party, provider) in [(ALICE, 0), (BOB, 0), (SERVICE, core.settings.deployment_provider)] {

@@ -117,7 +117,7 @@ fn a_compound_amendment_then_release_keeps_the_agent_idle() {
     assert_eq!(
         response(&mut world, |reply_to| Event::Compound {
             reply_to,
-            person: PERSON,
+            by: jig_domain_tasks::Party::Person(PERSON),
             project: 1,
             operations,
             period: 0,

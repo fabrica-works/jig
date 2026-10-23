@@ -263,6 +263,7 @@ impl Core {
             | people::Stored::ReadConversation { .. }
             | people::Stored::SignIn { .. }
             | people::Stored::Roles { .. }
+            | people::Stored::Acted { .. }
             | people::Stored::Policy { .. } => true,
         }
     }

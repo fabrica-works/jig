@@ -120,7 +120,7 @@ fn compound_payer_reads_a_move_before_the_live_financial_chain_changes() {
         .check(
             &h.env,
             crate::CompoundContext {
-                person: OTHER,
+                by: Party::Person(OTHER),
                 project: PROJECT,
                 period: 0,
                 pool_budget: 100,

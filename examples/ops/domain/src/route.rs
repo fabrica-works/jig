@@ -375,6 +375,7 @@ fn core_held(
         | core::Held::TurnBusy { .. }
         | core::Held::NotesLoad { .. }
         | core::Held::NotesWritten { .. }
+        | core::Held::Acted { .. }
         | core::Held::NotesDeleted { .. }) => held(decision, Output::Core(other)),
     }
 }

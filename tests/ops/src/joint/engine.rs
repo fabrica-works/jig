@@ -337,6 +337,7 @@ impl Application for OpsApplication {
                 | core::Held::Load(..)
                 | core::Held::NotesLoad { .. }
                 | core::Held::NotesWritten { .. }
+                | core::Held::Acted { .. }
                 | core::Held::NotesDeleted { .. },
             )
             | root::Output::Now(

@@ -494,11 +494,11 @@ pub fn max_out(limits: &Limits) -> u32 {
 #[expect(clippy::too_many_lines, reason = "the closed task event vocabulary dispatches to focused handlers")]
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Compound { reply_to, person, project, operations, period, pool_budget, period_budget } => {
+        Event::Compound { reply_to, by, project, operations, period, pool_budget, period_budget } => {
             crate::compound::compound(
                 domain,
                 env,
-                crate::compound::Compound { reply_to, person, project, operations, period, pool_budget, period_budget },
+                crate::compound::Compound { reply_to, by, project, operations, period, pool_budget, period_budget },
                 out,
             );
         }

@@ -31,7 +31,7 @@ fn roster(core: &mut Core, env: &Env<Limits>, members: &[u64]) {
     // Holder, another person and one service; the shared roster contains all three.
     limits.people = 3;
     limits.holdings = 3;
-    core.people = people::Domain::new(&limits, Box::new([]), core.settings.deployment_provider);
+    core.people = people::Domain::new(&limits, Box::new([]), core.settings.deployment_provider, Box::new([]));
     let people_env = Env { now: env.now, wall: env.wall, limits };
     let mut out = Queue::with_capacity(people::max_out(&limits));
     for party in [ALICE, BOB, SERVICE] {

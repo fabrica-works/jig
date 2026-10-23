@@ -10,6 +10,7 @@ mod ended;
 #[path = "inbox.rs"]
 mod inbox;
 pub use ended::EndedMark;
+pub(crate) mod acts;
 mod parties;
 use inbox::{conversation_seen_decision, mark_seen, prune_unheld_roles, replace_waiting};
 
@@ -38,12 +39,33 @@ pub(crate) struct Answered {
 }
 
 #[derive(Debug)]
-pub(crate) struct Pending {
+pub(crate) struct PartyPending {
     part: Option<Ask>,
     key: RequestKey,
     ask: Ask,
     models: Box<[Box<[u8]>]>,
     replies: List<ReplyTo>,
+}
+
+#[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "one shared slab prices the largest admitted flight inline")]
+pub(crate) enum Pending {
+    Party(PartyPending),
+    Act(acts::PendingAct),
+}
+impl Pending {
+    pub(super) fn party(&self) -> Option<&PartyPending> {
+        match self {
+            Self::Party(party) => Some(party),
+            Self::Act(_) => None,
+        }
+    }
+    pub(super) fn party_mut(&mut self) -> Option<&mut PartyPending> {
+        match self {
+            Self::Party(party) => Some(party),
+            Self::Act(_) => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -104,6 +126,10 @@ pub struct Domain {
     /// 3: owners seed the first start only).
     seeding: bool,
     answers: Map<RequestKey, Answered>,
+    acted: Map<crate::ActKey, acts::Acted>,
+    act_alarms: Deadlines<crate::ActKey>,
+    act_flights: Map<crate::ActKey, Id<Pending>>,
+    grants: Box<[crate::ActGrant]>,
     answer_alarms: Deadlines<RequestKey>,
     pending: Slab<Pending>,
     flights: Map<RequestKey, Id<Pending>>,
@@ -114,12 +140,24 @@ pub struct Domain {
 }
 
 impl Domain {
+    pub(super) fn party_pending(&self, id: Id<Pending>) -> Option<&PartyPending> {
+        self.pending.get(id)?.party()
+    }
+    fn party_pending_mut(&mut self, id: Id<Pending>) -> Option<&mut PartyPending> {
+        self.pending.get_mut(id)?.party_mut()
+    }
+
     /// Create restoring state with capacities from validated `limits` and at most
     /// `limits.initial_owners` owned bootstrap entries. Panics on unrepresentable/invalid limits,
     /// oversized owners or duplicate project/identity pairs; project roles must be initialized
     /// before sign-in.
     #[must_use]
-    pub fn new(limits: &Limits, owners: Box<[InitialOwner]>, deployment_provider: u16) -> Domain {
+    pub fn new(
+        limits: &Limits,
+        owners: Box<[InitialOwner]>,
+        deployment_provider: u16,
+        grants: Box<[crate::ActGrant]>,
+    ) -> Domain {
         assert!(crate::worst_case(limits).is_some(), "people limits are valid");
         assert!(
             owners.len() <= usize::try_from(limits.initial_owners).expect("u32 fits usize"),
@@ -137,6 +175,18 @@ impl Domain {
                     owner.project != earlier.project || owner.identity != earlier.identity,
                     "one initial owner identity per project"
                 );
+            }
+        }
+        assert!(grants.len() <= usize::from(u16::MAX).saturating_add(1), "one grant per connector");
+        for (at, grant) in grants.iter().enumerate() {
+            assert!(grant.may.len() <= 5, "bounded configured act kinds");
+            for earlier in grants.iter().take(at) {
+                assert!(earlier.connector != grant.connector, "unique connector grants");
+            }
+            for (at, kind) in grant.may.iter().enumerate() {
+                for earlier in grant.may.iter().take(at) {
+                    assert!(earlier != kind, "unique configured act kinds");
+                }
             }
         }
         Domain {
@@ -170,6 +220,10 @@ impl Domain {
             owners,
             seeding: true,
             answers: Map::with_capacity(limits.requests),
+            acted: Map::with_capacity(limits.requests),
+            act_alarms: Deadlines::with_capacity(limits.requests),
+            act_flights: Map::with_capacity(limits.pending),
+            grants,
             answer_alarms: Deadlines::with_capacity(limits.requests),
             pending: Slab::with_capacity(limits.pending),
             flights: Map::with_capacity(limits.pending),
@@ -184,10 +238,15 @@ impl Domain {
     /// expiration or output occurs here.
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        match (self.alarms.next(), self.answer_alarms.next()) {
+        let ordinary = match (self.alarms.next(), self.answer_alarms.next()) {
             (Some(left), Some(right)) => Some(left.min(right)),
             (Some(left), None) => Some(left),
             (None, Some(right)) => Some(right),
+            (None, None) => None,
+        };
+        match (ordinary, self.act_alarms.next()) {
+            (Some(left), Some(right)) => Some(left.min(right)),
+            (Some(at), None) | (None, Some(at)) => Some(at),
             (None, None) => None,
         }
     }
@@ -455,6 +514,9 @@ pub fn max_out(limits: &Limits) -> u32 {
 /// targets for keyed replay.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Act { reply_to, connector, key, act } => {
+            acts::admit(domain, env, reply_to, crate::ActKey { connector, key }, *act, out);
+        }
         Event::MoveChat { task, project, from, to } => {
             inbox::move_chat(domain, &env.limits, task, project, from, to, out);
         }
@@ -515,7 +577,10 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     if !domain.ready() {
         return;
     }
-    if let Some(key) = domain.answer_alarms.expire(env.now) {
+    if let Some(key) = domain.act_alarms.expire(env.now) {
+        assert!(domain.acted.remove(&key).is_some(), "acted alarm has its row");
+        out.push(Request::Erase { key: Key::Acted(key) });
+    } else if let Some(key) = domain.answer_alarms.expire(env.now) {
         let removed = domain.answers.remove(&key);
         assert!(removed.is_some(), "retained answer has its expiry alarm");
         out.push(Request::Erase { key: Key::Answer(key) });
@@ -610,7 +675,7 @@ fn apply_roles(
     if !domain.ready() {
         return Err(Outcome::Again(Again::NotReady));
     }
-    let flight = domain.pending.get(Id::from_token(request)).ok_or(Outcome::Refused(Refusal::Unknown))?;
+    let flight = domain.party_pending(Id::from_token(request)).ok_or(Outcome::Refused(Refusal::Unknown))?;
     let project = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::SetRoles { project, .. } => *project,
         Ask::Compound { .. }
@@ -766,7 +831,7 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         out.push(Request::ServiceMade { request, outcome: Outcome::Again(Again::NotReady) });
         return;
     }
-    let flight = domain.pending.get(Id::from_token(request)).expect("service creation names a live keyed flight");
+    let flight = domain.party_pending(Id::from_token(request)).expect("service creation names a live keyed flight");
     let (project, name, service_role) = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::MakeService { project, name, role } => (*project, name.clone(), *role),
         Ask::Compound { .. }
@@ -1481,7 +1546,7 @@ fn admit_ask(
     }
 
     if let Some(id) = domain.flights.get(&key).copied() {
-        let flight = domain.pending.get_mut(id).expect("key index names live pending request");
+        let flight = domain.party_pending_mut(id).expect("key index names live pending request");
         if flight.ask != ask || flight.models != models {
             return refused(to, Refusal::KeyConflict, out);
         }
@@ -1493,7 +1558,9 @@ fn admit_ask(
         return;
     }
     // Only ordinary flights reserve answers; Seen uses the existing pending room.
-    if reserves_answer(&ask) && domain.answers.len().saturating_add(answer_reservations(domain)) >= env.limits.requests
+    if reserves_answer(&ask)
+        && domain.answers.len().saturating_add(domain.acted.len()).saturating_add(answer_reservations(domain))
+            >= env.limits.requests
     {
         room_pressure(domain, env, key, &ask, crate::CapacityCause::Requests { limit: env.limits.requests });
         return again(to, Again::Busy, out);
@@ -1521,7 +1588,7 @@ fn admit_ask(
     }
     let mut replies = List::with_capacity(env.limits.waiters);
     replies.push(to).expect("bounded list room checked");
-    let flight = Pending { key, ask: ask.clone(), models: models.clone(), replies, part: None };
+    let flight = Pending::Party(PartyPending { key, ask: ask.clone(), models: models.clone(), replies, part: None });
     let id = domain.pending.insert(flight).expect("pending request admitted");
     let indexed = domain.flights.insert(key, id);
     assert!(indexed == Ok(None), "one key per flight within pending capacity");
@@ -1578,9 +1645,9 @@ fn save_answer(
 }
 
 fn answer_reservations(domain: &Domain) -> u32 {
-    let mut reserved = 0_u32;
+    let mut reserved = domain.act_flights.len();
     for (_, id) in &domain.flights {
-        let flight = domain.pending.get(*id).expect("key index names live pending request");
+        let flight = domain.party_pending(*id).expect("key index names live pending request");
         if reserves_answer(&flight.ask) {
             reserved = reserved.saturating_add(1);
         }
@@ -1621,7 +1688,10 @@ fn reserves_answer(ask: &Ask) -> bool {
 }
 
 fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Outcome, out: &mut Queue<Request>) {
-    let party = domain.pending.get(id).expect("pending decision").key.person;
+    if let Pending::Act(_) = domain.pending.get(id).expect("pending decision") {
+        return acts::decided(domain, env, id, outcome, out);
+    }
+    let party = domain.party_pending(id).expect("pending decision").key.person;
     if let Outcome::MarkedSeen { seen } = outcome {
         mark_seen(domain, &env.limits, party, seen, out);
     }
@@ -1635,7 +1705,7 @@ pub(super) fn answer_decided(
     outcome: Outcome,
     out: &mut Queue<Request>,
 ) {
-    let flight = domain.pending.get_mut(id).expect("root returns each routed request exactly once");
+    let flight = domain.party_pending_mut(id).expect("root returns each routed request exactly once");
     let key = flight.key;
     let ask = flight.ask.clone();
     let models = flight.models.clone();
@@ -1696,6 +1766,14 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
     }
     let key = record.key();
     let valid = match &record {
+        Stored::Acted { key, act, outcome, at } => {
+            acts::valid(&env.limits, act).is_ok()
+                && valid_program_outcome(&env.limits, outcome)
+                && acts::valid_outcome(&env.limits, act, outcome)
+                && !domain.acted.contains_key(key)
+                && (answer_expiry(*at, &env.limits) <= env.wall
+                    || domain.answers.len().saturating_add(domain.acted.len()) < env.limits.requests)
+        }
         Stored::Person { number, identity } => {
             valid_identity(&env.limits, identity)
                 && !domain.people.contains_key(number)
@@ -1729,13 +1807,15 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
                 && valid_program_outcome(&env.limits, outcome)
                 && valid_answer_shape(ask, outcome.clone())
                 && !domain.answers.contains_key(key)
-                && (answer_expiry(*at, &env.limits) <= env.wall || domain.answers.len() < env.limits.requests)
+                && (answer_expiry(*at, &env.limits) <= env.wall
+                    || domain.answers.len().saturating_add(domain.acted.len()) < env.limits.requests)
         }
     };
     if !valid {
         return restore_failed(domain, key, Refusal::Limit { which: LimitKind::Restore }, out);
     }
     match record {
+        Stored::Acted { key, act, outcome, at } => acts::restore(domain, env, key, act, outcome, at, out),
         Stored::Person { number, identity } => {
             let indexed = domain.identities.insert(identity.key.clone(), number);
             assert!(indexed == Ok(None), "restored identity admitted");
@@ -1923,7 +2003,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 /// Explicit model selectors refuse `Lack::Models`: parts carry no model-name context yet.
 pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, ask: Ask) -> Result<Request, Outcome> {
     let id = Id::from_token(request);
-    let flight = domain.pending.get(id).ok_or(Outcome::Refused(Refusal::Unknown))?;
+    let flight = domain.party_pending(id).ok_or(Outcome::Refused(Refusal::Unknown))?;
     let application_project = match &flight.ask {
         Ask::Application { scope, .. } => match scope {
             crate::ApplicationScope::Project(project) => *project,
@@ -2003,7 +2083,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     if let Some(why) = admission(domain, person, application_project, role, &ask) {
         return Err(Outcome::Refused(why));
     }
-    let flight = domain.pending.get_mut(id).expect("admitted application flight");
+    let flight = domain.party_pending_mut(id).expect("admitted application flight");
     assert!(flight.part.is_none(), "one core part at a time");
     flight.part = Some(ask.clone());
     Ok(Request::Route { request, person, project: application_project, role, ask: Box::new(ask), models: Box::new([]) })
@@ -2074,7 +2154,7 @@ fn holds(domain: &Domain, person: u64, holder: crate::AccountHolder) -> bool {
 
 /// Forget the synchronous part while preserving its application key and digest.
 pub fn application_part_done(domain: &mut Domain, request: Token) {
-    if let Some(flight) = domain.pending.get_mut(Id::from_token(request)) {
+    if let Some(flight) = domain.party_pending_mut(Id::from_token(request)) {
         flight.part = None;
     }
 }

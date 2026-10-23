@@ -273,7 +273,7 @@ fn compound(world: &mut World, operations: Vec<Operation>) -> Reply {
     let call = reply_to.into_token();
     world.send(Event::Compound {
         reply_to: skein_lib::ReplyTo::new(call),
-        person: PERSON,
+        by: jig_domain_tasks::Party::Person(PERSON),
         project: 1,
         operations: staged,
         period: 0,

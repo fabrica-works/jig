@@ -1347,7 +1347,7 @@ pub enum Event {
     /// One project's party operations, admitted in order and made whole.
     Compound {
         reply_to: ReplyTo,
-        person: u64,
+        by: Party,
         project: u32,
         operations: List<crate::Operation>,
         period: u64,

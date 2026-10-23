@@ -20,9 +20,16 @@ struct Measured {
 
 impl Measured {
     fn new(limits: Limits) -> Measured {
+        Self::configured(limits, Box::new([]), Box::new([]))
+    }
+    fn configured(
+        limits: Limits,
+        owners: Box<[jig_domain_people::InitialOwner]>,
+        grants: Box<[jig_domain_people::ActGrant]>,
+    ) -> Measured {
         let out = Queue::with_capacity(max_out(&limits));
         let meter = Meter::new();
-        let domain = Domain::new(&limits, Box::new([]), 1);
+        let domain = Domain::new(&limits, owners, 1, grants);
         Measured {
             domain,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
@@ -49,7 +56,7 @@ impl Measured {
         let measured = self.meter.end();
         let mut routed = None;
         while let Some(request) = self.out.pop() {
-            if let Request::Route { request, .. } = request {
+            if let Request::Route { request, .. } | Request::Act { request, .. } = request {
                 routed = Some(request);
             }
         }
@@ -370,5 +377,47 @@ fn retained_program_outcomes_fit_the_people_bound() {
             request,
             outcome: Outcome::AccountSignedOut { confirmed: false, failed_hosts: rows },
         });
+    }
+}
+
+#[test]
+fn deployment_act_flights_waiters_answers_and_expiry_fit() {
+    use jig_domain_people::{Act, ActGrant, ActKind, InitialOwner};
+    let limits = Limits { requests: 3, pending: 2, ..LIMITS };
+    let mut test = Measured::configured(
+        limits,
+        Box::new([InitialOwner { project: 1, identity: jig_people_world::identity(1).key }]),
+        Box::new([ActGrant { connector: 1, may: Box::new([ActKind::Close]) }]),
+    );
+    test.event(Event::Restored);
+    let mut requests = Vec::new();
+    for key in 0..limits.pending {
+        let act = Act::Close {
+            project: 1,
+            task: 1,
+            grace: None,
+            reason: vec![0; usize::try_from(limits.words).expect("bounded act memory fixture")].into(),
+        };
+        for waiter in 0..limits.waiters {
+            let reply_to = test.to();
+            let request = test.event(Event::Act {
+                reply_to,
+                connector: 1,
+                key: [u8::try_from(key).expect("bounded act memory fixture"); 16],
+                act: Box::new(act.clone()),
+            });
+            if waiter == 0 {
+                requests.push(request.expect("act routed"));
+            }
+        }
+    }
+    for request in requests {
+        test.event(Event::Decided { request, outcome: Outcome::Refused(jig_domain_people::Refusal::Unknown) });
+    }
+    test.env.now = test.env.now.saturating_add(limits.request_retention);
+    while test.domain.is_due(test.env.now) {
+        test.meter.start();
+        fire(&mut test.domain, &test.env, &mut test.out);
+        test.drain();
     }
 }

@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 use alloc::boxed::Box;
+mod acts;
 mod charters;
 mod core;
 mod templates;
@@ -43,6 +44,7 @@ pub use problem::{PROBLEMS, Path, Problem, Problems, Segment, What};
 pub struct Engine {
     pub deployment: Deployment,
     pub owners: Box<[jig_domain_people::InitialOwner]>,
+    pub acts: Box<[jig_domain_people::ActGrant]>,
     pub providers: Box<[Provider]>,
     pub rules: jig_domain_authority::Rules,
     pub projects: Box<[Project]>,
@@ -56,6 +58,7 @@ pub struct Engine {
     pub limits: Limits,
 }
 /// Parse jig's engine member before startup constructs any component.
+#[expect(clippy::too_many_lines, reason = "one engine object consumes and validates its complete member vocabulary")]
 pub fn engine(document: &skein_json::Document, at: u32, directories: &Directories) -> Result<Engine, Problems> {
     let path = Path::root();
     let mut problems = Problems::empty();
@@ -124,6 +127,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
         connectors =
             domain::connectors(document, at, &path.member(b"connectors"), limits.core.connectors, &mut problems);
     }
+    let acts = acts::parse(&mut object, document, &path, connectors.as_deref().unwrap_or(&[]), &mut problems);
     let memory = check::integer(&mut object, document, b"memory_bytes", &path, &mut problems);
     let owners = object.required(document, b"owners", &path, &mut problems);
     object.finish(document, &path, &mut problems);
@@ -137,6 +141,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
         projects: projects.expect("required member checked"),
         connectors: connectors.expect("required member checked"),
         owners: Box::default(),
+        acts,
         memory: memory.expect("required member checked"),
         charters: charters.expect("required member checked"),
         templates: templates.expect("required member checked"),

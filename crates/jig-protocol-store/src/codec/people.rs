@@ -1,9 +1,10 @@
 //! People rows translated exhaustively (protocol/store.md, 5.1).
-use crate::people_v9 as wire;
+use crate::people_v10 as wire;
 use alloc::boxed::Box;
 use jig_domain_core as core;
 use jig_domain_people as domain;
 use skein_lib::{Duration, List, Reader, Wall, Writer};
+mod acts;
 mod asks;
 mod batch;
 mod compound;
@@ -29,6 +30,7 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let people = &domain.people;
     let authority = &domain.authority;
     let mut limits = wire::Limits {
+        act_close_reason: people.words,
         refusal_circle_tasks: domain.tasks.circle,
         refusal_kept_pending: domain.tasks.dependencies,
         account_change_declare_program_name: 32,
@@ -165,6 +167,15 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits, names: &[Box<[u8]>]) 
                 models: encode_model_names(names, limits)?,
             },
         )?),
+        domain::Stored::Acted { key, act, outcome, at } => wire::Value::Acted(wire::StoredActed::new(
+            limits,
+            wire::StoredActedParts {
+                key: wire::ActKey::new(limits, wire::ActKeyParts { connector: key.connector, key: key.key })?,
+                act: acts::encode(act, limits)?,
+                outcome: outcomes::encode_outcome(outcome, limits)?,
+                at: at.as_nanos(),
+            },
+        )?),
         domain::Stored::Answer { key, ask, models, outcome, at } => wire::Value::Answer(wire::StoredAnswer::new(
             limits,
             wire::StoredAnswerParts {
@@ -222,6 +233,16 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits, names: &[Box<[u8]>]) -> Resul
             }
             let name = Box::from(::core::str::from_utf8(&name).expect("decoded UTF-8 name"));
             domain::Stored::Policy { project, name, value }
+        }
+        wire::Value::Acted(value) => {
+            let wire::StoredActedParts { key, act, outcome, at } = value.into_parts();
+            let wire::ActKeyParts { connector, key } = key.into_parts();
+            domain::Stored::Acted {
+                key: domain::ActKey { connector, key },
+                act: acts::decode(act, limits)?,
+                outcome: outcomes::decode_outcome(outcome),
+                at: Wall::from_nanos(at),
+            }
         }
         wire::Value::Answer(value) => {
             let wire::StoredAnswerParts { key, ask, models, outcome, at } = value.into_parts();

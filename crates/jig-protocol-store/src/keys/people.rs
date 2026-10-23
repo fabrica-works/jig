@@ -1,5 +1,5 @@
 //! People-owned address fields (protocol/store.md, section 4.1).
-use jig_domain_people::{Key, RequestKey};
+use jig_domain_people::{ActKey, Key, RequestKey};
 use skein_kv::{KeyReader, KeyWriter};
 pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
     match key {
@@ -33,6 +33,13 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
             writer.tag(5);
             writer.u64(u64::from(*project));
         }
+        Key::Acted(key) => {
+            writer.tag(8);
+            writer.u64(u64::from(key.connector));
+            for &byte in &key.key {
+                writer.tag(byte);
+            }
+        }
         Key::Answer(key) => {
             writer.tag(6);
             writer.u64(key.person);
@@ -51,6 +58,14 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
         3 => Key::SignIn(reader.u64()?),
         4 => Key::Roles(u32::try_from(reader.u64()?).ok()?),
         5 => Key::Policy(u32::try_from(reader.u64()?).ok()?),
+        8 => {
+            let connector = u16::try_from(reader.u64()?).ok()?;
+            let mut key = [0; 16];
+            for byte in &mut key {
+                *byte = reader.tag()?;
+            }
+            Key::Acted(ActKey { connector, key })
+        }
         6 => {
             let person = reader.u64()?;
             let mut key = [0; 16];

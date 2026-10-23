@@ -98,6 +98,7 @@ pub(super) fn route_core(
                 | core::Held::Load(..)
                 | core::Held::NotesLoad { .. }
                 | core::Held::NotesWritten { .. }
+                | core::Held::Acted { .. }
                 | core::Held::NotesDeleted { .. }) => hold(decision, crate::link::down(domain, Delivery::Core(other))),
             },
             core::Request::Now(now) => route_now(domain, env, decision, *now, work),
