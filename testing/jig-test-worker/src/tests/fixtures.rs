@@ -300,8 +300,14 @@ impl Worker {
 
     /// A started agent lent `grants`, so its notices name known accounts.
     pub fn lending(grants: Box<[smith::Grant]>) -> Self {
+        Self::asking(grants, host::LiveAsk::NONE)
+    }
+
+    pub fn asking(grants: Box<[smith::Grant]>, live: host::LiveAsk) -> Self {
         let mut worker = Self::new(limits());
-        worker.assign();
+        let mut assignment = assignment(charter_bytes());
+        assignment.assignment.live = live;
+        worker.step(Event::Link(host::LinkDown::Assign { assignment }));
         let (owner, source) = worker.take_decode();
         let mut start = start(source);
         start.grants = grants;
