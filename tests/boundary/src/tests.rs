@@ -190,7 +190,8 @@ fn engine_clients_link_only_their_boundary_wire_and_foundation() {
             "jig-domain-views",
             "jig-protocol-store",
             "skein-codec",
-            "skein-lib"
+            "skein-lib",
+            "skein-oauth-issuer"
         ]
     );
 }

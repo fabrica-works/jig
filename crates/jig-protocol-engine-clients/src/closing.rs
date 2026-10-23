@@ -41,6 +41,7 @@ impl Component {
                     | Waiting::Made { sign_in: number, .. }
                     | Waiting::Checked { sign_in: number, .. }
                     | Waiting::Read { sign_in: number, .. }
+                    | Waiting::Authorize { sign_in: number, .. }
                     | Waiting::ApplicationRead { sign_in: number, .. }
                     | Waiting::Ask { sign_in: number, .. }
                     | Waiting::Carry { sign_in: number, .. }
@@ -59,6 +60,7 @@ impl Component {
                     | Waiting::Made { .. }
                     | Waiting::Checked { .. }
                     | Waiting::Read { .. }
+                    | Waiting::Authorize { .. }
                     | Waiting::ApplicationRead { .. }
                     | Waiting::Ask { .. }
                     | Waiting::Carry { .. } => {}
@@ -82,6 +84,9 @@ impl Component {
                 }
                 Waiting::Get { route, .. } | Waiting::Checked { route, .. } => {
                     self.denied(env, exchange, route);
+                }
+                Waiting::Authorize { .. } => {
+                    self.denied(env, exchange, Route::Authorize);
                 }
                 Waiting::Ask { .. } | Waiting::Carry { .. } | Waiting::Moving { .. } => {
                     self.respond(env, exchange, routes::signed_out(&env.limits.wire));
@@ -166,6 +171,7 @@ impl Component {
                     | Waiting::Moving { .. }
                     | Waiting::Made { .. }
                     | Waiting::Read { .. }
+                    | Waiting::Authorize { .. }
                     | Waiting::ApplicationRead { .. }
                     | Waiting::Ask { .. }
                     | Waiting::Carry { .. }

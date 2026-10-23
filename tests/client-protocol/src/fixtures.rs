@@ -48,6 +48,8 @@ pub fn peers() -> jig_core_world::peers::Peers {
 #[must_use]
 pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
     jig_protocol_engine_clients::Settings {
+        provider: None,
+        addresses: Box::new([]),
         link: Some(jig_domain_people::Identity {
             key: jig_domain_people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
             login: b"login".as_slice().into(),

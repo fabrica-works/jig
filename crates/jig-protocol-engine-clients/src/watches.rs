@@ -249,6 +249,7 @@ impl Component {
                 | Waiting::Ask { sign_in, .. }
                 | Waiting::Carry { sign_in, .. }
                 | Waiting::Read { sign_in, .. }
+                | Waiting::Authorize { sign_in, .. }
                 | Waiting::ApplicationRead { sign_in, .. } => Some(*sign_in),
                 Waiting::Core { .. }
                 | Waiting::LinkGet { .. }

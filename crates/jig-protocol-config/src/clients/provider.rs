@@ -131,7 +131,7 @@ fn redirect(uri: &[u8]) -> bool {
     }
     false
 }
-/// Decode only RFC 7468 PKCS#8 armor; cryptographic validation belongs to startup.
+/// Read RFC 7468 PKCS#8 armor and require a 3072-bit RSA key.
 /// A failure identifies the configuration member and how to generate its file, never its contents.
 pub fn provider_key(pem: &[u8]) -> Result<Secret, Problem> {
     let problem = Problem {
@@ -163,7 +163,13 @@ pub fn provider_key(pem: &[u8]) -> Result<Secret, Problem> {
     }
     let Ok(max) = u32::try_from(compact.len()) else { return Err(problem) };
     match base64::decode(Alphabet::Standard, &compact, max) {
-        Ok(bytes) => Ok(Secret::new(bytes)),
+        Ok(bytes) => {
+            let public = skein_tls::rs256_public(&bytes).ok_or(problem.clone())?;
+            if public.modulus.len() != 384 || public.modulus.first().copied().unwrap_or(0) < 0x80 {
+                return Err(problem);
+            }
+            Ok(Secret::new(bytes))
+        }
         Err(_) => Err(problem),
     }
 }

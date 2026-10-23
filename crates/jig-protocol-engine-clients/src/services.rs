@@ -57,6 +57,7 @@ impl Component {
                             | Waiting::Ask { .. }
                             | Waiting::Carry { .. }
                             | Waiting::Read { .. }
+                            | Waiting::Authorize { .. }
                             | Waiting::ApplicationRead { .. }
                             | Waiting::Checked { .. } => None,
                         };
@@ -105,6 +106,7 @@ impl Component {
                         | Waiting::Ask { .. }
                         | Waiting::Carry { .. }
                         | Waiting::Read { .. }
+                        | Waiting::Authorize { .. }
                         | Waiting::ApplicationRead { .. }
                         | Waiting::Checked { .. } => {}
                     }

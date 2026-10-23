@@ -209,7 +209,7 @@ impl Peer {
     pub fn with_limits(settings: &Settings, limits: Limits) -> Self {
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
         let mut out = Queue::with_capacity(64);
-        let component = Component::new(settings.clone(), &env, &mut out).expect("component starts");
+        let component = Component::new(fixtures::copy_settings(settings), &env, &mut out).expect("component starts");
         let mut peer = Self {
             component,
             server: fixtures::server(),
@@ -340,6 +340,10 @@ impl Peer {
         }
         active
     }
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive pump of the component, transport, store and scripted core"
+    )]
     fn pump(&mut self) {
         // Every packet is tiny; this bound includes the seeded wire's harmless delays.
         let mut quiet = 0;
@@ -416,6 +420,9 @@ impl Peer {
                     }
                     Request::MintRefused { exchange, why } => {
                         self.mints.insert(exchange, Err(why));
+                    }
+                    Request::Redeemed { .. } | Request::Claimed { .. } => {
+                        panic!("provider endpoints use their own story")
                     }
                     Request::Closed => self.closed += 1,
                     Request::Application(request) => self.application.push_back(request),
@@ -597,7 +604,7 @@ impl Peer {
         self.core.clear();
         self.watch_sign_ins.clear();
         self.last_watch = None;
-        self.component = Component::new(settings.clone(), &self.env, &mut self.out).expect("restart");
+        self.component = Component::new(fixtures::copy_settings(settings), &self.env, &mut self.out).expect("restart");
         self.server = fixtures::server();
         self.server_out = Queue::with_capacity(64);
         self.mount = fixtures::mount();

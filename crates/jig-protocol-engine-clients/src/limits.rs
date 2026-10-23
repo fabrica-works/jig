@@ -66,7 +66,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             jig_domain_people::model_names_worst_case()?.checked_mul(u64::from(MAX_OUT_DOWN).checked_add(2)?)?,
         )?
         .checked_add(skein_lib::List::<crate::Served>::worst_case(limits.families)?)?
-        .checked_add(skein_lib::List::<u16>::worst_case(limits.providers)?)?
+        .checked_add(skein_lib::List::<u16>::worst_case(limits.providers)?.checked_mul(2)?)?
         // The configured models, which `Component::new` holds to the core's bounds.
         .checked_add(skein_lib::List::<crate::Model>::worst_case(jig_domain_tasks::MODELS)?)?
         .checked_add(
@@ -93,5 +93,35 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             )?,
         )?
         .checked_add(Map::<Token, Token>::worst_case(limits.mints)?)?
+        .checked_add(skein_oauth_issuer::worst_case(&provider_limits(limits))?)?
+        .checked_add(Map::<[u8; 32], super::component::provider::Code>::worst_case(limits.provider_codes)?)?
+        .checked_add(Map::<[u8; 32], super::component::provider::Access>::worst_case(limits.provider_tokens)?)?
+        .checked_add(
+            u64::from(limits.provider_codes).checked_mul(
+                // Authorization owns two URIs, state and nonce, and the person four UTF-8 strings.
+                4096_u64
+                    .checked_add(2048)?
+                    .checked_add(u64::from(limits.identity_bytes).checked_mul(4)?)?
+                    .checked_add(6)?,
+            )?,
+        )?
+        .checked_add(
+            u64::from(limits.provider_tokens)
+                .checked_mul(u64::from(limits.identity_bytes).checked_mul(4)?.checked_add(6)?)?,
+        )?
         .checked_add(256)
+}
+
+/// Issuer bounds shared with configuration's startup helper (client.md, 18).
+#[must_use]
+pub fn provider_limits(limits: &Limits) -> skein_oauth_issuer::Limits {
+    skein_oauth_issuer::Limits {
+        clients: 256,
+        uri_bytes: 2048,
+        client_bytes: 255,
+        request_bytes: limits.message_bytes.min(limits.wire.authorize_query),
+        state_bytes: 1024,
+        token_bytes: 43,
+        claim_bytes: limits.identity_bytes.saturating_add(6),
+    }
 }

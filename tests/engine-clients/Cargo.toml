@@ -24,6 +24,10 @@ skein-http.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
 [dev-dependencies]
+skein-tls.workspace = true
+skein-oauth-issuer.workspace = true
+serde_json = "1.0"
+tempfile = "3"
 jig-core-world = { path = "../core" }
 jig-domain-tasks.workspace = true
 jig-test-domain = { path = "../../testing/jig-test-domain" }

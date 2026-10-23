@@ -193,3 +193,22 @@ fn advertised_program_endpoints_follow_actual_endpoint_selections() {
         fs::remove_dir_all(directory).expect("scratch cleanup");
     }
 }
+
+#[test]
+fn provider_key_files_refuse_group_permissions_and_symbolic_links() {
+    use std::os::unix::{ffi::OsStrExt, fs::symlink};
+    let directory = tempfile::tempdir().expect("private key scratch");
+    let key = directory.path().join("provider.pem");
+    fs::write(&key, b"key contents are never included in a diagnostic").expect("key file");
+    let user = skein_shell::effective_user();
+    fs::set_permissions(&key, fs::Permissions::from_mode(0o640)).expect("group bits");
+    let error = super::read_startup_file(key.as_os_str().as_bytes(), 8192, user).expect_err("group bits refused");
+    assert!(error.contains("Unsafe(Mode("));
+    assert!(!error.contains("key contents"));
+    fs::set_permissions(&key, fs::Permissions::from_mode(0o600)).expect("private key");
+    let link = directory.path().join("linked.pem");
+    symlink(&key, &link).expect("key link");
+    let error = super::read_startup_file(link.as_os_str().as_bytes(), 8192, user).expect_err("link refused");
+    assert!(error.contains("Unsafe(Link)"));
+    assert!(!error.contains("key contents"));
+}

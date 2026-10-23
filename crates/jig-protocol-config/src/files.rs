@@ -21,8 +21,25 @@ pub fn files(engine: &Engine) -> Box<[File]> {
         .expect("bounded workers")
         .checked_add(engine.charters.len())
         .expect("bounded charters");
+    let max = match &engine.clients.provider {
+        Some(provider) => {
+            max.checked_add(provider.clients.len()).expect("bounded clients").checked_add(1).expect("key file")
+        }
+        None => max,
+    };
     let mut files = List::with_capacity(u32::try_from(max).expect("document count fits u32"));
     crate::charters::files(engine, &mut files);
+    if let Some(provider) = &engine.clients.provider {
+        let at = Path::root().member(b"clients").member(b"provider");
+        push(&mut files, at.member(b"key"), &provider.key, 8192, true);
+        for (index, client) in provider.clients.iter().enumerate() {
+            let at = at
+                .member(b"clients")
+                .child(Segment::Index(u32::try_from(index).expect("bounded clients")))
+                .member(b"secret");
+            push(&mut files, at, &client.secret, 256, true);
+        }
+    }
     for (index, worker) in engine.hosts.workers.iter().enumerate() {
         let at = Path::root()
             .member(b"hosts")

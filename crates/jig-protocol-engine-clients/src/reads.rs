@@ -124,7 +124,8 @@ impl Component {
                     self.pending.exchanges.insert(exchange, waiting).expect("same unrelated slot");
                 }
             },
-            Waiting::Core { .. }
+            Waiting::Authorize { .. }
+            | Waiting::Core { .. }
             | Waiting::LinkGet { .. }
             | Waiting::SignOut { .. }
             | Waiting::Watch { .. }
@@ -161,7 +162,8 @@ impl Component {
                 };
                 self.read_response(env, exchange, answer, out);
             }
-            Waiting::Core { .. }
+            Waiting::Authorize { .. }
+            | Waiting::Core { .. }
             | Waiting::LinkGet { .. }
             | Waiting::SignOut { .. }
             | Waiting::Watch { .. }

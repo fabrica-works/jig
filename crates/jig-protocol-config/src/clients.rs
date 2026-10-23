@@ -1,7 +1,9 @@
 //! Client heartbeat and local sign-in link (configuration.md, 3).
 use crate::{Directories, Path, Problems, check, read};
+mod issuer;
 mod provider;
 use alloc::boxed::Box;
+pub use issuer::{ProviderUrls, provider_issuer};
 pub use provider::{Provider, ProviderClient, provider_key};
 use skein_json::Document;
 use skein_lib::{Duration, List};

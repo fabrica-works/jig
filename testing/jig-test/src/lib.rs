@@ -65,11 +65,14 @@ fn read_files(document: &[u8], bounds: &[config::File], user: u32) -> Result<Fil
     let mut entries = List::with_capacity(names.len());
     for name in names.into_boxed() {
         let max = bounds.iter().filter(|file| file.path == name).map(|file| file.max).min().unwrap_or(CONFIG_BYTES);
-        let value = skein_shell::read_private_file(path(&name), max, user)
-            .map_err(|why| format!("startup file {}: {why:?}", path(&name).display()))?;
+        let value = read_startup_file(&name, max, user)?;
         entries.push((name, value)).expect("named files capacity");
     }
     Ok(Files { entries })
+}
+fn read_startup_file(name: &[u8], max: u32, user: u32) -> Result<skein_lib::Secret, String> {
+    skein_shell::read_private_file(path(name), max, user)
+        .map_err(|why| format!("startup file {}: {why:?}", path(name).display()))
 }
 #[derive(Debug)]
 struct AgentStart {

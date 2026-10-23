@@ -51,6 +51,16 @@ pub enum Event {
         exchange: Token,
         identity: people::Identity,
     },
+    Redeem {
+        exchange: Token,
+        authorization: Option<Secret>,
+        content_type: Option<Box<[u8]>>,
+        body: Secret,
+    },
+    Claims {
+        exchange: Token,
+        authorization: Option<Secret>,
+    },
     MovedTaken {
         exchange: Token,
         record: Option<Secret>,
@@ -69,6 +79,8 @@ pub enum Request {
     MintRefused { exchange: Token, why: MintRefusal },
     Link { secret: Secret },
     TakeMoved { exchange: Token, source: u32 },
+    Redeemed { exchange: Token, answer: ProviderAnswer },
+    Claimed { exchange: Token, answer: ProviderAnswer },
     Closed,
 }
 #[derive(Debug)]
@@ -154,8 +166,10 @@ pub enum MintRefusal {
     NotReady,
     Busy,
 }
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Settings {
+    pub provider: Option<skein_oauth_issuer::Issuer>,
+    pub addresses: Box<[u16]>,
     pub link: Option<people::Identity>,
     pub deployment_provider: u16,
     pub heartbeat: Duration,
@@ -248,4 +262,12 @@ pub enum Ended {
     SignedOut,
     Stopping,
     Busy,
+}
+
+/// A provider endpoint answer (client.md, 18); a body may contain bearer tokens.
+#[derive(Debug)]
+pub struct ProviderAnswer {
+    pub status: u16,
+    pub challenge: Option<Box<[u8]>>,
+    pub body: Secret,
 }

@@ -1251,7 +1251,8 @@ and their addresses are the application's (17.1: no provider route).
   `no_provider`, and a `Redeem` or a `Claims` is answered as an unknown
   client.
 - **Built by the application's startup,** which alone knows its routes:
-  it gives jig's helper the configuration's member and its own issuer
+  it gives jig's helper, in `jig-protocol-config::clients` beside the
+  key's reader, the configuration's member and its own issuer
   identifier, its public origin, and the URLs of its authorization,
   token, userinfo and key set routes; the helper builds skein's
   `Issuer`, which the startup hands the component in its settings,

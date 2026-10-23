@@ -511,7 +511,10 @@ impl Bytes {
                 }
             }
             clients::Request::Application(request) => self.application(joint, request),
-            clients::Request::Minted { .. } | clients::Request::MintRefused { .. } => {
+            clients::Request::Minted { .. }
+            | clients::Request::MintRefused { .. }
+            | clients::Request::Redeemed { .. }
+            | clients::Request::Claimed { .. } => {
                 panic!("Ops fixture mints no sign-ins")
             }
             clients::Request::Closed => {}

@@ -179,7 +179,10 @@ impl Engine {
                     Err(event) => self.event(*event),
                 }
             }
-            Request::Minted { .. } | Request::MintRefused { .. } => {
+            Request::Minted { .. }
+            | Request::MintRefused { .. }
+            | Request::Redeemed { .. }
+            | Request::Claimed { .. } => {
                 panic!("the world asks for no application sign-ins")
             }
             Request::Closed => {}

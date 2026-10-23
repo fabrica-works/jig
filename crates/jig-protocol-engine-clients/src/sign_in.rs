@@ -10,6 +10,7 @@ pub(crate) struct Link {
 }
 #[derive(Debug)]
 pub(crate) enum Waiting {
+    Authorize { sign_in: u64, authorization: skein_oauth_issuer::Authorization },
     Core { held: Option<u64> },
     LinkGet { sign_in: u64, digest: Secret },
     SignOut { sign_in: u64, committed: bool },

@@ -15,7 +15,7 @@ mod closing;
 #[path = "mint.rs"]
 mod mint;
 #[path = "provider.rs"]
-mod provider;
+pub(crate) mod provider;
 #[path = "reads.rs"]
 mod reads;
 #[path = "services.rs"]
@@ -30,6 +30,7 @@ pub enum Unusable {
 #[derive(Debug)]
 pub struct Component {
     settings: Settings,
+    provider: provider::State,
     rng: CryptoRng,
     link: Option<Link>,
     /// The link a sign-in spends while the core answers it, given back on not ready, busy or full (client.md, 8).
@@ -45,6 +46,7 @@ impl Component {
         crate::worst_case(&env.limits).ok_or(Unusable::Limits)?;
         if settings.served.capacity() > env.limits.families
             || settings.providers.capacity() > env.limits.providers
+            || settings.addresses.len() > usize::try_from(env.limits.providers).expect("u32 fits")
             || settings.heartbeat == skein_lib::Duration::ZERO
             || settings.rows == 0
             || settings.key_bytes > env.limits.wire.keyed_value_some
@@ -66,8 +68,24 @@ impl Component {
                 return Err(Unusable::Limits);
             }
         }
+        if settings.provider.is_some() {
+            let issuer = crate::provider_limits(&env.limits);
+            let location = issuer
+                .uri_bytes
+                .checked_add(issuer.state_bytes.checked_mul(3).ok_or(Unusable::Limits)?)
+                .ok_or(Unusable::Limits)?;
+            let location = location
+                .checked_add(issuer.token_bytes.checked_mul(3).ok_or(Unusable::Limits)?)
+                .ok_or(Unusable::Limits)?;
+            // Percent-encoded code/state, and room for separators or an issuer error.
+            let location = location.checked_add(64).ok_or(Unusable::Limits)?;
+            if env.limits.wire.authorize_go_location < location {
+                return Err(Unusable::Limits);
+            }
+        }
         let rng = CryptoRng::new(&settings.seed, settings.stream).ok_or(Unusable::Seed)?;
         let mut value = Self {
+            provider: provider::State::new(&env.limits),
             settings,
             rng,
             link: None,
@@ -153,6 +171,14 @@ impl Component {
             Event::Application(crate::FromApplication::Delivery { watcher, family, record }) => {
                 self.application_delivery(env, watcher, family, record);
             }
+            Event::Redeem { exchange, authorization, content_type, body } => {
+                let answer = self.redeem(env, authorization.as_ref(), content_type.as_deref(), body.expose());
+                out.push(Request::Redeemed { exchange, answer });
+            }
+            Event::Claims { exchange, authorization } => {
+                let answer = self.claims(env, authorization.as_ref());
+                out.push(Request::Claimed { exchange, answer });
+            }
             Event::Mint { exchange, identity } => self.mint(env, exchange, identity, out),
             Event::Application(crate::FromApplication::Unused { number }) => {
                 let mut found = None;
@@ -208,6 +234,7 @@ impl Component {
                 | Waiting::Moving { .. }
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
+                | Waiting::Authorize { .. }
                 | Waiting::ApplicationRead { .. }
                 | Waiting::Ask { .. }
                 | Waiting::Carry { .. } => {}
@@ -222,7 +249,7 @@ impl Component {
                     }
                     Route::Request => self.request(env, exchange, sign_in, &body, out),
                     Route::SignOut => self.sign_out(env, exchange, sign_in, &body, out),
-                    Route::Authorize => unreachable!("authorization handled before credentials"),
+                    Route::Authorize => self.authorize_checked(env, exchange, sign_in, &body, out),
                     Route::Link | Route::Service => {}
                 },
                 Waiting::Core { .. }
@@ -234,6 +261,7 @@ impl Component {
                 | Waiting::Moving { .. }
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
+                | Waiting::Authorize { .. }
                 | Waiting::ApplicationRead { .. }
                 | Waiting::Ask { .. }
                 | Waiting::Carry { .. } => {}
@@ -330,8 +358,10 @@ impl Component {
             connection.respond(crate::Reply::Record(answer), &env.limits);
             return;
         }
+        if route == Route::Authorize && !self.authorize_query(env, connection, &body) {
+            return;
+        }
         match route {
-            Route::Authorize => provider::authorize(env, connection, &body),
             Route::Link => {
                 let Ok(record) = w::LinkSignIn::decode(&env.limits.wire, &mut skein_lib::Reader::new(&body)) else {
                     connection.respond(crate::Reply::NotARecord, &env.limits);
@@ -377,7 +407,8 @@ impl Component {
                     self.link_sign_in(exchange, None, out);
                 }
             }
-            Route::Service
+            Route::Authorize
+            | Route::Service
             | Route::SignOut
             | Route::Request
             | Route::Read
@@ -444,6 +475,7 @@ impl Component {
                     }
                 }
             },
+            Waiting::Authorize { authorization, .. } => self.authorize_reply(env, exchange, reply, authorization),
             Waiting::Core { held } => self.sign_in_reply(env, exchange, reply, held, out),
             Waiting::Ask { .. } => self.ask_reply(env, exchange, reply, out, waiting),
             Waiting::LinkGet { .. }
@@ -530,6 +562,7 @@ impl Component {
             | Waiting::Get { .. }
             | Waiting::Made { .. }
             | Waiting::Read { .. }
+            | Waiting::Authorize { .. }
             | Waiting::ApplicationRead { .. }
             | Waiting::Ask { .. }
             | Waiting::Carry { .. }
@@ -591,6 +624,7 @@ impl Component {
             | Waiting::Made { .. }
             | Waiting::Checked { .. }
             | Waiting::Read { .. }
+            | Waiting::Authorize { .. }
             | Waiting::ApplicationRead { .. }
             | Waiting::Ask { .. }
             | Waiting::Carry { .. } => {
@@ -638,6 +672,7 @@ impl Component {
                 | Waiting::Moving { .. }
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
+                | Waiting::Authorize { .. }
                 | Waiting::ApplicationRead { .. }
                 | Waiting::Ask { .. }
                 | Waiting::Carry { .. } => {

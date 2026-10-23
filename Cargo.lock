@@ -828,10 +828,14 @@ dependencies = [
  "jig-protocol-engine-clients-http",
  "jig-test-domain",
  "jig-test-service",
+ "serde_json",
  "skein-http",
  "skein-io",
  "skein-lib",
+ "skein-oauth-issuer",
+ "skein-tls",
  "skein-world",
+ "tempfile",
 ]
 
 [[package]]
@@ -1163,7 +1167,9 @@ dependencies = [
  "skein-lib",
  "skein-oauth",
  "skein-oauth-accounts",
+ "skein-oauth-issuer",
  "skein-tls",
+ "tempfile",
 ]
 
 [[package]]
@@ -1186,6 +1192,7 @@ dependencies = [
  "jig-protocol-store",
  "skein-codec",
  "skein-lib",
+ "skein-oauth-issuer",
 ]
 
 [[package]]
@@ -2046,6 +2053,16 @@ dependencies = [
  "skein-io",
  "skein-lib",
  "skein-oauth",
+ "skein-tls",
+]
+
+[[package]]
+name = "skein-oauth-issuer"
+version = "0.0.0"
+source = "git+https://github.com/fabrig-dev/skein.git#6b6a95b8af24e5f5f80b4457c0e3990486f2e442"
+dependencies = [
+ "skein-json",
+ "skein-lib",
  "skein-tls",
 ]
 

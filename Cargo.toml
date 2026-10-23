@@ -143,6 +143,7 @@ skein-tls = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-tls-world = { git = "https://github.com/fabrig-dev/skein.git" }
 
 jig-protocol-accounts = { path = "crates/jig-protocol-accounts" }
+skein-oauth-issuer = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-oauth = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-oauth-accounts = { git = "https://github.com/fabrig-dev/skein.git" }
 jig-protocol-worker-link = { path = "crates/jig-protocol-worker-link" }

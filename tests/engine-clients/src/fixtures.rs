@@ -23,6 +23,8 @@ pub fn settings() -> Settings {
     let mut providers = List::with_capacity(1);
     providers.push(APPLICATION_PROVIDER).expect("application provider");
     Settings {
+        provider: None,
+        addresses: Box::new([]),
         deployment_provider: 2,
 
         link: Some(first_owner()),
@@ -202,4 +204,25 @@ pub fn mount() -> jig_protocol_engine_clients_http::Mount {
 #[must_use]
 pub fn server_http() -> skein_http::server::Limits {
     skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 256, response: 65536, send: 32 }
+}
+
+/// Existing transport stories have no provider; the provider story transfers its issuer once.
+#[must_use]
+pub fn copy_settings(settings: &Settings) -> Settings {
+    assert!(settings.provider.is_none());
+    Settings {
+        provider: None,
+        addresses: settings.addresses.clone(),
+        link: settings.link.clone(),
+        deployment_provider: settings.deployment_provider,
+        heartbeat: settings.heartbeat,
+        rows: settings.rows,
+        served: settings.served.clone(),
+        providers: settings.providers.clone(),
+        seed: settings.seed.clone(),
+        stream: settings.stream,
+        models: settings.models.clone(),
+        key_bytes: settings.key_bytes,
+        moved_bytes: settings.moved_bytes,
+    }
 }

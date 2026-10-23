@@ -154,7 +154,7 @@ fn provider_limits_are_positive_named_overrides_with_profile_defaults() {
     }
 }
 #[test]
-fn provider_key_reads_only_pkcs8_armor_and_base64_without_interpreting_der() {
+fn provider_key_refuses_non_rsa_der_and_malformed_armor() {
     let arbitrary = b"this is arbitrary DER-shaped test input, not a key";
     let size =
         skein_lib::base64::encoded_len(skein_lib::base64::Alphabet::Standard, u32::try_from(arbitrary.len()).unwrap())
@@ -164,7 +164,7 @@ fn provider_key_reads_only_pkcs8_armor_and_base64_without_interpreting_der() {
     let encoded = writer.finish();
     for eol in [b"\n".as_slice(), b"\r\n", b"\r"] {
         let pem = joined(&[b"-----BEGIN PRIVATE KEY-----", eol, &encoded, eol, b"-----END PRIVATE KEY-----", eol]);
-        assert_eq!(provider_key(&pem).unwrap().expose(), arbitrary);
+        assert_eq!(provider_key(&pem).unwrap_err().path, provider_path().member(b"key"));
     }
     for pem in [
         b"-----BEGIN RSA PRIVATE KEY-----\nYWJj\n-----END RSA PRIVATE KEY-----\n".as_slice(),
@@ -205,4 +205,126 @@ fn repeated(byte: u8, count: usize) -> Box<[u8]> {
         writer.put(&[byte]).unwrap();
     }
     writer.finish()
+}
+
+#[test]
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
+    clippy::print_stderr,
+    reason = "ordinary fixture setup measures and reports only key-generation time as the task requires"
+)]
+fn provider_files_are_private_and_rsa_key_policy_is_checked() {
+    use std::{fs, os::unix::fs::PermissionsExt, process::Command, time::Instant};
+    let engine = fixtures::engine(&bytes()).unwrap();
+    let files = crate::files(&engine);
+    for (name, at) in [
+        (b"secrets/provider.pem".as_slice(), provider_path().member(b"key")),
+        (b"secrets/app".as_slice(), client_path().member(b"secret")),
+    ] {
+        let mut found = None;
+        for file in &files {
+            if file.path.as_ref() == name {
+                found = Some(file);
+                break;
+            }
+        }
+        let file = found.expect("provider file enumerated");
+        assert!(file.private);
+        assert_eq!(file.at, at);
+    }
+    let scratch = tempfile::tempdir().expect("private key scratch");
+    let key = scratch.path().join("provider.pem");
+    for (bits, option) in [(3072_u32, "rsa_keygen_bits:3072"), (2048, "rsa_keygen_bits:2048")] {
+        let started = Instant::now();
+        let output = Command::new("openssl")
+            .args(["genpkey", "-algorithm", "RSA", "-pkeyopt", option, "-out"])
+            .arg(&key)
+            .output()
+            .expect("openssl installed");
+        assert!(output.status.success(), "key generation failed");
+        fs::set_permissions(&key, fs::Permissions::from_mode(0o600)).expect("private key");
+        eprintln!("configuration RSA {bits} key generation: {} us", started.elapsed().as_micros());
+        let pem = fs::read(&key).expect("key bytes");
+        if bits == 3072 {
+            let der = provider_key(&pem).expect("3072 PKCS#8 accepted");
+            issuer_member_paths(&pem, scratch.path());
+            assert_eq!(skein_tls::rs256_public(der.expose()).expect("RSA").modulus.len(), 384);
+            let pkcs1 = scratch.path().join("pkcs1.pem");
+            let output = Command::new("openssl")
+                .args(["rsa", "-traditional", "-in"])
+                .arg(&key)
+                .arg("-out")
+                .arg(&pkcs1)
+                .output()
+                .expect("openssl installed");
+            assert!(output.status.success());
+            fs::set_permissions(&pkcs1, fs::Permissions::from_mode(0o600)).expect("private key");
+            assert_eq!(
+                provider_key(&fs::read(pkcs1).expect("PKCS#1")).unwrap_err().path,
+                provider_path().member(b"key")
+            );
+        } else {
+            assert_eq!(
+                provider_key(&pem).unwrap_err(),
+                Problem {
+                    path: provider_path().member(b"key"),
+                    what: What::ProviderKey {
+                        generate: "openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072"
+                    }
+                }
+            );
+        }
+    }
+}
+
+fn issuer_urls() -> crate::clients::ProviderUrls {
+    crate::clients::ProviderUrls {
+        issuer: Box::from(b"https://app.example.com".as_slice()),
+        public_origin: Box::from(b"https://app.example.com".as_slice()),
+        authorization_endpoint: Box::from(b"https://app.example.com/authorize".as_slice()),
+        token_endpoint: Box::from(b"https://app.example.com/token".as_slice()),
+        userinfo_endpoint: Box::from(b"https://app.example.com/userinfo".as_slice()),
+        jwks_uri: Box::from(b"https://app.example.com/keys".as_slice()),
+    }
+}
+fn issuer_member_paths(pem: &[u8], scratch: &std::path::Path) {
+    use crate::clients::provider_issuer;
+    use skein_lib::Secret;
+    use std::{fs, os::unix::fs::OpenOptionsExt, process::Command};
+    let file = scratch.join("client.secret");
+    fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&file).expect("private secret file");
+    let output = Command::new("openssl")
+        .args(["rand", "-hex", "-out"])
+        .arg(&file)
+        .arg("32")
+        .output()
+        .expect("openssl installed");
+    assert!(output.status.success());
+    let secret = Secret::new(fs::read(file).expect("client secret").into_boxed_slice());
+    let mut engine = fixtures::engine(&bytes()).unwrap();
+    let provider = engine.clients.provider.as_mut().expect("configured provider");
+    let files = [(provider.key.clone(), Secret::new(Box::from(pem))), (provider.clients[0].secret.clone(), secret)];
+    let limits = crate::profile(crate::Profile::Small).clients;
+    let issuer = provider_issuer(provider, &files, issuer_urls(), &limits).expect("issuer built from private bytes");
+    assert!(issuer.discovery().starts_with(b"{\"issuer\":\"https://app.example.com\""));
+    assert_eq!(
+        provider_issuer(provider, &[], issuer_urls(), &limits).unwrap_err(),
+        Problem { path: provider_path().member(b"key"), what: What::Unreadable }
+    );
+    assert_eq!(
+        provider_issuer(provider, &files[..1], issuer_urls(), &limits).unwrap_err(),
+        Problem { path: client_path().member(b"secret"), what: What::Unreadable }
+    );
+    let empty =
+        [(provider.key.clone(), files[0].1.clone()), (provider.clients[0].secret.clone(), Secret::new(Box::new([])))];
+    assert_eq!(
+        provider_issuer(provider, &empty, issuer_urls(), &limits).unwrap_err(),
+        Problem { path: client_path().member(b"secret"), what: What::Bound }
+    );
+    provider.clients[0].redirect_uri = Box::from(b"https://app.example.com:0/callback".as_slice());
+    assert_eq!(
+        provider_issuer(provider, &files, issuer_urls(), &limits).unwrap_err(),
+        Problem { path: client_path().member(b"redirect_uri"), what: What::Form }
+    );
 }

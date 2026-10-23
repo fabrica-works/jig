@@ -70,7 +70,10 @@ pub(super) fn to_root(request: kit::Request) -> Routed {
         kit::Request::Secrets(value) => Routed::Secrets(value),
         kit::Request::Transport(message) => Routed::Transport(message),
         kit::Request::Link { secret } => Routed::Link(secret),
-        kit::Request::Minted { .. } | kit::Request::MintRefused { .. } => {
+        kit::Request::Minted { .. }
+        | kit::Request::MintRefused { .. }
+        | kit::Request::Redeemed { .. }
+        | kit::Request::Claimed { .. } => {
             unreachable!("the test service mints no application sign-ins")
         }
         kit::Request::TakeMoved { exchange, source } => Routed::TakeMoved { exchange, source },
@@ -140,6 +143,8 @@ impl Clients {
             })
             .or(Err(invalid(What::Bound)))?;
         let settings = kit::Settings {
+            provider: None,
+            addresses: Box::new([]),
             link,
             deployment_provider,
             heartbeat: config.clients.heartbeat,

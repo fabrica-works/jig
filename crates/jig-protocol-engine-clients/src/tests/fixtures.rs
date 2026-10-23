@@ -34,6 +34,8 @@ pub fn settings() -> Settings {
     served.push(crate::Served { family: None, first: 18, last: 18 }).expect("one jig range");
     served.push(crate::Served { family: Some(9), first: 2, last: 2 }).expect("one family range");
     Settings {
+        provider: None,
+        addresses: Box::new([]),
         deployment_provider: 2,
         link: None,
         heartbeat: Duration::from_secs(5),
