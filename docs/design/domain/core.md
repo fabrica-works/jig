@@ -290,6 +290,21 @@ A project is a body of work people steer, kept in the store:
 
 Every task belongs to one project, which its delegates inherit.
 
+A project begins in one of two ways:
+
+- **Seeded** at the deployment's first start, from configuration
+  (`../protocol/configuration.md`, sections 3 and 8).
+- **Made** after it, by a party whose role in the deployment is owner
+  (people.md, 5.1): with the name its maker chose, a copy of a
+  configured policy (`../protocol/configuration.md`, section 3), and its
+  maker as its owner and only party (people.md, 5.2). Its number is the
+  deployment's next, past every project seeded or made, and never given
+  again.
+
+Once it is, a project is the same either way: nothing records how it
+began, and a restart restores both from the store alone
+(`../protocol/store.md`, 4.4).
+
 A project's name:
 
 - **Every project has one,** and no two projects of a deployment have
@@ -304,9 +319,12 @@ A project's name:
   named "Project N", N its number (`../protocol/configuration.md`,
   section 3). A seed's names, configured and given, are checked
   together, and a collision refuses the start. The store keeps the
-  name with the project's policy (`../protocol/store.md`, 4.4).
+  name with the project's policy (`../protocol/store.md`, 4.4). A
+  project made after the first start is never given one: its maker
+  chooses it (people.md, 5.1).
 - **Renamed by an owner** (people.md, 5.1): the engine refuses a name
-  another project holds, or one out of shape. A rename changes nothing
+  another project holds, as *name taken*, or one out of shape, as it
+  refuses a made project's (`../client/domain/contract.md`, section 4). A rename changes nothing
   else: the number, the addresses and the tasks stay.
 - **Not a resource's:** a name is the project's own, never read from a
   resource or a home, which may be renamed, replaced or adopted

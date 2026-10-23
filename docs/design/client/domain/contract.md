@@ -209,6 +209,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 | `Answer` | a question, by its task and message, with the words; or a person task, by its revision, with the answer its contract asks (a choice, words, or the state an approval approves) or that it cannot be done | an answer to the question; the person task's result |
 | `Take`, `HandBack` | a person task addressed to a role the party holds | held by them, or back to the role |
 | `Seen` | how far the party has read: their results, or one conversation's turns | their durable read position advanced to `max(old, through)`; after completion a retry checks current subject and authority and may return `Unknown` after forget or `Role` after authority loss, never recreating history or replaying a new completed answer (3.1; `../../domain/people.md`, section 6) |
+| `MakeProject` | the deployment, its scope (7.5); the new project's name (`../../domain/core.md`, 6.1); a configured policy's number (`../../protocol/configuration.md`, section 3) | a project, its policy a copy of the configured one, its maker its owner and only party (`../../domain/people.md`, 5.2), its number answered; the maker's `me` gains it. Not among a compound request's operations (3.4) |
 | the project's own | notes, by the revision recalled; its name (`../../domain/core.md`, 6.1); the policy, its templates' overrides among them (3.6); roles; a party's pool; services, a service's credential answered once; as `../../domain/people.md`, 5.1 and 5.2 | the note or the project changed |
 | adopting a resource | the application's own request (3.3), its form the application's; the engine's root makes the people request on the party's behalf | the project changed |
 | the party's LLM accounts | as `../../domain/accounts.md`, section 5 has them: signing in with an LLM provider; signing a source out; adding or replacing a key, carrying its value (3.1), of at most the bytes `me` states (5.1), and removing one; declaring a program's login under a name; checking a program source's login; an account's place among the holder's and its sources' order; its uses; resuming a limited source; removing an account, which signs each of its sources out and erases its keys. The party's own accounts, or, for an owner, the deployment's | an account made, renewed or changed. A sign-in is answered done with the address to open in a browser on the engine's machine, and ends on the `accounts` watch (7.1), made, renewed or refused; a sign-out's answer says whether the provider confirmed revocation, and names each host that did not sign a program's login out; a program's login declared is answered with the source's name, by which the application's own command signs the program in on each host |
@@ -437,7 +438,8 @@ Every request has one answer, of one of these kinds:
     is made, not the refusal's;
   - *no one to escalate to:* a party's root task whose escalations would
     have no holder (3.2);
-  - *limit:* which one (the project's live tasks, its goals, the
+  - *limit:* which one (the deployment's projects, the project's live
+    tasks, its goals, the
     operations per request, a grace past its bound, the inbox full, the
     words too long, a key past the bytes `me` states (5.1), the LLM
     accounts' bounds: accounts in the deployment, accounts per holder,
@@ -454,6 +456,9 @@ Every request has one answer, of one of these kinds:
   - *moved:* the object's revision now, and what changed;
   - *ended:* the object has ended, and how;
   - *unknown:* nothing by that name the party may see;
+  - *name taken:* another project holds the name a `MakeProject` or a
+    rename gives, under simple case folding (`../../domain/core.md`,
+    6.1); it names no project, which the party may not see;
   - *not offered:* the deployment does not offer it (an executor it does
     not have);
   - *circle:* the batch or the dependencies an amendment adds would close
@@ -467,7 +472,8 @@ Every request has one answer, of one of these kinds:
     dependencies (`../../domain/tasks.md`, 5.7);
   - *not well formed:* which task or operation, and why (two tasks of a
     batch giving `AsAllowed`; the conversation flag on a task that is not
-    an agent's; a proposed batch giving `AsAllowed`);
+    an agent's; a proposed batch giving `AsAllowed`; a project's name out
+    of shape, saying which rule);
   - *key conflict:* the key names another ask, which is a client's bug
     where the client drew the key (3.1);
 - **busy** or **not ready:** nothing was made and nothing kept; send it
@@ -1130,7 +1136,8 @@ any watch's deliveries do (`../../protocol/client.md`, section 7).
 - **Scopes.** An application's request, read or subject names one:
   - *a project,* admitted on the party's role in it;
   - *the deployment,* admitted on their role in the deployment
-    (`../../domain/people.md`, section 3);
+    (`../../domain/people.md`, section 3), as jig's `MakeProject` is
+    (3.2);
   - *the party's own,* what is the signed-in party's across projects (an
     application's settings of theirs, the incidents they are paged
     for), admitted on the credential alone, and naming no party: the

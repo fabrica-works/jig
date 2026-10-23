@@ -167,6 +167,9 @@ inbox are the views child's (engine.md, section 11).
     `deployment_role`.
   - *Its roster counts* against people's `projects`, as a project's
     does, and never against authority's: it has no policy.
+  - *Its owners make projects* (5.1 and 5.2), and hold no role in a
+    project by it: a project's roles are its own roster's, which a first
+    start fills with the first owners because configuration names them.
 
 ## 4. Roles
 
@@ -258,6 +261,7 @@ The operations as the client sends them are
 | `Seen` | the party themselves | their read position moved over results, or over one conversation's turns (section 6) |
 | a compound request | one project; each operation's own needs; within operations per request | its operations made in one decision, or none of them (below) |
 | adopt a resource, as a home or not; rename the project; change the policy, roles or services | owner; a name no other project holds, in shape (core.md, 6.1) | the project changed (5.2) |
+| `MakeProject`, in the deployment's scope | owner in the deployment (section 3); a name in shape that no other project holds (core.md, 6.1); a configured policy (`../protocol/configuration.md`, section 3); room in the deployment's projects | a project, numbered next, its policy a copy of the configured one, its maker its owner and only party (5.2) |
 | edit or delete a note | the note's scope within their role | the note revised (engine.md, section 10) |
 | set a party's pool | owner | the pool opened or resized in the current period, what was spent and reserved kept |
 | an account request: sign in, sign out, add, replace or remove a key, declare or check a program's login, order, uses, resume, remove an account | the account's holder, not a role: a person for their own, a first owner for the deployment's (authority.md, 8.4) | accounts.md, section 5: the account's sources, states and uses changed; a value never committed |
@@ -312,7 +316,7 @@ The operations as the client sends them are
   Their other operations reach what the table says.
 - **What only parties do,** by design: carry out person tasks (`Take`,
   `HandBack`, and `Answer` with a result), stop runs, move tasks to
-  themselves, mark what they have seen, run the project (5.2), and act
+  themselves, mark what they have seen, make and run projects (5.2), and act
   on the LLM accounts they hold (accounts.md, section 5).
   Procedures decide nothing (tasks.md, section 9).
 - **A decision names what it saw.** A release, an amendment, a decision
@@ -403,6 +407,28 @@ in flight stopped cancels it. The policy's overrides of the
 application's templates (authority.md, section 6) reach only what
 clients create after them: a task keeps the values it was made with
 (`../protocol/configuration.md`, 3.1).
+
+A project made after the first start (`MakeProject`, 5.1) is made in
+the decision that admits the request, in one commit with its answer:
+
+- **its number,** the deployment's next (core.md, 6.1);
+- **its name and its policy,** the configured policy as it stands then,
+  copied: a later change to the configured policy, or its removal,
+  reaches no project made from it, and its owners change it as any
+  project's;
+- **its roster,** its maker alone, as owner (section 4). Other owners
+  of the deployment get no role in it; the maker gives roles, adopts
+  resources whose connectors seed them, or makes services;
+- **its first period,** its budget the policy's spend per period, with
+  no next start, as the smallest period source opens a seeded project's
+  (`../protocol/configuration.md`, section 5), and with it the maker's
+  pool. The application's root hears that the project was made, and a
+  period source that keeps a calendar says its periods from then on, as
+  for every project.
+
+A crash keeps the project and its answer, or neither; a retry under the
+key then makes it once. Two makes naming one name: the first commit
+takes it, and the second is refused as *name taken*.
 
 ## 6. A party's inbox
 

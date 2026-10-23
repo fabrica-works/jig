@@ -202,8 +202,10 @@ deployment's rules       the most any project may have; requirements on effects
   has, the limits, and the
   requirements every project's effects meet. A rule may forbid what no
   project may grant at all.
-- **A project's policy** is in the store, changed by the parties whose
-  role allows it, within the deployment's rules:
+- **A project's policy** is in the store, whole, from its seed or, for
+  a project made after the first start, copied from a configured policy
+  (`../protocol/configuration.md`, section 3); changed by the parties
+  whose role allows it, within the deployment's rules:
   - its ceiling: the authority no task in the project exceeds, which
     follows from its resources' roles (owned, fork, context) and from
     what the application was given on each at adoption (connectors.md,
@@ -545,6 +547,13 @@ pool has left.
   account's uses naming another person, or a project with another party,
   are refused, naming the LLM provider's rule (accounts.md, 4.2). They
   give no authority and spend nothing.
+
+- **Making a project** (people.md, 5.1) is checked against the party's
+  role in the deployment, owner, never a project's. It gives no
+  authority and spends nothing past its policy's own spend per period.
+  A configured policy is checked against the deployment's rules at
+  every start (`../protocol/configuration.md`, section 3), so the
+  request never finds it above them.
 
 ### 8.5 Tool calls and reads
 

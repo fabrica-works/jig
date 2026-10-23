@@ -129,7 +129,7 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   - the operations of `../client/domain/contract.md`, 3.2, one record
     each, by their names: `Create`, `Propose`, `Withdraw`, `Message`,
     `Amend`, `Cancel`, `Release`, `Stop`, `Move`, `Decide`, `Answer`,
-    `Take`, `HandBack`, `Seen`, and the project's own; and
+    `Take`, `HandBack`, `Seen`, `MakeProject`, and the project's own; and
     `Compound { project, operations }` (3.4 of it);
   - their answers, with refusals' facts (section 4 of it), *version not
     served* among them;

@@ -88,6 +88,7 @@ the application's main (its shell)
 | providers | the numbers and kinds that identities name (`../domain/people.md`, section 3), and nothing else: jig runs no provider's exchange. Of kind *link*, the printed link's; of kind *deployment*, exactly one, the deployment's own, for services' credentials; of kind *application*, each of the application's ways of signing in, whose identities its server verifies on its own routes and asks the clients' component to mint a credential for (`client.md`, section 8). The settings and secrets of the application's sign-in are its own members | the people child; `jig-protocol-engine-clients`, which mints a printed link's credential for the first owner it names, a service's under the deployment's provider, and a `Mint`'s only for an identity whose provider is of kind application |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6). A ceiling, the rules' or a project policy's, names in `models` the configured models it allows, from the llm member's, or every one without it; a role's authority names its models the same way: they seed the role on a first start, and the store keeps them by name (`store.md`, 5.1) | authority |
 | projects | each project seeded on a first start: its number, from 1, since 0 is the deployment's roles' and refused here (`What::Bound` at the number; `../domain/people.md`, section 3); its name, which may be left out for "Project N", N its number, the seed's names unique and in shape or the start refused (`../domain/core.md`, 6.1); its policy, with its spend per period, its roles (each one's authority, the spend a party in it may allot per period, the kinds of proposal it decides; `../domain/authority.md`, section 6) and its overrides of templates' defaults (3.1); its parties' roles. Its resources and homes come by adoption (below) | the core, on a first start |
+| policies | each policy a project made after the first start starts from (`../domain/core.md`, 6.1): numbered from 1 and never renumbered, as templates are (3.1); each a whole policy in a seed's format: its ceiling, its spend per period, its roles, its escalation role, its requirements, its projections' authority, its permissions' roles for adoption and its overrides of templates' defaults. Checked at every start as a seed's policy is: within the rules, its roles well formed, its overrides' templates configured, and its owner role able to be a root's requester (`../domain/people.md`, 5.1); one that fails refuses the start, at its path. A project made from one keeps a copy, which no later change or removal here reaches (`../domain/people.md`, 5.2). With none, no project is made after the first start | the core, at each `MakeProject` |
 | charters | each charter the deployment offers, numbered: its instructions (a file it names, a configuration path), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8). Its models are those it allows, in order, or every configured one; a task that names none takes the first whose LLM provider has a usable account serving its payer (`../domain/tasks.md`, section 3). It names no account: the core chooses one with each run's check (`../domain/accounts.md`, 4.3) | the core; `jig-protocol-charter` |
 | templates | each template the application defines, numbered and never renumbered, with its defaults; jig's chat and goal among them unless the application drops them (3.1) | the core, only to serve each project's merged templates in `me` (`../client/domain/contract.md`, 5.1); the client, which fills them in |
 | hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest, a data path; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, data paths, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
@@ -349,6 +350,11 @@ host's half reports it (`llm.md`, 5.5).
   memory the configuration states; the terms of the workers' channel
   follow from the same limits (`channel.md`, section 11). A profile whose
   sum does not fit refuses the start, saying by how much.
+- **Made projects count too.** Authority's and people's
+  `projects` bound every project the deployment holds, seeded and made
+  after the first start (`../domain/core.md`, 6.1): a deployment that
+  makes projects configures room past its seeds, and a `MakeProject`
+  past either is refused as a limit.
 - **Configured projects fit both owners.** After every override is
   applied, the actual distinct configured project count, including
   ownerless rows, fits authority's project capacity, and that count
@@ -470,7 +476,9 @@ memory sum even when every run slot is occupied.
   (`../domain/testing.md`, section 4).
 - **Every later start** reads the deployment from the store, and the
   installation's identifier, ignoring the one the shell drew. The
-  configuration's projects are ignored; its rules, charters, templates,
+  configuration's projects are ignored, every project, seeded or made,
+  restored from the store alone, and its `policies` matter only to the
+  next project made; its rules, charters, templates,
   limits, hosts and LLM providers apply as configured, and a narrowing
   reaches every later decision, as a policy's does
   (`../domain/authority.md`, section 6). LLM accounts are the store's,
