@@ -1,6 +1,7 @@
 use super::*;
 use skein_lib::{List, Secret, Wall};
-pub const HOST: &[u8] = b"127.0.0.1:7100";
+pub const HOST: &[u8] = b"127.0.0.1:8080";
+pub const PUBLIC: &[u8] = b"app.example.com";
 pub const EXCHANGE: Token = Token::new(11);
 pub const OTHER: Token = Token::new(12);
 pub fn env() -> Env<Limits> {
@@ -22,10 +23,16 @@ pub fn mount() -> Mount {
     prefixed(b"/jig")
 }
 pub fn fresh_mount() -> Mount {
-    Mount::new(Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }, &env().limits)
+    Mount::new(Settings { prefix: Box::from(b"/jig".as_slice()), public: None }, &env().limits)
+}
+pub fn public_mount() -> Mount {
+    listening(Settings { prefix: Box::from(b"/jig".as_slice()), public: Some(Box::from(PUBLIC)) })
 }
 pub fn prefixed(prefix: &[u8]) -> Mount {
-    let mut mount = Mount::new(Settings { prefix: Box::from(prefix), loopback: true }, &env().limits);
+    listening(Settings { prefix: Box::from(prefix), public: None })
+}
+fn listening(settings: Settings) -> Mount {
+    let mut mount = Mount::new(settings, &env().limits);
     let mut hosts = List::with_capacity(1);
     hosts.push(Box::from(HOST)).expect("one host");
     mount.down(&env(), Event::Listening { hosts }, &mut Queue::with_capacity(1));
@@ -191,9 +198,10 @@ fn append(out: &mut List<u8>, bytes: &[u8]) {
 pub const TOKEN: [u8; 40] = [7; 40];
 pub const PARTY: u64 = 7;
 pub const IN_A_DAY: u64 = 86_400_000_000_000;
-pub const COOKIE_ON_LOOPBACK: &[u8] = b"jig-sign-in=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=86400";
+pub const COOKIE_ON_LISTENER: &[u8] = b"jig-sign-in=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=86400";
 pub const COOKIE_SECURE: &[u8] = b"jig-sign-in=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=86400; Secure";
 pub const COOKIE_CLEARED: &[u8] = b"jig-sign-in=; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=0";
+pub const COOKIE_CLEARED_SECURE: &[u8] = b"jig-sign-in=; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=0; Secure";
 pub fn browser_header() -> [skein_http::Header; 1] {
     [skein_http::Header { name: Box::from(b"jig-client".as_slice()), value: Box::from(b"browser".as_slice()) }]
 }
@@ -246,4 +254,36 @@ pub fn names_a_cors_field(headers: &[skein_http::Header]) -> bool {
         }
     }
     false
+}
+
+pub fn browser_answer(host: &[u8], path: &[u8], reply: kit::Reply) -> Box<[skein_http::Header]> {
+    let mut mount = public_mount();
+    let mut out = Queue::with_capacity(16);
+    let [browser] = browser_header();
+    let host = skein_http::Header { name: Box::from(b"host".as_slice()), value: Box::from(host) };
+    let call = call(&mut mount, &mut out, Method::Post, path, &[browser, host], b"");
+    component(&mut out);
+    self::reply(&mut mount, &mut out, call, reply);
+    let (_, _, headers) = answered(&mut mount, &mut out, call);
+    headers
+}
+
+pub fn read_by_host(mount: &mut Mount, out: &mut Queue<Request>, host: &[u8]) -> Token {
+    call(mount, out, Method::Post, b"/jig/v1/read", &fields(&[(b"host", host)]), b"")
+}
+
+pub fn refused_host(mount: &mut Mount, host: &[u8]) {
+    let mut out = Queue::with_capacity(16);
+    let call = read_by_host(mount, &mut out, host);
+    for request in &out {
+        if let Request::Component(_) = request {
+            panic!("refused host reached the component: {host:?}");
+        }
+    }
+    let (status, _, _) = answered(mount, &mut out, call);
+    assert_eq!(status, 421, "{host:?}");
+}
+
+pub fn cookie_for(via: Via) -> skein_http::Header {
+    cookie(&public_mount().settings, via, &credential(), skein_lib::Duration::from_nanos(IN_A_DAY))
 }

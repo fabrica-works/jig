@@ -15,7 +15,25 @@ mod stream;
 #[derive(Debug)]
 pub struct Settings {
     pub prefix: Box<[u8]>,
-    pub loopback: bool,
+    /// The public name a TLS proxy serves the application at, as `Host` names it (protocol/client.md, 17.3).
+    pub public: Option<Box<[u8]>>,
+}
+/// How an exchange came, decided by its `Host` alone (protocol/client.md, 17.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Via {
+    Public,
+    Listener,
+}
+/// `Public` when the call's `Host` is byte-equal to the configured public name,
+/// with no case folding or port normalising; `Listener` otherwise, including a missing `Host`.
+#[must_use]
+pub fn via(settings: &Settings, call: &http::Call) -> Via {
+    if let Some(public) = &settings.public
+        && call.header(b"host") == Some(public.as_ref())
+    {
+        return Via::Public;
+    }
+    Via::Listener
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -59,6 +77,7 @@ impl Mount {
             Event::Listening { hosts } => self.hosts = hosts,
             Event::Call { call, head } => {
                 let mut value = call::Call::new(call, &env.limits);
+                value.via = via(&self.settings, &head);
                 value.route = dispatch::route(&self.settings.prefix, &head);
                 value.body_kind = head.body;
                 value.browser = head.header(b"jig-client") == Some(b"browser");
@@ -77,7 +96,7 @@ impl Mount {
                         streams = streams.saturating_add(1);
                     }
                 }
-                if !guards::host(&self.hosts, &head) {
+                if !guards::host(&self.settings, &self.hosts, &head) {
                     value.route = dispatch::Route::Missing;
                     value.respond(421, Box::new([]), &env.limits);
                 } else if value.route == dispatch::Route::Missing {

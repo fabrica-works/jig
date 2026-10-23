@@ -1,5 +1,5 @@
 //! Opaque bearer and browser credentials (protocol/client.md, 17.3).
-use crate::Settings;
+use crate::{Settings, Via};
 use alloc::boxed::Box;
 use skein_lib::{
     Decimal, Duration, Secret, Writer,
@@ -43,20 +43,20 @@ fn decode(value: &[u8]) -> Option<Secret> {
 }
 /// Set the mapping's cookie after a sign-in or `Minted` (protocol/client.md, 17.3).
 #[must_use]
-pub fn cookie(settings: &Settings, credential: &Secret, life: Duration) -> skein_http::Header {
-    header(settings, credential.expose(), life.as_nanos().checked_div(1_000_000_000).expect("seconds"))
+pub fn cookie(settings: &Settings, via: Via, credential: &Secret, life: Duration) -> skein_http::Header {
+    header(settings, via, credential.expose(), life.as_nanos().checked_div(1_000_000_000).expect("seconds"))
 }
 /// Clear the mapping's cookie when signing out.
 #[must_use]
-pub fn cleared(settings: &Settings) -> skein_http::Header {
-    header(settings, &[], 0)
+pub fn cleared(settings: &Settings, via: Via) -> skein_http::Header {
+    header(settings, via, &[], 0)
 }
-fn header(settings: &Settings, credential: &[u8], seconds: u64) -> skein_http::Header {
+fn header(settings: &Settings, via: Via, credential: &[u8], seconds: u64) -> skein_http::Header {
     let encoded = base64::encoded_len(Alphabet::Url, u32::try_from(credential.len()).expect("bounded credential"))
         .expect("credential base64");
     let age = Decimal::of(seconds);
     let attributes = b"; HttpOnly; SameSite=Strict; Max-Age=";
-    let secure = if settings.loopback { b"".as_slice() } else { b"; Secure".as_slice() };
+    let secure = if via == Via::Public { b"; Secure".as_slice() } else { b"".as_slice() };
     let size = b"jig-sign-in="
         .len()
         .checked_add(usize::try_from(encoded).expect("base64 fits"))

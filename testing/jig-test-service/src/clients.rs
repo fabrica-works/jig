@@ -770,5 +770,5 @@ fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
 }
 
 pub(super) fn http_settings() -> http::Settings {
-    http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }
+    http::Settings { prefix: Box::from(b"/jig".as_slice()), public: None }
 }

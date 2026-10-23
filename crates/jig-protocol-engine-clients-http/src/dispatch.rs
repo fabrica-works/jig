@@ -61,7 +61,7 @@ pub(crate) fn reply(
         return (body, None);
     }
     if call.route == Route::SignOut {
-        return (body, Some(crate::cleared(settings)));
+        return (body, Some(crate::cleared(settings, call.via)));
     }
     if call.route != Route::Link && call.route != Route::Service {
         return (body, None);
@@ -76,7 +76,7 @@ pub(crate) fn reply(
     let mut parts = value.into_parts();
     let Some(credential) = parts.token.take() else { return (body, None) };
     let life = skein_lib::Duration::from_nanos(parts.expires.saturating_sub(wall.as_nanos()));
-    let cookie = crate::cookie(settings, &credential, life);
+    let cookie = crate::cookie(settings, call.via, &credential, life);
     let answer = w::SignInAnswer::SignedIn(w::SignedIn::new(&w::CEILINGS, parts).expect("token removed"));
     let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("short sign-in"));
     answer.encode(&mut bytes).expect("measured answer");

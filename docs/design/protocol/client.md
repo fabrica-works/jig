@@ -1090,7 +1090,7 @@ prefix; jig's test application mounts it at `/jig`.
   sign-in refused, not ready, busy or full.
 - **The public name,** for an application behind a TLS proxy: its
   HTTPS origin's host, with its port where it is not 443, such as
-  `temper.example.com`, as a browser sends it in `Host`. The
+  `app.example.com`, as a browser sends it in `Host`. The
   application gives it the mapping when it mounts it, beside the
   prefix, or gives none; it is no member of jig's configuration, as
   the listener is not (`configuration.md`, section 3). The `Host`

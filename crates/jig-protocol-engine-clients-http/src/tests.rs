@@ -158,7 +158,7 @@ fn a_browser_s_link_sign_in_sets_the_cookie_and_answers_no_token() {
         fixtures::reply(&mut mount, &mut out, call, fixtures::signed_in_reply(&fixtures::TOKEN, fixtures::IN_A_DAY));
         let (status, body, headers) = fixtures::answered(&mut mount, &mut out, call);
         assert_eq!(status, 200, "{path:?}");
-        assert_eq!(fixtures::header(&headers, b"set-cookie"), Some(fixtures::COOKIE_ON_LOOPBACK), "{path:?}");
+        assert_eq!(fixtures::header(&headers, b"set-cookie"), Some(fixtures::COOKIE_ON_LISTENER), "{path:?}");
         let signed_in = fixtures::signed_in(&body);
         assert_eq!(signed_in.token(), &None, "{path:?}");
         assert_eq!((signed_in.party(), signed_in.expires()), (fixtures::PARTY, fixtures::IN_A_DAY), "{path:?}");
@@ -177,13 +177,6 @@ fn a_native_sign_in_answers_its_token_in_the_body() {
         assert_eq!(fixtures::header(&headers, b"set-cookie"), None, "{path:?}");
         assert_eq!(fixtures::signed_in(&body).token(), &Some(fixtures::credential()), "{path:?}");
     }
-}
-#[test]
-fn the_cookie_is_secure_off_loopback() {
-    let settings = Settings { prefix: Box::from(b"/jig".as_slice()), loopback: false };
-    let header = cookie(&settings, &fixtures::credential(), skein_lib::Duration::from_nanos(fixtures::IN_A_DAY));
-    assert_eq!(header.name.as_ref(), b"set-cookie");
-    assert_eq!(header.value.as_ref(), fixtures::COOKIE_SECURE);
 }
 const COOKIE_ROUTES: [(Method, &[u8], bool); 2] =
     [(Method::Post, b"/jig/v1/read", false), (Method::Get, b"/jig/v1/stream", true)];
@@ -257,8 +250,8 @@ const REFUSED: &[(Method, &[u8], Fields, u16)] = &[
         &[(b"host", b"evil.test:7100"), (b"content-type", b"application/octet-stream")],
         421,
     ),
-    (Method::Post, b"/jig/v1/read", &[(b"host", b"127.0.0.1:7100"), (b"content-type", b"text/plain")], 415),
-    (Method::Options, b"/jig/v1/read", &[(b"host", b"127.0.0.1:7100")], 404),
+    (Method::Post, b"/jig/v1/read", &[(b"host", b"127.0.0.1:8080"), (b"content-type", b"text/plain")], 415),
+    (Method::Options, b"/jig/v1/read", &[(b"host", b"127.0.0.1:8080")], 404),
 ];
 #[test]
 fn each_guard_refuses_with_nothing_reaching_the_component() {
@@ -444,4 +437,141 @@ fn busy_and_full_answer_200_without_setting_a_cookie() {
             }
         }
     }
+}
+
+#[test]
+fn the_public_name_is_admitted_beside_the_listener() {
+    for host in [fixtures::PUBLIC, fixtures::HOST] {
+        let mut mount = fixtures::public_mount();
+        let mut out = Queue::with_capacity(16);
+        fixtures::read_by_host(&mut mount, &mut out, host);
+        assert_eq!(
+            *fixtures::component(&mut out),
+            [kit::FromTransport::Exchange {
+                exchange: fixtures::EXCHANGE,
+                credential: None,
+                message: kit::Message::Read(Box::new([])),
+            }],
+            "{host:?}"
+        );
+    }
+}
+
+const PUBLIC_MISSES: [&[u8]; 3] = [b"App.example.com", b"app.example.com:443", b"other.example.com"];
+#[test]
+fn public_name_near_misses_reach_nothing_and_answer_421() {
+    for host in PUBLIC_MISSES {
+        fixtures::refused_host(&mut fixtures::public_mount(), host);
+    }
+}
+
+#[test]
+fn without_a_public_name_other_hosts_are_refused() {
+    for host in [fixtures::PUBLIC, b"other.example.com".as_slice()] {
+        fixtures::refused_host(&mut fixtures::mount(), host);
+    }
+}
+
+#[test]
+fn a_browser_public_sign_in_sets_a_secure_cookie() {
+    for path in SIGN_IN_PATHS {
+        let headers = fixtures::browser_answer(
+            fixtures::PUBLIC,
+            path,
+            fixtures::signed_in_reply(&fixtures::TOKEN, fixtures::IN_A_DAY),
+        );
+        assert_eq!(fixtures::header(&headers, b"set-cookie"), Some(fixtures::COOKIE_SECURE));
+    }
+}
+
+#[test]
+fn a_browser_listener_sign_in_sets_a_plain_cookie() {
+    for path in SIGN_IN_PATHS {
+        let headers = fixtures::browser_answer(
+            fixtures::HOST,
+            path,
+            fixtures::signed_in_reply(&fixtures::TOKEN, fixtures::IN_A_DAY),
+        );
+        assert_eq!(fixtures::header(&headers, b"set-cookie"), Some(fixtures::COOKIE_ON_LISTENER));
+    }
+}
+
+#[test]
+fn a_browser_public_sign_out_clears_a_secure_cookie() {
+    let headers = fixtures::browser_answer(fixtures::PUBLIC, b"/jig/v1/sign-out", kit::Reply::Record(Box::new([0])));
+    assert_eq!(fixtures::header(&headers, b"set-cookie"), Some(fixtures::COOKIE_CLEARED_SECURE));
+}
+
+#[test]
+fn a_browser_listener_sign_out_clears_a_plain_cookie() {
+    let headers = fixtures::browser_answer(fixtures::HOST, b"/jig/v1/sign-out", kit::Reply::Record(Box::new([0])));
+    assert_eq!(fixtures::header(&headers, b"set-cookie"), Some(fixtures::COOKIE_CLEARED));
+}
+
+#[test]
+fn via_is_public_for_the_exact_public_name() {
+    let mount = fixtures::public_mount();
+    let call = fixtures::head(Method::Get, b"/", &fixtures::fields(&[(b"host", fixtures::PUBLIC)]), http::Body::None);
+    assert_eq!(via(&mount.settings, &call), Via::Public);
+}
+
+#[test]
+fn via_is_listener_without_a_public_host_match() {
+    for public in [Some(Box::from(fixtures::PUBLIC)), None] {
+        let settings = Settings { prefix: Box::from(b"/jig".as_slice()), public };
+        for host in [
+            None,
+            Some(fixtures::HOST),
+            Some(b"App.example.com".as_slice()),
+            Some(b"app.example.com:443".as_slice()),
+            Some(b"other.example.com".as_slice()),
+        ] {
+            let headers = match host {
+                Some(host) => fixtures::fields(&[(b"host", host)]),
+                None => Box::new([]),
+            };
+            let call = http::Call {
+                method: Method::Get,
+                target: Box::from(b"/".as_slice()),
+                headers,
+                body: http::Body::None,
+                version: skein_http::Version::Http11,
+            };
+            assert_eq!(via(&settings, &call), Via::Listener);
+        }
+    }
+}
+
+#[test]
+fn without_a_public_name_via_is_always_listener() {
+    let mount = fixtures::mount();
+    let call = fixtures::head(Method::Get, b"/", &fixtures::fields(&[(b"host", fixtures::PUBLIC)]), http::Body::None);
+    assert_eq!(via(&mount.settings, &call), Via::Listener);
+}
+
+#[test]
+fn public_cookie_helper_sets_a_secure_cookie() {
+    let header = fixtures::cookie_for(Via::Public);
+    assert_eq!((header.name.as_ref(), header.value.as_ref()), (b"set-cookie".as_slice(), fixtures::COOKIE_SECURE));
+}
+
+#[test]
+fn public_clear_helper_clears_a_secure_cookie() {
+    let header = cleared(&fixtures::mount().settings, Via::Public);
+    assert_eq!(
+        (header.name.as_ref(), header.value.as_ref()),
+        (b"set-cookie".as_slice(), fixtures::COOKIE_CLEARED_SECURE)
+    );
+}
+
+#[test]
+fn listener_cookie_helper_sets_a_plain_cookie() {
+    let header = fixtures::cookie_for(Via::Listener);
+    assert_eq!((header.name.as_ref(), header.value.as_ref()), (b"set-cookie".as_slice(), fixtures::COOKIE_ON_LISTENER));
+}
+
+#[test]
+fn listener_clear_helper_clears_a_plain_cookie() {
+    let header = cleared(&fixtures::public_mount().settings, Via::Listener);
+    assert_eq!((header.name.as_ref(), header.value.as_ref()), (b"set-cookie".as_slice(), fixtures::COOKIE_CLEARED));
 }
