@@ -244,12 +244,12 @@ pub struct Chip {
 }
 
 /// A held project role and the actual current funding facts available to the party.
-/// Names are absent until an owner supplies one; unopened pools have no ledger.
+/// Each project has its kept name (core.md, 6.1); unopened pools have no ledger.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct FrameProjectRole {
     pub project: u32,
     pub role: people::Role,
-    pub name: Option<Text>,
+    pub name: Text,
     pub pool: Option<Ledger>,
     /// Direct creating bounds for this party and project (contract.md, 5.3).
     pub creating: Option<crate::acts::Creating>,

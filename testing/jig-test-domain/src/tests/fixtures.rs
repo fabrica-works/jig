@@ -115,6 +115,7 @@ pub fn domain() -> Domain {
                 owners: Box::new([]),
                 authority,
                 projects: List::with_capacity(0),
+                names: Map::with_capacity(limits.core.authority.projects),
                 permission_roles: Map::with_capacity(0),
                 template_overrides: Map::with_capacity(limits.core.authority.projects),
                 connectors: Box::new([1, 2]),

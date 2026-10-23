@@ -479,7 +479,10 @@ fn memory_below_the_components_sum_is_refused() {
         + FINISH_MESSAGE_GROWTH
         + LIVE_PIECE_GROWTH
         // Deployment role storage and project-role scratch: people.projects 2 -> 3.
-        + 7_288;
+        + 7_288
+        // Project names: (18,570 route + 4 load) payloads * 64 bytes,
+        // a 336-byte map and two 64-byte names, plus two codec scratch copies.
+        + 1_189_328;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

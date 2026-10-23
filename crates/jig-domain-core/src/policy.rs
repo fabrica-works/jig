@@ -421,7 +421,21 @@ impl Core {
     }
 
     /// Restore a committed mutable policy row before admitting new party requests.
-    pub fn restore_policy(&mut self, limits: &Limits, project: u32, value: people::PolicyValue) -> bool {
+    pub fn restore_policy(
+        &mut self,
+        limits: &Limits,
+        project: u32,
+        name: Box<str>,
+        value: people::PolicyValue,
+    ) -> bool {
+        if people::name_rule(&name).is_some() {
+            return false;
+        }
+        for (&other, previous) in &self.names {
+            if project != other && people::same_name(&name, previous) {
+                return false;
+            }
+        }
         match people::policy_bytes(&value) {
             Some(bytes) if bytes <= limits.policy_bytes => {}
             Some(_) | None => return false,
@@ -445,6 +459,7 @@ impl Core {
         facts.pop() == Some(authority::PolicyFact::Changed { project })
             && self.permission_roles.insert(project, permissions).is_ok()
             && self.template_overrides.insert(project, templates).is_ok()
+            && self.names.insert(project, name).is_ok()
     }
 }
 

@@ -5,6 +5,7 @@
     reason = "step tests are ordinary Rust (testing-strategy.md, section 4)"
 )]
 mod fixtures;
+mod names;
 use crate::*;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 

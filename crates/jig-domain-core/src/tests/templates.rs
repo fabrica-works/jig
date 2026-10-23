@@ -301,7 +301,7 @@ fn requester_template_restore_refuses_invalid_ending_authority_without_changing_
         let mut restored = before.clone();
         restored.templates =
             Box::new([people::TemplateOverride { executor: Some(executor), ..executor_override(PROJECT) }]);
-        assert!(!core.restore_policy(&limits, PROJECT, restored));
+        assert!(!core.restore_policy(&limits, PROJECT, Box::from("Project 1"), restored));
         assert_eq!(template_policy(&core), before);
         assert_eq!(core.settings.templates, templates);
         assert_eq!(core.template_overrides.len(), 0);
@@ -347,7 +347,7 @@ fn invalid_restored_template_overrides_leave_the_entire_policy_unchanged() {
         let mut restored = before.clone();
         restored.period_spend = 1; // A second field must not slip through a refused restore.
         restored.templates = overrides;
-        assert!(!core.restore_policy(&limits, PROJECT, restored), "{name}");
+        assert!(!core.restore_policy(&limits, PROJECT, Box::from("Project 1"), restored), "{name}");
         assert_eq!(template_policy(&core), before, "{name}");
     }
 }
@@ -359,7 +359,7 @@ fn a_valid_template_override_changes_and_restores_the_policy() {
     let value = core
         .change_policy(&limits, OWNER, PROJECT, people::PolicyChange::Templates { overrides: overrides.clone() })
         .expect("compatible override");
-    assert!(core.restore_policy(&limits, PROJECT, value));
+    assert!(core.restore_policy(&limits, PROJECT, Box::from("Project 1"), value));
     assert_eq!(core.template_overrides.get(&PROJECT), Some(&overrides));
 }
 

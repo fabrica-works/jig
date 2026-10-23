@@ -1087,8 +1087,8 @@ pub fn restore_record(domain: &mut Domain, env: &Env<Limits>, record: Record) ->
             );
             out.is_empty()
         }
-        Record::Core(core::Record::People(jig_domain_people::Stored::Policy { project, value })) => {
-            domain.core.restore_policy(&env.limits.core, project, value)
+        Record::Core(core::Record::People(jig_domain_people::Stored::Policy { project, name, value })) => {
+            domain.core.restore_policy(&env.limits.core, project, name, value)
         }
         Record::Core(core::Record::People(row)) => {
             if !domain.core.restore_people_row(&row) {

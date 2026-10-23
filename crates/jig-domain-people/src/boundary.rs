@@ -573,7 +573,7 @@ pub enum Stored {
         holdings: Box<[Holding]>,
     },
     /// Root-owned full mutable project policy; the people page carries it to authority.
-    Policy { project: u32, value: crate::PolicyValue },
+    Policy { project: u32, name: Box<str>, value: crate::PolicyValue },
     /// Persistent jig request and outcome, or application metadata and outcome token; replay never checks current
     /// roles anew.
     Answer {

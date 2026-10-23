@@ -136,6 +136,8 @@ pub struct Config {
     pub settings: Settings,
     /// Configured project identifiers for bootstrap.
     pub projects: List<u32>,
+    /// Project names in shape and unique under simple case folding (core.md, 6.1).
+    pub names: Map<u32, Box<str>>,
     /// Policy-controlled connector permissions per project.
     pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
     /// Template overrides retained with each project policy.
@@ -319,6 +321,8 @@ pub struct Core {
     pub relaying: Map<u64, PendingRelay>,
     /// Configured project identifiers for bootstrap.
     pub projects: List<u32>,
+    /// Names seeded or restored with the project policies (core.md, 6.1).
+    pub(crate) names: Map<u32, Box<str>>,
     /// Mutable connector permission mappings approved by policy edits.
     pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
     /// Template overrides retained with each project policy.
@@ -547,6 +551,14 @@ impl Core {
         charters::assert_configured(&config.settings, limits);
         templates::assert_configured(&config, limits);
         assert!(config.projects.capacity() <= limits.authority.projects, "core prices configured projects");
+        assert!(config.names.capacity() <= limits.authority.projects, "core prices project names");
+        for &project in &config.projects {
+            let name = config.names.get(&project).expect("every configured project has a name");
+            assert!(people::name_rule(name).is_none(), "configured project names are in shape");
+            for (&other, previous) in &config.names {
+                assert!(project == other || !people::same_name(name, previous), "configured project names are unique");
+            }
+        }
         assert!(
             config.projects.len() < limits.people.projects,
             "people prices configured project rosters and the deployment's"
@@ -619,6 +631,7 @@ impl Core {
             creating_procedures: Map::with_capacity(limits.tasks.tasks),
             relaying: Map::with_capacity(limits.tasks.tasks),
             projects: config.projects,
+            names: config.names,
             permission_roles: config.permission_roles,
             template_overrides: config.template_overrides,
             connectors: config.connectors,

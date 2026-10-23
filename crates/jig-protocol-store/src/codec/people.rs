@@ -1,5 +1,5 @@
 //! People rows translated exhaustively (protocol/store.md, 5.1).
-use crate::people_v8 as wire;
+use crate::people_v9 as wire;
 use alloc::boxed::Box;
 use jig_domain_core as core;
 use jig_domain_people as domain;
@@ -100,8 +100,8 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         ask_answer_question_words: people.words,
         ask_set_roles_holdings: people.holdings,
         stored_roles_holdings: people.holdings,
-        // A policy row names each configured model a role's bit stands for.
         stored_policy_models: u64::BITS,
+        stored_policy_name: u32::try_from(domain::NAME_BYTES).ok()?,
         stored_answer_models: u64::BITS,
         model_name_name: core::MODEL_NAME_BYTES,
         llm_choice_subagents: domain::MODELS,
@@ -113,20 +113,17 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     limits.member_inputs = limits.spec_inputs;
     limits.member_named = limits.authority_grants;
     limits.member_dependencies = people.amendment_bytes.checked_mul(3)?;
-    limits.verdict_fields = piece_bound(
-        people.amendment_bytes,
-        size_of::<domain::FieldRule>(),
-        wire::FieldRule::worst_case_bytes(&EMPTY)?,
-        true,
-    )?;
-    limits.contract_verdict_choices = piece_bound(
-        people.amendment_bytes,
-        size_of::<domain::Verdict>(),
-        wire::Verdict::worst_case_bytes(&EMPTY)?,
-        true,
-    )?;
+    derive_verdicts(people.amendment_bytes, &mut limits)?;
     wire::check_limits(&limits).ok()?;
     Some(limits)
+}
+
+fn derive_verdicts(amendment_bytes: u32, limits: &mut wire::Limits) -> Option<()> {
+    limits.verdict_fields =
+        piece_bound(amendment_bytes, size_of::<domain::FieldRule>(), wire::FieldRule::worst_case_bytes(&EMPTY)?, true)?;
+    limits.contract_verdict_choices =
+        piece_bound(amendment_bytes, size_of::<domain::Verdict>(), wire::Verdict::worst_case_bytes(&EMPTY)?, true)?;
+    Some(())
 }
 
 /// Encode a people row; `names` are the configured models' names in configuration's order, which
@@ -159,10 +156,11 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits, names: &[Box<[u8]>]) 
             limits,
             wire::StoredRolesParts { project: *project, holdings: encode_holdings(holdings, limits)? },
         )?),
-        domain::Stored::Policy { project, value } => wire::Value::Policy(wire::StoredPolicy::new(
+        domain::Stored::Policy { project, name, value } => wire::Value::Policy(wire::StoredPolicy::new(
             limits,
             wire::StoredPolicyParts {
                 project: *project,
+                name: Box::from(name.as_bytes()),
                 value: encode_policy_value(value, limits)?,
                 models: encode_model_names(names, limits)?,
             },
@@ -185,6 +183,7 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits, names: &[Box<[u8]>]) 
 }
 /// Decode a people row; a policy row's roles' models move to today's `names`, and a name no
 /// longer configured drops out (protocol/store.md, 5.1).
+#[expect(clippy::disallowed_methods, reason = "store protocol converts validated UTF-8 into the domain name")]
 pub fn decode(bytes: &[u8], limits: &wire::Limits, names: &[Box<[u8]>]) -> Result<domain::Stored, wire::Problem> {
     let wire::RowParts { value } = wire::Row::decode(limits, &mut Reader::new(bytes))?.into_parts();
     let row = match value {
@@ -213,7 +212,7 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits, names: &[Box<[u8]>]) -> Resul
             domain::Stored::Roles { project, holdings: decode_holdings(holdings) }
         }
         wire::Value::Policy(value) => {
-            let wire::StoredPolicyParts { project, value, models } = value.into_parts();
+            let wire::StoredPolicyParts { project, name, value, models } = value.into_parts();
             let mut value = decode_policy_value(value, limits)?;
             let moved = model_moves(&models, names);
             for role in &mut value.roles {
@@ -221,7 +220,8 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits, names: &[Box<[u8]>]) -> Resul
                     role.authority.models = Some(models.remap(&moved));
                 }
             }
-            domain::Stored::Policy { project, value }
+            let name = Box::from(::core::str::from_utf8(&name).expect("decoded UTF-8 name"));
+            domain::Stored::Policy { project, name, value }
         }
         wire::Value::Answer(value) => {
             let wire::StoredAnswerParts { key, ask, models, outcome, at } = value.into_parts();

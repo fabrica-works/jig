@@ -664,7 +664,7 @@ fn me_deployment_role_is_independent_of_project_rows() {
                 1,
                 [documents::FrameProjectRole {
                     project: 1,
-                    name: None,
+                    name: jig_domain_core::documents::Text { bytes: Box::from(&b"Tally"[..]), cut: false },
                     role: people::Role::Owner,
                     pool: None,
                     creating: None,

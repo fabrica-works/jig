@@ -60,6 +60,8 @@ pub use scope::ApplicationScope;
 mod templates;
 pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, TemplateOverride};
 mod amendment;
+mod names;
+pub use names::{NAME_BYTES, NameRule, name_rule, same_name};
 mod models;
 pub use models::{
     MODEL_DESCRIPTION_BYTES, MODEL_NAME_BYTES, Models, model_names_worst_case, remap_models, valid_model_context,

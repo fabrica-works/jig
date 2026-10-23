@@ -1,5 +1,5 @@
 //! Checked store admission bounds (protocol/store.md, 5.4 and 6).
-use crate::{accounts_v1, codec, component_v2, core_v5, notes_v1, people_v8, tasks_v9};
+use crate::{accounts_v1, codec, component_v2, core_v5, notes_v1, people_v9, tasks_v9};
 use jig_domain_core as core;
 
 /// The application's largest encodings, before the component's key tag.
@@ -85,7 +85,7 @@ fn largest(
     let value = u32::try_from(
         core_v5::Row::worst_case_bytes(&map_core)?
             .max(tasks_v9::Row::worst_case_bytes(&limits.tasks)?)
-            .max(people_v8::Row::worst_case_bytes(&limits.people)?)
+            .max(people_v9::Row::worst_case_bytes(&limits.people)?)
             .max(notes_v1::Row::worst_case_bytes(&limits.notes)?)
             .max(component_v2::worst_case_bytes(&component_v2::CEILINGS)?)
             .max(accounts_v1::worst_case_bytes(&accounts_v1::CEILINGS)?)

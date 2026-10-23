@@ -421,6 +421,11 @@ impl Core {
                 }
             }
             CoreRecord::Deployment(deployment) => {
+                // A cold load restores names independently of configuration. A live
+                // counter refresh does not begin a project-policy restoration.
+                if self.restart_step() == Some(crate::RestartStep::LoadCore) {
+                    self.names = skein_lib::Map::with_capacity(limits.authority.projects);
+                }
                 self.counters = Counters::new(deployment);
                 Restored::Deployment { commits: deployment.commits }
             }

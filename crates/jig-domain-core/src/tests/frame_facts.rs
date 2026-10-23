@@ -1,4 +1,4 @@
-//! Supplied Frame facts keep absent names, unopened pools and actual current ledgers distinct.
+//! Supplied Frame facts carry names, unopened pools and actual current ledgers.
 use super::*;
 const CREATING_PROJECT: u32 = 1;
 const CREATING_PARTY: u64 = 1;
@@ -23,7 +23,7 @@ fn frame_projects_keep_unopened_pools_absent_and_use_actual_current_funding() {
     set_role_authority(&mut core.authority, given);
     let initial = frame(&core, &limits);
     let project = initial.projects.get(0).expect("project role");
-    assert_eq!(project.name, None);
+    assert_eq!(project.name, Text { bytes: Box::from(&b"Project 1"[..]), cut: false });
     assert_eq!(project.pool, None);
     let period = core.period(1);
     let source = tasks::Funder::Pool { project: 1, person: 1, period };

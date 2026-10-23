@@ -176,7 +176,10 @@ impl World {
         world.observer = crate::observations::Observer::new(&configuration);
         world.bootstrap_owners = configuration.core.owners.to_vec();
         world.observer.durable(world.wall, &world.store);
-        world.seed(rows);
+        world.store.reconfigure(18, &configuration.core.settings.models);
+        let mut rows = rows.into_vec();
+        rows.extend(crate::fixtures::project_policy_rows(&configuration.core));
+        world.seed(rows.into_boxed_slice());
         world.domain = root::Domain::new(configuration, &limits);
         world.send(root::Event::RestartBegin);
         world.hello_engine();

@@ -428,7 +428,12 @@ pub(super) fn change_policy_request(
     match core.change_policy(&env.limits, person, project, change) {
         Ok(snapshot) => {
             core.touch_project_parties(project);
-            out.push(Request::Write(Write::Save(Record::People(people::Stored::Policy { project, value: snapshot }))));
+            let name = core.names.get(&project).expect("project policy has a name").clone();
+            out.push(Request::Write(Write::Save(Record::People(people::Stored::Policy {
+                project,
+                name,
+                value: snapshot,
+            }))));
             let mut reroutes = core.proposal_recheck_project(&env.limits, project, env.wall);
             for _ in 0..reroutes.len() {
                 work.push(Event::Tasks(reroutes.pop().expect("policy holder recheck")));

@@ -149,8 +149,8 @@ pub(crate) fn store(
                             false
                         }
                     }
-                    Record::Core(core::Record::People(people::Stored::Policy { project, value })) => {
-                        domain.core.restore_policy(&env.limits.core, project, value)
+                    Record::Core(core::Record::People(people::Stored::Policy { project, name, value })) => {
+                        domain.core.restore_policy(&env.limits.core, project, name, value)
                     }
                     Record::Core(core::Record::People(row)) => {
                         if domain.core.restore_people_row(&row) {

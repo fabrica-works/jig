@@ -328,6 +328,11 @@ pub fn config(seed: u64) -> root::Config {
                 identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
             }]),
             authority: domain,
+            names: {
+                let mut names = skein_lib::Map::with_capacity(1);
+                names.insert(1, Box::from("Project 1")).expect("one project name");
+                names
+            },
             projects: {
                 let mut projects = skein_lib::List::with_capacity(1);
                 projects.push(1).expect("one project");

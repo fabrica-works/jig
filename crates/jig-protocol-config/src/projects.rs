@@ -5,11 +5,12 @@ use jig_domain_authority as authority;
 use jig_domain_core::Model;
 use jig_domain_people::PermissionRole;
 use skein_json::Document;
-use skein_lib::{List, Wall};
+use skein_lib::{Decimal, List, Wall, Writer};
 
 #[derive(Debug)]
 pub struct Project {
     pub number: u32,
+    pub name: Box<str>,
     pub roles: Box<[PermissionRole]>,
     pub templates: Box<[jig_domain_people::TemplateOverride]>,
     pub policy: authority::Policy,
@@ -55,10 +56,13 @@ pub(crate) fn projects(
 ) -> Option<Box<[Project]>> {
     let items = domain::items(document, at, limits.core.authority.projects, path, problems)?;
     let mut projects = List::<Project>::with_capacity(items.len());
+    let mut name_paths = List::with_capacity(items.len());
     for (index, at) in items.iter().enumerate() {
         let path = check::index(path, index);
         let Some(mut object) = check::object(document, *at, &path, problems) else { continue };
         let number = check::count(&mut object, document, b"number", &path, problems);
+        let name_at = object.member(document, b"name");
+        let name = project_name(document, name_at, number, &path.member(b"name"), problems);
         let at = object.required(document, b"policy", &path, problems);
         let policy = policy(document, at, &path.member(b"policy"), limits, configured, problems);
         let roles = permissions(&mut object, document, &path, limits, problems);
@@ -66,6 +70,7 @@ pub(crate) fn projects(
         if let Some(number) = number
             && let Some((policy, templates)) = policy
             && let Some(roles) = roles
+            && let Some(name) = name
         {
             if number == jig_domain_people::DEPLOYMENT {
                 problems.push(path.member(b"number"), What::Bound);
@@ -77,10 +82,50 @@ pub(crate) fn projects(
                     break;
                 }
             }
-            projects.push(Project { number, roles, templates, policy }).expect("bounded project input");
+            let name_path = if name_at.is_some() { path.member(b"name") } else { path };
+            name_paths.push(name_path).expect("one path per project");
+            projects.push(Project { number, name, roles, templates, policy }).expect("bounded project input");
+        }
+    }
+    for (index, project) in projects.iter().enumerate() {
+        for previous in projects.iter().take(index) {
+            if jig_domain_people::same_name(&previous.name, &project.name) {
+                let index = u32::try_from(index).expect("bounded project index");
+                problems.push(name_paths.get(index).expect("one path per project").clone(), What::Unique);
+                break;
+            }
         }
     }
     Some(projects.into_boxed())
+}
+#[expect(clippy::disallowed_methods, reason = "configuration protocol decodes UTF-8 project names")]
+fn project_name(
+    document: &Document,
+    at: Option<u32>,
+    number: Option<u32>,
+    path: &Path,
+    problems: &mut Problems,
+) -> Option<Box<str>> {
+    if let Some(at) = at {
+        let token = document.token(at).expect("project member token");
+        if token.kind != skein_json::document::Kind::String {
+            problems.push(path.clone(), What::Kind);
+            return None;
+        }
+        let bytes = document.text(token).expect("JSON string bytes");
+        let name = core::str::from_utf8(bytes).expect("JSON strings are UTF-8");
+        if jig_domain_people::name_rule(name).is_some() {
+            problems.push(path.clone(), What::Form);
+            return None;
+        }
+        return Some(Box::from(name));
+    }
+    let digits = Decimal::of(u64::from(number?));
+    let mut writer = Writer::new(8_usize.checked_add(digits.as_bytes().len()).expect("project number length"));
+    writer.put(b"Project ").expect("measured prefix");
+    writer.put(digits.as_bytes()).expect("measured number");
+    let bytes = writer.finish();
+    Some(Box::from(core::str::from_utf8(&bytes).expect("ASCII project name")))
 }
 fn permissions(
     object: &mut read::Object,

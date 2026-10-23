@@ -5,6 +5,7 @@ use crate::{codec, format, sizes};
 use jig_domain_core as core;
 use skein_lib::{Duration, JournalLimits};
 
+// People v9 adds a 4-byte text length and 64 name bytes to the largest row.
 const JOURNAL: JournalLimits = JournalLimits { commits: 2, writes: 4, held: 4, now: 4, release: 4 };
 fn wanted() -> codec::component::Format {
     format::current(fixtures::APPLICATION.version, fixtures::DEPLOYMENT)
@@ -51,7 +52,7 @@ fn another_family_is_refused_naming_the_first_difference() {
     for (family, found) in [
         (Family::Component, codec::component::Format { component: 3, core: 5, ..wanted }),
         (Family::Core, codec::component::Format { core: 6, tasks: 4, ..wanted }),
-        (Family::People, codec::component::Format { people: 9, notes: 2, ..wanted }),
+        (Family::People, codec::component::Format { people: 8, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, accounts: 2, ..wanted }),
         (Family::Accounts, codec::component::Format { accounts: 2, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
@@ -62,13 +63,13 @@ fn another_family_is_refused_naming_the_first_difference() {
                 family,
                 found: match family {
                     Family::Core => 6,
-                    Family::People => 9,
+                    Family::People => 8,
                     Family::Component => 3,
                     Family::Tasks | Family::Notes | Family::Accounts | Family::Application => 2,
                 },
                 wanted: match family {
                     Family::Core => 5,
-                    Family::Tasks | Family::People => 8,
+                    Family::Tasks | Family::People => 9,
                     Family::Component => 2,
                     Family::Notes | Family::Accounts | Family::Application => 1,
                 }
@@ -84,21 +85,21 @@ fn a_key_limit_below_the_largest_note_line_is_refused() {
 fn a_value_limit_below_the_largest_task_record_is_refused() {
     let mut limits = store();
     limits.value = 1;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 343_665, has: 1 }));
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 343_733, has: 1 }));
 }
 fn a_value_limit_below_the_largest_core_turn_is_refused() {
     let mut limits = store();
     limits.value = 80_948;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 343_665, has: 80_948 }));
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Value { needs: 343_733, has: 80_948 }));
 }
 fn a_page_smaller_than_one_row_is_refused() {
     let mut limits = store();
     limits.page.bytes = 81_060;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Page { needs: 343_777, has: 81_060 }));
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Page { needs: 343_845, has: 81_060 }));
 }
 #[test]
 fn fixture_limits_fit_their_store() {
-    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 343_665, ops: 10, commit: 17_620 }));
+    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 343_733, ops: 10, commit: 17_620 }));
 }
 fn too_few_operations_are_refused() {
     let mut limits = store();
@@ -209,7 +210,7 @@ fn a_journal_whose_operation_count_overflows_is_refused() {
 #[test]
 fn a_map_budget_past_the_commit_envelope_is_refused() {
     for (label, budget, expected) in [
-        ("exact_u32_commit", 4_294_966_059, Ok(sizes::Sizes { key: 112, value: 343_665, ops: 10, commit: u32::MAX })),
+        ("exact_u32_commit", 4_294_966_059, Ok(sizes::Sizes { key: 112, value: 343_733, ops: 10, commit: u32::MAX })),
         ("one_byte_past_u32", 4_294_966_060, Err(sizes::SizeRefusal::Ceiling)),
         ("u64_sum_overflows", u64::MAX, Err(sizes::SizeRefusal::Ceiling)),
     ] {

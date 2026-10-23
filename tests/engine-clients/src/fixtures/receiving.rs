@@ -70,6 +70,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
         owners: Box::new([]),
         authority: authority::Domain::new(rules, limits.authority).expect("bounded authority"),
         projects: List::with_capacity(0),
+        names: Map::with_capacity(limits.authority.projects),
         permission_roles: Map::with_capacity(0),
         template_overrides: Map::with_capacity(limits.authority.projects),
         connectors: Box::new([]),

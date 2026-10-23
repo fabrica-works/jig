@@ -42,7 +42,7 @@ pub fn held_reads() -> [(&'static str, w::Read, reads::Read, reads::Answer, w::R
             w::Read::Me,
             reads::Read::Frame,
             reads::Answer::Document(Box::new(core::documents::Document::Frame(frame_two_projects()))),
-            value_answer(&w::ReadValue::Me(records::frame_two_projects_record())),
+            value_answer(&w::ReadValue::Me(frame_two_projects_record())),
         ),
         (
             "page",

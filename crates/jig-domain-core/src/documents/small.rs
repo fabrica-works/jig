@@ -113,7 +113,10 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
                 templates,
                 project: role.project,
                 role: role.role,
-                name: None,
+                name: text(
+                    core.names.get(&role.project).expect("project role has a kept name").as_bytes(),
+                    limits.documents.text_bytes,
+                ),
                 pool,
                 creating: match crate::acts::bounds::creating(core, limits, party, role.project, Some(role.role)) {
                     crate::acts::Admission::Bounded { within, beyond } => {

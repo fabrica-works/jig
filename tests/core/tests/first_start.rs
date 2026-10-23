@@ -136,6 +136,9 @@ fn two_projects(people_projects: u32) -> (root::Config, root::Limits) {
     }
     configuration.core.authority = authority;
     configuration.core.projects = projects;
+    configuration.core.names = skein_lib::Map::with_capacity(limits.core.authority.projects);
+    configuration.core.names.insert(1, Box::from("Tally")).expect("first name");
+    configuration.core.names.insert(2, Box::from("Project 2")).expect("second name");
     let mut permissions = skein_lib::Map::with_capacity(limits.core.authority.projects);
     for (&project, roles) in &configuration.core.permission_roles {
         permissions.insert(project, roles.clone()).expect("two project permission maps");
@@ -164,8 +167,9 @@ fn all_configured_projects_seed_together_at_or_below_people_capacity() {
                     holdings: holdings.into_boxed_slice(),
                 }))
             );
-            let root::Record::Core(core::Record::People(people::Stored::Policy { project: saved_project, value })) =
-                &world.store.rows[&root::Key::Core(core::Key::People(people::Key::Policy(project)))]
+            let root::Record::Core(core::Record::People(people::Stored::Policy {
+                project: saved_project, value, ..
+            })) = &world.store.rows[&root::Key::Core(core::Key::People(people::Key::Policy(project)))]
             else {
                 panic!("each configured project has a saved policy")
             };
@@ -335,4 +339,47 @@ fn an_original_key_replays_before_model_admission_after_removal() {
         named_edit(&mut world, sign_in, 81, b"removed"),
         people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Unknown))
     );
+}
+
+fn named_projects() -> (root::Config, root::Limits) {
+    let (mut configuration, mut limits) = two_projects(AT_ROSTER_BOUND);
+    let owner = configuration.core.owners[0].clone();
+    configuration.core.owners = Box::new([owner.clone(), people::InitialOwner { project: 2, ..owner }]);
+    limits.core.people.initial_owners = CONFIGURED_PROJECTS;
+    jig_core_world::peers::journal(&mut limits);
+    (configuration, limits)
+}
+
+fn project_names(world: &mut World, sign_in: u64) -> Vec<(u32, Box<[u8]>)> {
+    frame(world, sign_in)
+        .projects
+        .into_boxed()
+        .into_vec()
+        .into_iter()
+        .map(|row| (row.project, row.name.bytes))
+        .collect()
+}
+
+#[test]
+fn a_first_start_names_each_project() {
+    let (configuration, limits) = named_projects();
+    let mut world = World::first_start(configuration, limits);
+    world.client_peer = Some(ClientPeer::default());
+    let (_, signed) = sign_in(&mut world, FIRST_OWNER_SUBJECT);
+    assert_eq!(project_names(&mut world, signed), [(1, Box::from(&b"Tally"[..])), (2, Box::from(&b"Project 2"[..]))]);
+}
+
+#[test]
+fn a_restart_keeps_each_projects_name() {
+    let (configuration, limits) = named_projects();
+    let mut world = World::first_start(configuration, limits);
+    world.client_peer = Some(ClientPeer::default());
+    let (mut changed, _) = named_projects();
+    // Even swapped configured names cannot collide with the names being restored.
+    changed.core.names.insert(1, Box::from("Project 2")).expect("first name");
+    changed.core.names.insert(2, Box::from("Tally")).expect("second name");
+    changed.core.projects.clear();
+    world.restart_with(changed);
+    let (_, signed) = sign_in(&mut world, FIRST_OWNER_SUBJECT);
+    assert_eq!(project_names(&mut world, signed), [(1, Box::from(&b"Tally"[..])), (2, Box::from(&b"Project 2"[..]))]);
 }

@@ -5,7 +5,7 @@ fn me_preserves_two_projects_in_its_wire_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::owner::frame(&fixtures::frame_two_projects(), &[], &limits),
-        Ok(jig_client_test_records::frame_two_projects_record())
+        Ok(fixtures::frame_two_projects_record())
     );
 }
 const PROJECT_ROOM: [u32; 2] = [2, 32];
@@ -21,7 +21,7 @@ fn me_encoding_preserves_rows_despite_spare_list_capacity() {
         frame.projects = projects;
         assert_eq!(
             translate::owner::frame(&frame, &[], &limits),
-            Ok(jig_client_test_records::frame_two_projects_record()),
+            Ok(fixtures::frame_two_projects_record()),
             "projects room {project_room}"
         );
     }

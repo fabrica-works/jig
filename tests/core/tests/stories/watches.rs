@@ -182,6 +182,8 @@ fn inbox_across_projects_stories() {
     }
     let first = config.core.owners[0].clone();
     config.core.owners = Box::new([first.clone(), people::InitialOwner { project: 2, identity: first.identity }]);
+    config.core.template_overrides = Map::with_capacity(2);
+    config.core.names = jig_core_world::fixtures::project_names();
     config.core.projects = List::with_capacity(2);
     let permissions = config.core.permission_roles.get(&1).expect("permissions").clone();
     config.core.permission_roles = Map::with_capacity(2);

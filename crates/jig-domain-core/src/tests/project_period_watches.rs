@@ -30,6 +30,9 @@ fn period_core(configured: u64) -> (Core, Limits) {
         );
         assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
     }
+    config.names = Map::with_capacity(2);
+    config.names.insert(1, Box::from("Project 1")).expect("first project name");
+    config.names.insert(2, Box::from("Project 2")).expect("second project name");
     config.projects = List::with_capacity(2);
     config.projects.push(1).unwrap();
     config.projects.push(2).unwrap();

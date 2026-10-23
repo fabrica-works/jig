@@ -86,7 +86,7 @@ pub fn frame(
             templates: super::me::templates(&row.templates, limits, models)?,
             creating: row.creating.as_ref().map(|v| super::me::creating(v, limits, models)).transpose()?,
             project: row.project,
-            name: row.name.as_ref().map(|value| text(value, limits)).transpose()?,
+            name: Some(text(&row.name, limits)?),
             role: held_role(row.role),
             pool: row.pool.as_ref().map(ledger),
         })
@@ -876,7 +876,7 @@ pub(super) mod tests {
                 .push(documents::FrameProjectRole {
                     project: u32::MAX,
                     role,
-                    name: None,
+                    name: jig_domain_core::documents::Text { bytes: Box::from(&b"A"[..]), cut: false },
                     pool: None,
                     creating: None,
                     models: jig_domain_authority::Models::NONE,
@@ -929,7 +929,7 @@ pub(super) mod tests {
         for (row, (_, expected)) in translated.projects.iter().zip(roles) {
             assert_eq!(row.role, expected);
             assert_eq!(row.project, u32::MAX);
-            assert_eq!(row.name, None);
+            assert_eq!(row.name.as_ref().expect("required engine name").bytes.bytes(), b"A");
             assert_eq!(row.pool, None);
         }
         assert_eq!(

@@ -288,6 +288,11 @@ fn config(seed: u64) -> Config {
             identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
         }]),
         authority: domain,
+        names: {
+            let mut names = Map::with_capacity(1);
+            names.insert(1, Box::from("Project 1")).expect("one project name");
+            names
+        },
         projects: {
             let mut projects = List::with_capacity(1);
             projects.push(1).expect("one project");
@@ -485,7 +490,7 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
         &[FrameProjectRole {
             project: 1,
             role: people::Role::Owner,
-            name: None,
+            name: Text { bytes: Box::from(&b"Project 1"[..]), cut: false },
             pool: None,
             creating: Some(crate::acts::Creating {
                 within: frame_facts::owner_creating(limits.documents.lines, 1, 1),
@@ -3538,3 +3543,5 @@ fn assert_one_watch_ending(out: &[Request], expected: views::End) {
     }
     assert_eq!(endings, 1);
 }
+
+mod project_names;

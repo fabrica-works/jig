@@ -135,8 +135,8 @@ fn first_owners_hold_the_deployments_roles_across_start_and_restart() {
                     Record::Core(record) => {
                         let _restored = core.restore_core(record.clone(), &env.limits);
                     }
-                    Record::People(people::Stored::Policy { project, value }) => {
-                        let _restored = core.restore_policy(&env.limits, *project, value.clone());
+                    Record::People(people::Stored::Policy { project, name, value }) => {
+                        let _restored = core.restore_policy(&env.limits, *project, name.clone(), value.clone());
                     }
                     Record::People(record) => {
                         drop(saves(&mut core, &env, Event::People(people::Event::Restore { record: record.clone() })));

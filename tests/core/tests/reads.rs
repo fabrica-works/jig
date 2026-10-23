@@ -623,7 +623,7 @@ fn a_delegates_question_waits_for_the_person_after_the_director_reads_it() {
     assert!(jig_core_world::fixtures::live_row(&world, director).inbox.is_empty());
     for restart in [false, true] {
         if restart {
-            world.restart(796, false);
+            world.restart_with(jig_core_world::faults::plan_fixture(796).0);
         }
         ask(
             &mut world,

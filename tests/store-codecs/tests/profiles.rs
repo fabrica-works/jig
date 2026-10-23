@@ -101,6 +101,7 @@ fn both_shipped_profiles_round_trip_a_policy_whose_roles_name_models() {
         decides: 0,
     };
     let row = people::Stored::Policy {
+        name: Box::from("Tally"),
         project: 1,
         value: people::PolicyValue {
             period_spend: 0,

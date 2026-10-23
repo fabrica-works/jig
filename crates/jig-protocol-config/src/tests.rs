@@ -12,3 +12,5 @@ mod providers;
 mod read;
 mod templates;
 mod worker;
+
+mod project_names;

@@ -14,6 +14,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
     let mut authority = authority::Domain::new(engine.rules.clone(), limits.authority).expect("checked rules");
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     let mut projects = List::with_capacity(limits.authority.projects);
+    let mut names = Map::with_capacity(limits.authority.projects);
     let mut template_overrides = Map::with_capacity(limits.authority.projects);
     let mut permission_roles = Map::with_capacity(limits.authority.projects);
     for project in &engine.projects {
@@ -30,6 +31,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
         }
         template_overrides.insert(project.number, project.templates.clone()).expect("checked projects");
         projects.push(project.number).expect("checked project count");
+        names.insert(project.number, project.name.clone()).expect("checked project count");
         let previous = permission_roles.insert(project.number, project.roles.clone()).expect("checked project count");
         assert!(previous.is_none(), "checked unique project");
     }
@@ -96,6 +98,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
             llm_providers: accounts::Providers { providers: llm_providers.into_boxed() },
         },
         projects,
+        names,
         permission_roles,
         template_overrides,
         connectors: engine.connectors.clone(),

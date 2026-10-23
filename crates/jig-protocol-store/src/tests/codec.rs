@@ -556,7 +556,7 @@ fn core_limits() -> jig_domain_core::Limits {
     fixtures::CORE_LIMITS
 }
 
-fn people_limits() -> crate::people_v8::Limits {
+fn people_limits() -> crate::people_v9::Limits {
     crate::codec::people::limits(&core_limits()).expect("within people's ceilings")
 }
 
@@ -573,7 +573,7 @@ fn ask_round_trip(ask: jig_domain_people::Ask) {
     let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("bounded length"));
     value.encode(&mut writer).expect("measured room");
     let bytes = writer.finish();
-    let read = crate::people_v8::Ask::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("saved ask");
+    let read = crate::people_v9::Ask::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("saved ask");
     assert_eq!(crate::codec::people::decode_ask(read, &limits), Ok(ask));
 }
 
@@ -582,14 +582,18 @@ fn a_person_reads_back_with_its_identity() {
 }
 
 fn a_projects_policy_reads_back() {
-    people_round_trip(jig_domain_people::Stored::Policy { project: 3, value: fixtures::people_policy() });
+    people_round_trip(jig_domain_people::Stored::Policy {
+        project: 3,
+        name: Box::from("Tally"),
+        value: fixtures::people_policy(),
+    });
 }
 
 fn a_roles_models_follow_their_names_to_todays_configuration() {
     let limits = people_limits();
     let mut value = fixtures::people_policy();
     value.roles[0].authority.models = Some(jig_domain_people::Models::Named(0b111));
-    let row = jig_domain_people::Stored::Policy { project: 3, value: value.clone() };
+    let row = jig_domain_people::Stored::Policy { project: 3, name: Box::from("Tally"), value: value.clone() };
     let then = fixtures::model_names(&[b"first", b"second", b"third"]);
     let bytes = crate::codec::people::encode(&row, &limits, &then).expect("within people's bounds");
     // "third" moved to the front, "second" is no longer configured, "fourth" is new.
@@ -597,7 +601,7 @@ fn a_roles_models_follow_their_names_to_todays_configuration() {
     value.roles[0].authority.models = Some(jig_domain_people::Models::Named(0b101));
     assert_eq!(
         crate::codec::people::decode(&bytes, &limits, &now),
-        Ok(jig_domain_people::Stored::Policy { project: 3, value })
+        Ok(jig_domain_people::Stored::Policy { project: 3, name: Box::from("Tally"), value })
     );
 }
 
@@ -605,7 +609,7 @@ fn a_role_naming_every_model_keeps_every_model() {
     let limits = people_limits();
     let mut value = fixtures::people_policy();
     value.roles[0].authority.models = Some(jig_domain_people::Models::ALL);
-    let row = jig_domain_people::Stored::Policy { project: 3, value };
+    let row = jig_domain_people::Stored::Policy { project: 3, name: Box::from("Tally"), value };
     let bytes = crate::codec::people::encode(&row, &limits, &fixtures::model_names(&[b"first"])).expect("bounded");
     let now = fixtures::model_names(&[b"second", b"first"]);
     assert_eq!(crate::codec::people::decode(&bytes, &limits, &now), Ok(row));
@@ -617,7 +621,7 @@ fn a_policy_larger_than_one_amendment_reads_back() {
     let mut second = first.clone();
     second.number = 5;
     value.roles = Box::new([first, second]);
-    people_round_trip(jig_domain_people::Stored::Policy { project: 3, value });
+    people_round_trip(jig_domain_people::Stored::Policy { project: 3, name: Box::from("Tally"), value });
 }
 
 #[test]
@@ -677,8 +681,8 @@ fn a_person_identity_field_past_its_limit_is_refused() {
             &people_limits(),
             &fixtures::model_names(&[])
         ),
-        Err(crate::people_v8::Problem {
-            path: crate::people_v8::Path::IdentityKeySubject,
+        Err(crate::people_v9::Problem {
+            path: crate::people_v9::Path::IdentityKeySubject,
             reason: skein_codec::Reason::Bound
         })
     );
@@ -689,11 +693,11 @@ fn a_people_row_of_another_version_does_not_decode() {
     let row = jig_domain_people::Stored::ReadResults { party: 1, through: 2 };
     let names = fixtures::model_names(&[]);
     let mut bytes = crate::codec::people::encode(&row, &limits, &names).expect("fixed row");
-    *bytes.get_mut(1).expect("version prefix") = 7;
+    *bytes.get_mut(1).expect("version prefix") = 8;
     assert_eq!(
         crate::codec::people::decode(&bytes, &limits, &names),
-        Err(crate::people_v8::Problem {
-            path: crate::people_v8::Path::RowVersion,
+        Err(crate::people_v9::Problem {
+            path: crate::people_v9::Path::RowVersion,
             reason: skein_codec::Reason::Version
         })
     );
@@ -1042,13 +1046,13 @@ fn a_named_full_mask_drops_removed_models_without_becoming_all() {
         names.push(Box::<[u8]>::from([b'0'.checked_add(at).expect("ASCII name")])).expect("64 names");
     }
     let names = names.into_boxed();
-    let row = jig_domain_people::Stored::Policy { project: 3, value: value.clone() };
+    let row = jig_domain_people::Stored::Policy { project: 3, name: Box::from("Tally"), value: value.clone() };
     let bytes = crate::codec::people::encode(&row, &limits, &names).unwrap();
     let now = fixtures::model_names(&[b"new", b"o", b"0"]);
     value.roles[0].authority.models = Some(jig_domain_people::Models::Named(0b110));
     assert_eq!(
         crate::codec::people::decode(&bytes, &limits, &now),
-        Ok(jig_domain_people::Stored::Policy { project: 3, value })
+        Ok(jig_domain_people::Stored::Policy { project: 3, name: Box::from("Tally"), value })
     );
 }
 
@@ -1292,5 +1296,34 @@ fn retained_people_answers_keep_dependency_refusal_facts() {
         p::Refusal::Dependency { dependency: 9, how: p::DependencyStatus::Cancelled },
     ] {
         people_round_trip(fixtures::people_outcomes::answered(p::Outcome::Refused(why)));
+    }
+}
+
+#[test]
+#[expect(clippy::disallowed_macros, reason = "ordinary tests build boundary text")]
+fn a_stored_project_name_is_bounded_and_utf8() {
+    use crate::people_v9 as wire;
+    use skein_lib::{Reader, Writer};
+    // store.md, 4.4: the name is UTF-8 text, at most 64 bytes.
+    const NAME_BOUND: usize = 64;
+    let limits = people_limits();
+    let at = "a".repeat(NAME_BOUND);
+    people_round_trip(jig_domain_people::Stored::Policy {
+        project: 3,
+        name: Box::from(at.as_str()),
+        value: fixtures::people_policy(),
+    });
+    for (name, reason) in
+        [(vec![b'a'; NAME_BOUND + 1], skein_codec::Reason::Bound), (vec![0xff], skein_codec::Reason::Utf8)]
+    {
+        // A StoredPolicy's leading fields, written as records, stop at its bad name.
+        let mut writer = Writer::new(size_of::<u32>() * 2 + name.len());
+        writer.put(&3_u32.to_be_bytes()).expect("project");
+        writer.put(&u32::try_from(name.len()).expect("test length").to_be_bytes()).expect("length");
+        writer.put(&name).expect("name");
+        assert_eq!(
+            wire::StoredPolicy::decode(&limits, &mut Reader::new(&writer.finish())),
+            Err(wire::Problem { path: wire::Path::StoredPolicyName, reason }),
+        );
     }
 }

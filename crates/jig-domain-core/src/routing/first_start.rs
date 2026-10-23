@@ -56,8 +56,9 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
             Some(entries) => entries.as_ref(),
             None => &[],
         };
+        let name = core.names.get(&project).expect("project policy has a name").clone();
         let value = crate::policy::snapshot(policy, permissions, templates).expect("configured policy snapshot");
-        out.push(Request::Write(Write::Save(Record::People(people::Stored::Policy { project, value }))));
+        out.push(Request::Write(Write::Save(Record::People(people::Stored::Policy { project, name, value }))));
         let mut holdings = List::with_capacity(env.limits.people.holdings);
         for owner in &owners {
             if owner.project != project {

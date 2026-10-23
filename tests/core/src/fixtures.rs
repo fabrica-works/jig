@@ -229,6 +229,11 @@ pub fn two_projects(seed: u64) -> (root::Config, root::Limits) {
         authority::step(&mut config.core.authority, authority::Event::Policy { project, policy }, &mut facts);
         assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
     }
+    let permissions = config.core.permission_roles.get(&1).expect("first permission map").clone();
+    config.core.permission_roles = skein_lib::Map::with_capacity(2);
+    config.core.permission_roles.insert(1, permissions).expect("first permission map");
+    config.core.template_overrides = skein_lib::Map::with_capacity(2);
+    config.core.names = project_names();
     config.core.projects = skein_lib::List::with_capacity(2);
     config.core.projects.push(1).expect("first project");
     config.core.projects.push(2).expect("second project");
@@ -575,4 +580,70 @@ pub fn configured_sources(
         b"make an effect".as_slice().into(),
     );
     crate::effects::World::configured_with_rows(seed, false, config, limits, initial, rows)
+}
+
+/// Complete policy rows for worlds that hand-bootstrap rosters before cold restore.
+pub(crate) fn project_policy_rows(config: &core::Config) -> Vec<root::Record> {
+    config
+        .projects
+        .iter()
+        .map(|project| {
+            let policy = config.authority.policy(*project).expect("configured policy");
+            let grant = |value: &authority::Grant| people::Grant {
+                connector: value.connector,
+                kind: value.kind,
+                pattern: core::pattern_to_people(&value.pattern),
+            };
+            let value = people::PolicyValue {
+                period_spend: policy.period_spend,
+                projections: policy.projections.iter().map(grant).collect(),
+                roles: policy
+                    .roles
+                    .iter()
+                    .map(|role| people::PolicyRole {
+                        number: role.number,
+                        authority: core::authority_to_people(&role.authority).expect("bounded role"),
+                        period_spend: role.period_spend,
+                        requests: role.requests.0,
+                        decides: role.decides.0,
+                    })
+                    .collect(),
+                requirements: policy
+                    .requirements
+                    .iter()
+                    .map(|requirement| people::Requirement {
+                        connector: requirement.connector,
+                        kind: requirement.kind,
+                        pattern: core::pattern_to_people(&requirement.pattern),
+                        judge: people::Judge {
+                            connector: requirement.judge.connector,
+                            requirement: requirement.judge.requirement,
+                            parameters: requirement.judge.parameters,
+                        },
+                        guard: match requirement.guard {
+                            authority::Guard::Guarded => people::Guard::Guarded,
+                            authority::Guard::Observed { freshness } => people::Guard::Observed { freshness },
+                        },
+                        must_be_guarded: requirement.must_be_guarded,
+                    })
+                    .collect(),
+                permissions: config.permission_roles.get(project).cloned().unwrap_or_else(|| Box::new([])),
+                templates: config.template_overrides.get(project).cloned().unwrap_or_else(|| Box::new([])),
+            };
+            root::Record::Core(core::Record::People(people::Stored::Policy {
+                project: *project,
+                name: config.names.get(project).expect("configured project name").clone(),
+                value,
+            }))
+        })
+        .collect()
+}
+
+/// Names for the standard fixture's two projects.
+#[must_use]
+pub fn project_names() -> skein_lib::Map<u32, Box<str>> {
+    let mut names = skein_lib::Map::with_capacity(2);
+    names.insert(1, Box::from("Project 1")).expect("first project name");
+    names.insert(2, Box::from("Project 2")).expect("second project name");
+    names
 }

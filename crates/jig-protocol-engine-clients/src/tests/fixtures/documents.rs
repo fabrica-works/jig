@@ -16,7 +16,7 @@ pub fn frame_two_projects() -> d::Frame {
             .push(d::FrameProjectRole {
                 project,
                 role,
-                name: None,
+                name: jig_domain_core::documents::Text { bytes: Box::from(&b"Tally"[..]), cut: false },
                 pool: None,
                 creating: None,
                 models: jig_domain_authority::Models::NONE,
@@ -185,4 +185,36 @@ pub fn task_with_hold() -> d::Task {
         proposals: List::with_capacity(0),
         cut: false,
     }
+}
+
+/// The shared v14 fixture with each engine-supplied project's required name.
+pub fn frame_two_projects_record() -> jig_client_protocol_wire::v14::Me {
+    let limits = w::CEILINGS;
+    let mut parts = jig_client_test_records::frame_two_projects_record().into_parts();
+    let mut reader = skein_lib::Reader::new(&parts.projects);
+    let mut projects = List::with_capacity(2);
+    let mut size = 0_usize;
+    while let Some(bytes) = skein_codec::piece::split(&mut reader).expect("fixture pieces") {
+        let project = w::MeProject::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("fixture project");
+        let mut project = project.into_parts();
+        project.name = Some(
+            w::DocumentText::new(&limits, w::DocumentTextParts { bytes: Box::from(&b"Tally"[..]), cut: false })
+                .expect("literal name"),
+        );
+        let project = w::MeProject::new(&limits, project).expect("named project");
+        size = size
+            .checked_add(usize::try_from(project.measure()).expect("fixture size"))
+            .expect("fixture size")
+            .checked_add(size_of::<u32>())
+            .expect("piece header");
+        projects.push(project).expect("two fixture projects");
+    }
+    let mut writer = skein_lib::Writer::new(size);
+    for project in projects.into_boxed() {
+        let mut encoded = skein_lib::Writer::new(usize::try_from(project.measure()).expect("fixture size"));
+        project.encode(&mut encoded).expect("measured project");
+        skein_codec::piece::write(&mut writer, &encoded.finish()).expect("measured piece");
+    }
+    parts.projects = writer.finish();
+    w::Me::new(&limits, parts).expect("named frame fixture")
 }

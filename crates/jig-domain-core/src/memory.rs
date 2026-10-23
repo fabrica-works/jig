@@ -200,6 +200,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<tasks::ViewTask>::worst_case(limits.tasks.tasks.checked_mul(2)?)?)?
         .checked_add(Map::<(u32, u64), u64>::worst_case(limits.tasks.tasks)?)?
         .checked_add(Map::<(u64, u64), u64>::worst_case(limits.tasks.tasks)?)?
+        .checked_add(Map::<u32, Box<str>>::worst_case(limits.authority.projects)?)?
+        .checked_add(bytes(limits.authority.projects, u64::try_from(people::NAME_BYTES).ok()?)?)?
         .checked_add(Map::<u32, Box<[people::TemplateOverride]>>::worst_case(limits.authority.projects)?)?
         .checked_add(bytes(
             limits.authority.projects.checked_add(1)?,
@@ -446,6 +448,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(context)?
         .checked_add(u64::from(task.message_bytes.max(task.result_bytes)).checked_mul(field_size.checked_add(1)?)?)?
         .checked_add(limits.policy_bytes)?
+        .checked_add(u64::try_from(people::NAME_BYTES).ok()?)?
         .checked_add(u64::from(limits.run_bytes))?
         .checked_add(u64::from(task.message_bytes))?
         .checked_add(u64::from(limits.brief.brief_bytes))?
