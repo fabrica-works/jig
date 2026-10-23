@@ -1,6 +1,6 @@
 # The application's root
 
-Provisional, 2026-10-07, revised 2026-10-18. What an application's
+Provisional, 2026-10-07, revised 2026-10-23. What an application's
 engine root is and does: the top-level domain every application on jig
 writes, which composes jig's core with the application's connectors and
 its own child domains. It says what the root carries, the one shape
@@ -190,6 +190,11 @@ It inspects nothing it holds. What jig asks of it:
   core. What the core says of a procedure's step, the task it made, goes
   to the procedure's connector in the same decision, and is never
   dropped (connectors.md, 6.3).
+- **A project made** (`people.md`, 5.2): the core's word that it was
+  made, released once its commit is durable, goes to the application's
+  period source, which, keeping a calendar, says the project's periods
+  from then on; the reference service's, keeping none, takes nothing
+  from it.
 - **To the hub inside the engine:** the core's assignments, relays and
   cancels for runs placed on the engine's own slots go to the hub, and
   what it says goes back to the core as a worker's would (hosts.md,

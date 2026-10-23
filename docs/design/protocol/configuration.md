@@ -336,6 +336,11 @@ host's half reports it (`llm.md`, 5.5).
   project, its budget the project's spend per period, with no next
   start, since it keeps no calendar. A later start says none: the store
   keeps the current period (`../domain/engine.md`, 5.4).
+- **A project made after the first start** has its first period opened
+  by the core, in the decision that makes it, its budget the policy's
+  spend per period, with no next start (`../domain/people.md`, 5.2);
+  the root hears that it was made, and a source that keeps a calendar
+  says its periods from then on.
 
 ## 6. Limits
 
