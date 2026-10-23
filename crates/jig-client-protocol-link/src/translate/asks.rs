@@ -2,7 +2,7 @@
 use crate::translate::too_large;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{List, Writer, bytes};
 pub(crate) fn wire_revision(value: c::Revision, limits: &w::Limits) -> Result<w::Revision, w::Problem> {
     w::Revision::new(limits, w::RevisionParts { value: value.value })
@@ -554,6 +554,7 @@ pub(crate) fn wire_holding(value: &c::Holding, limits: &w::Limits) -> Result<w::
 #[expect(clippy::too_many_lines, reason = "one exhaustive field translation arm per client ask")]
 pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
     Ok(match value {
+        c::Ask::ChangeSettings(value) => w::Ask::ChangeSettings(super::settings::wire_change_settings(value, limits)?),
         c::Ask::Propose { project, action, reason } => super::operations::propose(*project, action, reason, limits)?,
         c::Ask::Withdraw { project, proposal } => {
             w::Ask::Withdraw(w::Withdraw::new(limits, w::WithdrawParts { project: *project, proposal: *proposal })?)

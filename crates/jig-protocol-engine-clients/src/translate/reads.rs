@@ -7,6 +7,8 @@ use jig_domain_people as people;
 use skein_lib::{Reader, Writer};
 pub(crate) fn read(value: w::Read) -> Option<reads::Read> {
     Some(match value {
+        // task C
+        w::Read::Settings | w::Read::Setting(_) | w::Read::Revision(_) | w::Read::Revisions(_) => return None,
         w::Read::Tasks(value) => {
             let value = value.into_parts();
             reads::Read::Tasks {

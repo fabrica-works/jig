@@ -2,7 +2,7 @@
 use super::asks;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{List, bytes};
 
 pub(super) fn answer(value: &c::AnswerOn, limits: &w::Limits) -> Result<w::AnswerOn, w::Problem> {
@@ -67,7 +67,7 @@ pub(super) fn templates(values: &List<c::TemplateOverride>, limits: &w::Limits) 
     }
     Ok(w::PolicyEdit::Templates(w::PolicyEditTemplates::new(limits, w::PolicyEditTemplatesParts { overrides })?))
 }
-fn executor(value: c::TemplateExecutor, limits: &w::Limits) -> Result<w::TemplateExecutor, w::Problem> {
+pub(super) fn executor(value: c::TemplateExecutor, limits: &w::Limits) -> Result<w::TemplateExecutor, w::Problem> {
     Ok(match value {
         c::TemplateExecutor::Charter(value) => {
             w::TemplateExecutor::Charter(w::TemplateCharter::new(limits, w::TemplateCharterParts { value })?)
@@ -75,7 +75,7 @@ fn executor(value: c::TemplateExecutor, limits: &w::Limits) -> Result<w::Templat
         c::TemplateExecutor::Chosen => w::TemplateExecutor::Chosen,
     })
 }
-fn budget(value: c::TemplateBudget, limits: &w::Limits) -> Result<w::TemplateBudget, w::Problem> {
+pub(super) fn budget(value: c::TemplateBudget, limits: &w::Limits) -> Result<w::TemplateBudget, w::Problem> {
     Ok(match value {
         c::TemplateBudget::Amount(value) => {
             w::TemplateBudget::Amount(w::TemplateAmount::new(limits, w::TemplateAmountParts { value })?)
@@ -86,7 +86,7 @@ fn budget(value: c::TemplateBudget, limits: &w::Limits) -> Result<w::TemplateBud
         c::TemplateBudget::Given => w::TemplateBudget::Given,
     })
 }
-fn deadline(value: c::TemplateDeadline, limits: &w::Limits) -> Result<w::TemplateDeadline, w::Problem> {
+pub(super) fn deadline(value: c::TemplateDeadline, limits: &w::Limits) -> Result<w::TemplateDeadline, w::Problem> {
     Ok(match value {
         c::TemplateDeadline::None => w::TemplateDeadline::None,
         c::TemplateDeadline::Span(value) => {

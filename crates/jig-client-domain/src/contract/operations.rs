@@ -15,6 +15,8 @@ pub enum Operation {
 /// Why the request is malformed; its refusal names the place.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Malformed {
+    Settings(super::MalformedSettings),
+    SettingsUnchanged,
     ProjectMismatch,
     TwoAsAllowed,
     ConversationNotAgent,

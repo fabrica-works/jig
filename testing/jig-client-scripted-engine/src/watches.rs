@@ -189,6 +189,7 @@ impl<A: crate::Application> Engine<A> {
             Subject::Accounts => return Some(WatchEnd::Unknown),
             Subject::Me => return (!self.truth.frames.contains_key(&party)).then_some(hidden),
             Subject::Inbox { .. } => return None,
+            Subject::Settings => return (!self.read_visible(party, &Read::Settings)).then_some(hidden),
             Subject::Deployment => return (!self.read_visible(party, &Read::Deployment)).then_some(hidden),
         };
         for task in tasks {
@@ -282,6 +283,7 @@ impl<A: crate::Application> Engine<A> {
                 Delivery::Run(Box::new(value))
             }
             Subject::Accounts => return Err(WatchEnd::Unknown),
+            Subject::Settings => Delivery::Settings(Box::new(self.truth.settings.clone().ok_or(WatchEnd::Unknown)?)),
             Subject::Deployment => {
                 if let Some(value) = &self.truth.owner_deployment {
                     Delivery::OwnerDeployment(Box::new(value.clone()))
@@ -324,6 +326,7 @@ impl<A: crate::Application> Engine<A> {
                 | Delivery::Chips(_)
                 | Delivery::Run(_)
                 | Delivery::RunState(_)
+                | Delivery::Settings(_)
                 | Delivery::Deployment(_)
                 | Delivery::OwnerDeployment(_)
                 | Delivery::OwnerAccounts(_) => return Err(WatchEnd::Busy),

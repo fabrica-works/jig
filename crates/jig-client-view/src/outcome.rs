@@ -64,6 +64,8 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             }
         },
         Outcome::Proposed { .. } => Route::Proposed,
-        Outcome::Decided { .. } | Outcome::DecidedFirst { .. } | Outcome::Changed => Route::Other,
+        Outcome::SettingsChanged(_) | Outcome::Decided { .. } | Outcome::DecidedFirst { .. } | Outcome::Changed => {
+            Route::Other
+        }
     }
 }

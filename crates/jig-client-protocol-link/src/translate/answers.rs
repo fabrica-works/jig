@@ -3,7 +3,7 @@ use crate::Limits;
 use crate::translate::text_problem;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{List, Reader, Wall, bytes};
 pub(crate) fn seen(value: &w::SeenThrough, _limits: &Limits) -> c::SeenThrough {
     match value {
@@ -237,6 +237,9 @@ pub(crate) fn outcome(value: &w::Outcome, limits: &Limits) -> Result<c::Outcome,
             how: decision(row.how(), limits)?,
             at: Wall::from_nanos(row.at()),
         },
+        w::Outcome::SettingsChanged(value) => {
+            c::Outcome::SettingsChanged(super::settings::restore_outcome_settings_changed(value, limits)?)
+        }
         w::Outcome::Changed => c::Outcome::Changed,
     })
 }
@@ -482,6 +485,8 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
                 w::OwnerTaskStatus::Cancelled => c::OwnerTaskStatus::Cancelled,
             },
         },
+        w::Refusal::Stale(value) => c::Refusal::Stale(super::settings::restore_refusal_stale(value, limits)?),
+        w::Refusal::Full(value) => c::Refusal::Full(super::settings::restore_refusal_full(value, limits)?),
         w::Refusal::NotWaiting => c::Refusal::NotWaiting,
         w::Refusal::NoFurther => c::Refusal::NoFurther,
         w::Refusal::Authority(row) => {
@@ -499,6 +504,10 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
         w::Refusal::Malformed(row) => c::Refusal::Malformed {
             at: row.at(),
             why: match row.why() {
+                w::Malformed::Settings(value) => {
+                    c::Malformed::Settings(super::settings::restore_malformed_settings(value, limits)?)
+                }
+                w::Malformed::SettingsUnchanged => c::Malformed::SettingsUnchanged,
                 w::Malformed::TwoAsAllowed => c::Malformed::TwoAsAllowed,
                 w::Malformed::ConversationNotAgent => c::Malformed::ConversationNotAgent,
 

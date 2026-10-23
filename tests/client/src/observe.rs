@@ -104,6 +104,7 @@ pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> 
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::Rename { .. }
+        | Ask::ChangeSettings(_)
         | Ask::MakeProject { .. }
         | Ask::SetPool { .. } => (None, None, None),
     };
@@ -172,6 +173,10 @@ fn read_cards(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::OwnerSpend(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Deployment(_)
         | ReadValue::OwnerDeployment(_) => vec![],
     }

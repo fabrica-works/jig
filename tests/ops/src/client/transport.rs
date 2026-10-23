@@ -301,7 +301,7 @@ impl Front<Ops> for Scripted {
                     client,
                     Event::Client {
                         event: jig_client::Event::Up {
-                            up: jig_client::Up::Served { served: self.engine.versions().contains(17), versions: None },
+                            up: jig_client::Up::Served { served: self.engine.versions().contains(18), versions: None },
                         },
                     },
                 )
@@ -512,6 +512,7 @@ fn run_position(subject: &jig_client_domain::contract::Subject) -> SubjectRun {
         | jig_client_domain::contract::Subject::Chips { .. }
         | jig_client_domain::contract::Subject::Inbox { .. }
         | jig_client_domain::contract::Subject::Tasks { .. }
+        | jig_client_domain::contract::Subject::Settings
         | jig_client_domain::contract::Subject::Deployment
         | jig_client_domain::contract::Subject::Accounts => unreachable!("only run watches continue"),
     }
@@ -559,6 +560,10 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Notes(_)
                 | ReadValue::OwnerDeployment(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::Deployment(_) => false,
             };
             if terminal {
@@ -593,10 +598,18 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Notes(_)
                 | ReadValue::OwnerDeployment(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::Deployment(_) => {}
             }
         }
-        engine::Change::Request(_)
+        engine::Change::Settings(_)
+        | engine::Change::Setting(_)
+        | engine::Change::Revision { .. }
+        | engine::Change::Revisions { .. }
+        | engine::Change::Request(_)
         | engine::Change::Me(_)
         | engine::Change::SignIn { .. }
         | engine::Change::SignedOut { .. }
@@ -630,6 +643,10 @@ impl Scripted {
             | Read::Spend { .. }
             | Read::Project { .. }
             | Read::Notes { .. }
+            | Read::Settings
+            | Read::Setting(_)
+            | Read::Revision(_)
+            | Read::Revisions(_)
             | Read::Deployment => self.last_object,
         }
     }

@@ -159,6 +159,10 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
         | Read::PersonTask { .. }
         | Read::Result { .. }
         | Read::Project { .. }
+        | Read::Settings
+        | Read::Setting(_)
+        | Read::Revision(_)
+        | Read::Revisions(_)
         | Read::Deployment => None,
     };
     (read, position)
@@ -183,6 +187,10 @@ impl<A: crate::Application> Engine<A> {
         self.queue(now, self.next_commit - 1, Up::Read { token, terminal });
         Ok(())
     }
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the exhaustive selectors and bounded page construction share one read admission"
+    )]
     pub(crate) fn read_value(&mut self, party: u64, read: Read) -> core::result::Result<ReadValue, ReadNone> {
         let (query, position) = plain(read);
         if !self.read_visible(party, &query) {
@@ -205,6 +213,33 @@ impl<A: crate::Application> Engine<A> {
                 }
                 return self
                     .checked_read(self.truth.projects.get(project).cloned().map(|v| ReadValue::Project(Box::new(v))));
+            }
+            Read::Settings => {
+                return self.checked_read(self.truth.settings.clone().map(|v| ReadValue::Settings(Box::new(v))));
+            }
+            Read::Setting(query) => {
+                return self.checked_read(
+                    self.truth
+                        .setting_values
+                        .iter()
+                        .find(|v| v.setting == query.setting && v.revision == query.revision)
+                        .cloned()
+                        .map(|v| ReadValue::Setting(Box::new(v))),
+                );
+            }
+            Read::Revision(query) => {
+                return self.checked_read(Some(ReadValue::Revision(Box::new(
+                    self.truth
+                        .revisions
+                        .get(&query.number)
+                        .cloned()
+                        .unwrap_or(jig_client_domain::contract::RevisionAnswer::Unknown),
+                ))));
+            }
+            Read::Revisions(query) => {
+                return self.checked_read(
+                    self.truth.revision_pages.get(&query.before).cloned().map(|v| ReadValue::Revisions(Box::new(v))),
+                );
             }
             Read::Deployment => {
                 if let Some(value) = &self.truth.owner_deployment {
@@ -332,7 +367,7 @@ impl<A: crate::Application> Engine<A> {
                 match query {
                     Read::Inbox { group, project, kind, goal, .. } => *group == InboxReadGroup::of(row.group) && project.is_none_or(|p| p == row.project) && kind.is_none_or(|k| k == row.group) && goal.is_none_or(|g| row.goal == Some(g)),
                     Read::Tasks { .. } | Read::Me | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
-                    | Read::Turn { .. } | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
+                    | Read::Turn { .. } | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Settings | Read::Setting(_) | Read::Revision(_) | Read::Revisions(_) | Read::Deployment => false,
                 }
             }).collect();
                 rows.sort_by(|a, b| {
@@ -387,7 +422,9 @@ impl<A: crate::Application> Engine<A> {
                 );
             }
             Read::Me => return self.truth.frames.contains_key(&party),
-            Read::Deployment => return self.truth.frames.get(&party).is_some_and(|f| f.deployment_role.is_some()),
+            Read::Settings | Read::Setting(_) | Read::Revision(_) | Read::Revisions(_) | Read::Deployment => {
+                return self.truth.frames.get(&party).is_some_and(|f| f.deployment_role.is_some());
+            }
         };
         key.and_then(|key| self.truth.project(key)).is_some_and(|project| self.truth.visible(party, project))
     }
@@ -410,6 +447,10 @@ fn empty(read: &Read) -> Rows {
         | Read::PersonTask { .. }
         | Read::Result { .. }
         | Read::Project { .. }
+        | Read::Settings
+        | Read::Setting(_)
+        | Read::Revision(_)
+        | Read::Revisions(_)
         | Read::Deployment => unreachable!("documents do not request a row source"),
     }
 }

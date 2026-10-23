@@ -86,7 +86,10 @@ pub fn close_chat(me: &Me, project: u32, chat: u64, delegates: &[Delegate], reas
     if !present {
         return Err(NotOffered::Project);
     }
-    let template = template(me, project, CHAT).ok_or(NotOffered::Template)?;
+    let grace = match template(me, project, CHAT) {
+        Some(template) => template.grace,
+        None => None,
+    };
     let count = u32::try_from(delegates.len()).expect("validated delegates fit u32");
     let mut operations = List::with_capacity(count.saturating_add(1));
     for delegate in delegates {
@@ -96,7 +99,7 @@ pub fn close_chat(me: &Me, project: u32, chat: u64, delegates: &[Delegate], reas
         };
         operations.push(operation).expect("one operation per delegate");
     }
-    operations.push(Operation::Cancel { project, task: chat, reason, grace: template.grace }).expect("chat last");
+    operations.push(Operation::Cancel { project, task: chat, reason, grace }).expect("chat last");
     Ok(Ask::Compound { project, operations })
 }
 #[must_use]

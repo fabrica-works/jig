@@ -160,7 +160,7 @@ impl Scripted {
                 (
                     client,
                     crate::test::up(jig_client::Up::Served {
-                        served: self.engine.versions().contains(17),
+                        served: self.engine.versions().contains(18),
                         versions: None,
                     }),
                 )
@@ -335,6 +335,10 @@ impl Front<Test> for Scripted {
                     | Read::Spend { .. }
                     | Read::Project { .. }
                     | Read::Notes { .. }
+                    | Read::Settings
+                    | Read::Setting(_)
+                    | Read::Revision(_)
+                    | Read::Revisions(_)
                     | Read::Deployment => self.last_object,
                 };
                 self.engine.read(now, party, read, what).expect("read fits");
@@ -358,6 +362,7 @@ impl Front<Test> for Scripted {
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
                 | Subject::Tasks { .. }
+                | Subject::Settings
                 | Subject::Deployment
                 | Subject::Accounts => unreachable!("only runs continue"),
             },
@@ -535,6 +540,10 @@ impl Front<Test> for Scripted {
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "the observation table classifies every scripted change without inspecting client state"
+)]
 fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>) {
     match change {
         engine::Change::Source(source) => {
@@ -581,6 +590,10 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::Deployment(_)
                 | ReadValue::OwnerDeployment(_) => false,
             };
@@ -613,11 +626,19 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::Deployment(_)
                 | ReadValue::OwnerDeployment(_) => {}
             }
         }
-        engine::Change::Request(_)
+        engine::Change::Settings(_)
+        | engine::Change::Setting(_)
+        | engine::Change::Revision { .. }
+        | engine::Change::Revisions { .. }
+        | engine::Change::Request(_)
         | engine::Change::Me(_)
         | engine::Change::SignIn { .. }
         | engine::Change::SignedOut { .. }

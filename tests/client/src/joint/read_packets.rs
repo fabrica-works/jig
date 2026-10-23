@@ -64,6 +64,10 @@ pub fn read_with_codec(
                 | client::Read::PersonTask { .. }
                 | client::Read::Result { .. }
                 | client::Read::Project { .. }
+                | client::Read::Settings
+                | client::Read::Setting(_)
+                | client::Read::Revision(_)
+                | client::Read::Revisions(_)
                 | client::Read::Deployment => return Err(Invalid::PendingValue),
             }
             .map_err(Invalid::Page)?;

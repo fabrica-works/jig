@@ -420,6 +420,10 @@ pub const fn query_filter(query: Option<&Read>) -> Option<Filter> {
             | Read::Spend { .. }
             | Read::Project { .. }
             | Read::Notes { .. }
+            | Read::Settings
+            | Read::Setting(_)
+            | Read::Revision(_)
+            | Read::Revisions(_)
             | Read::Deployment,
         )
         | None => None,

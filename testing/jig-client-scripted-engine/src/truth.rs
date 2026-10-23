@@ -7,6 +7,10 @@ use std::collections::BTreeMap;
 /// Client documents indexed by their identities, with parties and sign-ins.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Truth {
+    pub settings: Option<jig_client_domain::contract::SettingsDocument>,
+    pub setting_values: Vec<jig_client_domain::contract::SettingDocument>,
+    pub revisions: BTreeMap<u32, jig_client_domain::contract::RevisionAnswer>,
+    pub revision_pages: BTreeMap<Option<u32>, jig_client_domain::contract::RevisionsPage>,
     /// Configured policy numbers for `MakeProject`; `None` supplies the default `[1]`.
     pub policies: Option<Vec<u32>>,
     pub frames: BTreeMap<u64, Me>,
@@ -30,18 +34,39 @@ pub struct Truth {
 /// One whole-document replacement made atomically with its story's decision.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Change {
+    Settings(jig_client_domain::contract::SettingsDocument),
+    Setting(jig_client_domain::contract::SettingDocument),
+    Revision {
+        number: u32,
+        value: jig_client_domain::contract::RevisionAnswer,
+    },
+    Revisions {
+        before: Option<u32>,
+        value: jig_client_domain::contract::RevisionsPage,
+    },
     /// A jig request on an application requester's behalf; only application decisions may use this.
     Request(Box<Ask>),
     /// Replace a party's authoritative frame, including roles and retention.
     Me(Me),
     /// Confirm a numbered sign-in for a party.
-    SignIn { sign_in: u64, party: u64 },
+    SignIn {
+        sign_in: u64,
+        party: u64,
+    },
     /// End a numbered sign-in.
-    SignedOut { sign_in: u64 },
+    SignedOut {
+        sign_in: u64,
+    },
     /// Replace an object, preserving its identity.
-    Object { project: u32, key: ObjectKey, value: ReadValue },
+    Object {
+        project: u32,
+        key: ObjectKey,
+        value: ReadValue,
+    },
     /// Forget a live object; subsequent reads are unknown.
-    Forget { key: ObjectKey },
+    Forget {
+        key: ObjectKey,
+    },
     /// Replace a project document.
     Project(Box<Project>),
     /// Replace a whole owner project after its name changes.
@@ -49,7 +74,9 @@ pub enum Change {
     /// Replace a revisioned note.
     Note(Note),
     /// Delete a note.
-    DeleteNote { note: u64 },
+    DeleteNote {
+        note: u64,
+    },
     /// Replace deployment hosts, accounts and capacities.
     Deployment(Deployment),
     /// Replace whole owner deployment facts and bounded diagnostics.
@@ -59,11 +86,19 @@ pub enum Change {
     /// Replace the authoritative subtree, including folded counts.
     Tree(Tree),
     /// Replace committed inbox read positions for a party.
-    Seen { party: u64, results: u64, replies: Vec<jig_client_domain::contract::ReadPosition> },
+    Seen {
+        party: u64,
+        results: u64,
+        replies: Vec<jig_client_domain::contract::ReadPosition>,
+    },
 }
 impl Change {
     pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
         let fits = match self {
+            Self::Settings(v) => payload::fits(v, bounds),
+            Self::Setting(v) => payload::fits(v, bounds),
+            Self::Revision { value, .. } => payload::fits(value, bounds),
+            Self::Revisions { value, .. } => payload::fits(value, bounds),
             Self::Request(ask) => payload::fits(ask, bounds),
             Self::Source(value) => {
                 return value.validate(bounds);
@@ -90,6 +125,18 @@ impl Change {
 impl Truth {
     /// Validates fixture documents, including unused list capacity and nested payloads.
     pub fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
+        if let Some(value) = &self.settings {
+            Change::Settings(value.clone()).validate(bounds)?;
+        }
+        for value in &self.setting_values {
+            Change::Setting(value.clone()).validate(bounds)?;
+        }
+        for (number, value) in &self.revisions {
+            Change::Revision { number: *number, value: value.clone() }.validate(bounds)?;
+        }
+        for (before, value) in &self.revision_pages {
+            Change::Revisions { before: *before, value: value.clone() }.validate(bounds)?;
+        }
         for (party, frame) in &self.frames {
             if *party != frame.party.number {
                 return Err(Invalid::Identity);
@@ -144,6 +191,17 @@ impl Truth {
     }
     pub(crate) fn apply(&mut self, change: &Change) -> core::result::Result<(), Invalid> {
         match change {
+            Change::Settings(value) => self.settings = Some(value.clone()),
+            Change::Setting(value) => {
+                self.setting_values.retain(|old| old.setting != value.setting || old.revision != value.revision);
+                self.setting_values.push(value.clone());
+            }
+            Change::Revision { number, value } => {
+                self.revisions.insert(*number, value.clone());
+            }
+            Change::Revisions { before, value } => {
+                self.revision_pages.insert(*before, value.clone());
+            }
             Change::Request(_) => return Err(Invalid::Script),
             Change::Source(source) => {
                 self.sources.retain(|old| old.party != source.party || old.read != source.read);
@@ -253,7 +311,7 @@ pub struct Script {
 impl Default for Script {
     fn default() -> Self {
         Self {
-            versions: jig_client_domain::contract::VersionRange { first: 17, last: 17 },
+            versions: jig_client_domain::contract::VersionRange { first: 18, last: 18 },
             truth: Truth::default(),
             bounds: Bounds::default(),
             rules: Vec::new(),
@@ -298,6 +356,10 @@ pub(crate) fn identity(value: &ReadValue) -> Option<ObjectKey> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Deployment(_)
         | ReadValue::OwnerDeployment(_) => None,
     }
@@ -329,6 +391,10 @@ fn document_project(value: &ReadValue) -> Option<u32> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Deployment(_)
         | ReadValue::OwnerDeployment(_) => None,
     }

@@ -326,3 +326,42 @@ fn moving_out_words_show_only_account_and_move_numbers() {
     assert!(contains(&tree, b"Account 19: moving out, move 23"));
     assert!(!contains(&tree, b"private moved record"));
 }
+
+#[test]
+fn settings_refusals_name_each_setting_fault_and_retained_holder_fact() {
+    for (setting, name) in [
+        (Setting::Charter(SettingNumber { number: 2 }), b"charter 2".as_slice()),
+        (Setting::Template(SettingNumber { number: 1 }), b"template 1".as_slice()),
+        (Setting::Policy(SettingNumber { number: 3 }), b"policy 3".as_slice()),
+        (Setting::Rules, b"the rules".as_slice()),
+    ] {
+        for (fault, words) in [
+            (SettingFault::Shape, b"out of shape".as_slice()),
+            (SettingFault::Count, b"count limit".as_slice()),
+            (SettingFault::Reference, b"not offered".as_slice()),
+            (SettingFault::Rules, b"above the deployment rules".as_slice()),
+            (SettingFault::Budget, b"short of one costliest completion".as_slice()),
+            (SettingFault::Grace, b"past the allowed span".as_slice()),
+            (SettingFault::Owner, b"cannot be a root requester".as_slice()),
+        ] {
+            let tree =
+                render(Refusal::Malformed { at: 0, why: Malformed::Settings(MalformedSettings { setting, fault }) });
+            assert!(contains(&tree, name));
+            assert!(contains(&tree, words));
+        }
+    }
+    assert!(contains(&render(Refusal::Stale(RefusalStale { newest: 29 })), b"newest revision 29"));
+    let mut tasks = List::with_capacity(2);
+    tasks.push(11).unwrap();
+    tasks.push(13).unwrap();
+    let tree = render(Refusal::Full(RefusalFull { revision: 7, tasks, more: 17 }));
+    for words in [b"oldest held revision 7".as_slice(), b"held by task 11", b"held by task 13", b"17 more tasks"] {
+        assert!(contains(&tree, words));
+    }
+    assert!(contains(&render(Refusal::Malformed { at: 0, why: Malformed::SettingsUnchanged }), b"settings unchanged"));
+    let mut builder = Builder::new(&limits());
+    builder.open(Role::Page);
+    shared_words().outcome(&mut builder, &Outcome::SettingsChanged(OutcomeSettingsChanged { revision: 31 }));
+    builder.close();
+    assert!(contains(&builder.finish(), b"Settings changed; revision 31"));
+}

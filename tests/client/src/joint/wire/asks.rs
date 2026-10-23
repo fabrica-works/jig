@@ -11,6 +11,7 @@ use skein_lib::List;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
+    Settings,
     Decision,
     NoteRevision,
     NoteProject,
@@ -66,6 +67,7 @@ fn translate(
     names: &mut List<Box<[u8]>>,
 ) -> Result<people::Ask, Invalid> {
     Ok(match value {
+        client::Ask::ChangeSettings(_) => return Err(Invalid::Settings),
         client::Ask::Propose { project, action, reason } => create::propose(*project, action, reason, models, names)?,
         client::Ask::Withdraw { project, proposal } => people::Ask::Withdraw { project: *project, proposal: *proposal },
         client::Ask::Create { project, tasks } => create::ask(*project, tasks, models, names)?,

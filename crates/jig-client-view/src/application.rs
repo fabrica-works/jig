@@ -135,6 +135,7 @@ pub(crate) fn delivery(
         | Delivery::Tasks(_)
         | Delivery::Run(_)
         | Delivery::RunState(_)
+        | Delivery::Settings(_)
         | Delivery::Deployment(_)
         | Delivery::OwnerDeployment(_)
         | Delivery::OwnerAccounts(_) => {}
@@ -200,6 +201,10 @@ pub(crate) fn read_result(
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::Deployment(_)
                 | ReadValue::OwnerDeployment(_) => false,
             };
@@ -227,6 +232,10 @@ fn key(what: &Read) -> Option<ObjectKey> {
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
+        | Read::Settings
+        | Read::Setting(_)
+        | Read::Revision(_)
+        | Read::Revisions(_)
         | Read::Deployment => None,
     }
 }

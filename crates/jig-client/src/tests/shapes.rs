@@ -255,3 +255,29 @@ fn a_goal_span_keeps_the_other_creating_judgments() {
         assert_eq!(judgment, expected, "{name}");
     }
 }
+
+#[test]
+fn close_chat_without_an_offered_template_has_no_grace() {
+    let mut me = me();
+    shape_project(&mut me).templates = List::with_capacity(0);
+    let Ask::Compound { operations, .. } = close_chat(&me, PROJECT, CHAT_TASK, &[], words()).unwrap() else {
+        panic!("compound")
+    };
+    assert_eq!(
+        operations.as_slice(),
+        &[Operation::Cancel { project: PROJECT, task: CHAT_TASK, reason: words(), grace: None }]
+    );
+}
+#[test]
+fn close_chat_reads_the_edited_template_grace() {
+    let mut me = me();
+    let grace = skein_lib::Duration::from_nanos(1234);
+    shape_project(&mut me).templates.get_mut(0).unwrap().grace = Some(grace);
+    let Ask::Compound { operations, .. } = close_chat(&me, PROJECT, CHAT_TASK, &[], words()).unwrap() else {
+        panic!("compound")
+    };
+    assert_eq!(
+        operations.as_slice(),
+        &[Operation::Cancel { project: PROJECT, task: CHAT_TASK, reason: words(), grace: Some(grace) }]
+    );
+}

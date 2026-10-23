@@ -49,6 +49,10 @@ impl Word {
     pub(super) const fn data(self) -> (u16, &'static [u8], &'static [HoleKind]) {
         match self {
             Self::Decision(value) => value.data(),
+            Self::Refusal(RefusalWord::Stale) => (112, b"Settings changed; newest revision ", &[HoleKind::Number]),
+            Self::Refusal(RefusalWord::Full) => {
+                (113, b"Settings history is full; oldest held revision ", &[HoleKind::Number])
+            }
             Self::Hold(HoldWord::Circle) => (91, b"Held for a circle of waits", &[]),
             Self::Refusal(RefusalWord::Circle) => (92, b"These tasks would wait for one another", &[]),
             Self::Refusal(RefusalWord::Dependency) => (93, b"The added dependency has ended", &[]),

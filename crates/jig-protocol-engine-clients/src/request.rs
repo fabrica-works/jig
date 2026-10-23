@@ -95,6 +95,16 @@ impl Component {
     ) {
         let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
             Ok(value) => {
+                // task B
+                if settings_ask(&value) {
+                    let answer = w::KeyedAnswer::NotServed(crate::served::not_served(
+                        &self.settings,
+                        w::Owner::Jig,
+                        &env.limits.wire,
+                    ));
+                    self.respond(env, exchange, routes::encoded(&answer));
+                    return;
+                }
                 if let Some(carried) = &keyed.value {
                     let bound = carried_bound(&value, self.settings.key_bytes, self.settings.moved_bytes);
                     if u64::try_from(carried.len()).expect("value size fits u64") > bound
@@ -192,7 +202,9 @@ impl Component {
 fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
     let change = match ask {
         w::Ask::AccountChange(row) => row.change(),
-        w::Ask::Message(_)
+        // task B
+        w::Ask::ChangeSettings(_)
+        | w::Ask::Message(_)
         | w::Ask::Answer(_)
         | w::Ask::Take(_)
         | w::Ask::HandBack(_)
@@ -239,7 +251,9 @@ fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
 fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64) -> u64 {
     let change = match ask {
         w::Ask::AccountChange(row) => row.change(),
-        w::Ask::Message(_)
+        // task B
+        w::Ask::ChangeSettings(_)
+        | w::Ask::Message(_)
         | w::Ask::Answer(_)
         | w::Ask::Take(_)
         | w::Ask::HandBack(_)
@@ -278,5 +292,38 @@ fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64) -> u64 {
         | w::AccountChange::SetUses(_)
         | w::AccountChange::MoveOut(_)
         | w::AccountChange::Written(_) => 0,
+    }
+}
+
+// task B
+fn settings_ask(value: &w::Ask) -> bool {
+    match value {
+        w::Ask::ChangeSettings(_) => true,
+        w::Ask::Message(_)
+        | w::Ask::Answer(_)
+        | w::Ask::Take(_)
+        | w::Ask::HandBack(_)
+        | w::Ask::Decide(_)
+        | w::Ask::Release(_)
+        | w::Ask::Amend(_)
+        | w::Ask::Stop(_)
+        | w::Ask::Cancel(_)
+        | w::Ask::MoveTask(_)
+        | w::Ask::Seen(_)
+        | w::Ask::EditNote(_)
+        | w::Ask::DeleteNote(_)
+        | w::Ask::ChangePolicy(_)
+        | w::Ask::SetRoles(_)
+        | w::Ask::MakeService(_)
+        | w::Ask::SetPool(_)
+        | w::Ask::Compound(_)
+        | w::Ask::Create(_)
+        | w::Ask::Propose(_)
+        | w::Ask::Withdraw(_)
+        | w::Ask::SignIn(_)
+        | w::Ask::SignOut(_)
+        | w::Ask::AccountChange(_)
+        | w::Ask::Rename(_)
+        | w::Ask::MakeProject(_) => false,
     }
 }

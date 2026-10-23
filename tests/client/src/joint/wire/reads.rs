@@ -8,6 +8,7 @@ use jig_domain_people as people;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
+    Settings,
     Cursor,
     InboxGroup,
 }
@@ -16,6 +17,9 @@ pub enum Invalid {
 /// Refuses a cursor for another query or an inbox kind outside its supplied parent group.
 pub fn read(value: &client::Read, cursor_bytes: u32) -> Result<reads::Read, Invalid> {
     Ok(match value {
+        client::Read::Settings | client::Read::Setting(_) | client::Read::Revision(_) | client::Read::Revisions(_) => {
+            return Err(Invalid::Settings);
+        }
         client::Read::Tasks { query, live, ended } => reads::Read::Tasks {
             query: super::queries::query(query).map_err(|_| Invalid::InboxGroup)?,
             live: cursor(live.as_ref(), cursor_bytes)?,

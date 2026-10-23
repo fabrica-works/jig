@@ -134,7 +134,7 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
         assert_eq!(object.card, Card::Refused { refusal: refusal.clone() });
         assert_eq!(object.answer, Some(refusal_answer(refusal.clone())));
         match refusal {
-            Refusal::Moved { .. } => {
+            Refusal::Stale(_) | Refusal::Moved { .. } => {
                 assert!(recovery(&object).look_again);
                 assert!(
                     drive(&mut domain, Time::ZERO, Event::Act { action: Act::LookAgain { object: id.token() } })
@@ -153,7 +153,8 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
                 assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Task(Box::new(current))));
                 assert_eq!(domain.objects().get(id).unwrap().card, Card::Refused { refusal });
             }
-            Refusal::Circle { .. }
+            Refusal::Full(_)
+            | Refusal::Circle { .. }
             | Refusal::Dependency { .. }
             | Refusal::Kept { .. }
             | Refusal::Authority { .. }

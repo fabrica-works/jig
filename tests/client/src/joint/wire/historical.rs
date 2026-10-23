@@ -40,6 +40,10 @@ fn key(query: &client::Read) -> Result<client::ObjectKey, Invalid> {
         | client::Read::Ended { .. }
         | client::Read::Spend { .. }
         | client::Read::Project { .. }
+        | client::Read::Settings
+        | client::Read::Setting(_)
+        | client::Read::Revision(_)
+        | client::Read::Revisions(_)
         | client::Read::Deployment => return Err(Invalid::Query),
     })
 }

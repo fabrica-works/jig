@@ -13,7 +13,8 @@ impl<A: Application> Engine<A> {
         let (project, name, policy) = match ask {
             Ask::Rename { project, name } => (Some(*project), name, None),
             Ask::MakeProject { name, policy } => (None, name, Some(*policy)),
-            Ask::Create { .. }
+            Ask::ChangeSettings(_)
+            | Ask::Create { .. }
             | Ask::Propose { .. }
             | Ask::Withdraw { .. }
             | Ask::Message { .. }
