@@ -4,7 +4,7 @@ use crate::Limits;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
 use jig_client_domain::{Ask, Family};
-use jig_client_protocol_wire::{self as wire, v16 as w};
+use jig_client_protocol_wire::{self as wire, v17 as w};
 use skein_lib::{List, Reader, RequestRecord, Wall, Writer, bytes};
 
 pub(super) fn text(value: &[u8], limits: &Limits) -> Result<c::Text, w::Problem> {
@@ -264,6 +264,9 @@ fn account_change(value: &w::AccountChange) -> Result<c::AccountChange, w::Probl
                 name: bytes::copy_of(row.name()),
             }
         }
+        w::AccountChange::MoveOut(row) => c::AccountChange::MoveOut { account: row.account() },
+        w::AccountChange::Written(row) => c::AccountChange::Written { number: row.number() },
+        w::AccountChange::MoveIn(row) => c::AccountChange::MoveIn { digest: *row.digest() },
         w::AccountChange::CheckProgram(row) => c::AccountChange::CheckProgram { source: row.source() },
         w::AccountChange::AddKey(row) => {
             c::AccountChange::AddKey { provider: row.provider(), join: *row.join(), digest: *row.digest() }

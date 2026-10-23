@@ -17,11 +17,13 @@ pub(super) const fn holder(holder: people::AccountHolder, person: u64) -> accoun
 /// so the subject's refusals (another holder's, or not well formed) are never an answer here.
 pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::Outcome {
     let refusal = match answer {
-        // M2 (the account's move through the client) replaces this arm.
-        // Only the move variants are unreachable in M1: accounts' people_changes_never_emit_move_values.
-        accounts::Answer::MovingOut { .. } | accounts::Answer::MovedIn { .. } | accounts::Answer::Done => {
-            return people::Outcome::AccountChanged;
+        accounts::Answer::MovingOut { account, number, source } => {
+            return people::Outcome::AccountMovingOut { account, number, source };
         }
+        accounts::Answer::MovedIn { account, renewed } => {
+            return people::Outcome::AccountMovedIn { account, renewed };
+        }
+        accounts::Answer::Done => return people::Outcome::AccountChanged,
         accounts::Answer::Started { source, address } => {
             return people::Outcome::AccountSignInStarted { source, address };
         }
@@ -46,23 +48,19 @@ pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::O
         }
         accounts::Refusal::Limit { bound } => people::Refusal::Limit { which: limit(bound) },
         accounts::Refusal::Numbers => people::Refusal::Limit { which: people::LimitKind::Arithmetic },
-        // A provider or source kind that does not offer the requested change.
-        // M2 (the account's move through the client) replaces this arm.
-        // Only the move variants are unreachable in M1: accounts' people_changes_never_emit_move_values.
-        accounts::Refusal::NotSignedIn
-        | accounts::Refusal::NotOurs
-        | accounts::Refusal::Cancelled
-        | accounts::Refusal::Moving
-        | accounts::Refusal::Provider { .. }
+        accounts::Refusal::NotSignedIn => people::Refusal::AccountMove { why: people::AccountMoveWhy::NotSignedIn },
+        accounts::Refusal::NotOurs => people::Refusal::AccountMove { why: people::AccountMoveWhy::NotOurs },
+        accounts::Refusal::Cancelled => people::Refusal::AccountMove { why: people::AccountMoveWhy::Cancelled },
+        accounts::Refusal::Moving => people::Refusal::AccountMove { why: people::AccountMoveWhy::Moving },
+        accounts::Refusal::Held { .. } => people::Refusal::AccountMove { why: people::AccountMoveWhy::Held },
+        accounts::Refusal::Provider { .. }
         | accounts::Refusal::Kind { .. }
         | accounts::Refusal::NotLimited
         | accounts::Refusal::Uses => people::Refusal::NotOffered,
         accounts::Refusal::NotKept { why: accounts::KeyFailure::TooLong } => {
             people::Refusal::Limit { which: people::LimitKind::Words }
         }
-        accounts::Refusal::Unknown | accounts::Refusal::Held { .. } | accounts::Refusal::Subject => {
-            people::Refusal::Unknown
-        }
+        accounts::Refusal::Unknown | accounts::Refusal::Subject => people::Refusal::Unknown,
     };
     people::Outcome::Refused(refusal)
 }
@@ -107,9 +105,13 @@ pub(crate) fn change(
             accounts::Change::DeclareProgram { provider, join, name }
         }
         people::AccountChange::CheckProgram { source } => accounts::Change::CheckProgram { source },
-        people::AccountChange::AddKey { .. } | people::AccountChange::ReplaceKey { .. } => {
+        people::AccountChange::AddKey { .. }
+        | people::AccountChange::ReplaceKey { .. }
+        | people::AccountChange::MoveIn { .. } => {
             return Err(people::Refusal::NotOffered);
         }
+        people::AccountChange::MoveOut { account } => accounts::Change::MoveOut { account },
+        people::AccountChange::Written { number } => accounts::Change::Written { number },
         people::AccountChange::RemoveKey { source } => accounts::Change::RemoveKey { source },
         people::AccountChange::Resume { source } => accounts::Change::Resume { source },
         people::AccountChange::Remove { account } => accounts::Change::Remove { account },

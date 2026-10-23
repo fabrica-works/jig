@@ -90,6 +90,7 @@ fn the_server_listens_where_the_application_member_says() {
         &mut engine.events,
         &engine.env.limits.connector,
         engine.env.limits.core.documents.rows,
+        &mut engine.accounts,
     );
     let Some(skein_io::Request::Listen { addr, .. }) = clients.io.pop() else { panic!("listener requested") };
     assert_eq!(addr, skein_io::Addr::Ip(core::net::SocketAddr::new(core::net::IpAddr::from([127, 0, 0, 1]), PORT)));

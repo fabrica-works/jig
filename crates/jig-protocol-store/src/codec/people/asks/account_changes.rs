@@ -1,4 +1,4 @@
-//! Holder account changes retain only LLM key digests (domain/accounts.md, section 5).
+//! Holder account changes retain only carried-value digests (domain/accounts.md, section 5).
 use super::{domain, wire};
 use alloc::boxed::Box;
 use skein_lib::{List, bytes};
@@ -7,6 +7,18 @@ pub(super) fn encode(
     limits: &wire::Limits,
 ) -> Result<wire::AccountChange, wire::Problem> {
     Ok(match value {
+        domain::AccountChange::MoveOut { account } => wire::AccountChange::MoveOut(wire::AccountChangeMoveOut::new(
+            limits,
+            wire::AccountChangeMoveOutParts { account: *account },
+        )?),
+        domain::AccountChange::Written { number } => wire::AccountChange::Written(wire::AccountChangeWritten::new(
+            limits,
+            wire::AccountChangeWrittenParts { number: *number },
+        )?),
+        domain::AccountChange::MoveIn { digest } => wire::AccountChange::MoveIn(wire::AccountChangeMoveIn::new(
+            limits,
+            wire::AccountChangeMoveInParts { digest: bytes::copy_of(digest) },
+        )?),
         domain::AccountChange::DeclareProgram { provider, join, name } => {
             wire::AccountChange::DeclareProgram(wire::AccountChangeDeclareProgram::new(
                 limits,
@@ -61,6 +73,11 @@ pub(super) fn encode(
 }
 pub(super) fn decode(value: wire::AccountChange) -> Result<domain::AccountChange, wire::Problem> {
     Ok(match value {
+        wire::AccountChange::MoveOut(value) => domain::AccountChange::MoveOut { account: value.account() },
+        wire::AccountChange::Written(value) => domain::AccountChange::Written { number: value.number() },
+        wire::AccountChange::MoveIn(value) => domain::AccountChange::MoveIn {
+            digest: digest(value.into_parts().digest, wire::Path::AccountChangeMoveInDigest)?,
+        },
         wire::AccountChange::DeclareProgram(value) => {
             let value = value.into_parts();
             if !domain::program_name(&value.name) {

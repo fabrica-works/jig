@@ -50,6 +50,7 @@ pub fn recovery(object: &Object) -> Recovery {
             | Refusal::NameTaken
             | Refusal::NotOffered
             | Refusal::NoEscalationHolder
+            | Refusal::AccountMove { .. }
             | Refusal::Provider
             | Refusal::KeyConflict => {}
         },

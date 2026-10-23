@@ -1011,6 +1011,8 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::AccountSignInStarted { .. }
         | people::Outcome::AccountProgramDeclared { .. }
         | people::Outcome::AccountKeyKept { .. }
+        | people::Outcome::AccountMovingOut { .. }
+        | people::Outcome::AccountMovedIn { .. }
         | people::Outcome::AccountChanged
         | people::Outcome::AccountRemoved { .. }
         | people::Outcome::AccountSignedOut { .. }

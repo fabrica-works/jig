@@ -47,6 +47,7 @@ impl World {
 impl World {
     /// Announce the source's form before placement starts its run.
     pub fn announce_grant(&mut self, account: u32, generation: u64, form: accounts::Form) {
+        self.account_generations.insert(account, generation);
         self.send(root::Event::Core(core::Event::Account(accounts::Event::Component(
             accounts::FromComponent::Granted { account, generation, valid: Duration::from_secs(60), form },
         ))));

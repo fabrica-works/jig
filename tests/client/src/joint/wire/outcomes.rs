@@ -9,6 +9,7 @@ use skein_lib::{List, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
     Owner(client::OwnerOutcome),
+    MovingOut { account: u32, number: u32, source: u32 },
     Applied { connector: u16, token: Token },
     Again(people::Again),
     SignedOut,
@@ -21,6 +22,12 @@ pub enum Outcome {
 #[expect(clippy::too_many_lines, reason = "one exhaustive translation retains every owner outcome")]
 pub fn outcome(value: &people::Outcome, limits: &Limits) -> Result<Outcome, owner::Invalid> {
     let owner = match value {
+        people::Outcome::AccountMovingOut { account, number, source } => {
+            return Ok(Outcome::MovingOut { account: *account, number: *number, source: *source });
+        }
+        people::Outcome::AccountMovedIn { account, renewed } => {
+            client::OwnerOutcome::AccountMovedIn { account: *account, renewed: *renewed }
+        }
         people::Outcome::NoteEdited { name } => client::OwnerOutcome::NoteEdited { name: *name },
         people::Outcome::ServiceMade { person } => client::OwnerOutcome::ServiceMade { person: *person },
         people::Outcome::Adopted { project } => client::OwnerOutcome::Adopted { project: *project },

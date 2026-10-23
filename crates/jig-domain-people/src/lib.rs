@@ -84,7 +84,7 @@ pub use domain::EndedMark;
 mod facts;
 mod limits;
 mod llm;
-pub use llm::{AccountWhy, LlmChoice, LlmWhy, MODELS, ModelEffort, llm_bytes};
+pub use llm::{AccountMoveWhy, AccountWhy, LlmChoice, LlmWhy, MODELS, ModelEffort, llm_bytes};
 mod policy_value;
 mod refusals;
 #[cfg(test)]

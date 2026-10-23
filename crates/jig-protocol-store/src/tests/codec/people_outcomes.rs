@@ -3,6 +3,42 @@ use super::{fixtures, people_round_trip};
 use fixtures::people_outcomes as values;
 use jig_domain_people as domain;
 use skein_lib::Wall;
+
+#[test]
+fn account_move_asks_read_back_with_their_numbers_and_digest() {
+    for change in [
+        domain::AccountChange::MoveOut { account: 3 },
+        domain::AccountChange::Written { number: 7 },
+        domain::AccountChange::MoveIn { digest: [0xa5; 32] },
+    ] {
+        super::ask_round_trip(domain::Ask::AccountChange { holder: domain::AccountHolder::Own, change });
+    }
+}
+
+#[test]
+fn account_move_answers_read_back_without_a_record() {
+    for outcome in [
+        domain::Outcome::AccountMovingOut { account: 3, number: 7, source: 5 },
+        domain::Outcome::AccountChanged,
+        domain::Outcome::AccountMovedIn { account: 3, renewed: false },
+        domain::Outcome::AccountMovedIn { account: 3, renewed: true },
+    ] {
+        people_round_trip(values::answered(outcome));
+    }
+}
+
+#[test]
+fn every_account_move_refusal_reads_back() {
+    for why in [
+        domain::AccountMoveWhy::NotSignedIn,
+        domain::AccountMoveWhy::NotOurs,
+        domain::AccountMoveWhy::Held,
+        domain::AccountMoveWhy::Cancelled,
+        domain::AccountMoveWhy::Moving,
+    ] {
+        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::AccountMove { why })));
+    }
+}
 fn each_again_reads_back() {
     for value in values::again_values() {
         people_round_trip(values::answered(domain::Outcome::Again(value)));
@@ -160,8 +196,8 @@ fn an_account_sign_in_address_over_its_bound_is_an_encode_error() {
     let result = crate::codec::people::encode(&row, &super::people_limits(), &fixtures::model_names(&[]));
     assert_eq!(
         result,
-        Err(crate::people_v12::Problem {
-            path: crate::people_v12::Path::OutcomeAccountSignInStartedAddress,
+        Err(crate::people_v13::Problem {
+            path: crate::people_v13::Path::OutcomeAccountSignInStartedAddress,
             reason: skein_codec::Reason::Bound,
         })
     );

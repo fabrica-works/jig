@@ -195,3 +195,120 @@ fn program_host_results_share_the_native_answer_budget() {
         Some(w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Bound })
     );
 }
+
+#[test]
+fn account_move_asks_are_translated_both_ways() {
+    let limits = fixtures::limits();
+    for holder in [c::AccountHolder::Own, c::AccountHolder::Deployment] {
+        for change in [
+            c::AccountChange::MoveOut { account: u32::MAX },
+            c::AccountChange::Written { number: u32::MAX },
+            c::AccountChange::MoveIn { digest: [255; 32] },
+        ] {
+            let ask = c::Ask::AccountChange { holder, change };
+            let wire = translate::asks::ask(&ask, &limits.wire).unwrap();
+            assert_eq!(translate::store::restore_ask(wire, &limits), Ok(ask));
+        }
+    }
+}
+#[test]
+fn a_moving_out_answer_decodes_its_secret_record() {
+    let limits = fixtures::limits();
+    for bytes in [b"".as_slice(), b"moved record"] {
+        let record = skein_lib::Secret::new(Box::from(bytes));
+        let what = w::Made::MovingOut(
+            w::MadeMovingOut::new(
+                &limits.wire,
+                w::MadeMovingOutParts { account: u32::MAX, number: u32::MAX, record: record.clone() },
+            )
+            .unwrap(),
+        );
+        let outcome = w::Outcome::Made(w::OutcomeMade::new(&limits.wire, w::OutcomeMadeParts { what }).unwrap());
+        let done = w::Final::Done(w::Done::new(&limits.wire, w::DoneParts { outcome }).unwrap());
+        let mut writer = skein_lib::Writer::new(usize::try_from(done.measure()).unwrap());
+        done.encode(&mut writer).unwrap();
+        let answer = w::KeyedAnswer::FinalAnswer(
+            w::Owned::new(
+                &limits.wire,
+                w::OwnedParts {
+                    owner: w::Owner::Jig,
+                    version: jig_client_protocol_wire::VERSION,
+                    record: writer.finish(),
+                },
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            translate::answers::answer(answer, &limits),
+            Ok(c::Answer::Done(c::Outcome::Made {
+                what: c::Made::MovingOut { account: u32::MAX, number: u32::MAX, record },
+            }))
+        );
+    }
+}
+#[test]
+fn moved_in_outcomes_keep_the_renewed_fact() {
+    let limits = fixtures::limits();
+    for renewed in [false, true] {
+        let wire = w::OwnerOutcome::AccountMovedIn(
+            w::OwnerOutcomeAccountMovedIn::new(
+                &limits.wire,
+                w::OwnerOutcomeAccountMovedInParts { account: u32::MAX, renewed },
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            translate::answers::owner_outcome(&wire, &limits),
+            Ok(c::OwnerOutcome::AccountMovedIn { account: u32::MAX, renewed })
+        );
+    }
+}
+#[test]
+fn account_move_refusals_keep_each_reason() {
+    let limits = fixtures::limits();
+    for (wire, why) in [
+        (w::AccountMoveWhy::NotSignedIn, c::AccountMoveWhy::NotSignedIn),
+        (w::AccountMoveWhy::NotOurs, c::AccountMoveWhy::NotOurs),
+        (w::AccountMoveWhy::Held, c::AccountMoveWhy::Held),
+        (w::AccountMoveWhy::Cancelled, c::AccountMoveWhy::Cancelled),
+        (w::AccountMoveWhy::Moving, c::AccountMoveWhy::Moving),
+    ] {
+        let wire = w::Refusal::AccountMove(
+            w::RefusalAccountMove::new(&limits.wire, w::RefusalAccountMoveParts { why: wire }).unwrap(),
+        );
+        assert_eq!(translate::answers::refusal(&wire, &limits), Ok(c::Refusal::AccountMove { why }));
+    }
+}
+#[test]
+fn moving_states_cross_into_account_and_task_documents() {
+    let limits = fixtures::limits();
+    assert_eq!(
+        translate::documents::owner_account_state_fields(&w::OwnerAccountState::Moving, &limits),
+        c::OwnerAccountState::Moving
+    );
+    let wait = w::TaskRunWait::Account(
+        w::TaskWaitAccount::new(
+            &limits.wire,
+            w::TaskWaitAccountParts {
+                account: Some(u32::MAX),
+                source: Some(u32::MAX),
+                why: w::TaskWaitWhy::Source(
+                    w::TaskWaitSource::new(&limits.wire, w::TaskWaitSourceParts { state: w::TaskSourceState::Moving })
+                        .unwrap(),
+                ),
+            },
+        )
+        .unwrap(),
+    );
+    let mut task = fixtures::task_record().into_parts();
+    task.run_wait = Some(wait);
+    let wire = w::Task::new(&limits.wire, task).unwrap();
+    assert_eq!(
+        translate::documents::task_fields(&wire, &limits).unwrap().run_wait,
+        Some(c::TaskRunWait::Account {
+            account: Some(u32::MAX),
+            source: Some(u32::MAX),
+            why: c::TaskWaitWhy::Source(c::TaskSourceState::Moving),
+        })
+    );
+}

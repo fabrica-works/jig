@@ -130,6 +130,7 @@ impl Component {
             | Waiting::Watch { .. }
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
+            | Waiting::Moving { .. }
             | Waiting::Made { .. }
             | Waiting::Ask { .. }
             | Waiting::Carry { .. }
@@ -166,6 +167,7 @@ impl Component {
             | Waiting::Watch { .. }
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
+            | Waiting::Moving { .. }
             | Waiting::Made { .. }
             | Waiting::Ask { .. }
             | Waiting::Carry { .. }

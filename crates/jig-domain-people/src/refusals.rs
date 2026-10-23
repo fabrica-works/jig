@@ -18,6 +18,8 @@ pub enum Accepter {
 pub enum Refusal {
     /// Another project holds this name under simple case folding.
     NameTaken,
+    /// A holder's account move could not proceed (domain/accounts.md, section 6).
+    AccountMove { why: crate::AccountMoveWhy },
     /// The bounded wait circle in traversal order (tasks.md, 6.7).
     Circle { tasks: Box<[u64]>, cut: bool },
     /// An added prerequisite already failed or was cancelled (tasks.md, 7).

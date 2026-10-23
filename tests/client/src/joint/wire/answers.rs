@@ -14,6 +14,11 @@ pub enum Reply {
         expires: Wall,
     },
     Final(client::Answer),
+    MovingOut {
+        account: u32,
+        number: u32,
+        source: u32,
+    },
     Again(people::Again),
     SignedOut,
     /// The connector's separate whole application answer supplies its body.
@@ -39,6 +44,7 @@ pub fn reply(
             Reply::Final(client::Answer::Refused { refusal: refusal(why, models, limits)?, at: None })
         }
         people::Reply::Outcome(value) => match outcomes::outcome(&value, limits)? {
+            outcomes::Outcome::MovingOut { account, number, source } => Reply::MovingOut { account, number, source },
             outcomes::Outcome::Owner(value) => Reply::Final(client::Answer::Done(client::Outcome::Owner(value))),
             outcomes::Outcome::Applied { connector, token } => Reply::Applied { connector, token },
             outcomes::Outcome::Again(why) => Reply::Again(why),
@@ -74,6 +80,7 @@ fn refusal(
         | people::Refusal::NoFurther
         | people::Refusal::Unknown
         | people::Refusal::Account { .. }
+        | people::Refusal::AccountMove { .. }
         | people::Refusal::Provider
         | people::Refusal::NameTaken
         | people::Refusal::NotOffered
@@ -91,7 +98,7 @@ pub fn keyed(value: Reply) -> Result<(RequestEnvelope, Option<client::Answer>), 
         Reply::Final(answer) => Ok((RequestEnvelope::Final, Some(answer))),
         Reply::Again(_) => Ok((RequestEnvelope::Again, None)),
         Reply::SignedOut => Ok((RequestEnvelope::SignedOut, None)),
-        other @ (Reply::SignedIn { .. } | Reply::Applied { .. }) => Err(other),
+        other @ (Reply::SignedIn { .. } | Reply::Applied { .. } | Reply::MovingOut { .. }) => Err(other),
     }
 }
 

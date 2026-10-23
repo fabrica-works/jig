@@ -609,8 +609,33 @@ impl Session {
                 if self.driver.transport.reply(to).is_none() {
                     return Ok(());
                 }
-                let value = packets::people_reply(&mut self.driver.transport, to, reply, &self.limits.client.domain)
-                    .map_err(Invalid::Packet)?;
+                let translated =
+                    super::wire::answers::reply(reply, &self.driver.transport.models, &self.limits.client.domain)
+                        .map_err(|why| {
+                            Invalid::Packet(packets::Invalid::Document(super::wire::documents::Invalid::Owner(why)))
+                        })?;
+                let translated = match translated {
+                    super::wire::answers::Reply::MovingOut { account, number, source } => {
+                        let record = self
+                            .driver
+                            .world
+                            .take_moved(source)
+                            .unwrap_or_else(|| skein_lib::Secret::new(Box::new([])));
+                        super::wire::answers::Reply::Final(jig_client_domain::contract::Answer::Done(
+                            jig_client_domain::contract::Outcome::Made {
+                                what: jig_client_domain::contract::Made::MovingOut { account, number, record },
+                            },
+                        ))
+                    }
+                    value @ (super::wire::answers::Reply::SignedIn { .. }
+                    | super::wire::answers::Reply::Final(_)
+                    | super::wire::answers::Reply::Again(_)
+                    | super::wire::answers::Reply::SignedOut
+                    | super::wire::answers::Reply::Applied { .. }) => value,
+                };
+                let value =
+                    packets::translated_reply(&mut self.driver.transport, to, translated, &self.limits.client.domain)
+                        .map_err(Invalid::Packet)?;
                 self.incoming(value, now, wall)?;
             }
             root::Delivery::Core(core::Held::Read { reply, answer }) => {

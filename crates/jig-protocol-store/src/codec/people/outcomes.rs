@@ -45,6 +45,18 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
                 wire::OutcomeAccountProgramDeclaredParts { source: *source, name: name.clone() },
             )?)
         }
+        domain::Outcome::AccountMovingOut { account, number, source } => {
+            wire::Outcome::AccountMovingOut(wire::OutcomeAccountMovingOut::new(
+                limits,
+                wire::OutcomeAccountMovingOutParts { account: *account, number: *number, source: *source },
+            )?)
+        }
+        domain::Outcome::AccountMovedIn { account, renewed } => {
+            wire::Outcome::AccountMovedIn(wire::OutcomeAccountMovedIn::new(
+                limits,
+                wire::OutcomeAccountMovedInParts { account: *account, renewed: *renewed },
+            )?)
+        }
         domain::Outcome::AccountChanged => wire::Outcome::AccountChanged,
         domain::Outcome::AccountRemoved { confirmed, failed_hosts } => {
             wire::Outcome::AccountRemoved(wire::OutcomeAccountRemoved::new(
@@ -173,6 +185,14 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             source: value.source(),
             name: skein_lib::bytes::copy_of(value.name()),
         },
+        wire::Outcome::AccountMovingOut(value) => {
+            let wire::OutcomeAccountMovingOutParts { account, number, source } = value.into_parts();
+            domain::Outcome::AccountMovingOut { account, number, source }
+        }
+        wire::Outcome::AccountMovedIn(value) => {
+            let wire::OutcomeAccountMovedInParts { account, renewed } = value.into_parts();
+            domain::Outcome::AccountMovedIn { account, renewed }
+        }
         wire::Outcome::AccountChanged => domain::Outcome::AccountChanged,
         wire::Outcome::AccountRemoved(value) => domain::Outcome::AccountRemoved {
             confirmed: value.confirmed(),

@@ -189,6 +189,8 @@ impl World {
         let mut rows = rows.into_vec();
         rows.extend(crate::fixtures::project_policy_rows(&configuration.core));
         world.seed(rows.into_boxed_slice());
+        world.move_provider =
+            configuration.core.settings.llm_providers.providers.first().map(|provider| provider.number);
         world.domain = root::Domain::new(configuration, &limits);
         world.send(root::Event::RestartBegin);
         world.hello_engine();
@@ -246,6 +248,7 @@ impl World {
             crate::fixtures::create_chat(&creating, 1, 0, b"make an effect".as_slice().into())
         };
         let store = Store::new(limits, &configuration.core.settings.models);
+        let move_provider = configuration.core.settings.llm_providers.providers.first().map(|provider| provider.number);
         World {
             bootstrap_owners: Vec::new(),
             fixture_accounts: Box::new([]),
@@ -265,6 +268,10 @@ impl World {
             fail_account_before_workspace: false,
             hold_accounts: false,
             fail_llm_key_keep: None,
+            fail_move_open: false,
+            moved: std::collections::BTreeMap::new(),
+            account_generations: std::collections::BTreeMap::new(),
+            move_provider,
             assignments: Vec::new(),
             cancellations: Vec::new(),
             busy_turns: Vec::new(),

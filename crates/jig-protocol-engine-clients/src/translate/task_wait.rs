@@ -1,5 +1,5 @@
 //! Task wait facts are already joined and translated to wall time by the core.
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use jig_domain_core::documents as d;
 
 pub(super) fn waiting(value: Option<d::TaskRunWait>, limits: &w::Limits) -> Result<Option<w::TaskRunWait>, w::Problem> {
@@ -82,6 +82,7 @@ fn source_state(value: d::TaskSourceState, limits: &w::Limits) -> Result<w::Task
         d::TaskSourceState::NeedsSignIn => w::TaskSourceState::NeedsSignIn,
         d::TaskSourceState::Misconfigured => w::TaskSourceState::Misconfigured,
         d::TaskSourceState::Cancelled => w::TaskSourceState::Cancelled,
+        d::TaskSourceState::Moving => w::TaskSourceState::Moving,
         d::TaskSourceState::Closing => w::TaskSourceState::Closing,
         d::TaskSourceState::Unloaded { at, why } => w::TaskSourceState::Unloaded(w::TaskSourceStateUnloaded::new(
             limits,

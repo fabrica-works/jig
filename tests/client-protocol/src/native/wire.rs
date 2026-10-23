@@ -2,7 +2,7 @@
 use super::Received;
 use jig_client::{Event, Message, Request, Streamed};
 use jig_client_protocol_link::translate;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use skein_lib::{Reader, Secret, Token};
 use std::collections::BTreeMap;
 

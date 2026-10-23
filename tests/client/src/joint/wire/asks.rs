@@ -380,6 +380,9 @@ fn account_holder(value: client::AccountHolder) -> people::AccountHolder {
 
 fn account_change(value: &client::AccountChange) -> people::AccountChange {
     match value {
+        client::AccountChange::MoveOut { account } => people::AccountChange::MoveOut { account: *account },
+        client::AccountChange::Written { number } => people::AccountChange::Written { number: *number },
+        client::AccountChange::MoveIn { digest } => people::AccountChange::MoveIn { digest: *digest },
         client::AccountChange::DeclareProgram { provider, join, name } => {
             people::AccountChange::DeclareProgram { provider: *provider, join: *join, name: name.clone() }
         }

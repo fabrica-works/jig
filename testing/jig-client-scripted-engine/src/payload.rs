@@ -172,6 +172,9 @@ impl Payload for Ask {
                         .ok()
                 }
                 jig_client_domain::contract::AccountChange::CheckProgram { .. }
+                | jig_client_domain::contract::AccountChange::MoveOut { .. }
+                | jig_client_domain::contract::AccountChange::Written { .. }
+                | jig_client_domain::contract::AccountChange::MoveIn { .. }
                 | jig_client_domain::contract::AccountChange::AddKey { .. }
                 | jig_client_domain::contract::AccountChange::ReplaceKey { .. }
                 | jig_client_domain::contract::AccountChange::RemoveKey { .. }
@@ -245,6 +248,12 @@ impl Payload for Outcome {
 impl Payload for Made {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::MovingOut { record, .. } => {
+                if record.len() > jig_client_domain::VALUE_BYTES {
+                    return None;
+                }
+                u64::try_from(record.len()).ok()
+            }
             Self::PersonResult { task } => sum(&[task.heap(bounds)]),
             Self::Tasks { tasks } => sum(&[tasks.heap(bounds)]),
             Self::Service { party } => sum(&[party.heap(bounds)]),
@@ -1085,6 +1094,7 @@ impl Payload for Refusal {
             | Self::NotOffered
             | Self::KeyConflict
             | Self::Dependency { .. }
+            | Self::AccountMove { .. }
             | Self::Account { .. } => Some(0),
             Self::Llm { model, why: _ } => model.heap(bounds),
         }

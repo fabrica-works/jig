@@ -37,6 +37,7 @@ impl Component {
                     | Waiting::Keep { sign_in: number, .. }
                     | Waiting::Get { owner: SecretOwner::SignIn(number), .. }
                     | Waiting::LinkGet { sign_in: number, .. }
+                    | Waiting::Moving { sign_in: number, .. }
                     | Waiting::Made { sign_in: number, .. }
                     | Waiting::Checked { sign_in: number, .. }
                     | Waiting::Read { sign_in: number, .. }
@@ -54,6 +55,7 @@ impl Component {
                     | Waiting::Watch { .. }
                     | Waiting::Keep { .. }
                     | Waiting::Get { .. }
+                    | Waiting::Moving { .. }
                     | Waiting::Made { .. }
                     | Waiting::Checked { .. }
                     | Waiting::Read { .. }
@@ -81,7 +83,7 @@ impl Component {
                 Waiting::Get { route, .. } | Waiting::Checked { route, .. } => {
                     self.denied(env, exchange, route);
                 }
-                Waiting::Ask { .. } | Waiting::Carry { .. } => {
+                Waiting::Ask { .. } | Waiting::Carry { .. } | Waiting::Moving { .. } => {
                     self.respond(env, exchange, routes::signed_out(&env.limits.wire));
                 }
                 Waiting::Watch { opening, .. } => {
@@ -161,6 +163,7 @@ impl Component {
                     | Waiting::Watch { .. }
                     | Waiting::Keep { .. }
                     | Waiting::Get { .. }
+                    | Waiting::Moving { .. }
                     | Waiting::Made { .. }
                     | Waiting::Read { .. }
                     | Waiting::ApplicationRead { .. }

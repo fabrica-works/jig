@@ -389,6 +389,7 @@ fn movable(domain: &Domain, limits: &Limits, holder: Holder, account: u32) -> Re
     }
     match domain.source(source).expect("a checked source").state {
         crate::State::NeedsSignIn | crate::State::Unloaded { .. } => return Err(Refusal::NotSignedIn),
+        crate::State::Moving => return Err(Refusal::Moving),
         crate::State::Asking
         | crate::State::Granted
         | crate::State::Later { .. }

@@ -174,6 +174,10 @@ pub fn account_end_records() -> Vec<w::OwnerAccountEnd> {
         ),
         w::OwnerAccountRefusal::Closing,
         w::OwnerAccountRefusal::NotStarted,
+        w::OwnerAccountRefusal::NotSignedIn,
+        w::OwnerAccountRefusal::NotOurs,
+        w::OwnerAccountRefusal::Cancelled,
+        w::OwnerAccountRefusal::Moving,
     ];
     for refusal in refusals {
         ends.push(w::OwnerAccountEnd::Refused(

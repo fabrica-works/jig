@@ -60,6 +60,7 @@ pub(super) enum Routed {
     Secrets(kit::SecretsRequest),
     Transport(kit::ToTransport),
     Link(skein_lib::Secret),
+    TakeMoved { exchange: Token, source: u32 },
     Closed,
 }
 pub(super) fn to_root(request: kit::Request) -> Routed {
@@ -72,6 +73,7 @@ pub(super) fn to_root(request: kit::Request) -> Routed {
         kit::Request::Minted { .. } | kit::Request::MintRefused { .. } => {
             unreachable!("the test service mints no application sign-ins")
         }
+        kit::Request::TakeMoved { exchange, source } => Routed::TakeMoved { exchange, source },
         kit::Request::Closed => Routed::Closed,
     }
 }
@@ -88,6 +90,11 @@ impl Clients {
         room: u32,
         transport: &crate::server::Limits,
     ) -> Result<Self, Problems> {
+        if jig_protocol_accounts::moved::bound(&config.limits.driver.client.document)
+            > u64::from(config.limits.clients.wire.keyed_value_some)
+        {
+            return Err(invalid(What::Bound));
+        }
         let mut providers = List::with_capacity(u32::try_from(config.providers.len()).expect("bounded providers"));
         let mut link_provider = None;
         let mut deployment_provider = 0;
@@ -142,6 +149,14 @@ impl Clients {
             seed: seeds.crypto.clone(),
             stream: seeds.seed,
             models: config::clients::models(&config.llm),
+            key_bytes: config
+                .limits
+                .driver
+                .client
+                .document
+                .token_bytes
+                .min(config.limits.clients.wire.keyed_value_some),
+            moved_bytes: jig_protocol_accounts::moved::bound(&config.limits.driver.client.document),
         };
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients };
         let out = Queue::with_capacity(room);
@@ -310,7 +325,13 @@ impl Clients {
             events.push(value);
         }
     }
-    pub fn advance(&mut self, events: &mut Queue<root::Event>, bound: &jig_test_connector::Limits, rows: u32) {
+    pub fn advance(
+        &mut self,
+        events: &mut Queue<root::Event>,
+        bound: &jig_test_connector::Limits,
+        rows: u32,
+        accounts: &mut Option<crate::accounts::Accounts>,
+    ) {
         for _ in 0..self.out.len() {
             if self.io.room() == 0
                 || self.links.room() == 0
@@ -327,6 +348,13 @@ impl Clients {
                 Routed::Link(value) => {
                     self.secret = Some(value);
                     self.print_link();
+                }
+                Routed::TakeMoved { exchange, source } => {
+                    let record = match accounts {
+                        Some(accounts) => accounts.take_moved(source),
+                        None => None,
+                    };
+                    self.down(kit::Event::MovedTaken { exchange, record });
                 }
                 Routed::Secrets(value) => self.secrets.push(value),
                 Routed::Root(value) => self.root(*value, events),
@@ -345,6 +373,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         bound: &jig_test_connector::Limits,
         rows: u32,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         self.env.now = now;
         self.env.wall = wall;
@@ -357,15 +386,15 @@ impl Clients {
         self.server.fire(&mut self.server_out);
         let server_pending = self.server.advance(&mut self.server_out);
         self.server_requests();
-        self.endings_step(events, bound, rows);
-        self.advance(events, bound, rows);
+        self.endings_step(events, bound, rows, accounts);
+        self.advance(events, bound, rows, accounts);
         if self.closed {
             return;
         }
         if !self.component_closed {
             self.component.as_mut().expect("clients started at first service clock").fire(&self.env, &mut self.out);
         }
-        self.advance(events, bound, rows);
+        self.advance(events, bound, rows, accounts);
         self.pending = server_pending || !self.server_out.is_empty();
         self.pending |= self.mount.up(&self.mount_env, &mut self.mount_out);
         if let Some(request) = self.mount_out.pop() {
@@ -379,7 +408,7 @@ impl Clients {
             self.pending |=
                 self.component.as_mut().expect("clients started at first service clock").up(&self.env, &mut self.out);
         }
-        self.advance(events, bound, rows);
+        self.advance(events, bound, rows, accounts);
     }
 }
 pub(super) fn owns(token: Token) -> bool {
@@ -523,7 +552,13 @@ impl Clients {
         }
         false
     }
-    fn endings_step(&mut self, events: &mut Queue<root::Event>, bound: &jig_test_connector::Limits, rows: u32) {
+    fn endings_step(
+        &mut self,
+        events: &mut Queue<root::Event>,
+        bound: &jig_test_connector::Limits,
+        rows: u32,
+        accounts: &mut Option<crate::accounts::Accounts>,
+    ) {
         while self.room(1) && events.room() >= kit::MAX_OUT_DOWN {
             let mut ready = None;
             for (number, _) in &self.endings {
@@ -540,7 +575,7 @@ impl Clients {
                 self.endings.remove(&number);
             }
             self.down(kit::Event::SignInEnded { sign_in });
-            self.advance(events, bound, rows);
+            self.advance(events, bound, rows, accounts);
         }
     }
 }

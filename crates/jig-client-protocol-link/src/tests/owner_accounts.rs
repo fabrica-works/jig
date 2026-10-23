@@ -105,6 +105,10 @@ fn ends() -> Box<[c::OwnerAccountEnd]> {
         c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Kind { kind: c::OwnerAccountKind::Program } },
         c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Closing },
         c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::NotStarted },
+        c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::NotSignedIn },
+        c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::NotOurs },
+        c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Cancelled },
+        c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Moving },
         c::OwnerAccountEnd::Failed {
             failure: c::OwnerAccountFailure::Later { after: Some(Duration::from_nanos(103)) },
         },

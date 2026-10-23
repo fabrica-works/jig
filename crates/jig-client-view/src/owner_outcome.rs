@@ -66,6 +66,13 @@ fn header(value: &OwnerOutcome) -> P {
         OwnerOutcome::PolicyChanged { .. } => P::PolicyChanged,
         OwnerOutcome::AccountProgramDeclared { .. } => P::AccountProgramDeclared,
         OwnerOutcome::AccountKeyKept { .. } => P::AccountKeyKept,
+        OwnerOutcome::AccountMovedIn { renewed, .. } => {
+            if *renewed {
+                P::AccountRenewed
+            } else {
+                P::AccountMovedIn
+            }
+        }
         OwnerOutcome::AccountChanged => P::AccountChanged,
         OwnerOutcome::AccountRemoved { .. } => P::AccountRemoved,
         OwnerOutcome::AccountSignInStarted { .. } => P::AccountSignInStarted,
@@ -132,6 +139,7 @@ fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
         OwnerOutcome::AccountKeyKept { .. }
         | OwnerOutcome::AccountChanged
         | OwnerOutcome::AccountSignInStarted { .. } => {}
+        OwnerOutcome::AccountMovedIn { account, .. } => number(b, words, P::AccountNumber, u64::from(*account)),
         OwnerOutcome::AccountProgramDeclared { source, name } => {
             number(b, words, P::SourceNumber, u64::from(*source));
             b.text(Run::Plain, name);

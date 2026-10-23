@@ -17,6 +17,8 @@ pub mod truth;
 pub mod wire;
 
 #[cfg(test)]
+mod account_moves;
+#[cfg(test)]
 mod stories;
 
 #[cfg(test)]

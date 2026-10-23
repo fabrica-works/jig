@@ -10,6 +10,9 @@ use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::{Duration, Time, Token, Wall};
 
+#[path = "credentials/moves.rs"]
+mod moves;
+
 fn configured(seed: u64) -> World {
     let (config, limits) = world::with_workspace_credential(seed);
     let mut world = World::configured(seed, false, config, limits);

@@ -60,6 +60,7 @@ fn a_printed_link_survives_the_first_host_clock() {
         &mut engine.events,
         &engine.env.limits.connector,
         engine.env.limits.core.documents.rows,
+        &mut engine.accounts,
     );
     let mut peer = Peer::new(engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
     peer.pump(engine);
@@ -173,14 +174,19 @@ fn address() -> io::Addr {
 fn ready_client(service: &mut crate::Service) -> &mut crate::Engine {
     let engine = f::engine(service);
     let clients = engine.clients.as_mut().expect("clients");
-    clients.advance(&mut engine.events, &engine.env.limits.connector, engine.env.limits.core.documents.rows);
+    clients.advance(
+        &mut engine.events,
+        &engine.env.limits.connector,
+        engine.env.limits.core.documents.rows,
+        &mut engine.accounts,
+    );
     take_listener(engine);
     listening(engine);
     engine.clients.as_mut().expect("clients").starting = None;
     engine
 }
 fn link_body(engine: &mut crate::Engine) -> Box<[u8]> {
-    use jig_client_protocol_wire::v16 as w;
+    use jig_client_protocol_wire::v17 as w;
     use skein_lib::{
         Writer,
         base64::{self, Alphabet},
@@ -259,6 +265,7 @@ fn take_listener(engine: &mut crate::Engine) {
         &mut engine.events,
         &limits.connector,
         limits.core.documents.rows,
+        &mut engine.accounts,
     );
     let Some(io::Request::Listen { .. }) = engine.clients.as_mut().expect("clients").io.pop() else {
         panic!("clients listener")
@@ -337,7 +344,7 @@ fn prepared(clients: bool) -> crate::Service {
 }
 
 fn before_restart_is_not_ready(engine: &mut crate::Engine) {
-    use jig_client_protocol_wire::v16 as w;
+    use jig_client_protocol_wire::v17 as w;
     engine.clients.as_mut().expect("clients").starting = Some(());
     let body = link_body(engine);
     let mut peer = Peer::new(engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
@@ -422,7 +429,7 @@ fn response_body(peer: &Peer) -> &[u8] {
     peer.wire.received.get(at..).expect("response body")
 }
 fn application_read(engine: &crate::Engine) -> Box<[u8]> {
-    use jig_client_protocol_wire::v16 as w;
+    use jig_client_protocol_wire::v17 as w;
     let limits = &engine.clients.as_ref().expect("clients").env.limits.wire;
     let owner = w::Owner::Family(w::Family::new(limits, w::FamilyParts { number: 1 }).expect("test family"));
     let window = w::Window::new(limits, w::WindowParts { rows: 2, after: None }).expect("window");
@@ -448,7 +455,7 @@ fn application_read(engine: &crate::Engine) -> Box<[u8]> {
 }
 #[test]
 fn a_core_refusal_finishes_an_application_read() {
-    use jig_client_protocol_wire::v16 as w;
+    use jig_client_protocol_wire::v17 as w;
     let mut service = started(true);
     let engine = ready_client(&mut service);
     let body = application_read(engine);
@@ -509,7 +516,7 @@ fn advance_client(
     events: &mut skein_lib::Queue<root::Event>,
     limits: &root::Limits,
 ) {
-    clients.iterate(Time::ZERO, Wall::EPOCH, events, &limits.connector, limits.core.documents.rows);
+    clients.iterate(Time::ZERO, Wall::EPOCH, events, &limits.connector, limits.core.documents.rows, &mut None);
 }
 
 #[test]
@@ -608,4 +615,20 @@ fn a_call_past_the_mounts_room_is_answered_busy() {
     let mut out = Queue::with_capacity(capacity.checked_mul(2).expect("retirement output"));
     while clients.mount.up(&env, &mut out) {}
     assert_eq!(clients.mount.room(), capacity);
+}
+
+#[test]
+fn a_moved_record_bound_past_the_wire_value_bound_refuses_start() {
+    let (mut config, _) = crate::startup::fixture_connectors(&f::engine_document());
+    config.limits.driver.client.document.record_bytes = config.limits.clients.wire.keyed_value_some;
+    let Err(problems) = crate::clients::Clients::new(
+        &config,
+        address(),
+        &f::seeds(),
+        512,
+        &crate::limits::profile_limits(jig_protocol_config::Profile::Small).server,
+    ) else {
+        panic!("moved file does not fit the wire")
+    };
+    assert_eq!(problems.problems.get(0).expect("bound refusal").what, jig_protocol_config::What::Bound);
 }

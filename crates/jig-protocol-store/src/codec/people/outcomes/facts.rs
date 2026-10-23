@@ -437,6 +437,7 @@ pub(super) fn decode_limit_kind(value: wire::LimitKind) -> domain::LimitKind {
         wire::LimitKind::Goals => domain::LimitKind::Goals,
     }
 }
+#[expect(clippy::too_many_lines, reason = "one exhaustive translation preserves every stored refusal variant")]
 pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> Result<wire::Refusal, wire::Problem> {
     Ok(match value {
         domain::Refusal::NotWellFormed { at, why } => wire::Refusal::NotWellFormed(wire::RefusalNotWellFormed::new(
@@ -521,6 +522,10 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         )?),
         domain::Refusal::NotWaiting => wire::Refusal::NotWaiting,
         domain::Refusal::NoFurther => wire::Refusal::NoFurther,
+        domain::Refusal::AccountMove { why } => wire::Refusal::AccountMove(wire::RefusalAccountMove::new(
+            limits,
+            wire::RefusalAccountMoveParts { why: encode_account_move_why(*why) },
+        )?),
         domain::Refusal::NameTaken => wire::Refusal::NameTaken,
         domain::Refusal::Unknown => wire::Refusal::Unknown,
         domain::Refusal::Provider => wire::Refusal::Provider,
@@ -611,6 +616,9 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
         }
         wire::Refusal::NotWaiting => domain::Refusal::NotWaiting,
         wire::Refusal::NoFurther => domain::Refusal::NoFurther,
+        wire::Refusal::AccountMove(value) => {
+            domain::Refusal::AccountMove { why: decode_account_move_why(value.into_parts().why) }
+        }
         wire::Refusal::NameTaken => domain::Refusal::NameTaken,
         wire::Refusal::Unknown => domain::Refusal::Unknown,
         wire::Refusal::Provider => domain::Refusal::Provider,
@@ -708,5 +716,25 @@ fn decode_name_rule(rule: wire::NameRule) -> domain::NameRule {
         wire::NameRule::Control => domain::NameRule::Control,
         wire::NameRule::Space => domain::NameRule::Space,
         wire::NameRule::Digits => domain::NameRule::Digits,
+    }
+}
+
+const fn encode_account_move_why(value: domain::AccountMoveWhy) -> wire::AccountMoveWhy {
+    match value {
+        domain::AccountMoveWhy::NotSignedIn => wire::AccountMoveWhy::NotSignedIn,
+        domain::AccountMoveWhy::NotOurs => wire::AccountMoveWhy::NotOurs,
+        domain::AccountMoveWhy::Held => wire::AccountMoveWhy::Held,
+        domain::AccountMoveWhy::Cancelled => wire::AccountMoveWhy::Cancelled,
+        domain::AccountMoveWhy::Moving => wire::AccountMoveWhy::Moving,
+    }
+}
+
+const fn decode_account_move_why(value: wire::AccountMoveWhy) -> domain::AccountMoveWhy {
+    match value {
+        wire::AccountMoveWhy::NotSignedIn => domain::AccountMoveWhy::NotSignedIn,
+        wire::AccountMoveWhy::NotOurs => domain::AccountMoveWhy::NotOurs,
+        wire::AccountMoveWhy::Held => domain::AccountMoveWhy::Held,
+        wire::AccountMoveWhy::Cancelled => domain::AccountMoveWhy::Cancelled,
+        wire::AccountMoveWhy::Moving => domain::AccountMoveWhy::Moving,
     }
 }

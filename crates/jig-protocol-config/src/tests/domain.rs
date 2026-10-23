@@ -596,10 +596,11 @@ fn the_catalogue_key_bound_follows_the_component() {
     assert_eq!(core.settings.key_bytes, engine.limits.driver.client.document.token_bytes);
 }
 #[test]
-fn the_catalogue_key_bound_respects_the_carried_value_limit() {
+fn the_larger_carried_value_bound_keeps_the_catalogue_key_bound() {
     let engine = engine();
     let core = crate::core(&engine, [0; 16], 1);
-    assert_eq!(core.settings.key_bytes, engine.limits.clients.wire.keyed_value_some);
+    assert_eq!(core.settings.key_bytes, engine.limits.driver.client.document.token_bytes);
+    assert!(core.settings.key_bytes < engine.limits.clients.wire.keyed_value_some);
 }
 
 #[test]

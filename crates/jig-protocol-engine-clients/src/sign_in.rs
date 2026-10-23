@@ -1,7 +1,7 @@
 //! One live link, fresh bearer tokens, and durable digest admission (client.md, 8).
 use crate::{Kept, SecretOwner, routes::Route};
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use skein_lib::{CryptoRng, Map, Secret, Time, Token, Writer};
 #[derive(Debug)]
 pub(crate) struct Link {
@@ -17,6 +17,7 @@ pub(crate) enum Waiting {
     Keep { sign_in: u64, owner: SecretOwner, answer: Answer },
     Get { owner: SecretOwner, digest: Secret, body: Box<[u8]>, route: Route },
     Made { sign_in: u64, party: u64 },
+    Moving { sign_in: u64, account: u32, number: u32 },
     Read { sign_in: u64, what: Box<jig_domain_core::reads::Read> },
     ApplicationRead { sign_in: u64, family: u16, version: u32 },
     Ask { sign_in: u64, family: Option<u16>, version: u32 },

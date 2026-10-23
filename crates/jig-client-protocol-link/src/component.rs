@@ -3,7 +3,7 @@
 use crate::{Event, Fact, Limits, Message, Request, Streamed, Unusable, translate};
 use alloc::boxed::Box;
 use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Retry, Watchable};
-use jig_client_protocol_wire::{self as wire, v16 as w};
+use jig_client_protocol_wire::{self as wire, v17 as w};
 use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Secret, Time, Token, Writer};
 #[derive(Debug)]
 pub(crate) struct Attempt {
@@ -29,7 +29,7 @@ impl Attempt {
 pub(super) enum ExchangeKind {
     SignIn,
     SignOut { generation: u64 },
-    // `carrying`: a request carrying a value, sent once and never held
+    // `carrying`: an exchange carrying a value either way, sent once and never held
     // behind the store (protocol/client.md, 5 and 10).
     Attempt { carrying: bool },
     Read { turn: Option<(u64, u64, u32)> },
@@ -131,8 +131,16 @@ impl Link {
         value: Option<Secret>,
         out: &mut Queue<Request>,
     ) {
-        let carrying = value.is_some();
-        // A request carrying a value that never left is one the engine did not make.
+        let mut carrying = value.is_some();
+        if let Ask::Jig(ask) = &ask
+            && let jig_client_domain::contract::Ask::AccountChange {
+                change: jig_client_domain::contract::AccountChange::MoveOut { .. },
+                ..
+            } = ask.as_ref()
+        {
+            carrying = true;
+        }
+        // An exchange carrying a value either way never left if it cannot be sent.
         let refuse: fn(Token, &mut Queue<Request>) = if carrying { unsent } else { lost };
         if self.attempts.len() == self.attempts.capacity() {
             refuse(attempt, out);

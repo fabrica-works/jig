@@ -273,6 +273,7 @@ fn number(value: &OwnerOutcome, task: u64, place: u32) -> Option<u64> {
         | OwnerOutcome::PolicyChanged { .. }
         | OwnerOutcome::AccountProgramDeclared { .. }
         | OwnerOutcome::AccountKeyKept { .. }
+        | OwnerOutcome::AccountMovedIn { .. }
         | OwnerOutcome::AccountChanged
         | OwnerOutcome::AccountRemoved { .. }
         | OwnerOutcome::AccountSignInStarted { .. }

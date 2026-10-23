@@ -1,7 +1,8 @@
 //! Sparse entrance facts without invented names, words or bounds (contract.md, 4).
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
+#[expect(clippy::too_many_lines, reason = "one total match preserves every people refusal")]
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
         p::Refusal::NameTaken => w::Refusal::NameTaken,
@@ -76,6 +77,18 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
+        p::Refusal::AccountMove { why } => w::Refusal::AccountMove(w::RefusalAccountMove::new(
+            limits,
+            w::RefusalAccountMoveParts {
+                why: match why {
+                    p::AccountMoveWhy::NotSignedIn => w::AccountMoveWhy::NotSignedIn,
+                    p::AccountMoveWhy::NotOurs => w::AccountMoveWhy::NotOurs,
+                    p::AccountMoveWhy::Held => w::AccountMoveWhy::Held,
+                    p::AccountMoveWhy::Cancelled => w::AccountMoveWhy::Cancelled,
+                    p::AccountMoveWhy::Moving => w::AccountMoveWhy::Moving,
+                },
+            },
+        )?),
         p::Refusal::Account { account, why } => w::Refusal::Account(w::RefusalAccount::new(
             limits,
             w::RefusalAccountParts {

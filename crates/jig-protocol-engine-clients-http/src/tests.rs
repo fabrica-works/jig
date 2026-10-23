@@ -1,5 +1,5 @@
 use super::*;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use skein_http::Method;
 use skein_lib::stream::{Down, Up};
 mod fixtures;
@@ -42,8 +42,9 @@ fn a_record_the_component_cannot_read_is_written_as_400() {
 fn a_body_past_the_route_s_bound_is_413_and_reaches_nothing() {
     let mut mount = fixtures::mount();
     let mut out = Queue::with_capacity(32);
-    let mut body = List::with_capacity(65537);
-    for _ in 0_u32..65537 {
+    let length = fixtures::env().limits.body.checked_add(1).expect("past body bound");
+    let mut body = List::with_capacity(length);
+    for _ in 0..length {
         body.push(7).expect("body");
     }
     let body = body.into_boxed();
@@ -381,7 +382,7 @@ fn room_is_released_only_after_a_calls_end_is_handled() {
 
 #[test]
 fn a_browser_link_keeps_its_cookie_on_a_tokenless_sign_in() {
-    use jig_client_protocol_wire::v16 as w;
+    use jig_client_protocol_wire::v17 as w;
     let mut mount = fixtures::mount();
     let mut out = Queue::with_capacity(16);
     let call =

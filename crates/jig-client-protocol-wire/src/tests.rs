@@ -460,3 +460,29 @@ fn a_me_project_without_its_name_cannot_decode() {
         Err(Problem { path: Path::DocumentTextBytes, reason: skein_codec::Reason::Short })
     );
 }
+
+// protocol/client.md, 5: Keyed.value holds at most 128 KiB of a moved file.
+const MOVED_FILE_BYTES: usize = 131_072;
+#[test]
+fn a_keyed_value_at_the_move_bound_round_trips() {
+    let limits = CEILINGS;
+    let value = skein_lib::Secret::new(skein_lib::bytes::zeroed(MOVED_FILE_BYTES));
+    let keyed = Keyed::new(
+        &limits,
+        KeyedParts { key: [7; 16], owner: Owner::Jig, version: VERSION, request: Box::new([]), value: Some(value) },
+    )
+    .expect("128 KiB value fits");
+    let bytes = fixtures::encoded(&keyed, Keyed::measure, Keyed::encode);
+    assert_eq!(Keyed::decode(&limits, &mut Reader::new(&bytes)), Ok(keyed));
+}
+#[test]
+fn a_keyed_value_one_byte_past_the_move_bound_is_refused() {
+    let value = skein_lib::Secret::new(skein_lib::bytes::zeroed(MOVED_FILE_BYTES + 1));
+    assert_eq!(
+        Keyed::new(
+            &CEILINGS,
+            KeyedParts { key: [7; 16], owner: Owner::Jig, version: VERSION, request: Box::new([]), value: Some(value) }
+        ),
+        Err(Problem { path: Path::KeyedValue, reason: skein_codec::Reason::Bound })
+    );
+}

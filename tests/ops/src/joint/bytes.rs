@@ -48,7 +48,7 @@ impl Side {
         }
     }
     fn send(&mut self, now: Time, request: Request) {
-        use jig_client_protocol_wire::v16 as w;
+        use jig_client_protocol_wire::v17 as w;
         use skein_lib::Reader;
         if matches!(&request, Request::CloseStream) {
             self.stream_epoch += 1;
@@ -79,7 +79,7 @@ impl Side {
         self.connections.down(now, request, &mut self.down);
     }
     fn receipts(&mut self, event: &Event) -> Vec<Receipt> {
-        use jig_client_protocol_wire::v16 as w;
+        use jig_client_protocol_wire::v17 as w;
         use skein_lib::Reader;
         let mut receipts: Vec<_> = self
             .wire
@@ -169,7 +169,7 @@ impl Bytes {
             name: Box::new([]),
         });
         settings.served = jig_client_world::test::list([
-            clients::Served { family: None, first: 16, last: 16 },
+            clients::Served { family: None, first: 17, last: 17 },
             clients::Served { family: Some(1), first: 1, last: 1 },
             clients::Served { family: Some(2), first: 1, last: 1 },
         ]);
@@ -478,6 +478,9 @@ impl Bytes {
     }
     fn request(&mut self, joint: &mut Joint, request: clients::Request) {
         match request {
+            clients::Request::TakeMoved { exchange, .. } => {
+                self.component.down(&self.env, clients::Event::MovedTaken { exchange, record: None }, &mut self.out);
+            }
             clients::Request::Transport(message) => self.mount_event(http::Event::Component(message)),
             clients::Request::Link { secret } => self.link = jig_client_protocol_world::fixtures::printed(&secret),
             clients::Request::Secrets(request) => {

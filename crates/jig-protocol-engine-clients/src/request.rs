@@ -83,7 +83,7 @@ impl Component {
             .expect("get released slot");
         out.push(request);
     }
-    /// Admit jig's account key envelope before asking the store to keep a value.
+    /// Admit jig's key or moved file before asking the store to keep its value.
     fn jig_request(
         &mut self,
         env: &Env<Limits>,
@@ -95,6 +95,17 @@ impl Component {
     ) {
         let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
             Ok(value) => {
+                if let Some(carried) = &keyed.value {
+                    let bound = carried_bound(&value, self.settings.key_bytes, self.settings.moved_bytes);
+                    if u64::try_from(carried.len()).expect("value size fits u64") > bound
+                        && account_key_digest(&value).is_some()
+                    {
+                        let reply = people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Words });
+                        let answer = crate::translate::answers::answer(&reply, &self.settings.models, &env.limits.wire);
+                        self.answer(env, exchange, answer, out);
+                        return;
+                    }
+                }
                 let valid = match account_key_digest(&value) {
                     Some(digest) => match &keyed.value {
                         Some(value) => digest == skein_lib::sha256::digest(value.expose()),
@@ -177,7 +188,7 @@ impl Component {
     }
 }
 
-/// The account key digest is the sole secret-derived fact admitted to the core.
+/// The value's digest is the sole secret-derived fact admitted to the core.
 fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
     let change = match ask {
         w::Ask::AccountChange(row) => row.change(),
@@ -210,6 +221,7 @@ fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
     match change {
         w::AccountChange::AddKey(row) => Some(*row.digest()),
         w::AccountChange::ReplaceKey(row) => Some(*row.digest()),
+        w::AccountChange::MoveIn(row) => Some(*row.digest()),
         w::AccountChange::DeclareProgram(_)
         | w::AccountChange::CheckProgram(_)
         | w::AccountChange::RemoveKey(_)
@@ -217,6 +229,54 @@ fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
         | w::AccountChange::Remove(_)
         | w::AccountChange::MoveAccount(_)
         | w::AccountChange::MoveSource(_)
-        | w::AccountChange::SetUses(_) => None,
+        | w::AccountChange::SetUses(_)
+        | w::AccountChange::MoveOut(_)
+        | w::AccountChange::Written(_) => None,
+    }
+}
+
+/// Only account key changes and a moved file carry jig values.
+fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64) -> u64 {
+    let change = match ask {
+        w::Ask::AccountChange(row) => row.change(),
+        w::Ask::Message(_)
+        | w::Ask::Answer(_)
+        | w::Ask::Take(_)
+        | w::Ask::HandBack(_)
+        | w::Ask::Decide(_)
+        | w::Ask::Release(_)
+        | w::Ask::Amend(_)
+        | w::Ask::Stop(_)
+        | w::Ask::Cancel(_)
+        | w::Ask::MoveTask(_)
+        | w::Ask::Seen(_)
+        | w::Ask::EditNote(_)
+        | w::Ask::DeleteNote(_)
+        | w::Ask::ChangePolicy(_)
+        | w::Ask::SetRoles(_)
+        | w::Ask::MakeService(_)
+        | w::Ask::Rename(_)
+        | w::Ask::MakeProject(_)
+        | w::Ask::SetPool(_)
+        | w::Ask::Compound(_)
+        | w::Ask::Create(_)
+        | w::Ask::Propose(_)
+        | w::Ask::Withdraw(_)
+        | w::Ask::SignIn(_)
+        | w::Ask::SignOut(_) => return 0,
+    };
+    match change {
+        w::AccountChange::MoveIn(_) => moved_bytes,
+        w::AccountChange::AddKey(_) | w::AccountChange::ReplaceKey(_) => u64::from(key_bytes),
+        w::AccountChange::DeclareProgram(_)
+        | w::AccountChange::CheckProgram(_)
+        | w::AccountChange::RemoveKey(_)
+        | w::AccountChange::Resume(_)
+        | w::AccountChange::Remove(_)
+        | w::AccountChange::MoveAccount(_)
+        | w::AccountChange::MoveSource(_)
+        | w::AccountChange::SetUses(_)
+        | w::AccountChange::MoveOut(_)
+        | w::AccountChange::Written(_) => 0,
     }
 }

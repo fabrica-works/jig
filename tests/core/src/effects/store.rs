@@ -172,6 +172,7 @@ impl World {
         self.stopped = false;
         self.period_started = false;
         self.restoring = None;
+        self.move_provider = config.core.settings.llm_providers.providers.first().map(|provider| provider.number);
         self.domain = root::Domain::new(config, &self.limits);
         for (connector, kinds) in self.hold_kinds.clone() {
             self.domain.configure_holds(&self.env(), connector, kinds);
@@ -182,6 +183,7 @@ impl World {
         self.pending_lookups.clear();
         self.restart_reads.clear();
         self.restart_steps.clear();
+        self.moved.clear();
         self.restore_ranges.clear();
         self.census_ended = 0;
         if let Some(peers) = &mut self.peers {

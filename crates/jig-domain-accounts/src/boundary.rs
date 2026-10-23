@@ -430,6 +430,7 @@ pub enum State {
     Unloaded { at: Place, why: Unread },
     Cancelled,
     Closing,
+    Moving,
 }
 
 /// A source's state, with its account; an account's view is the source deciding it.

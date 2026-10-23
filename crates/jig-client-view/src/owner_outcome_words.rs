@@ -115,6 +115,9 @@ pub enum OutcomePhrase {
     AccountSignedOut,
     AccountKeyKept,
     AccountChanged,
+    AccountMovedIn,
+    AccountRenewed,
+    AccountNumber,
     AccountRemoved,
     AccountProgramDeclared,
     SourceNumber,
@@ -125,7 +128,7 @@ pub enum OutcomePhrase {
     HostFailed,
 }
 /// Every outcome phrase in stable owner order.
-pub const ALL: [OutcomePhrase; 64] = [
+pub const ALL: [OutcomePhrase; 67] = [
     OutcomePhrase::Created,
     OutcomePhrase::FirstTask,
     OutcomePhrase::LastTask,
@@ -182,6 +185,9 @@ pub const ALL: [OutcomePhrase; 64] = [
     OutcomePhrase::AccountSignedOut,
     OutcomePhrase::AccountKeyKept,
     OutcomePhrase::AccountChanged,
+    OutcomePhrase::AccountMovedIn,
+    OutcomePhrase::AccountRenewed,
+    OutcomePhrase::AccountNumber,
     OutcomePhrase::AccountRemoved,
     OutcomePhrase::AccountProgramDeclared,
     OutcomePhrase::SourceNumber,
@@ -252,6 +258,9 @@ impl OutcomePhrase {
             Self::AccountSignedOut => 6458,
             Self::AccountKeyKept => 6459,
             Self::AccountChanged => 6460,
+            Self::AccountMovedIn => 6471,
+            Self::AccountRenewed => 6472,
+            Self::AccountNumber => 6473,
             Self::AccountRemoved => 6461,
             Self::AccountProgramDeclared => 6462,
             Self::SourceNumber => 6463,
@@ -286,7 +295,8 @@ impl OutcomePhrase {
             | Self::Question
             | Self::Revision
             | Self::ResultsThrough
-            | Self::RepliesThrough => Some(HoleKind::Number),
+            | Self::RepliesThrough
+            | Self::AccountNumber => Some(HoleKind::Number),
             Self::At => Some(HoleKind::Wall),
             Self::AccountProgramDeclared
             | Self::SignOutConfirmed
@@ -325,6 +335,8 @@ impl OutcomePhrase {
             | Self::Stale
             | Self::AccountSignInStarted
             | Self::AccountKeyKept
+            | Self::AccountMovedIn
+            | Self::AccountRenewed
             | Self::AccountChanged
             | Self::AccountRemoved
             | Self::AccountSignedOut
@@ -335,7 +347,7 @@ impl OutcomePhrase {
 /// Phrase contracts independent of the selected language's word order.
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut values = List::with_capacity(64);
+    let mut values = List::with_capacity(67);
     for phrase in ALL {
         let holes: Box<[HoleShape]> = match phrase.hole() {
             Some(kind) => Box::new([HoleShape { kind, bytes: 0 }]),
@@ -348,7 +360,7 @@ pub fn shapes() -> Box<[PhraseShape]> {
 /// Explicit English data for composition, never a rendering fallback.
 #[must_use]
 pub fn english() -> Language {
-    let mut values = List::with_capacity(64);
+    let mut values = List::with_capacity(67);
     for phrase in ALL {
         let text: &[u8] = match phrase {
             OutcomePhrase::Created => b"Tasks created",
@@ -405,6 +417,9 @@ pub fn english() -> Language {
             OutcomePhrase::RepliesThrough => b"Replies seen through: ",
             OutcomePhrase::AccountSignInStarted => b"LLM account sign-in started",
             OutcomePhrase::AccountKeyKept => b"LLM account key kept",
+            OutcomePhrase::AccountMovedIn => b"moved in",
+            OutcomePhrase::AccountRenewed => b"renewed",
+            OutcomePhrase::AccountNumber => b"Account: ",
             OutcomePhrase::AccountChanged => b"LLM account changed",
             OutcomePhrase::AccountRemoved => b"LLM account removed",
             OutcomePhrase::AccountProgramDeclared => b"Program login declared",

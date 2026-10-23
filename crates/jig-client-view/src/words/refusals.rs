@@ -78,6 +78,7 @@ impl Words {
             Refusal::Account { account, .. } => {
                 self.text(b, JigPhrase::Word(Word::refusal(refusal)), &[Hole::Number(u64::from(*account))]);
             }
+            Refusal::AccountMove { .. } => self.text(b, JigPhrase::Word(Word::refusal(refusal)), &[]),
             Refusal::Provider => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Provider)), &[]),
             Refusal::Unknown => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Unknown)), &[]),
             Refusal::NoEscalationHolder => {

@@ -37,6 +37,10 @@ pub enum AccountPhrase {
     OffersCut,
     ReadinessCut,
     SignInPlan,
+    RefusalNotSignedIn,
+    RefusalNotOurs,
+    RefusalCancelled,
+    RefusalMoving,
 }
 impl AccountPhrase {
     pub(super) const fn hole(self) -> Option<skein_ui::phrases::HoleKind> {
@@ -50,6 +54,10 @@ impl AccountPhrase {
             | Self::PaysParty
             | Self::PaysProject => Some(HoleKind::Number),
             Self::SignInPlan
+            | Self::RefusalNotSignedIn
+            | Self::RefusalNotOurs
+            | Self::RefusalCancelled
+            | Self::RefusalMoving
             | Self::Catalogue
             | Self::Ready
             | Self::Unavailable
@@ -118,6 +126,10 @@ impl AccountPhrase {
             Self::OffersCut => 9482,
             Self::ReadinessCut => 9483,
             Self::SignInPlan => 9484,
+            Self::RefusalNotSignedIn => 9486,
+            Self::RefusalNotOurs => 9487,
+            Self::RefusalCancelled => 9488,
+            Self::RefusalMoving => 9489,
         }
     }
     pub(super) const fn label(self) -> &'static [u8] {
@@ -145,6 +157,10 @@ impl AccountPhrase {
             Self::OffersCut => b"More provider offers omitted",
             Self::ReadinessCut => b"More payer readiness omitted",
             Self::SignInPlan => b"Sign-ins use plan terms",
+            Self::RefusalNotSignedIn => b"Account move: not signed in",
+            Self::RefusalNotOurs => b"Account move: not ours",
+            Self::RefusalCancelled => b"Account move: cancelled",
+            Self::RefusalMoving => b"Account move: moving",
 
             Self::Provider => b"LLM provider ",
             Self::HeldByDeployment => b"Held by the deployment",

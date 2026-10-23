@@ -1,7 +1,7 @@
 //! Wire asks into the people vocabulary (client/domain/contract.md, 3).
 use super::Untranslatable;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use jig_domain_people as p;
 use skein_lib::{List, Reader, Wall};
 #[derive(Debug)]
@@ -571,6 +571,9 @@ fn account_change(value: &w::AccountChange) -> Result<p::AccountChange, Untransl
             }
         }
         w::AccountChange::CheckProgram(row) => p::AccountChange::CheckProgram { source: row.source() },
+        w::AccountChange::MoveOut(row) => p::AccountChange::MoveOut { account: row.account() },
+        w::AccountChange::Written(row) => p::AccountChange::Written { number: row.number() },
+        w::AccountChange::MoveIn(row) => p::AccountChange::MoveIn { digest: *row.digest() },
         w::AccountChange::AddKey(row) => {
             p::AccountChange::AddKey { provider: row.provider(), join: *row.join(), digest: *row.digest() }
         }

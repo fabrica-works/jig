@@ -117,6 +117,7 @@ fn account_state(b: &mut Builder, words: &Words, value: OwnerAccountState) {
         }
         OwnerAccountState::Cancelled => P::AccountDetail(A::Cancelled),
         OwnerAccountState::Closing => P::AccountStateClosing,
+        OwnerAccountState::Moving => P::AccountStateMoving,
     };
     text(b, words, phrase, &[]);
 }

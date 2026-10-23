@@ -227,6 +227,8 @@ fn permanent(outcome: &Outcome) -> bool {
         | Outcome::AccountSignInStarted { .. }
         | Outcome::AccountProgramDeclared { .. }
         | Outcome::AccountKeyKept { .. }
+        | Outcome::AccountMovingOut { .. }
+        | Outcome::AccountMovedIn { .. }
         | Outcome::AccountChanged
         | Outcome::AccountRemoved { .. }
         | Outcome::AccountSignedOut { .. }
@@ -274,6 +276,8 @@ pub(super) fn valid_outcome(limits: &Limits, act: &Act, outcome: &Outcome) -> bo
             | Outcome::AccountSignInStarted { .. }
             | Outcome::AccountProgramDeclared { .. }
             | Outcome::AccountKeyKept { .. }
+            | Outcome::AccountMovingOut { .. }
+            | Outcome::AccountMovedIn { .. }
             | Outcome::AccountChanged
             | Outcome::AccountRemoved { .. }
             | Outcome::AccountSignedOut { .. }

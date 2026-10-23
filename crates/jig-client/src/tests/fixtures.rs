@@ -1,7 +1,7 @@
 pub mod thread;
 use crate::*;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use skein_lib::{Duration, List, Queue, Secret, Time, Token, Wall, Writer};
 pub const PARTY: u64 = 7;
 pub const SUBJECT_TASK: u64 = 9;

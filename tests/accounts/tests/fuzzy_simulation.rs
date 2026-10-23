@@ -103,7 +103,7 @@ fn changes(seed: u64) -> Vec<Request> {
         );
         let account = chosen.map_or(u32::MAX, |view| view.account);
         let source = chosen.map_or(u32::MAX, |view| view.source);
-        let choice = rng.below(12);
+        let choice = rng.below(15);
         let change = match choice {
             0 => Change::AddKey {
                 provider: 1,
@@ -120,6 +120,9 @@ fn changes(seed: u64) -> Vec<Request> {
             8 => {
                 Change::DeclareProgram { provider: 1, join: None, name: format!("fake-{request}").into_bytes().into() }
             }
+            12 => Change::MoveOut { account },
+            13 => Change::Written { number: world.domain.next_number().saturating_sub(1) },
+            14 => Change::MoveIn { carried: 1 << 63 },
             _ => Change::CheckProgram { source },
         };
         let event = match choice {
@@ -153,7 +156,7 @@ fn changes(seed: u64) -> Vec<Request> {
     trace
 }
 fn change_response(world: &mut World, rng: &mut Rng, output: &Request, trace: &mut Vec<Request>) -> Option<Event> {
-    use jig_domain_accounts::{Answer, Signing};
+    use jig_domain_accounts::Signing;
     match *output {
         Request::Signing(Signing::Keep { source, .. }) => {
             if rng.chance(25) {
@@ -187,12 +190,23 @@ fn change_response(world: &mut World, rng: &mut Rng, output: &Request, trace: &m
             })
         }
         Request::Signing(Signing::SignOut { source }) => Some(Event::SignedOut { source, confirmed: rng.chance(70) }),
+        Request::Signing(Signing::Withdraw { source, .. }) => {
+            Some(Event::Withdrawn { source, readable: rng.chance(90) })
+        }
+        Request::Signing(Signing::Open { source, .. }) => Some(if rng.chance(20) {
+            Event::NotOurs { source }
+        } else {
+            Event::Opened { source, provider: 1, subject: Box::from(b"subject-a".as_slice()), display: Box::new([]) }
+        }),
+        Request::Signing(Signing::Adopt { source, .. }) => Some(Event::Adopted { source, kept: rng.chance(90) }),
+        Request::Signing(Signing::Refresh { source }) => Some(Event::Component(FromComponent::Granted {
+            account: source,
+            generation: world.domain.source(source).and_then(|s| s.generation).unwrap_or(0) + 1,
+            valid: Duration::from_secs(100),
+            form: Form::Credential(Scheme::Bearer),
+        })),
         Request::Signing(
-            Signing::Withdraw { .. }
-            | Signing::Return { .. }
-            | Signing::Refresh { .. }
-            | Signing::Open { .. }
-            | Signing::Adopt { .. }
+            Signing::Return { .. }
             | Signing::CancelSignIn { .. }
             | Signing::Replaced { .. }
             | Signing::Forget { .. }
@@ -206,11 +220,8 @@ fn change_response(world: &mut World, rng: &mut Rng, output: &Request, trace: &m
         | Request::Granted { .. }
         | Request::Save { .. }
         | Request::Erase { .. }
+        | Request::Answer { .. }
         | Request::Closed => None,
-        Request::Answer { ref answer, .. } => {
-            assert!(!matches!(answer, Answer::MovingOut { .. } | Answer::MovedIn { .. }));
-            None
-        }
     }
 }
 
@@ -236,42 +247,5 @@ fn dense_and_bounded(world: &World) {
 fn seeded_account_changes_replay() {
     for seed in 0..64 {
         assert_eq!(changes(seed), changes(seed), "seed {seed}");
-    }
-}
-
-/// M1's core constructs changes only from people's `AccountChange`, which has no move.
-/// These whole traces cover the other half: without a move entrance the child emits none
-/// of the values the transitional M2 arms would translate.
-#[test]
-fn people_changes_never_emit_move_values() {
-    use jig_domain_accounts::{Answer, Held, Refusal, Signing, Stored};
-    for seed in 0..64 {
-        for trace in [run(seed), changes(seed)] {
-            for request in trace {
-                assert!(
-                    !matches!(
-                        request,
-                        Request::Answer {
-                            answer: Answer::MovingOut { .. }
-                                | Answer::MovedIn { .. }
-                                | Answer::Refused {
-                                    refusal: Refusal::NotSignedIn
-                                        | Refusal::NotOurs
-                                        | Refusal::Cancelled
-                                        | Refusal::Moving
-                                },
-                            ..
-                        } | Request::Signing(
-                            Signing::Withdraw { .. }
-                                | Signing::Return { .. }
-                                | Signing::Refresh { .. }
-                                | Signing::Open { .. }
-                                | Signing::Adopt { .. }
-                        ) | Request::Save { record: Stored::Source { held: Some(Held::Moving), .. } }
-                    ),
-                    "seed {seed}: {request:?}"
-                );
-            }
-        }
     }
 }

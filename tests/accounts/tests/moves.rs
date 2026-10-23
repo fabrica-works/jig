@@ -57,7 +57,7 @@ fn grant(source: u32, generation: u64) -> Event {
 }
 fn moving_fact(world: &World, source: u32) {
     let fact = world.domain.source(source).expect("the moving source stays");
-    assert_eq!((fact.state, fact.usable, fact.generation), (State::Asking, false, None));
+    assert_eq!((fact.state, fact.usable, fact.generation), (State::Moving, false, None));
     assert!(!world.domain.usable(fact.account));
     assert_eq!(world.domain.source_grant(source, world.now), None);
 }
@@ -161,7 +161,7 @@ fn a_move_out_withdraws_the_source_and_answers_with_the_moves_number() {
     withdrawn(&mut world, number);
     assert_eq!(world.domain.next_deadline(), Some(world.now.saturating_add(LIMITS.move_deadline)));
     assert!(world.step(Event::Withdrawn { source: 6, readable: true }).is_empty());
-    assert!(world.facts().iter().any(|fact| fact.source == 6 && fact.state == State::Asking && !fact.usable));
+    assert!(world.facts().iter().any(|fact| fact.source == 6 && fact.state == State::Moving && !fact.usable));
 }
 
 #[test]
