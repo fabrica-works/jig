@@ -39,6 +39,7 @@ impl Harness {
             | Request::Dropped
             | Request::Signing { .. }
             | Request::ServiceCredential { .. }
+            | Request::Authorized(_)
             | Request::Fact { .. }) => {
                 panic!("expected read exchange: {other:?}")
             }
@@ -78,6 +79,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }
@@ -104,6 +106,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }

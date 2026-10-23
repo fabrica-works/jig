@@ -1175,7 +1175,12 @@ fn first_owners_seed_their_roles_on_the_first_start_only() {
 fn signed_person(reply: Reply) -> Option<u64> {
     match reply {
         Reply::SignedIn { person, .. } => Some(person),
-        Reply::Full { .. } | Reply::SignedOut | Reply::Again(_) | Reply::Outcome(_) | Reply::Refused(_) => None,
+        Reply::Signer(_)
+        | Reply::Full { .. }
+        | Reply::SignedOut
+        | Reply::Again(_)
+        | Reply::Outcome(_)
+        | Reply::Refused(_) => None,
     }
 }
 
@@ -2285,4 +2290,73 @@ fn a_full_pool_ends_only_the_next_expired_sign_in_by_either_clock() {
         assert_eq!(test.d.pop_fact(), Some(Fact::SignedIn { person: 1, sign_in: 12 }));
         assert!(test.d.pop_fact().is_none());
     }
+}
+
+#[test]
+fn whose_reads_the_live_signers_identity_and_kind_without_writes() {
+    let mut test = Test::new(LIMITS);
+    let person_identity = identity(0, 1);
+    test.signin(1, 10, person_identity.clone());
+    let out = test.send(Event::Whose { reply_to: whose_destination(), sign_in: 10 });
+    assert_eq!(
+        out,
+        [Request::Reply {
+            to: whose_destination(),
+            reply: Reply::Signer(Some(Signer { identity: person_identity, kind: Kind::Person }))
+        }]
+    );
+    assert_eq!(
+        test.send(Event::Whose { reply_to: whose_destination(), sign_in: 999 }),
+        [Request::Reply { to: whose_destination(), reply: Reply::Signer(None) }]
+    );
+    test.send(Event::SignOut { reply_to: whose_destination(), sign_in: 10 });
+    assert_eq!(
+        test.send(Event::Whose { reply_to: whose_destination(), sign_in: 10 }),
+        [Request::Reply { to: whose_destination(), reply: Reply::Signer(None) }]
+    );
+    for wall in [false, true] {
+        let mut test = Test::new(LIMITS);
+        test.signin(1, 10, identity(0, 1));
+        if wall {
+            test.env.wall = Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos());
+        } else {
+            test.env.now = Time::ZERO.saturating_add(LIMITS.sign_in_lifetime);
+        }
+        assert_eq!(
+            test.send(Event::Whose { reply_to: whose_destination(), sign_in: 10 }),
+            [Request::Reply { to: whose_destination(), reply: Reply::Signer(None) }]
+        );
+    }
+}
+
+#[test]
+fn whose_reads_a_service_and_answers_not_ready_before_restoration() {
+    let mut test = Test::new(LIMITS);
+    test.d = Domain::new(&LIMITS, Box::new([]), 2, Box::new([]));
+    assert_eq!(
+        test.send(Event::Whose { reply_to: whose_destination(), sign_in: 21 }),
+        [Request::Reply { to: whose_destination(), reply: Reply::Again(Again::NotReady) }]
+    );
+    let service = identity(2, 2);
+    test.send(Event::Restore { record: Stored::Person { number: 2, identity: service.clone() } });
+    test.send(Event::Restored);
+    test.send(Event::SignedIn {
+        held: None,
+        reply_to: whose_destination(),
+        person: 2,
+        sign_in: 21,
+        identity: service.clone(),
+        kind: Kind::Service,
+    });
+    assert_eq!(
+        test.send(Event::Whose { reply_to: whose_destination(), sign_in: 21 }),
+        [Request::Reply {
+            to: whose_destination(),
+            reply: Reply::Signer(Some(Signer { identity: service, kind: Kind::Service }))
+        }]
+    );
+}
+
+fn whose_destination() -> ReplyTo {
+    ReplyTo::new(Token::new(777))
 }

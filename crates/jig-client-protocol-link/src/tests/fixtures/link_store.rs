@@ -202,6 +202,7 @@ impl Harness {
                 | Request::Hello { .. }
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }
@@ -227,6 +228,7 @@ impl Harness {
                 | Request::Hello { .. }
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }

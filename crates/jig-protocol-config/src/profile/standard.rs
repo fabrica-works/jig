@@ -14,6 +14,7 @@
 //! **hub**: `slots=4, accounts=32, facts=256, told=256`.
 //! **link**: `opening=16, facts=256`.
 //! **driver**: `exchanges=8, listeners=ACCOUNTS.sign_ins`.
+//! **clients**: `provider_codes=256, provider_tokens=1024`.
 use super::small;
 use super::{Limits, Link};
 use jig_domain_accounts as accounts;
@@ -161,8 +162,14 @@ pub(super) const LIMITS: Limits = Limits {
     routes: 2048,
 };
 
-pub(super) const CLIENTS: jig_protocol_engine_clients::Limits =
-    jig_protocol_engine_clients::Limits { streams: 8, exchanges: 32, mints: 16, ..small::CLIENTS };
+pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_engine_clients::Limits {
+    streams: 8,
+    exchanges: 32,
+    mints: 16,
+    provider_codes: 256,
+    provider_tokens: 1024,
+    ..small::CLIENTS
+};
 
 // One extra Sources output at hello adds eight core route positions.
 // Close cancellation adds one output per pending sign-in: four in Standard (protocol/llm.md, 5.2).

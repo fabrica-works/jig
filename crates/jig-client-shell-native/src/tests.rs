@@ -255,6 +255,7 @@ impl skein_shell::Host for Disk {
                 }
                 client::Event::Lost { .. } => self.closing = true,
                 other @ (client::Event::SignIn { .. }
+                | client::Event::Authorize { .. }
                 | client::Event::SignOut
                 | client::Event::SignOutLost
                 | client::Event::Start { .. }

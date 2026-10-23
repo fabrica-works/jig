@@ -1,7 +1,7 @@
 //! Durability before exchanges, and owner-versioned restoration (protocol/client.md, 10).
 use crate::{Fact, Limits, Link, Message, Record, Request, Saved, translate};
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{List, Queue, Reader, RequestKey, Token, Writer, bytes};
 #[derive(Debug)]
 struct Held {
@@ -64,7 +64,8 @@ impl Link {
             | Message::StreamGone(_)
             | Message::SignInLink(_)
             | Message::SignInService
-            | Message::SignOut => false,
+            | Message::SignOut
+            | Message::Authorize(_) => false,
         };
         if !self.attempts.contains_key(&exchange) && tracked {
             return;
@@ -81,7 +82,8 @@ impl Link {
             | Message::StreamGone(_)
             | Message::SignInLink(_)
             | Message::SignInService
-            | Message::SignOut => false,
+            | Message::SignOut
+            | Message::Authorize(_) => false,
         };
         if !keyed {
             out.push(Request::Exchange { exchange, message, credential: self.credential.clone() });
@@ -122,6 +124,7 @@ impl Link {
                 | Request::Ended { .. }
                 | Request::Hello { .. }
                 | Request::Read { .. }
+                | Request::Authorized(_)
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
                 | Request::Fact { .. }) => out.push(value),

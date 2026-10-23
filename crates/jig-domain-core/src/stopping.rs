@@ -142,7 +142,9 @@ fn people_gate(event: people::Event) -> Result<Event, Requests> {
             to: reply_to,
             outcome: people::Outcome::Again(people::Again::NotReady),
         }))))),
-        people::Event::Ask { reply_to, .. } | people::Event::SignOut { reply_to, .. } => Err(party(reply_to)),
+        people::Event::Whose { reply_to, .. }
+        | people::Event::Ask { reply_to, .. }
+        | people::Event::SignOut { reply_to, .. } => Err(party(reply_to)),
         people::Event::ConversationSeen { .. } => Err(empty()),
         event @ (people::Event::ChatState { .. }
         | people::Event::MoveChat { .. }

@@ -19,6 +19,9 @@ pub enum Event {
         with: With,
     },
     SignOut,
+    Authorize {
+        query: Box<[u8]>,
+    },
     Start {
         kept: List<Record>,
     },
@@ -68,6 +71,7 @@ pub enum Event {
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
+    Authorized(Authorized),
     Save {
         record: Record,
     },
@@ -161,6 +165,7 @@ pub enum Signing {
 /// A protocol record, independent of its transport's route.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Message {
+    Authorize(Box<[u8]>),
     Request(Box<[u8]>),
     Read(Box<[u8]>),
     Watch(Box<[u8]>),
@@ -186,4 +191,23 @@ pub enum Streamed {
     Heartbeat,
     /// The stream refused, its opening answered signed out.
     SignedOut,
+}
+
+/// Authorization's terminal answer (protocol/client.md, 18).
+#[derive(Debug, PartialEq, Eq)]
+pub enum Authorized {
+    Go { location: Box<[u8]> },
+    Refused(AuthorizeWhy),
+    SignedOut,
+    NotReady,
+    Busy,
+    Lost,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AuthorizeWhy {
+    Malformed,
+    UnknownClient,
+    UnknownRedirect,
+    NoProvider,
+    NotAPerson,
 }

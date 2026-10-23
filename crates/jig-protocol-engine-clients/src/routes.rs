@@ -1,11 +1,12 @@
 //! Method and route dispatch (protocol/client.md, section 4).
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Route {
     Link,
     Service,
     SignOut,
+    Authorize,
     Request,
     Read,
     Watch,
@@ -23,6 +24,7 @@ pub(crate) fn message(message: crate::Message) -> (Route, Box<[u8]>) {
         crate::Message::SignInLink(body) => (Route::Link, body),
         crate::Message::SignInService(body) => (Route::Service, body),
         crate::Message::SignOut(body) => (Route::SignOut, body),
+        crate::Message::Authorize(body) => (Route::Authorize, body),
     }
 }
 pub(crate) fn refused(_limits: &w::Limits) -> Box<[u8]> {
@@ -87,6 +89,7 @@ pub(crate) fn unauthenticated(route: Route, limits: &w::Limits) -> Box<[u8]> {
         Route::Gone | Route::Stream => Box::new([]),
         Route::Link | Route::Service => refused(limits),
         Route::SignOut => sign_out_answer(),
+        Route::Authorize => authorize_answer(w::AuthorizeAnswer::SignedOut),
         Route::Request => signed_out(limits),
     }
 }
@@ -131,6 +134,7 @@ pub(crate) fn stopped(route: Route) -> Option<Box<[u8]>> {
     match route {
         Route::Link | Route::Service => Some(sign_in_not_ready()),
         Route::SignOut => Some(sign_out_not_ready()),
+        Route::Authorize => Some(authorize_answer(w::AuthorizeAnswer::NotReady)),
         Route::Request => Some(not_ready()),
         Route::Read | Route::Watch | Route::Unwatch | Route::Gone | Route::Stream => None,
     }
@@ -152,4 +156,10 @@ pub(crate) fn encoded_open(answer: &w::OpenAnswer) -> Box<[u8]> {
     let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
     answer.encode(&mut writer).expect("measured answer");
     writer.finish()
+}
+
+pub(crate) fn authorize_answer(answer: w::AuthorizeAnswer) -> Box<[u8]> {
+    let mut out = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut out).expect("measured authorization answer");
+    out.finish()
 }

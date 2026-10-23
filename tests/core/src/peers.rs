@@ -261,7 +261,8 @@ impl Peers {
                         _ => parties::Reply::Done,
                     }
                 }
-                reply @ (people::Reply::Full { .. }
+                reply @ (people::Reply::Signer(_)
+                | people::Reply::Full { .. }
                 | people::Reply::SignedIn { .. }
                 | people::Reply::SignedOut
                 | people::Reply::Outcome(_)
@@ -330,7 +331,7 @@ fn task_number(task: parties::Task) -> u64 {
 
 fn party_reply(reply: &people::Reply) -> parties::Reply {
     match reply {
-        people::Reply::Full { .. } => parties::Reply::Again(parties::Again::Busy),
+        people::Reply::Signer(_) | people::Reply::Full { .. } => parties::Reply::Again(parties::Again::Busy),
         people::Reply::SignedIn { person, sign_in, .. } => {
             parties::Reply::SignedIn { person: *person, sign_in: *sign_in }
         }

@@ -1,5 +1,5 @@
 use super::*;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_http::Method;
 use skein_lib::stream::{Down, Up};
 mod fixtures;
@@ -382,7 +382,7 @@ fn room_is_released_only_after_a_calls_end_is_handled() {
 
 #[test]
 fn a_browser_link_keeps_its_cookie_on_a_tokenless_sign_in() {
-    use jig_client_protocol_wire::v17 as w;
+    use jig_client_protocol_wire::v18 as w;
     let mut mount = fixtures::mount();
     let mut out = Queue::with_capacity(16);
     let call =
@@ -575,4 +575,58 @@ fn listener_cookie_helper_sets_a_plain_cookie() {
 fn listener_clear_helper_clears_a_plain_cookie() {
     let header = cleared(&fixtures::public_mount().settings, Via::Listener);
     assert_eq!((header.name.as_ref(), header.value.as_ref()), (b"set-cookie".as_slice(), fixtures::COOKIE_CLEARED));
+}
+
+#[test]
+fn authorize_maps_under_the_prefix_and_uses_record_error_statuses() {
+    for prefix in [b"/jig".as_slice(), b"/nested/api"] {
+        let mut mount = fixtures::prefixed(prefix);
+        let mut out = Queue::with_capacity(32);
+        let mut path = skein_lib::Writer::new(prefix.len().checked_add(b"/v1/authorize".len()).unwrap());
+        path.put(prefix).unwrap();
+        path.put(b"/v1/authorize").unwrap();
+        let path = path.finish();
+        let body = [0, 0, 0, 1, b'q'];
+        let call = fixtures::call(&mut mount, &mut out, Method::Post, &path, &fixtures::bearer(), &body);
+        assert_eq!(
+            *fixtures::component(&mut out),
+            [kit::FromTransport::Exchange {
+                exchange: fixtures::EXCHANGE,
+                credential: Some(fixtures::credential()),
+                message: kit::Message::Authorize(Box::from(body))
+            }]
+        );
+        fixtures::reply(&mut mount, &mut out, call, kit::Reply::NotARecord);
+        assert_eq!(fixtures::answered(&mut mount, &mut out, call).0, 400);
+    }
+    let mut mount = fixtures::mount();
+    let mut out = Queue::with_capacity(32);
+    let length =
+        usize::try_from(w::Authorize::worst_case_bytes(&w::CEILINGS).unwrap()).unwrap().checked_add(1).unwrap();
+    let call = fixtures::call(
+        &mut mount,
+        &mut out,
+        Method::Post,
+        b"/jig/v1/authorize",
+        &[],
+        &skein_lib::bytes::zeroed(length),
+    );
+    for request in &out {
+        if let Request::Component(_) = request {
+            panic!("oversized authorization reaches nothing");
+        }
+    }
+    assert_eq!(fixtures::answered(&mut mount, &mut out, call).0, 413);
+    let mut mount = fixtures::mount();
+    let header = skein_http::Header {
+        name: Box::from(b"content-type".as_slice()),
+        value: Box::from(b"application/json".as_slice()),
+    };
+    let call = fixtures::call(&mut mount, &mut out, Method::Post, b"/jig/v1/authorize", &[header], b"{}");
+    for request in &out {
+        if let Request::Component(_) = request {
+            panic!("wrong content type reaches nothing");
+        }
+    }
+    assert_eq!(fixtures::answered(&mut mount, &mut out, call).0, 415);
 }

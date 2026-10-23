@@ -1,4 +1,4 @@
-//! Connection and exchange admission (protocol/client.md, section 13).
+//! Connection and exchange admission (protocol/client.md, sections 13 and 18).
 use crate::{Request, exchange::Exchange, sign_in::Waiting};
 use alloc::boxed::Box;
 use skein_lib::{Duration, Map, Queue, Token};
@@ -12,10 +12,14 @@ pub struct Limits {
     pub providers: u32,
     pub exchanges: u32,
     pub mints: u32,
+    /// Maximum volatile authorization codes.
+    pub provider_codes: u32,
+    /// Maximum volatile provider access tokens.
+    pub provider_tokens: u32,
     pub exchanges_per_client: u32,
     /// A message's bytes, owned by the component (protocol/client.md, 4.2 and 13).
     pub message_bytes: u32,
-    pub wire: jig_client_protocol_wire::v17::Limits,
+    pub wire: jig_client_protocol_wire::v18::Limits,
     pub link_span: Duration,
 }
 pub const MAX_OUT_DOWN: u32 = 4;
@@ -30,6 +34,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.streams == 0
         || limits.watches_per_stream == 0
         || limits.queued_bytes < 128
+        || limits.provider_codes == 0
+        || limits.provider_tokens == 0
         || limits.mints == 0
         || limits.message_bytes == 0
         || limits.exchanges == 0
@@ -38,12 +44,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     {
         return None;
     }
-    jig_client_protocol_wire::v17::check_limits(&limits.wire).ok()?;
+    jig_client_protocol_wire::v18::check_limits(&limits.wire).ok()?;
     let body = u64::from(limits.message_bytes);
     let answer = core::cmp::max(
-        jig_client_protocol_wire::v17::KeyedAnswer::worst_case_bytes(&limits.wire)?,
-        jig_client_protocol_wire::v17::ReadAnswer::worst_case_bytes(&limits.wire)?,
+        jig_client_protocol_wire::v18::KeyedAnswer::worst_case_bytes(&limits.wire)?,
+        jig_client_protocol_wire::v18::ReadAnswer::worst_case_bytes(&limits.wire)?,
     );
+    let answer = answer.max(jig_client_protocol_wire::v18::AuthorizeAnswer::worst_case_bytes(&limits.wire)?);
     let each = u64::from(limits.wire.signed_in_token_some).checked_add(1)?.checked_add(32)?.checked_add(answer)?;
     Map::<Token, Exchange>::worst_case(limits.exchanges)?
         .checked_add(each.checked_mul(u64::from(limits.exchanges))?)?

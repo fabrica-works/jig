@@ -16,7 +16,7 @@ pub fn family_subject() -> Watchable {
 pub fn hello_event(heartbeat: Duration) -> Box<[u8]> {
     let lim = limits().wire;
     let mut served = List::with_capacity(2);
-    served.push(w::Served::new(&lim, w::ServedParts { owner: w::Owner::Jig, first: 17, last: 17 }).unwrap()).unwrap();
+    served.push(w::Served::new(&lim, w::ServedParts { owner: w::Owner::Jig, first: 18, last: 18 }).unwrap()).unwrap();
     served
         .push(
             w::Served::new(
@@ -109,6 +109,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }
@@ -134,6 +135,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }
@@ -159,6 +161,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }
@@ -184,6 +187,7 @@ impl Harness {
             | Request::Dropped
             | Request::Signing { .. }
             | Request::ServiceCredential { .. }
+            | Request::Authorized(_)
             | Request::Fact { .. }) => panic!("no close: {other:?}"),
         }
     }
@@ -214,6 +218,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }
@@ -256,6 +261,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }

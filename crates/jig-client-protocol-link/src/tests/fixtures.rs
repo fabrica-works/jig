@@ -58,7 +58,7 @@ pub fn final_answer(value: w::Final) -> Box<[u8]> {
     let mut bytes = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut bytes).unwrap();
     let owned =
-        w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 17, record: bytes.finish() })
+        w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 18, record: bytes.finish() })
             .unwrap();
     encoded_answer(&w::KeyedAnswer::FinalAnswer(owned))
 }
@@ -99,7 +99,7 @@ pub fn answer_signed_out() -> Box<[u8]> {
 }
 pub fn malformed_final() -> Box<[u8]> {
     let owned =
-        w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 17, record: Box::from([255]) })
+        w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 18, record: Box::from([255]) })
             .unwrap();
     encoded_answer(&w::KeyedAnswer::FinalAnswer(owned))
 }
@@ -134,6 +134,7 @@ impl Harness {
             | Request::Dropped
             | Request::Signing { .. }
             | Request::ServiceCredential { .. }
+            | Request::Authorized(_)
             | Request::Fact { .. }) => {
                 panic!("expected exchange: {other:?}")
             }
@@ -169,6 +170,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }
@@ -201,6 +203,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }

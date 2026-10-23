@@ -496,7 +496,7 @@ enum LabelByte {
 }
 
 #[expect(clippy::disallowed_methods, reason = "configuration parses an address's IPv6 literal (configuration.md, 3)")]
-fn public_authority(authority: &[u8]) -> bool {
+pub(crate) fn public_authority(authority: &[u8]) -> bool {
     if let Some(rest) = authority.strip_prefix(b"[") {
         let Some(end) = skein_lib::bytes::find(rest, b"]") else {
             return false;

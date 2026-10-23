@@ -99,7 +99,7 @@ pub use boundary::{
     Adoption, Ask, Counts, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity,
     IdentityKey, InitialOwner, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole,
     ProposalChoice, ProposalDecision, Proposer, Reply, Request, RequestKey, ResourceName, ResourceRole, Role, Seed,
-    Stored, USES, Use, Whom,
+    Signer, Stored, USES, Use, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{Bound, Exceeded, FailureClass, HoldReason, Moved};

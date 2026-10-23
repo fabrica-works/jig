@@ -216,6 +216,7 @@ pub enum FromTransport {
 }
 #[derive(Debug, PartialEq)]
 pub enum Message {
+    Authorize(Box<[u8]>),
     Request(Box<[u8]>),
     Read(Box<[u8]>),
     Watch(Box<[u8]>),

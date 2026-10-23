@@ -195,6 +195,7 @@ pub(crate) fn route_client(
             | jig_client::Request::OpenStream { .. }
             | jig_client::Request::CloseStream
             | jig_client::Request::Down { .. }
+            | jig_client::Request::Authorized(_)
             | jig_client::Request::ServiceCredential { .. }
             | jig_client::Request::SignOut) => out.push(Request::Client { request }),
         }

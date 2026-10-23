@@ -6,7 +6,7 @@ use crate::{
     sign_in::{self, Link, Pending, Waiting},
 };
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use skein_lib::{CryptoRng, Env, Map, Queue, ReplyTo, Time, Token};
@@ -14,6 +14,8 @@ use skein_lib::{CryptoRng, Env, Map, Queue, ReplyTo, Time, Token};
 mod closing;
 #[path = "mint.rs"]
 mod mint;
+#[path = "provider.rs"]
+mod provider;
 #[path = "reads.rs"]
 mod reads;
 #[path = "services.rs"]
@@ -220,6 +222,7 @@ impl Component {
                     }
                     Route::Request => self.request(env, exchange, sign_in, &body, out),
                     Route::SignOut => self.sign_out(env, exchange, sign_in, &body, out),
+                    Route::Authorize => unreachable!("authorization handled before credentials"),
                     Route::Link | Route::Service => {}
                 },
                 Waiting::Core { .. }
@@ -328,6 +331,7 @@ impl Component {
             return;
         }
         match route {
+            Route::Authorize => provider::authorize(env, connection, &body),
             Route::Link => {
                 let Ok(record) = w::LinkSignIn::decode(&env.limits.wire, &mut skein_lib::Reader::new(&body)) else {
                     connection.respond(crate::Reply::NotARecord, &env.limits);
@@ -429,7 +433,8 @@ impl Component {
                 people::Reply::Again(people::Again::NotReady) => {
                     self.respond(env, exchange, routes::sign_out_not_ready());
                 }
-                people::Reply::Full { .. }
+                people::Reply::Signer(_)
+                | people::Reply::Full { .. }
                 | people::Reply::SignedIn { .. }
                 | people::Reply::Outcome(_)
                 | people::Reply::Again(_)
@@ -488,7 +493,8 @@ impl Component {
             people::Reply::Outcome(people::Outcome::Applied { .. }) => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
             }
-            people::Reply::Full { .. }
+            people::Reply::Signer(_)
+            | people::Reply::Full { .. }
             | people::Reply::SignedIn { .. }
             | people::Reply::SignedOut
             | people::Reply::Outcome(_)

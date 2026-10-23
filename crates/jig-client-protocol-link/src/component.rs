@@ -3,7 +3,7 @@
 use crate::{Event, Fact, Limits, Message, Request, Streamed, Unusable, translate};
 use alloc::boxed::Box;
 use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Retry, Watchable};
-use jig_client_protocol_wire::{self as wire, v17 as w};
+use jig_client_protocol_wire::{self as wire, v18 as w};
 use skein_lib::{Map, Queue, Reader, RequestEnvelope, RequestKey, Secret, Time, Token, Writer};
 #[derive(Debug)]
 pub(crate) struct Attempt {
@@ -17,7 +17,8 @@ impl Attempt {
     pub(super) fn carrying(&self) -> bool {
         match self.kind {
             ExchangeKind::Attempt { carrying } => carrying,
-            ExchangeKind::SignIn
+            ExchangeKind::Authorize
+            | ExchangeKind::SignIn
             | ExchangeKind::SignOut { .. }
             | ExchangeKind::Read { .. }
             | ExchangeKind::WatchOpen { .. }
@@ -27,6 +28,7 @@ impl Attempt {
 }
 #[derive(Clone, Copy, Debug)]
 pub(super) enum ExchangeKind {
+    Authorize,
     SignIn,
     SignOut { generation: u64 },
     // `carrying`: an exchange carrying a value either way, sent once and never held
@@ -92,6 +94,7 @@ impl Link {
         match event {
             Event::SignIn { with } => self.sign_in(now, with, out),
             Event::SignOut => self.sign_out(now, out),
+            Event::Authorize { query } => self.authorize(query, out),
             Event::Start { kept } => self.start_store(kept, out),
             Event::Save { record } => self.save(record, out),
             Event::Erase { key } => self.erase(key, out),
@@ -207,6 +210,10 @@ impl Link {
         match attempt.kind {
             ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
                 self.signing_answer(attempt.kind, attempt.held, body, out);
+                return;
+            }
+            ExchangeKind::Authorize => {
+                self.authorized(body, out);
                 return;
             }
             ExchangeKind::Attempt { .. } => {}
@@ -347,6 +354,7 @@ impl Link {
                         read_none(attempt.token, &attempt.owner, jig_client_domain::contract::ReadNone::Malformed, out);
                     }
                     ExchangeKind::Read { turn: None }
+                    | ExchangeKind::Authorize
                     | ExchangeKind::Attempt { .. }
                     | ExchangeKind::SignIn
                     | ExchangeKind::SignOut { .. }
@@ -381,6 +389,7 @@ fn read_none(read: Token, owner: &w::Owner, why: jig_client_domain::contract::Re
 }
 fn failed(attempt: Attempt, out: &mut Queue<Request>) {
     match attempt.kind {
+        ExchangeKind::Authorize => out.push(Request::Authorized(crate::Authorized::Lost)),
         ExchangeKind::Attempt { .. } => lost(attempt.token, out),
         ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
             out.push(Request::Signing { signing: crate::Signing::Lost });
@@ -416,7 +425,7 @@ fn keyed(key: RequestKey, ask: Ask, value: Option<Secret>, limits: &w::Limits) -
 }
 
 impl Link {
-    fn token(&mut self) -> Option<Token> {
+    pub(super) fn token(&mut self) -> Option<Token> {
         let next = self.next.checked_add(1)?;
         let token = Token::new(self.next);
         self.next = next;
@@ -530,7 +539,8 @@ impl Link {
                         tokens.push(*exchange).expect("bounded exchanges");
                     }
                 }
-                ExchangeKind::Attempt { .. }
+                ExchangeKind::Authorize
+                | ExchangeKind::Attempt { .. }
                 | ExchangeKind::Read { .. }
                 | ExchangeKind::SignIn
                 | ExchangeKind::SignOut { .. } => {}
@@ -599,7 +609,8 @@ impl Link {
                     Err(_) => self.failure(attempt, out),
                 }
             }
-            ExchangeKind::Attempt { .. }
+            ExchangeKind::Authorize
+            | ExchangeKind::Attempt { .. }
             | ExchangeKind::Read { .. }
             | ExchangeKind::SignIn
             | ExchangeKind::SignOut { .. } => {
@@ -626,7 +637,7 @@ impl Link {
             ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
                 out.push(Request::Signing { signing: crate::Signing::Lost });
             }
-            ExchangeKind::Attempt { .. } | ExchangeKind::Read { .. } => failed(attempt, out),
+            ExchangeKind::Authorize | ExchangeKind::Attempt { .. } | ExchangeKind::Read { .. } => failed(attempt, out),
         }
     }
     fn streamed(&mut self, now: Time, message: Streamed, out: &mut Queue<Request>) {
@@ -750,6 +761,15 @@ impl Link {
         while let Some((key, _)) = (&self.attempts).into_iter().next() {
             let key = *key;
             let attempt = self.attempts.remove(&key).expect("listed attempt");
+            match attempt.kind {
+                ExchangeKind::Authorize => out.push(Request::Authorized(crate::Authorized::Lost)),
+                ExchangeKind::SignIn
+                | ExchangeKind::SignOut { .. }
+                | ExchangeKind::Attempt { .. }
+                | ExchangeKind::Read { .. }
+                | ExchangeKind::WatchOpen { .. }
+                | ExchangeKind::WatchClose { .. } => {}
+            }
             // The table's attempts end with the sign-in; a carried one has no other answer.
             if attempt.carrying() {
                 lost(attempt.token, out);

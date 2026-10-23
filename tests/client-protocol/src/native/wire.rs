@@ -2,7 +2,7 @@
 use super::Received;
 use jig_client::{Event, Message, Request, Streamed};
 use jig_client_protocol_link::translate;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{Reader, Secret, Token};
 use std::collections::BTreeMap;
 
@@ -81,7 +81,7 @@ impl Wire {
                 }
                 Kind::Other
             }
-            Message::Unwatch(_) | Message::StreamGone(_) => Kind::Other,
+            Message::Authorize(_) | Message::Unwatch(_) | Message::StreamGone(_) => Kind::Other,
         };
         self.exchanges.insert(*exchange, kind);
         if let Message::Request(bytes) = message {
@@ -212,6 +212,7 @@ impl Wire {
             Event::Start { .. }
             | Event::StartUnlinked { .. }
             | Event::SignIn { .. }
+            | Event::Authorize { .. }
             | Event::SignOut
             | Event::SignOutLost
             | Event::Watch { .. }

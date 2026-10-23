@@ -477,6 +477,8 @@ pub enum Outcome {
 /// until their decision is durable. (domain/people.md, sections 3 and 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Reply {
+    /// The sign-in's party, or none when unknown, ended or past either clock.
+    Signer(Option<Signer>),
     /// Sign-in succeeded or an existing active same-person sign-in was replayed.
     SignedIn {
         /** Stable deployment party number for the authenticated identity. */
@@ -741,6 +743,8 @@ pub enum Event {
         /// Authenticated sign-in to keep if it is live and belongs to this identity.
         held: Option<u64>,
     },
+    /// Read the live sign-in's identity and kind without writing or spending admission room.
+    Whose { reply_to: ReplyTo, sign_in: u64 },
     /// End one sign-in after restoration, emitting erase if present and one reply.
     SignOut {
         /// Destination for the terminal `SignedOut` reply.
@@ -911,4 +915,11 @@ pub enum AccountHostWhy {
     NotInContact,
     Lost,
     Failed,
+}
+
+/// The live sign-in's party (domain/people.md, 3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Signer {
+    pub identity: Identity,
+    pub kind: Kind,
 }

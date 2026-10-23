@@ -75,6 +75,7 @@ pub(super) fn route_people(
         | people::Event::SignedIn { .. }
         | people::Event::Roles { .. }
         | people::Event::Act { .. }
+        | people::Event::Whose { .. }
         | people::Event::Ask { .. }
         | people::Event::Restore { .. }
         | people::Event::Restored) => other,
@@ -178,7 +179,8 @@ pub(super) fn tag_people(
                 people::Reply::Outcome(people::Outcome::Applied { connector, token }) => {
                     Request::Held(Box::new(Held::Applied { to, connector, token }))
                 }
-                reply @ (people::Reply::SignedIn { .. }
+                reply @ (people::Reply::Signer(_)
+                | people::Reply::SignedIn { .. }
                 | people::Reply::SignedOut
                 | people::Reply::Again(..)
                 | people::Reply::Refused(..)

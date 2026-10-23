@@ -122,7 +122,10 @@ impl Call {
         use skein_lib::stream::Up;
         match event {
             http::Event::Body(Up::Bytes(bytes)) => {
-                if self.body.append(&bytes).is_err() {
+                if u64::from(self.body.len()).saturating_add(u64::try_from(bytes.len()).expect("body bytes"))
+                    > u64::from(crate::dispatch::body_bound(self.route, env.limits.body))
+                    || self.body.append(&bytes).is_err()
+                {
                     self.route = Route::Missing;
                     self.respond(413, Box::new([]), &env.limits);
                 } else {

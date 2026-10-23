@@ -16,7 +16,7 @@ pub struct Llm {
     /// Every model belongs to one numbered provider (configuration.md, 3).
     pub providers: Box<[Provider]>,
 }
-mod providers;
+pub(crate) mod providers;
 pub use providers::{Provider, Registration};
 #[derive(Debug)]
 pub struct Endpoint {

@@ -127,7 +127,10 @@ impl Component {
                     self.respond(env, exchange, answer);
                 }
             }
-            people::Reply::SignedOut | people::Reply::Outcome(_) | people::Reply::Refused(_) => {
+            people::Reply::Signer(_)
+            | people::Reply::SignedOut
+            | people::Reply::Outcome(_)
+            | people::Reply::Refused(_) => {
                 if !self.mint_refused(exchange, MintRefusal::Bound, out) {
                     self.respond(env, exchange, routes::refused(&env.limits.wire));
                 }

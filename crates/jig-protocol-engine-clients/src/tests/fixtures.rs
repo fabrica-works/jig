@@ -31,7 +31,7 @@ pub fn wire() -> w::Limits {
 }
 pub fn settings() -> Settings {
     let mut served = List::with_capacity(2);
-    served.push(crate::Served { family: None, first: 17, last: 17 }).expect("one jig range");
+    served.push(crate::Served { family: None, first: 18, last: 18 }).expect("one jig range");
     served.push(crate::Served { family: Some(9), first: 2, last: 2 }).expect("one family range");
     Settings {
         deployment_provider: 2,
@@ -83,6 +83,8 @@ pub fn env() -> Env<Limits> {
             families: 2,
             providers: 0,
             mints: 2,
+            provider_codes: 16,
+            provider_tokens: 64,
             exchanges: 4,
             exchanges_per_client: 2,
             message_bytes: MESSAGE_BYTES,
@@ -658,7 +660,7 @@ mod answers;
 pub use answers::*;
 impl Exchange {
     pub fn ask(&mut self) -> (Token, ReplyTo) {
-        let body = keyed(w::Owner::Jig, 17, encode_ask(&start(&self.env.limits.wire)));
+        let body = keyed(w::Owner::Jig, 18, encode_ask(&start(&self.env.limits.wire)));
         let owner = self.send(crate::Message::Request(body));
         self.authenticate();
         let Some(Request::Core(event)) = self.out.pop() else {
@@ -734,7 +736,7 @@ pub fn final_record(record: w::KeyedAnswer, limits: &w::Limits) -> w::Final {
     match record {
         w::KeyedAnswer::FinalAnswer(value) => {
             assert_eq!(value.owner(), &w::Owner::Jig);
-            assert_eq!(value.version(), 17);
+            assert_eq!(value.version(), 18);
             w::Final::decode(limits, &mut skein_lib::Reader::new(value.record())).expect("jig answer")
         }
         other @ (w::KeyedAnswer::NotServed(_)

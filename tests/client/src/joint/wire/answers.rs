@@ -37,6 +37,7 @@ pub fn reply(
 ) -> Result<Reply, super::owner::Invalid> {
     Ok(match value {
         people::Reply::SignedIn { person, sign_in, expires } => Reply::SignedIn { person, sign_in, expires },
+        people::Reply::Signer(_) => panic!("Whose is a separate provider read"),
         people::Reply::SignedOut => Reply::SignedOut,
         people::Reply::Again(why) => Reply::Again(why),
         people::Reply::Full { .. } => Reply::Again(people::Again::Busy),

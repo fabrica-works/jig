@@ -1097,7 +1097,8 @@ impl World {
                 Reply::Refused(why) | Reply::Outcome(Outcome::Refused(why)) => {
                     self.observe(Seen::Refused { why: why.clone() });
                 }
-                Reply::Full { .. }
+                Reply::Signer(_)
+                | Reply::Full { .. }
                 | Reply::SignedIn { .. }
                 | Reply::SignedOut
                 | Reply::Outcome(_)

@@ -124,6 +124,7 @@ impl Harness {
                 | Request::Dropped
                 | Request::Signing { .. }
                 | Request::ServiceCredential { .. }
+                | Request::Authorized(_)
                 | Request::Fact { .. } => {}
             }
         }

@@ -1112,7 +1112,8 @@ impl Observer {
     fn reply_receipts(&mut self, to: &mut skein_lib::ReplyTo, reply: &people::Reply, requires: &mut Vec<r::Receipt>) {
         match reply {
             people::Reply::SignedIn { sign_in, .. } => requires.push(r::Receipt::SignIn(*sign_in)),
-            people::Reply::Full { .. }
+            people::Reply::Signer(_)
+            | people::Reply::Full { .. }
             | people::Reply::Again(_)
             | people::Reply::SignedOut
             | people::Reply::Refused(_) => {

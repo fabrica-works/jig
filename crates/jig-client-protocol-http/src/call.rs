@@ -18,6 +18,7 @@ pub struct Call {
 #[must_use]
 pub fn exchange(mapping: &Mapping, credential: Option<&Secret>, message: Message) -> Call {
     let (route, body): (&[u8], Box<[u8]>) = match message {
+        Message::Authorize(body) => (b"/v1/authorize".as_slice(), body),
         Message::Request(body) => (b"/v1/request".as_slice(), body),
         Message::Read(body) => (b"/v1/read".as_slice(), body),
         Message::Watch(body) => (b"/v1/watch".as_slice(), body),

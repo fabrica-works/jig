@@ -124,6 +124,7 @@ impl Connections {
             client::Request::Save { .. }
             | client::Request::Erase { .. }
             | client::Request::Told { .. }
+            | client::Request::Authorized(_)
             | client::Request::ServiceCredential { .. } => {}
             client::Request::Down { .. } | client::Request::SignOut => panic!("linked hosts emit wire work"),
         }

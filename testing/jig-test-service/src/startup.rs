@@ -155,6 +155,9 @@ fn parse_in(document: &Document) -> Result<Parsed, Problems> {
             return Err(problems);
         }
     };
+    if engine.clients.provider.is_some() {
+        return Err(problem(Path::root().member(b"engine").member(b"clients").member(b"provider"), What::Form));
+    }
     let mut engine_object = object(document, at, &path.member(b"engine"))?;
     let at = engine_object.member(document, b"limits").expect("engine parser checked limits");
     let mut profile = object(document, at, &path)?;

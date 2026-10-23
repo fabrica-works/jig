@@ -116,7 +116,13 @@ impl Component {
                         .respond(crate::Reply::NotARecord, &env.limits);
                 }
             },
-            Route::Stream | Route::Link | Route::Service | Route::SignOut | Route::Read | Route::Request => {
+            Route::Stream
+            | Route::Link
+            | Route::Service
+            | Route::Authorize
+            | Route::SignOut
+            | Route::Read
+            | Route::Request => {
                 self.connections
                     .get_mut(&owner)
                     .expect("exchange owner")

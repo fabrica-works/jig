@@ -14,6 +14,7 @@
 //! **hub**: `slots=2, accounts=8, charter_bytes=65536, transcript_bytes=262144, delivery_evidence_bytes=4096, turn_bytes=65536, outcome_bytes=4096, detail_bytes=4096, held=8, inbox=8, event_bytes=65536, run_calls=8, facts=64, told=64, turns=8, turn_queue_bytes=524288`.
 //! **link**: `chunk=16384, name=32, secret=256, names=8, opening=4, handshake=Duration::from_secs(10), hello=Duration::from_secs(10), ping=Duration::from_secs(5), silence=Duration::from_secs(15), stall=Duration::from_secs(30), backoff=Duration::from_millis(250), ceiling=Duration::from_secs(30), proved=Duration::from_secs(60), busy=Duration::from_secs(2), facts=64`.
 //! **driver**: `listeners=ACCOUNTS.sign_ins`, the sign-in deadline `client.sign_in_time=Duration::from_secs(300)`.
+//! **clients**: `provider_codes=16, provider_tokens=64`.
 use super::{Limits, Link};
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
@@ -296,11 +297,13 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_eng
     families: 32,
     providers: 32,
     mints: 4,
+    provider_codes: 16,
+    provider_tokens: 64,
     exchanges: 8,
     exchanges_per_client: 2,
     // One full moved file and its keyed account-change envelope.
     message_bytes: 131_328,
-    wire: jig_client_protocol_wire::v17::CEILINGS,
+    wire: jig_client_protocol_wire::v18::CEILINGS,
     link_span: Duration::from_secs(300),
 };
 

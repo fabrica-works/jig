@@ -50,7 +50,7 @@ fn drain(client: &mut Client, front: &mut Joint, out: &mut Queue<Request>) {
     while let Some(request) = out.pop() {
         match request {
             Request::Down { down } => front.down(CLIENT, NOW, WALL, down).expect("Jig transport operation"),
-            Request::Told { .. } | Request::ServiceCredential { .. } => {}
+            Request::Told { .. } | Request::Authorized(_) | Request::ServiceCredential { .. } => {}
             Request::Exchange { .. }
             | Request::OpenStream { .. }
             | Request::CloseStream
@@ -158,6 +158,7 @@ fn a_key_constructor_sends_the_value_once_without_keeping_it() {
                 | Request::Told { .. }
                 | Request::Down { .. }
                 | Request::SignOut
+                | Request::Authorized(_)
                 | Request::ServiceCredential { .. }) => panic!("carried account key must not be saved: {other:?}"),
             }
         }

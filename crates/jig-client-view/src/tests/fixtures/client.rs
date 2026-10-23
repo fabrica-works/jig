@@ -245,6 +245,7 @@ impl Fixture {
             | jig_client::Event::Start { .. }
             | jig_client::Event::StartUnlinked { .. }
             | jig_client::Event::SignIn { .. }
+            | jig_client::Event::Authorize { .. }
             | jig_client::Event::SignOut
             | jig_client::Event::SignOutLost
             | jig_client::Event::Watch { .. }
@@ -263,6 +264,7 @@ impl Fixture {
             jig_client::Event::Start { .. }
             | jig_client::Event::StartUnlinked { .. }
             | jig_client::Event::SignIn { .. }
+            | jig_client::Event::Authorize { .. }
             | jig_client::Event::SignOut
             | jig_client::Event::SignOutLost
             | jig_client::Event::Watch { .. }
@@ -322,6 +324,7 @@ impl Fixture {
                 }
                 jig_client::Request::Exchange { .. }
                 | jig_client::Request::OpenStream { .. }
+                | jig_client::Request::Authorized(_)
                 | jig_client::Request::ServiceCredential { .. }
                 | jig_client::Request::CloseStream
                 | jig_client::Request::Save { .. }
@@ -478,6 +481,7 @@ fn copy_client_event(event: &jig_client::Event) -> jig_client::Event {
         | jig_client::Event::Start { .. }
         | jig_client::Event::StartUnlinked { .. }
         | jig_client::Event::SignIn { .. }
+        | jig_client::Event::Authorize { .. }
         | jig_client::Event::SignOutLost
         | jig_client::Event::Reply { .. }
         | jig_client::Event::Lost { .. }

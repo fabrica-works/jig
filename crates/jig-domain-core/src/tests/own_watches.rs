@@ -287,3 +287,44 @@ fn lifting_a_host_drain_marks_an_open_accounts_watch() {
     ));
     assert!(accounts_marked(&core));
 }
+
+#[test]
+fn whose_routes_a_read_and_its_whole_reply_and_refuses_it_while_stopping() {
+    let (mut core, limits, sign_in, _) = signed_core();
+    let to = Token::new(987);
+    let out =
+        watch_outputs(&mut core, &limits, Event::People(people::Event::Whose { reply_to: ReplyTo::new(to), sign_in }));
+    let mut replies = 0_u32;
+    for request in out {
+        match request {
+            Request::Held(value) => {
+                if let Held::PeopleReply { to: destination, reply: people::Reply::Signer(signer) } = *value {
+                    assert_eq!(destination.into_token(), to);
+                    assert_eq!(signer, Some(people::Signer { identity: identity(1), kind: people::Kind::Person }));
+                    replies = replies.saturating_add(1);
+                }
+            }
+            Request::Write(_) => panic!("Whose writes nothing"),
+            Request::Ask { .. } | Request::Now(_) | Request::ProjectMade { .. } | Request::Decided => {}
+        }
+    }
+    assert_eq!(replies, 1);
+    drop(watch_outputs(&mut core, &limits, Event::Stopping));
+    let out =
+        watch_outputs(&mut core, &limits, Event::People(people::Event::Whose { reply_to: ReplyTo::new(to), sign_in }));
+    let mut answered = false;
+    for request in out {
+        match request {
+            Request::Held(value) => {
+                if let Held::PeopleReply { to: destination, reply } = *value {
+                    assert_eq!(destination.into_token(), to);
+                    assert_eq!(reply, people::Reply::Again(people::Again::NotReady));
+                    answered = true;
+                }
+            }
+            Request::Write(_) => panic!("Whose writes nothing while stopping"),
+            Request::Ask { .. } | Request::Now(_) | Request::ProjectMade { .. } | Request::Decided => {}
+        }
+    }
+    assert!(answered);
+}

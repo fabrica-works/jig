@@ -95,3 +95,16 @@ fn the_server_listens_where_the_application_member_says() {
     let Some(skein_io::Request::Listen { addr, .. }) = clients.io.pop() else { panic!("listener requested") };
     assert_eq!(addr, skein_io::Addr::Ip(core::net::SocketAddr::new(core::net::IpAddr::from([127, 0, 0, 1]), PORT)));
 }
+
+#[test]
+fn the_test_service_refuses_clients_provider_because_it_serves_no_provider_routes() {
+    let document = fixtures::with(&fixtures::engine_document(), br#""clients": {"#, br#""clients":{"provider":{"key":"provider.pem","clients":[{"id":"app","secret":"app.secret","redirect_uri":"https://app.example.com/cb"}],"addresses":[]},"#);
+    let found = crate::startup::parse(&document).expect_err("no provider routes");
+    assert_eq!(
+        found.problems.as_slice(),
+        &[jig_protocol_config::Problem {
+            path: Path::root().member(b"engine").member(b"clients").member(b"provider"),
+            what: What::Form
+        }]
+    );
+}

@@ -639,7 +639,8 @@ impl Application for Ops {
                         peers.observed.push(r::Observed::Released { requires: vec![r::Receipt::SignIn(number)] });
                     }
                     people::Reply::Outcome(_) => {}
-                    other @ (people::Reply::Full { .. }
+                    other @ (people::Reply::Signer(_)
+                    | people::Reply::Full { .. }
                     | people::Reply::SignedOut
                     | people::Reply::Refused(_)
                     | people::Reply::Again(_)) => {

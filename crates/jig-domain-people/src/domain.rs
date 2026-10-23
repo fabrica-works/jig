@@ -550,6 +550,19 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::SignedIn { reply_to, person, sign_in, identity, kind, held } => {
             signin(domain, env, reply_to, person, sign_in, identity, kind, held, out);
         }
+        Event::Whose { reply_to, sign_in } => {
+            if !domain.ready() {
+                return again(reply_to, Again::NotReady, out);
+            }
+            let signer = match domain.person(sign_in, env.now, env.wall) {
+                Some(person) => {
+                    let identity = domain.people.get(&person).expect("live sign-in has a party");
+                    Some(crate::Signer { identity: identity.clone(), kind: domain.kind_of(identity) })
+                }
+                None => None,
+            };
+            out.push(Request::Reply { to: reply_to, reply: Reply::Signer(signer) });
+        }
         Event::SignOut { reply_to, sign_in } => {
             if !domain.ready() {
                 return again(reply_to, Again::NotReady, out);

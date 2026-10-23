@@ -1,6 +1,6 @@
 //! Fixed attempt admission and receiving bounds (protocol/client.md, 13).
 use crate::component::Attempt;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{Duration, Map};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -202,6 +202,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(crate::watches::worst_case(limits)?)?
         .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.client.watches)?)?
         .checked_add(crate::store::worst_case(limits)?)?
+        // Authorization owns its encoded query and decoded redirect only for this step.
+        .checked_add(w::Authorize::worst_case_bytes(&limits.wire)?.checked_mul(2)?)?
+        .checked_add(w::AuthorizeAnswer::worst_case_bytes(&limits.wire)?.checked_mul(2)?)?
         .checked_add(40)
 }
 

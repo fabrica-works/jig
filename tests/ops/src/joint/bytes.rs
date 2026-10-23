@@ -48,7 +48,7 @@ impl Side {
         }
     }
     fn send(&mut self, now: Time, request: Request) {
-        use jig_client_protocol_wire::v17 as w;
+        use jig_client_protocol_wire::v18 as w;
         use skein_lib::Reader;
         if matches!(&request, Request::CloseStream) {
             self.stream_epoch += 1;
@@ -69,6 +69,7 @@ impl Side {
                 }
                 Message::SignInLink(_)
                 | Message::SignInService
+                | Message::Authorize(_)
                 | Message::SignOut
                 | Message::Watch(_)
                 | Message::Unwatch(_)
@@ -79,7 +80,7 @@ impl Side {
         self.connections.down(now, request, &mut self.down);
     }
     fn receipts(&mut self, event: &Event) -> Vec<Receipt> {
-        use jig_client_protocol_wire::v17 as w;
+        use jig_client_protocol_wire::v18 as w;
         use skein_lib::Reader;
         let mut receipts: Vec<_> = self
             .wire
@@ -119,6 +120,7 @@ impl Side {
             Event::Start { .. }
             | Event::StartUnlinked { .. }
             | Event::SignIn { .. }
+            | Event::Authorize { .. }
             | Event::SignOut
             | Event::SignOutLost
             | Event::Watch { .. }
@@ -169,7 +171,7 @@ impl Bytes {
             name: Box::new([]),
         });
         settings.served = jig_client_world::test::list([
-            clients::Served { family: None, first: 17, last: 17 },
+            clients::Served { family: None, first: 18, last: 18 },
             clients::Served { family: Some(1), first: 1, last: 1 },
             clients::Served { family: Some(2), first: 1, last: 1 },
         ]);
@@ -313,6 +315,7 @@ fn callback(event: &Event) -> Option<Callback> {
         Event::Start { .. }
         | Event::StartUnlinked { .. }
         | Event::SignIn { .. }
+        | Event::Authorize { .. }
         | Event::SignOut
         | Event::SignOutLost
         | Event::Watch { .. }

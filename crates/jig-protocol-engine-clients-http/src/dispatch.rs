@@ -1,12 +1,13 @@
 //! Method and route dispatch (protocol/client.md, 17.1).
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use jig_protocol_engine_clients::Message;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Route {
     Link,
     Service,
     SignOut,
+    Authorize,
     Request,
     Read,
     Watch,
@@ -30,6 +31,7 @@ pub(crate) fn route(prefix: &[u8], call: &skein_http::server::Call) -> Route {
         b"/v1/sign-in/deployment" => Route::Service,
         b"/v1/request" => Route::Request,
         b"/v1/sign-out" => Route::SignOut,
+        b"/v1/authorize" => Route::Authorize,
         b"/v1/read" => Route::Read,
         b"/v1/watch" => Route::Watch,
         b"/v1/unwatch" => Route::Unwatch,
@@ -37,11 +39,30 @@ pub(crate) fn route(prefix: &[u8], call: &skein_http::server::Call) -> Route {
         _ => Route::Missing,
     }
 }
+pub(crate) fn body_bound(route: Route, configured: u32) -> u32 {
+    match route {
+        Route::Authorize => configured.min(
+            u32::try_from(w::Authorize::worst_case_bytes(&w::CEILINGS).expect("record bound"))
+                .expect("record fits u32"),
+        ),
+        Route::Link
+        | Route::Service
+        | Route::SignOut
+        | Route::Request
+        | Route::Read
+        | Route::Watch
+        | Route::Unwatch
+        | Route::Gone
+        | Route::Stream
+        | Route::Missing => configured,
+    }
+}
 pub(crate) fn message(route: Route, body: Box<[u8]>) -> Option<Message> {
     Some(match route {
         Route::Link => Message::SignInLink(body),
         Route::Service => Message::SignInService(body),
         Route::SignOut => Message::SignOut(body),
+        Route::Authorize => Message::Authorize(body),
         Route::Request => Message::Request(body),
         Route::Read => Message::Read(body),
         Route::Watch => Message::Watch(body),

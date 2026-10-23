@@ -127,6 +127,7 @@ impl Story {
                     | client::Request::Save { .. }
                     | client::Request::Erase { .. }
                     | client::Request::SignOut
+                    | client::Request::Authorized(_)
                     | client::Request::ServiceCredential { .. } => panic!("unlinked client doors only"),
                 }
             }

@@ -13,6 +13,7 @@ pub enum Event {
     StartUnlinked { kept: List<skein_lib::RequestRecord<crate::Held>> },
     SignIn { with: With },
     SignOut,
+    Authorize { query: Box<[u8]> },
     SignOutLost,
     Watch { handle: Handle, subject: Watchable },
     Unwatch { handle: Handle },
@@ -52,6 +53,7 @@ pub enum Request {
         down: Down,
     },
     SignOut,
+    Authorized(crate::Authorized),
     /// Shown once by the host; the client never retains it.
     ServiceCredential {
         party: u64,
@@ -180,6 +182,7 @@ impl Client {
                     self.up(&env, Up::SignedIn);
                 }
             }
+            Event::Authorize { query } => self.link_step(now, link::Event::Authorize { query }),
             Event::SignOut => {
                 self.signing_out = true;
                 self.sign_out_lost = false;
@@ -292,6 +295,7 @@ impl Client {
                 assert!(with == With::Transport, "unlinked sign-in belongs to the transport");
                 self.up(env, Up::SignedIn);
             }
+            Event::Authorize { .. } => out.push(Request::Authorized(crate::Authorized::Lost)),
             Event::SignOut => {
                 self.signing_out = true;
                 self.sign_out_lost = false;
@@ -484,6 +488,7 @@ impl Client {
             link::Request::Hello { family: Some(family), versions } => {
                 self.up(env, Up::FamilyServed { family, versions });
             }
+            link::Request::Authorized(answer) => out.push(Request::Authorized(answer)),
             link::Request::Signing { signing } => self.signing(env, signing),
             link::Request::Kept { record: link::Saved { record, .. } } => {
                 let mut kept = List::with_capacity(1);

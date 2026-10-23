@@ -3,7 +3,7 @@ use crate::{
     Link, Message, Request, Signing, With,
     component::{Attempt, ExchangeKind},
 };
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{Queue, Reader, Secret, Time, Token, Writer};
 impl Link {
     #[must_use]
@@ -100,6 +100,7 @@ impl Link {
             ExchangeKind::SignOut { generation } if generation != self.generation => return,
             ExchangeKind::SignOut { .. }
             | ExchangeKind::SignIn
+            | ExchangeKind::Authorize
             | ExchangeKind::Attempt { .. }
             | ExchangeKind::Read { .. }
             | ExchangeKind::WatchOpen { .. }
@@ -140,7 +141,8 @@ impl Link {
                     Ok(w::SignOutAnswer::NotReady) if reader.remaining() == 0 => Signing::Again,
                     Ok(_) | Err(_) => Signing::Lost,
                 },
-                ExchangeKind::Attempt { .. }
+                ExchangeKind::Authorize
+                | ExchangeKind::Attempt { .. }
                 | ExchangeKind::Read { .. }
                 | ExchangeKind::WatchOpen { .. }
                 | ExchangeKind::WatchClose { .. } => unreachable!("signing exchange"),

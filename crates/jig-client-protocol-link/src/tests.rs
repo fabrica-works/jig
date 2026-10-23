@@ -2,7 +2,7 @@ use crate::*;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
 use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Watchable};
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{Queue, Reader, RequestEnvelope, Time, Token};
 mod attempts;
 mod carried;
@@ -18,7 +18,7 @@ mod stream;
 
 #[test]
 fn the_link_serves_the_wire_s_version_alone() {
-    assert!(serves(c::VersionRange { first: 17, last: 17 }));
+    assert!(serves(c::VersionRange { first: 18, last: 18 }));
     assert!(!serves(c::VersionRange { first: 7, last: 7 }));
 }
 

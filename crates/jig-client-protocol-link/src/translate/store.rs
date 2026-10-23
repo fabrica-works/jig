@@ -4,7 +4,7 @@ use crate::Limits;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
 use jig_client_domain::{Ask, Family};
-use jig_client_protocol_wire::{self as wire, v17 as w};
+use jig_client_protocol_wire::{self as wire, v18 as w};
 use skein_lib::{List, Reader, RequestRecord, Wall, Writer, bytes};
 
 pub(super) fn text(value: &[u8], limits: &Limits) -> Result<c::Text, w::Problem> {

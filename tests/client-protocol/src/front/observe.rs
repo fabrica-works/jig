@@ -1,7 +1,7 @@
 //! Facts decoded independently at the byte boundary, before the root sees them.
 use crate::native::Received;
 use jig_client::{Message, Request as ClientRequest, contract as c};
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use jig_client_test_domain::{Event, Request};
 use jig_client_world::harness::{Receipt, Sent};
 use skein_lib::{Reader, RequestEnvelope, Token};
@@ -26,6 +26,7 @@ pub(super) fn callback(event: &jig_client::Event) -> Option<Callback> {
         jig_client::Event::Start { .. }
         | jig_client::Event::StartUnlinked { .. }
         | jig_client::Event::SignIn { .. }
+        | jig_client::Event::Authorize { .. }
         | jig_client::Event::SignOut
         | jig_client::Event::SignOutLost
         | jig_client::Event::Watch { .. }

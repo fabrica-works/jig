@@ -421,7 +421,8 @@ fn tracked_goal(world: &mut World) -> u64 {
         .rev()
         .find_map(|reply| match reply {
             people::Reply::Outcome(people::Outcome::Created { first: task, .. }) => Some(*task),
-            people::Reply::Full { .. }
+            people::Reply::Signer(_)
+            | people::Reply::Full { .. }
             | people::Reply::SignedIn { .. }
             | people::Reply::SignedOut
             | people::Reply::Outcome(_)

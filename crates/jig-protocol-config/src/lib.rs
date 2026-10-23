@@ -87,7 +87,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
     }
     let mut clients = None;
     if let Some(at) = object.required(document, b"clients", &path, &mut problems) {
-        clients = clients::parse(document, at, &path.member(b"clients"), &mut problems);
+        clients = clients::parse(document, at, &path.member(b"clients"), directories, &mut problems);
     }
     let mut charters = None;
     if let Some(at) = object.required(document, b"charters", &path, &mut problems)
@@ -154,6 +154,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
         limits,
     };
     engine.owners = domain::owners(document, owners.expect("required member checked"), &engine, &mut problems);
+    clients::check_provider(&engine, &mut problems);
     domain::whole(&engine, &mut problems);
     if !problems.is_empty() {
         return Err(problems);

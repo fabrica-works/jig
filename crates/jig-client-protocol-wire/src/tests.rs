@@ -486,3 +486,37 @@ fn a_keyed_value_one_byte_past_the_move_bound_is_refused() {
         Err(Problem { path: Path::KeyedValue, reason: skein_codec::Reason::Bound })
     );
 }
+
+#[test]
+fn authorization_query_and_each_answer_round_trip_at_their_bounds() {
+    let limits = CEILINGS;
+    let record = Authorize::new(&limits, AuthorizeParts { query: fixtures::bytes(8192) }).unwrap();
+    let bytes = fixtures::encoded(&record, Authorize::measure, Authorize::encode);
+    assert_eq!(Authorize::decode(&limits, &mut Reader::new(&bytes)), Ok(record));
+    assert_eq!(
+        Authorize::new(&limits, AuthorizeParts { query: fixtures::bytes(8193) }),
+        Err(Problem { path: Path::AuthorizeQuery, reason: skein_codec::Reason::Bound })
+    );
+    assert_eq!(
+        AuthorizeGo::new(&limits, AuthorizeGoParts { location: fixtures::bytes(16385) }),
+        Err(Problem { path: Path::AuthorizeGoLocation, reason: skein_codec::Reason::Bound })
+    );
+    let go = AuthorizeGo::new(&limits, AuthorizeGoParts { location: fixtures::bytes(16384) }).unwrap();
+    for answer in
+        [AuthorizeAnswer::Go(go), AuthorizeAnswer::SignedOut, AuthorizeAnswer::NotReady, AuthorizeAnswer::Busy]
+    {
+        let bytes = fixtures::encoded(&answer, AuthorizeAnswer::measure, AuthorizeAnswer::encode);
+        assert_eq!(AuthorizeAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer));
+    }
+    for why in [
+        AuthorizeWhy::Malformed,
+        AuthorizeWhy::UnknownClient,
+        AuthorizeWhy::UnknownRedirect,
+        AuthorizeWhy::NoProvider,
+        AuthorizeWhy::NotAPerson,
+    ] {
+        let answer = AuthorizeAnswer::Refused(AuthorizeRefused::new(&limits, AuthorizeRefusedParts { why }).unwrap());
+        let bytes = fixtures::encoded(&answer, AuthorizeAnswer::measure, AuthorizeAnswer::encode);
+        assert_eq!(AuthorizeAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer));
+    }
+}

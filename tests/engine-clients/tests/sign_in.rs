@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use jig_engine_clients_world::fixtures::{self, Peer};
 use jig_protocol_engine_clients::{Event, MintRefusal};
 fn peer() -> Peer {
@@ -380,6 +380,7 @@ fn busy_and_full_return_the_same_printed_link_and_it_can_sign_in() {
                 .expect("full answer within wire bounds"),
             ),
             jig_domain_people::Reply::SignedIn { .. }
+            | jig_domain_people::Reply::Signer(_)
             | jig_domain_people::Reply::SignedOut
             | jig_domain_people::Reply::Outcome(_)
             | jig_domain_people::Reply::Refused(_) => {

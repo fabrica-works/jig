@@ -599,7 +599,8 @@ impl World {
             .rev()
             .find_map(|reply| match reply {
                 people::Reply::Outcome(people::Outcome::Said { message, .. }) => Some(*message),
-                people::Reply::Full { .. }
+                people::Reply::Signer(_)
+                | people::Reply::Full { .. }
                 | people::Reply::SignedIn { .. }
                 | people::Reply::SignedOut
                 | people::Reply::Outcome(_)

@@ -2,7 +2,7 @@ use super::{
     fixtures::{self, CREDENTIAL, Client, NEW_CREDENTIAL, SERVICE_CREDENTIAL, STOP, TASK},
     *,
 };
-use jig_client_protocol_wire::v17 as w;
+use jig_client_protocol_wire::v18 as w;
 use skein_lib::{Duration, Time};
 const FIRST_BACKOFF: Duration = Duration::from_millis(10);
 const LEAST_BACKOFF: Duration = Duration::from_millis(5);
@@ -193,6 +193,7 @@ fn a_sign_out_that_did_not_reach_the_engine_tells_the_link() {
             Request::Told { told: Told::Link { link } } => links.push(*link).unwrap(),
             Request::Exchange { .. }
             | Request::OpenStream { .. }
+            | Request::Authorized(_)
             | Request::ServiceCredential { .. }
             | Request::CloseStream
             | Request::Save { .. }
@@ -227,6 +228,7 @@ fn the_link_s_service_credential_leaves_once_as_a_host_duty() {
             | Request::Erase { .. }
             | Request::Told { .. }
             | Request::Down { .. }
+            | Request::Authorized(_)
             | Request::SignOut => {}
         }
     }

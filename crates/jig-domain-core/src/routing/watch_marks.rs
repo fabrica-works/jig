@@ -353,6 +353,7 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
         | people::Event::Seed { .. }
         | people::Event::ApplyRoles { .. }
         | people::Event::SignedIn { .. }
+        | people::Event::Whose { .. }
         | people::Event::SignOut { .. }
         | people::Event::Act { .. }
         | people::Event::Ask { .. }

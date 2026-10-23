@@ -49,6 +49,10 @@ pub enum What {
     Confidential,
     NoProvider,
     Digest,
+    /// PKCS#8 PEM only; includes the local key-generation instruction, never key bytes.
+    ProviderKey {
+        generate: &'static str,
+    },
     Reserve {
         charter: u32,
     },

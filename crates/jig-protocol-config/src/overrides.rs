@@ -40,6 +40,18 @@ pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), What> {
         b"documents" => set_documents(&mut core.documents, field, value),
         b"core" => set_core(core, field, value),
         b"link" => set_link(link, field, value),
+        b"clients" => {
+            let count = count(value)?;
+            if count == 0 {
+                return Err(What::Override);
+            }
+            match field {
+                b"provider_codes" => limits.clients.provider_codes = count,
+                b"provider_tokens" => limits.clients.provider_tokens = count,
+                _ => return Err(What::Override),
+            }
+            Ok(())
+        }
         _ => Err(What::Override),
     }
 }

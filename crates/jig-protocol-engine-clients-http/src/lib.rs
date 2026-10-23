@@ -107,6 +107,11 @@ impl Mount {
                 } else if !guards::content(&head) {
                     value.route = dispatch::Route::Missing;
                     value.respond(415, Box::new([]), &env.limits);
+                } else if let skein_http::server::Body::Length(length) = head.body
+                    && length > u64::from(dispatch::body_bound(value.route, env.limits.body))
+                {
+                    value.route = dispatch::Route::Missing;
+                    value.respond(413, Box::new([]), &env.limits);
                 } else if value.route == dispatch::Route::Stream && streams >= env.limits.streams {
                     value.route = dispatch::Route::Missing;
                     value.respond(409, Box::new([]), &env.limits);
