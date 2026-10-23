@@ -68,3 +68,13 @@ pub enum AccountWhy {
     Uses,
     Limited,
 }
+
+/// Why a holder's account move cannot proceed (domain/accounts.md, section 6).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AccountMoveWhy {
+    NotSignedIn,
+    NotOurs,
+    Held,
+    Cancelled,
+    Moving,
+}

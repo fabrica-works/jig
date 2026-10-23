@@ -162,6 +162,8 @@ pub(crate) fn permanent(outcome: &Outcome) -> Option<CapacityCause> {
         | Outcome::AccountSignInStarted { .. }
         | Outcome::AccountProgramDeclared { .. }
         | Outcome::AccountKeyKept { .. }
+        | Outcome::AccountMovingOut { .. }
+        | Outcome::AccountMovedIn { .. }
         | Outcome::AccountChanged
         | Outcome::AccountRemoved { .. }
         | Outcome::AccountSignedOut { .. }
@@ -233,6 +235,7 @@ fn room(refusal: &Refusal) -> Option<CapacityCause> {
         | Refusal::NotOffered
         | Refusal::NoEscalationHolder
         | Refusal::Llm { .. }
+        | Refusal::AccountMove { .. }
         | Refusal::Account { .. }
         | Refusal::KeyConflict => None,
     }

@@ -301,7 +301,7 @@ pub enum Ask {
     AccountSignIn { holder: AccountHolder, provider: u32 },
     /// Sign this holder's account's source out; admitted like a sign-in.
     AccountSignOut { holder: AccountHolder, source: u32 },
-    /// Change this holder's LLM accounts; only the digest of an LLM key is retained.
+    /// Change this holder's LLM accounts; carried keys and moved records retain only their digest.
     AccountChange { holder: AccountHolder, change: AccountChange },
 }
 
@@ -463,6 +463,10 @@ pub enum Outcome {
     AccountProgramDeclared { source: u32, name: Box<[u8]> },
     /// The holder's account change finished.
     AccountChanged,
+    /// The move is under way; its record is taken from the source once, outside the answer.
+    AccountMovingOut { account: u32, number: u32, source: u32 },
+    /// A moved record was adopted, making or renewing this account.
+    AccountMovedIn { account: u32, renewed: bool },
     /// Every signed-in source answered its sign-out.
     AccountRemoved { confirmed: bool, failed_hosts: Box<[AccountHostFailure]> },
     /// Final refusal, retained under the request key.
@@ -891,6 +895,9 @@ pub enum AccountChange {
     MoveAccount { account: u32, place: u32 },
     MoveSource { account: u32, source: u32, place: u32 },
     SetUses { account: u32, uses: Option<Box<[Use]>> },
+    MoveOut { account: u32 },
+    Written { number: u32 },
+    MoveIn { digest: [u8; 32] },
 }
 
 /// A configured worker that did not confirm the original operation.

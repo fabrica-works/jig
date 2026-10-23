@@ -62,6 +62,7 @@ pub struct Host {
 /// Account state at document time; the child's retry clock crosses as a wall.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum AccountState {
+    Moving,
     Asking,
     Granted,
     Later { until: Option<Wall> },
@@ -170,6 +171,7 @@ pub(super) fn wall_deadline(clock: Option<DocumentClock>, at: Time) -> Option<Wa
 }
 pub(super) fn account_state(state: accounts::State) -> AccountState {
     match state {
+        accounts::State::Moving => AccountState::Moving,
         accounts::State::Asking => AccountState::Asking,
         accounts::State::Granted => AccountState::Granted,
         accounts::State::Later { until } | accounts::State::Limited { until: Some(until) } => {

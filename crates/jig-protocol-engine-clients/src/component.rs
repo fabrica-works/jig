@@ -6,7 +6,7 @@ use crate::{
     sign_in::{self, Link, Pending, Waiting},
 };
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use skein_lib::{CryptoRng, Env, Map, Queue, ReplyTo, Time, Token};
@@ -45,6 +45,8 @@ impl Component {
             || settings.providers.capacity() > env.limits.providers
             || settings.heartbeat == skein_lib::Duration::ZERO
             || settings.rows == 0
+            || settings.key_bytes > env.limits.wire.keyed_value_some
+            || settings.moved_bytes > u64::from(env.limits.wire.keyed_value_some)
             || !crate::translate::llm::fits(&settings.models, &env.limits.wire)
         {
             return Err(Unusable::Limits);
@@ -131,6 +133,7 @@ impl Component {
             Event::Application(crate::FromApplication::Answered { to, family, record }) => {
                 self.application(env, to.into_token(), family, record, out);
             }
+            Event::MovedTaken { exchange, record } => self.moved_taken(env, exchange, record, out),
             Event::Stop => self.stop(out),
             Event::Close => self.close(out),
             Event::Abort => self.abort(out),
@@ -200,6 +203,7 @@ impl Component {
                 | Waiting::Watch { .. }
                 | Waiting::Get { .. }
                 | Waiting::Keep { .. }
+                | Waiting::Moving { .. }
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
                 | Waiting::ApplicationRead { .. }
@@ -224,6 +228,7 @@ impl Component {
                 | Waiting::Watch { .. }
                 | Waiting::Get { .. }
                 | Waiting::Keep { .. }
+                | Waiting::Moving { .. }
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
                 | Waiting::ApplicationRead { .. }
@@ -442,6 +447,7 @@ impl Component {
             | Waiting::ApplicationRead { .. }
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
+            | Waiting::Moving { .. }
             | Waiting::Made { .. }
             | Waiting::Carry { .. }
             | Waiting::Checked { .. } => {
@@ -468,6 +474,13 @@ impl Component {
     ) {
         let Waiting::Ask { sign_in, .. } = waiting else { unreachable!("ask reply route") };
         match reply {
+            people::Reply::Outcome(people::Outcome::AccountMovingOut { account, number, source }) => {
+                self.pending
+                    .exchanges
+                    .insert(exchange, Waiting::Moving { sign_in, account, number })
+                    .expect("same slot");
+                out.push(Request::TakeMoved { exchange, source });
+            }
             people::Reply::Outcome(people::Outcome::ServiceMade { person }) => {
                 self.pending.exchanges.insert(exchange, Waiting::Made { sign_in, party: person }).expect("same slot");
                 out.push(Request::Secrets(SecretsRequest::Get { owner: SecretOwner::Service(person) }));
@@ -483,6 +496,39 @@ impl Component {
             | people::Reply::Refused(_) => {
                 let answer = crate::translate::answers::answer(&reply, &self.settings.models, &env.limits.wire);
                 self.answer(env, exchange, answer, out);
+            }
+        }
+    }
+    fn moved_taken(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        record: Option<skein_lib::Secret>,
+        out: &mut Queue<Request>,
+    ) {
+        let Some(waiting) = self.pending.exchanges.remove(&exchange) else { return };
+        match waiting {
+            Waiting::Moving { account, number, .. } => {
+                let record = match record {
+                    Some(record) => record,
+                    None => skein_lib::Secret::new(Box::new([])),
+                };
+                let answer = crate::translate::answers::moving_out(account, number, record, &env.limits.wire);
+                self.answer(env, exchange, answer, out);
+            }
+            Waiting::Core { .. }
+            | Waiting::LinkGet { .. }
+            | Waiting::SignOut { .. }
+            | Waiting::Watch { .. }
+            | Waiting::Keep { .. }
+            | Waiting::Get { .. }
+            | Waiting::Made { .. }
+            | Waiting::Read { .. }
+            | Waiting::ApplicationRead { .. }
+            | Waiting::Ask { .. }
+            | Waiting::Carry { .. }
+            | Waiting::Checked { .. } => {
+                self.pending.exchanges.insert(exchange, waiting).expect("same slot");
             }
         }
     }
@@ -535,6 +581,7 @@ impl Component {
             | Waiting::Watch { .. }
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
+            | Waiting::Moving { .. }
             | Waiting::Made { .. }
             | Waiting::Checked { .. }
             | Waiting::Read { .. }
@@ -582,6 +629,7 @@ impl Component {
                 | Waiting::SignOut { .. }
                 | Waiting::Watch { .. }
                 | Waiting::Keep { .. }
+                | Waiting::Moving { .. }
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
                 | Waiting::ApplicationRead { .. }

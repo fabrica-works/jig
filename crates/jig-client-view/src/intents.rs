@@ -261,10 +261,17 @@ pub(crate) fn answered(
     domain: &mut crate::Ui,
     env: &skein_lib::Env<crate::Limits>,
     request: Token,
-    answer: Answer,
+    mut answer: Answer,
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
+    // A moved record belongs to the caller's shell, never retained UI state (client.md, 6).
+    if let Answer::Done(jig_client::contract::Outcome::Made {
+        what: jig_client::contract::Made::MovingOut { record, .. },
+    }) = &mut answer
+    {
+        *record = skein_lib::Secret::new(Box::new([]));
+    }
     let Some(receipt) = domain.intents.terminal(request, answer) else {
         return;
     };

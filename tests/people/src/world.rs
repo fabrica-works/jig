@@ -732,7 +732,14 @@ impl World {
                                     people::AccountChange::Remove { .. } => {
                                         Outcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) }
                                     }
-                                    people::AccountChange::CheckProgram { .. }
+                                    people::AccountChange::MoveOut { account } => {
+                                        Outcome::AccountMovingOut { account, number: 2, source: 1 }
+                                    }
+                                    people::AccountChange::MoveIn { .. } => {
+                                        Outcome::AccountMovedIn { account: 1, renewed: false }
+                                    }
+                                    people::AccountChange::Written { .. }
+                                    | people::AccountChange::CheckProgram { .. }
                                     | people::AccountChange::RemoveKey { .. }
                                     | people::AccountChange::Resume { .. }
                                     | people::AccountChange::MoveAccount { .. }

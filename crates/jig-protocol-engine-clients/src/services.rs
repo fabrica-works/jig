@@ -6,6 +6,10 @@ use super::{
 use crate::sign_in::{Answer, CarriedRequest};
 use skein_lib::{Secret, Wall};
 impl Component {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive route for secret-store answers and their waiting exchanges"
+    )]
     pub(super) fn secrets(&mut self, env: &Env<Limits>, answer: SecretsAnswer, out: &mut Queue<Request>) {
         match answer {
             SecretsAnswer::Kept { owner } => {
@@ -45,7 +49,8 @@ impl Component {
                             Waiting::Get { owner, .. } => Some(*owner),
                             Waiting::LinkGet { sign_in, .. } => Some(SecretOwner::SignIn(*sign_in)),
                             Waiting::Made { party, .. } => Some(SecretOwner::Service(*party)),
-                            Waiting::Core { .. }
+                            Waiting::Moving { .. }
+                            | Waiting::Core { .. }
                             | Waiting::SignOut { .. }
                             | Waiting::Watch { .. }
                             | Waiting::Keep { .. }
@@ -96,6 +101,7 @@ impl Component {
                         | Waiting::SignOut { .. }
                         | Waiting::Watch { .. }
                         | Waiting::Keep { .. }
+                        | Waiting::Moving { .. }
                         | Waiting::Ask { .. }
                         | Waiting::Carry { .. }
                         | Waiting::Read { .. }

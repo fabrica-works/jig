@@ -951,12 +951,11 @@ fn fact(number: u32, entry: &Source) -> Fact {
     let held = match entry.hold {
         Some(Hold::Limited { until }) => State::Limited { until },
         Some(Hold::Refused) => State::Refused,
-        // M2 carries the moving state through the client; M1 exposes Asking.
-        Some(Hold::Moving) => State::Asking,
+        Some(Hold::Moving) => State::Moving,
         None => entry.state,
     };
     let state = if entry.hold == Some(Hold::Moving) {
-        State::Asking
+        State::Moving
     } else {
         match entry.state {
             State::Asking | State::Granted | State::Later { .. } => held,
@@ -966,7 +965,8 @@ fn fact(number: u32, entry: &Source) -> Fact {
             | State::Misconfigured
             | State::Unloaded { .. }
             | State::Cancelled
-            | State::Closing => entry.state,
+            | State::Closing
+            | State::Moving => entry.state,
         }
     };
     let attention = match state {
@@ -977,7 +977,8 @@ fn fact(number: u32, entry: &Source) -> Fact {
         | State::Limited { .. }
         | State::Refused
         | State::Cancelled
-        | State::Closing => false,
+        | State::Closing
+        | State::Moving => false,
     };
     Fact {
         account: entry.account,

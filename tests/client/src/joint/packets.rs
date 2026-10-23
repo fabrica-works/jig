@@ -318,7 +318,7 @@ pub fn keyed_refusal(
     translated_reply(transport, to, wire::answers::Reply::Final(answer), limits)
 }
 
-fn translated_reply(
+pub(super) fn translated_reply(
     transport: &mut Transport,
     to: Token,
     translated: wire::answers::Reply,
@@ -341,7 +341,9 @@ fn translated_reply(
                     .map_err(|_| Invalid::Payload)?;
                 Incoming::SignInFailed { client, failure: SignInFailure::Refused(why) }
             }
-            wire::answers::Reply::Final(client::Answer::Done(_)) | wire::answers::Reply::Applied { .. } => {
+            wire::answers::Reply::Final(client::Answer::Done(_))
+            | wire::answers::Reply::MovingOut { .. }
+            | wire::answers::Reply::Applied { .. } => {
                 return Err(Invalid::OwnerRoute);
             }
         },

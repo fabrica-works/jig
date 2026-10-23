@@ -322,6 +322,7 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
             &mut engine.events,
             &engine.env.limits.connector,
             engine.env.limits.core.documents.rows,
+            &mut engine.accounts,
         );
     }
     clients_pass(engine);
@@ -386,11 +387,21 @@ pub fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
 
 fn clients_pass(engine: &mut Engine) {
     if let Some(clients) = &mut engine.clients {
-        clients.advance(&mut engine.events, &engine.env.limits.connector, engine.env.limits.core.documents.rows);
+        clients.advance(
+            &mut engine.events,
+            &engine.env.limits.connector,
+            engine.env.limits.core.documents.rows,
+            &mut engine.accounts,
+        );
         if engine.end.is_none() {
             clients.secrets_step(&mut engine.store);
         }
-        clients.advance(&mut engine.events, &engine.env.limits.connector, engine.env.limits.core.documents.rows);
+        clients.advance(
+            &mut engine.events,
+            &engine.env.limits.connector,
+            engine.env.limits.core.documents.rows,
+            &mut engine.accounts,
+        );
     }
 }
 

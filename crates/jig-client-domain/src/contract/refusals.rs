@@ -163,6 +163,10 @@ pub enum Moved {
 /// A durable request refusal and all facts needed to show it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Refusal {
+    /// An account move refused (client/domain/contract.md, 4).
+    AccountMove {
+        why: AccountMoveWhy,
+    },
     Circle {
         tasks: skein_lib::List<u64>,
         cut: bool,
@@ -274,4 +278,14 @@ pub enum Bound {
     Window,
     /// The model's declared output ceiling: tokens.
     Output,
+}
+
+/// Why an account move was refused (client/domain/contract.md, 4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AccountMoveWhy {
+    NotSignedIn,
+    NotOurs,
+    Held,
+    Cancelled,
+    Moving,
 }

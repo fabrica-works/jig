@@ -9,7 +9,8 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
         | people::Refusal::NameTaken
         | people::Refusal::Circle { .. }
         | people::Refusal::Dependency { .. }
-        | people::Refusal::Kept { .. } => {
+        | people::Refusal::Kept { .. }
+        | people::Refusal::AccountMove { .. } => {
             unreachable!("the application routes only Release, never Create, Amend or Answer")
         }
         people::Refusal::Role { held } => application::Refusal::Role {

@@ -53,6 +53,11 @@ pub struct World {
     pub hold_accounts: bool,
     /// Fail the next LLM key keep at the scripted accounts component.
     pub fail_llm_key_keep: Option<accounts::KeyFailure>,
+    /// Refuse the next moved record as belonging to another application.
+    pub fail_move_open: bool,
+    moved: std::collections::BTreeMap<u32, skein_lib::Secret>,
+    account_generations: std::collections::BTreeMap<u32, u64>,
+    move_provider: Option<u32>,
     pub assignments: Vec<(u64, u64)>,
     pub cancellations: Vec<(u64, u64)>,
     pub busy_turns: Vec<(u64, u64, u32)>,

@@ -201,6 +201,10 @@ fn provider_templates(
     Ok(providers)
 }
 impl Accounts {
+    pub fn take_moved(&mut self, source: u32) -> Option<Secret> {
+        self.moves.take(source)
+    }
+
     /// Checks public provider registrations; restored sources are admitted after the store opens.
     pub fn new(
         application: Box<[u8]>,

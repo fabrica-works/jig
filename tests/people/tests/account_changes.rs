@@ -30,6 +30,9 @@ fn an_account_change_is_admitted_for_its_holder_with_no_role() {
     let changes = [
         AccountChange::AddKey { provider: 3, join: None, digest: [8; 32] },
         AccountChange::ReplaceKey { source: 1, digest: [9; 32] },
+        AccountChange::MoveOut { account: 1 },
+        AccountChange::Written { number: 2 },
+        AccountChange::MoveIn { digest: [7; 32] },
         AccountChange::RemoveKey { source: 1 },
         AccountChange::Resume { source: 1 },
         AccountChange::Remove { account: 1 },
@@ -45,7 +48,10 @@ fn an_account_change_is_admitted_for_its_holder_with_no_role() {
             }
 
             AccountChange::Remove { .. } => Outcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) },
-            AccountChange::CheckProgram { .. }
+            AccountChange::MoveOut { account } => Outcome::AccountMovingOut { account, number: 2, source: 1 },
+            AccountChange::MoveIn { .. } => Outcome::AccountMovedIn { account: 1, renewed: false },
+            AccountChange::Written { .. }
+            | AccountChange::CheckProgram { .. }
             | AccountChange::RemoveKey { .. }
             | AccountChange::Resume { .. }
             | AccountChange::MoveAccount { .. }
@@ -113,6 +119,55 @@ fn a_key_ask_with_another_digest_is_a_key_conflict() {
     world.commit_all();
     assert_eq!(world.reply(conflict), Some(Reply::Refused(Refusal::KeyConflict)));
     assert_eq!(world.stats().routes, routes);
+    world.assert_settled();
+}
+
+#[test]
+fn a_move_out_replays_its_answer_without_routing_again() {
+    let mut world = owners();
+    let ask = change(AccountHolder::Own, AccountChange::MoveOut { account: 1 });
+    let first = world.request(11, [20; 16], ask.clone());
+    world.commit_all();
+    let routes = world.stats().routes;
+    world.restart();
+    let replay = world.request(11, [20; 16], ask);
+    world.commit_all();
+    assert_eq!(world.reply(first), world.reply(replay));
+    assert_eq!(
+        world.reply(replay),
+        Some(Reply::Outcome(Outcome::AccountMovingOut { account: 1, number: 2, source: 1 }))
+    );
+    assert_eq!(world.stats().routes, routes);
+    world.assert_settled();
+}
+
+#[test]
+fn a_move_in_with_another_digest_conflicts_under_the_same_key() {
+    let mut world = owners();
+    let first = world.request(11, [21; 16], change(AccountHolder::Own, AccountChange::MoveIn { digest: [7; 32] }));
+    world.commit_all();
+    assert_eq!(world.reply(first), Some(Reply::Outcome(Outcome::AccountMovedIn { account: 1, renewed: false })));
+    let routes = world.stats().routes;
+    world.restart();
+    let conflict = world.request(11, [21; 16], change(AccountHolder::Own, AccountChange::MoveIn { digest: [8; 32] }));
+    world.commit_all();
+    assert_eq!(world.reply(conflict), Some(Reply::Refused(Refusal::KeyConflict)));
+    assert_eq!(world.stats().routes, routes);
+    world.assert_settled();
+}
+
+#[test]
+fn a_non_owner_cannot_request_the_deployments_account_moves() {
+    let mut world = owners();
+    for (key, value) in [
+        (22, AccountChange::MoveOut { account: 1 }),
+        (23, AccountChange::Written { number: 2 }),
+        (24, AccountChange::MoveIn { digest: [7; 32] }),
+    ] {
+        let call = world.request(11, [key; 16], change(AccountHolder::Deployment, value));
+        world.commit_all();
+        assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: None }))));
+    }
     world.assert_settled();
 }
 #[test]

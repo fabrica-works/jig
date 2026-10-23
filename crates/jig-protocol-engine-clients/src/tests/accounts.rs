@@ -2,7 +2,7 @@
 use super::fixtures;
 use crate::translate::{accounts, watches};
 use fixtures::list;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use jig_domain_accounts as a;
 use jig_domain_core::documents as d;
 use jig_domain_people::CapacityAction as A;
@@ -93,6 +93,10 @@ fn ends() -> Box<[a::End]> {
         a::End::Refused { refusal: a::Refusal::Kind { kind: a::Kind::Program } },
         a::End::Refused { refusal: a::Refusal::Closing },
         a::End::Refused { refusal: a::Refusal::NotStarted },
+        a::End::Refused { refusal: a::Refusal::NotSignedIn },
+        a::End::Refused { refusal: a::Refusal::NotOurs },
+        a::End::Refused { refusal: a::Refusal::Cancelled },
+        a::End::Refused { refusal: a::Refusal::Moving },
         a::End::Failed { failure: a::Failure::Later { after: Some(Duration::from_nanos(103)) } },
         a::End::Failed { failure: a::Failure::Later { after: None } },
         a::End::Failed { failure: a::Failure::SignInAgain },

@@ -117,6 +117,10 @@ impl Engine {
     }
     pub fn request(&mut self, request: Request) -> Option<skein_io::Request> {
         match request {
+            Request::TakeMoved { exchange, source } => {
+                let record = self.driver.world.take_moved(source);
+                self.event(Event::MovedTaken { exchange, record });
+            }
             Request::Transport(message) => {
                 if matches!(&message, clients::ToTransport::Reply { reply: clients::Reply::NotARecord, .. }) {
                     self.not_records += 1;

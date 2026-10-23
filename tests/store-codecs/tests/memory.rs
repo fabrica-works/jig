@@ -1,5 +1,5 @@
 //! Full golden rows decode within their heap worst cases (skein's codec.md, 6).
-use jig_protocol_store::{accounts_v2, component_v2, core_v6, notes_v1, people_v12, tasks_v9};
+use jig_protocol_store::{accounts_v2, component_v2, core_v6, notes_v1, people_v13, tasks_v9};
 use skein_heap::{Counting, Meter};
 use skein_lib::Reader;
 
@@ -10,7 +10,7 @@ fn check<T>(family: &str, record: &str, bound: u64, decode: impl FnOnce(&[u8]) -
     let version = match family {
         "core" => 6,
         "tasks" => 9,
-        "people" => 12,
+        "people" => 13,
         "component" | "accounts" => 2,
         _ => 1,
     };
@@ -51,9 +51,9 @@ fn a_full_core_row_decodes_within_its_heap_worst_case() {
 }
 #[test]
 fn a_full_people_row_decodes_within_its_heap_worst_case() {
-    let bound = people_v12::Row::worst_case_heap(&people_v12::CEILINGS).expect("people heap bound");
+    let bound = people_v13::Row::worst_case_heap(&people_v13::CEILINGS).expect("people heap bound");
     check("people", "row", bound, |golden| {
-        people_v12::Row::decode(&people_v12::CEILINGS, &mut Reader::new(golden)).expect("full row")
+        people_v13::Row::decode(&people_v13::CEILINGS, &mut Reader::new(golden)).expect("full row")
     });
 }
 #[test]

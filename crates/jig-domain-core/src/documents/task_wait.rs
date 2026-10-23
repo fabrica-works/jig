@@ -39,6 +39,7 @@ pub enum TaskWaitWhy {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TaskSourceState {
+    Moving,
     Asking,
     Granted,
     Later { until: Option<Wall> },
@@ -94,6 +95,7 @@ pub(super) fn waiting(core: &Core, row: &tasks::TaskRecord) -> Option<TaskRunWai
 #[expect(clippy::manual_map, reason = "step code has no closures (programming-model.md, section 10)")]
 fn source_state(state: accounts::State) -> TaskSourceState {
     match state {
+        accounts::State::Moving => TaskSourceState::Moving,
         accounts::State::Asking => TaskSourceState::Asking,
         accounts::State::Granted => TaskSourceState::Granted,
         accounts::State::Later { until } => TaskSourceState::Later { until: Some(until.wall) },

@@ -1,7 +1,7 @@
 //! Durable keyed answers (protocol/client.md, section 5; contract.md, 4).
 use super::refusals;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn answer(
@@ -58,6 +58,19 @@ pub(crate) fn service(
     answer.encode(&mut out).expect("measured final answer");
     owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits)
 }
+pub(crate) fn moving_out(
+    account: u32,
+    number: u32,
+    record: skein_lib::Secret,
+    limits: &w::Limits,
+) -> Result<w::KeyedAnswer, w::Problem> {
+    let what = w::Made::MovingOut(w::MadeMovingOut::new(limits, w::MadeMovingOutParts { account, number, record })?);
+    let outcome = w::Outcome::Made(w::OutcomeMade::new(limits, w::OutcomeMadeParts { what })?);
+    let answer = w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?);
+    let mut out = Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut out).expect("measured final answer");
+    owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits)
+}
 pub(crate) fn owned(
     owner: w::Owner,
     version: u32,
@@ -78,6 +91,13 @@ fn problem() -> w::Problem {
 #[expect(clippy::too_many_lines, reason = "one total match names every people outcome")]
 fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::Problem> {
     Ok(match value {
+        p::Outcome::AccountMovingOut { .. } => return Err(problem()),
+        p::Outcome::AccountMovedIn { account, renewed } => {
+            w::OwnerOutcome::AccountMovedIn(w::OwnerOutcomeAccountMovedIn::new(
+                limits,
+                w::OwnerOutcomeAccountMovedInParts { account: *account, renewed: *renewed },
+            )?)
+        }
         p::Outcome::Proposed { proposal, .. } => w::OwnerOutcome::Proposed(w::OwnerOutcomeProposed::new(
             limits,
             w::OwnerOutcomeProposedParts { proposal: *proposal },

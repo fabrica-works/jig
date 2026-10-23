@@ -201,7 +201,8 @@ impl Domain {
                 | State::Misconfigured
                 | State::Unloaded { .. }
                 | State::Cancelled
-                | State::Closing => true,
+                | State::Closing
+                | State::Moving => true,
                 State::Asking | State::Granted | State::Later { .. } => false,
             };
             if globally_held {

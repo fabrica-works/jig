@@ -51,6 +51,10 @@ pub(crate) fn owner_account_refusal(value: &w::OwnerAccountRefusal) -> c::OwnerA
         w::OwnerAccountRefusal::Numbers => c::OwnerAccountRefusal::Numbers,
         w::OwnerAccountRefusal::Kind(row) => c::OwnerAccountRefusal::Kind { kind: owner_account_kind(row.kind()) },
         w::OwnerAccountRefusal::Closing => c::OwnerAccountRefusal::Closing,
+        w::OwnerAccountRefusal::NotSignedIn => c::OwnerAccountRefusal::NotSignedIn,
+        w::OwnerAccountRefusal::NotOurs => c::OwnerAccountRefusal::NotOurs,
+        w::OwnerAccountRefusal::Cancelled => c::OwnerAccountRefusal::Cancelled,
+        w::OwnerAccountRefusal::Moving => c::OwnerAccountRefusal::Moving,
         w::OwnerAccountRefusal::NotStarted => c::OwnerAccountRefusal::NotStarted,
     }
 }

@@ -51,6 +51,10 @@ pub enum Event {
         exchange: Token,
         identity: people::Identity,
     },
+    MovedTaken {
+        exchange: Token,
+        record: Option<Secret>,
+    },
     Stop,
     Close,
     Abort,
@@ -64,6 +68,7 @@ pub enum Request {
     Minted { exchange: Token, credential: Secret, expires: Wall },
     MintRefused { exchange: Token, why: MintRefusal },
     Link { secret: Secret },
+    TakeMoved { exchange: Token, source: u32 },
     Closed,
 }
 #[derive(Debug)]
@@ -164,6 +169,10 @@ pub struct Settings {
     /// The configured models in configuration's order: the client names a model and its effort
     /// by their names, which the component maps to the core's indices (contract.md, 3.2 and 5.1).
     pub models: Box<[Model]>,
+    /// The key bound advertised by me, independent of the moved file bound.
+    pub key_bytes: u32,
+    /// The moved file form's bound under the configured accounts limits.
+    pub moved_bytes: u64,
 }
 /// A configured model as the client protocol names and shows it (configuration.md, 3).
 #[derive(Clone, Debug, PartialEq, Eq)]

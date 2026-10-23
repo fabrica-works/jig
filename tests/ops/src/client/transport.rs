@@ -301,7 +301,7 @@ impl Front<Ops> for Scripted {
                     client,
                     Event::Client {
                         event: jig_client::Event::Up {
-                            up: jig_client::Up::Served { served: self.engine.versions().contains(16), versions: None },
+                            up: jig_client::Up::Served { served: self.engine.versions().contains(17), versions: None },
                         },
                     },
                 )

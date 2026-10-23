@@ -3,7 +3,7 @@ use crate::{Handle, domain::HandleState, watches::Watch};
 use skein_lib::{Duration, List, Map, RequestLimits, RequestTable};
 /// A carried value's most bytes: the client wire's bound on `Keyed.value`
 /// (protocol/client.md, 5).
-pub const VALUE_BYTES: usize = 4096;
+pub const VALUE_BYTES: usize = 131_072;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Backoff {
     pub first: Duration,

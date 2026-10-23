@@ -461,7 +461,7 @@ fn full_moves_and_their_deadlines_stay_within_the_worst_case() {
             Some(Signing::Withdraw { source, display: longest(DISPLAY, account) })
         );
         run.step(&mut domain, Event::Withdrawn { source, readable: true }, "move deadline armed");
-        assert_eq!(domain.source(source).expect("moving source").state, jig_domain_accounts::State::Asking);
+        assert_eq!(domain.source(source).expect("moving source").state, jig_domain_accounts::State::Moving);
     }
     assert_eq!(domain.next_deadline(), Some(Time::ZERO.saturating_add(run.env.limits.move_deadline)));
     run.step(&mut domain, Event::Close, "full moves close");

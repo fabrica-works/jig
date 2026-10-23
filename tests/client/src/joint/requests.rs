@@ -25,7 +25,7 @@ pub enum Invalid {
     Read(wire::reads::Invalid),
     Watch(wire::watches::Invalid),
     Family(jig_client_test_domain::family::wire::Invalid),
-    // Jig's own ask carries no value until a key is a source (llm.md).
+    // A value must match a key or moved file ask's digest (protocol/client.md, 5).
     Carried,
     Continuation,
     Shell,
@@ -49,7 +49,7 @@ pub fn send(
             let sign_in = sign_in.ok_or(Invalid::Session)?;
             let refusal = match ask {
                 Ask::Jig(ask) => {
-                    if value.is_some() {
+                    if !valid_value(ask, value.as_ref()) {
                         return Err(Invalid::Carried);
                     }
                     wire::asks::refused(ask, &driver.transport.models).map_err(Invalid::Ask)?
@@ -155,11 +155,19 @@ fn keyed(
 ) -> Result<root::Event, Invalid> {
     Ok(match ask {
         Ask::Jig(value) => {
-            if carried.is_some() {
-                return Err(Invalid::Carried);
-            }
             let request = wire::asks::request(value, &driver.transport.models).map_err(Invalid::Ask)?;
             let reply_to = driver.transport.reply_to(Reply::Keyed { client, attempt, key, owner: KeyedOwner::Jig });
+            if let Some(value) = carried {
+                let digest = skein_lib::sha256::digest(value.expose());
+                let number = driver.transport.carry(value.clone());
+                return Ok(root::Event::Core(core::Event::Key {
+                    reply_to,
+                    sign_in,
+                    key,
+                    ask: Box::new(request.ask),
+                    carried: core::Carried { number, digest },
+                }));
+            }
             root::Event::Core(core::Event::People(people::Event::Ask {
                 models: request.models,
                 reply_to,
@@ -255,6 +263,33 @@ fn carrying_digest(request: &[u8; 32], value: &skein_lib::Secret) -> [u8; 32] {
     digest.update(u64::try_from(value.len()).expect("value length fits").to_be_bytes());
     digest.update(value.expose());
     digest.finalize().into()
+}
+
+fn valid_value(ask: &jig_client::contract::Ask, value: Option<&skein_lib::Secret>) -> bool {
+    let digest = if let jig_client::contract::Ask::AccountChange { change, .. } = ask {
+        match change {
+            jig_client::contract::AccountChange::AddKey { digest, .. }
+            | jig_client::contract::AccountChange::ReplaceKey { digest, .. }
+            | jig_client::contract::AccountChange::MoveIn { digest } => Some(*digest),
+            jig_client::contract::AccountChange::DeclareProgram { .. }
+            | jig_client::contract::AccountChange::CheckProgram { .. }
+            | jig_client::contract::AccountChange::RemoveKey { .. }
+            | jig_client::contract::AccountChange::Resume { .. }
+            | jig_client::contract::AccountChange::Remove { .. }
+            | jig_client::contract::AccountChange::MoveAccount { .. }
+            | jig_client::contract::AccountChange::MoveSource { .. }
+            | jig_client::contract::AccountChange::SetUses { .. }
+            | jig_client::contract::AccountChange::MoveOut { .. }
+            | jig_client::contract::AccountChange::Written { .. } => None,
+        }
+    } else {
+        None
+    };
+    match (digest, value) {
+        (Some(expected), Some(value)) if expected == skein_lib::sha256::digest(value.expose()) => true,
+        (None, None) => true,
+        (Some(_), _) | (None, Some(_)) => false,
+    }
 }
 
 #[cfg(test)]

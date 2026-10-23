@@ -92,6 +92,7 @@ pub(crate) fn account_state(value: d::AccountState, limits: &w::Limits) -> Resul
         d::AccountState::SignInAgain => w::OwnerAccountState::SignInAgain,
         d::AccountState::Misconfigured => w::OwnerAccountState::Misconfigured,
         d::AccountState::Cancelled => w::OwnerAccountState::Cancelled,
+        d::AccountState::Moving => w::OwnerAccountState::Moving,
         d::AccountState::Closing => w::OwnerAccountState::Closing,
         d::AccountState::Later { until } => w::OwnerAccountState::Later(w::OwnerAccountStateLater::new(
             limits,

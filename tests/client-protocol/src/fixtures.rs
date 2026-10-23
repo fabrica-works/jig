@@ -57,13 +57,15 @@ pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
         heartbeat: Duration::from_millis(50),
         rows,
         served: jig_client_world::test::list([
-            Served { family: None, first: 16, last: 16 },
+            Served { family: None, first: 17, last: 17 },
             Served { family: Some(1), first: 2, last: 2 },
         ]),
         providers: List::with_capacity(0),
         seed: Secret::new(Box::new([7; 32])),
         stream: 31,
         models: models(),
+        key_bytes: 7934,
+        moved_bytes: 70000,
     }
 }
 /// The core world's configured models as the client side names them.
@@ -101,7 +103,7 @@ pub fn engine_limits() -> Limits {
         exchanges: 8,
         exchanges_per_client: 4,
         message_bytes: MESSAGE_BYTES,
-        wire: jig_client_protocol_wire::v16::CEILINGS,
+        wire: jig_client_protocol_wire::v17::CEILINGS,
         link_span: Duration::from_secs(300),
     }
 }

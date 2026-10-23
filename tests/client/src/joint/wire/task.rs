@@ -129,6 +129,7 @@ fn wait(value: documents::TaskRunWait) -> client::TaskRunWait {
                     documents::TaskSourceState::NeedsSignIn => client::TaskSourceState::NeedsSignIn,
                     documents::TaskSourceState::Misconfigured => client::TaskSourceState::Misconfigured,
                     documents::TaskSourceState::Cancelled => client::TaskSourceState::Cancelled,
+                    documents::TaskSourceState::Moving => client::TaskSourceState::Moving,
                     documents::TaskSourceState::Closing => client::TaskSourceState::Closing,
                     documents::TaskSourceState::Unloaded { at, why } => client::TaskSourceState::Unloaded {
                         at: match at {

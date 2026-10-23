@@ -6,7 +6,7 @@ mod shapes;
 mod thread;
 use crate::{engine::Engine, fixtures, net::Net};
 use jig_client::{self as client, Ask, Event, Handle, Key, Latest, Link, Outcome, Readable, Told, Watchable};
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use jig_client_shell_native::{Conn, Connections};
 use jig_client_world::{ClientId, harness::Observed};
 use skein_lib::Reader;
@@ -128,7 +128,7 @@ impl Front {
         }
     }
     fn event(&mut self, now: Time, event: Event) {
-        if let Event::Carry { value, .. } = &event {
+        if let Event::Carry { value: Some(value), .. } = &event {
             self.referee.carry(value.expose());
         }
         self.client.step(now, fixtures::wall(now), event, &mut self.out);
@@ -343,7 +343,7 @@ impl Story {
     }
     /// Sends a request carrying `value` under `name` (protocol/client.md, 5).
     pub fn carry(&mut self, key: Key, name: skein_lib::RequestKey, request: Ask, value: &[u8]) {
-        self.event(Event::Carry { key, name, request, value: skein_lib::Secret::new(Box::from(value)) });
+        self.event(Event::Carry { key, name, request, value: Some(skein_lib::Secret::new(Box::from(value))) });
     }
     /// The numbers of the carried values the engine's secrets hold.
     #[must_use]

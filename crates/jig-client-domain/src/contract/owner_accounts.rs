@@ -119,6 +119,10 @@ pub enum OwnerAccountRefusal {
     Kind { kind: OwnerAccountKind },
     Closing,
     NotStarted,
+    NotSignedIn,
+    NotOurs,
+    Cancelled,
+    Moving,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerAccountFailure {

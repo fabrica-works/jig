@@ -203,6 +203,7 @@ pub(super) fn account_state(value: documents::AccountState) -> client::OwnerAcco
             },
         },
         documents::AccountState::Cancelled => client::OwnerAccountState::Cancelled,
+        documents::AccountState::Moving => client::OwnerAccountState::Moving,
         documents::AccountState::Closing => client::OwnerAccountState::Closing,
     }
 }

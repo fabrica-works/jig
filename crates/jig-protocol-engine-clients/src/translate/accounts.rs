@@ -49,13 +49,11 @@ fn key_failure(value: a::KeyFailure) -> w::OwnerAccountKeyFailure {
 }
 pub fn refusal(value: a::Refusal, limits: &w::Limits) -> Result<w::OwnerAccountRefusal, w::Problem> {
     Ok(match value {
-        // M2 (the account's move through the client) replaces this arm.
-        // Only the move variants are unreachable in M1: accounts' people_changes_never_emit_move_values.
-        a::Refusal::NotSignedIn
-        | a::Refusal::NotOurs
-        | a::Refusal::Cancelled
-        | a::Refusal::Moving
-        | a::Refusal::Unknown => w::OwnerAccountRefusal::Unknown,
+        a::Refusal::NotSignedIn => w::OwnerAccountRefusal::NotSignedIn,
+        a::Refusal::NotOurs => w::OwnerAccountRefusal::NotOurs,
+        a::Refusal::Cancelled => w::OwnerAccountRefusal::Cancelled,
+        a::Refusal::Moving => w::OwnerAccountRefusal::Moving,
+        a::Refusal::Unknown => w::OwnerAccountRefusal::Unknown,
         a::Refusal::NotLimited => w::OwnerAccountRefusal::NotLimited,
         a::Refusal::Uses => w::OwnerAccountRefusal::Uses,
         a::Refusal::NotKept { why } => w::OwnerAccountRefusal::NotKept(w::OwnerAccountRefusalNotKept::new(

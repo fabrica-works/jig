@@ -1,6 +1,6 @@
 //! Preserve the task's next-run wait and its unknown deadlines.
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 
 pub(super) fn waiting(value: Option<&w::TaskRunWait>, limits: &crate::Limits) -> Option<c::TaskRunWait> {
     Some(match value? {
@@ -48,6 +48,7 @@ fn source_state(value: &w::TaskSourceState) -> c::TaskSourceState {
         w::TaskSourceState::Misconfigured => c::TaskSourceState::Misconfigured,
         w::TaskSourceState::Cancelled => c::TaskSourceState::Cancelled,
         w::TaskSourceState::Closing => c::TaskSourceState::Closing,
+        w::TaskSourceState::Moving => c::TaskSourceState::Moving,
         w::TaskSourceState::Unloaded(row) => c::TaskSourceState::Unloaded {
             at: match row.at() {
                 w::TaskSourcePlace::Directory => c::OwnerAccountPlace::Directory,

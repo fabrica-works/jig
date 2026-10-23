@@ -2,7 +2,7 @@
 use jig_protocol_engine_clients_http as mapping;
 mod closing;
 use crate::fixtures;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_protocol_engine_clients::{
@@ -352,6 +352,9 @@ impl Peer {
             if let Some(request) = self.out.pop() {
                 active = true;
                 match request {
+                    Request::TakeMoved { exchange, .. } => {
+                        self.component.down(&self.env, Event::MovedTaken { exchange, record: None }, &mut self.out);
+                    }
                     Request::Transport(message) => self.mount_event(mapping::Event::Component(message)),
                     Request::Core(event) => {
                         if let core::Event::Delivered { watcher } = event.as_ref() {
@@ -527,7 +530,7 @@ impl Peer {
         subject.encode(&mut record).expect("subject");
         let subject = w::Owned::new(
             &self.env.limits.wire,
-            w::OwnedParts { owner: w::Owner::Jig, version: 16, record: record.finish() },
+            w::OwnedParts { owner: w::Owner::Jig, version: 17, record: record.finish() },
         )
         .expect("subject owner");
         let open = w::Open::new(&self.env.limits.wire, w::OpenParts { stream, watch: self.next_watch, subject })

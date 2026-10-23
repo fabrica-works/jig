@@ -249,6 +249,7 @@ impl Component {
                 | Waiting::SignOut { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Get { .. }
+                | Waiting::Moving { .. }
                 | Waiting::Made { .. }
                 | Waiting::Checked { .. } => None,
             };

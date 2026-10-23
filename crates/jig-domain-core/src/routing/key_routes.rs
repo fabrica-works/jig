@@ -1,4 +1,4 @@
-//! LLM key values travel by carried number only (domain/accounts.md, section 5).
+//! LLM keys and moved records travel by carried number only (domain/accounts.md, section 5).
 use crate::{Carried, Core, Event, Held, Limits, Request, Requests};
 use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
@@ -17,7 +17,10 @@ pub(super) fn start(
     carried: Carried,
 ) -> Requests {
     let digest = if let people::Ask::AccountChange {
-        change: people::AccountChange::AddKey { digest, .. } | people::AccountChange::ReplaceKey { digest, .. },
+        change:
+            people::AccountChange::AddKey { digest, .. }
+            | people::AccountChange::ReplaceKey { digest, .. }
+            | people::AccountChange::MoveIn { digest },
         ..
     } = &ask
     {
@@ -60,6 +63,7 @@ pub(super) fn admitted(
             }
             accounts::Change::AddKey { provider, join, carried }
         }
+        people::AccountChange::MoveIn { .. } => accounts::Change::MoveIn { carried: take(core, request)? },
         people::AccountChange::ReplaceKey { source, .. } => {
             let carried = take(core, request)?;
             if let Some(row) = core.accounts.source(source) {
@@ -74,7 +78,9 @@ pub(super) fn admitted(
         | people::AccountChange::Remove { .. }
         | people::AccountChange::MoveAccount { .. }
         | people::AccountChange::MoveSource { .. }
-        | people::AccountChange::SetUses { .. }) => return super::account_requests::change(core, holder, other),
+        | people::AccountChange::SetUses { .. }
+        | people::AccountChange::MoveOut { .. }
+        | people::AccountChange::Written { .. }) => return super::account_requests::change(core, holder, other),
     };
     Ok(change)
 }
@@ -84,10 +90,14 @@ fn take(core: &mut Core, request: Token) -> Result<u64, people::Refusal> {
     Ok(carried.number)
 }
 
-/// The component consumed a kept LLM key; every other outcome returns it unused.
+/// The component consumed the kept key or moved record; every other outcome returns it unused.
 pub(super) fn finished(core: &mut Core, request: Token, outcome: &people::Outcome) -> Option<u64> {
     let carried = core.keys.remove(&request)?;
-    if let people::Outcome::AccountKeyKept { .. } = outcome { None } else { Some(carried.number) }
+    if let people::Outcome::AccountKeyKept { .. } | people::Outcome::AccountMovedIn { .. } = outcome {
+        None
+    } else {
+        Some(carried.number)
+    }
 }
 
 fn held(core: &Core, holder: accounts::Holder, account: u32) -> Result<(), people::Refusal> {

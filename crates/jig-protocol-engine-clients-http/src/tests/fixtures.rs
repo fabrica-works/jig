@@ -218,7 +218,7 @@ pub fn cookie_header() -> skein_http::Header {
     }
 }
 pub fn signed_in_reply(token: &[u8; 40], expires: u64) -> kit::Reply {
-    use jig_client_protocol_wire::v16 as w;
+    use jig_client_protocol_wire::v17 as w;
     let answer = w::SignInAnswer::SignedIn(
         w::SignedIn::new(
             &w::CEILINGS,
@@ -230,8 +230,8 @@ pub fn signed_in_reply(token: &[u8; 40], expires: u64) -> kit::Reply {
     answer.encode(&mut bytes).expect("sign in");
     kit::Reply::Record(bytes.finish())
 }
-pub fn signed_in(bytes: &[u8]) -> jig_client_protocol_wire::v16::SignedIn {
-    use jig_client_protocol_wire::v16 as w;
+pub fn signed_in(bytes: &[u8]) -> jig_client_protocol_wire::v17::SignedIn {
+    use jig_client_protocol_wire::v17 as w;
     let w::SignInAnswer::SignedIn(value) =
         w::SignInAnswer::decode(&w::CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("sign-in answer")
     else {

@@ -3,7 +3,7 @@ use crate::Limits;
 use crate::translate::text_problem;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use skein_lib::{List, Reader, Wall, bytes};
 pub(crate) fn seen(value: &w::SeenThrough, _limits: &Limits) -> c::SeenThrough {
     match value {
@@ -99,6 +99,9 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> Result<
             }
             c::OwnerOutcome::AccountProgramDeclared { source: row.source(), name: bytes::copy_of(row.name()) }
         }
+        w::OwnerOutcome::AccountMovedIn(row) => {
+            c::OwnerOutcome::AccountMovedIn { account: row.account(), renewed: row.renewed() }
+        }
         w::OwnerOutcome::AccountChanged => c::OwnerOutcome::AccountChanged,
         w::OwnerOutcome::AccountRemoved(row) => c::OwnerOutcome::AccountRemoved {
             confirmed: row.confirmed(),
@@ -155,6 +158,9 @@ pub(crate) fn made(value: &w::Made, limits: &Limits) -> c::Made {
                 list0.push(*item).expect("reserved supplied list");
             }
             c::Made::Tasks { tasks: list0 }
+        }
+        w::Made::MovingOut(row) => {
+            c::Made::MovingOut { account: row.account(), number: row.number(), record: row.record().clone() }
         }
         w::Made::Service(row) => c::Made::Service { party: row.party() },
         w::Made::PersonResult(row) => c::Made::PersonResult { task: row.task() },
@@ -507,6 +513,15 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
                 w::Malformed::Cycle => c::Malformed::Cycle,
                 w::Malformed::ProposedAsAllowed => c::Malformed::ProposedAsAllowed,
                 w::Malformed::ProjectMismatch => c::Malformed::ProjectMismatch,
+            },
+        },
+        w::Refusal::AccountMove(row) => c::Refusal::AccountMove {
+            why: match row.why() {
+                w::AccountMoveWhy::NotSignedIn => c::AccountMoveWhy::NotSignedIn,
+                w::AccountMoveWhy::NotOurs => c::AccountMoveWhy::NotOurs,
+                w::AccountMoveWhy::Held => c::AccountMoveWhy::Held,
+                w::AccountMoveWhy::Cancelled => c::AccountMoveWhy::Cancelled,
+                w::AccountMoveWhy::Moving => c::AccountMoveWhy::Moving,
             },
         },
         w::Refusal::Account(row) => c::Refusal::Account {
