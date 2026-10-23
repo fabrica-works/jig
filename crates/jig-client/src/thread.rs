@@ -172,11 +172,6 @@ impl Thread {
         let reading = self.reading.take()?;
         self.page_cut |= page.cut;
         self.words.observe(&page);
-        for row in &page.rows {
-            if let Some(name) = row.event.committed_turn() {
-                self.committed(name);
-            }
-        }
         let edges = page_edges(page.after, page.before);
         match reading {
             Reading::Latest { known } => {
@@ -250,6 +245,13 @@ impl Thread {
                 if dropped > 0 {
                     assert!(self.lines.rows.len() == self.lines.rows.capacity(), "a dropping slide fills its window");
                 }
+            }
+        }
+        // Staged pages fence live text only once their rows enter the window.
+        for at in 0..self.lines.rows.len() {
+            let row = self.lines.rows.get(at).expect("bounded window row exists");
+            if let Some(name) = row.event.committed_turn() {
+                self.committed(name);
             }
         }
         self.prune_live();

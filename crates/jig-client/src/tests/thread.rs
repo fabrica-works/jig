@@ -112,6 +112,49 @@ fn a_committed_turn_replaces_its_provisional_text() {
     );
 }
 #[test]
+fn a_live_turn_stays_until_its_staged_commit_merges() {
+    let mut thread = model();
+    assert!(thread.moved(2).is_some());
+    assert_eq!(thread.page(page(&[2, 1], None, None)), None);
+    thread.run(&run(), Some(&provisional(TURN, b"The answer")));
+    assert!(thread.moved(4).is_some());
+    let turn = empty_turn();
+    let name = TurnName { attempt: ATTEMPT, number: TURN };
+    let mut newest = page(&[4, 3], Some(b"older"), None);
+    *newest.rows.get_mut(0).unwrap() = ActivityLine {
+        position: 4,
+        at: TURN_AT,
+        event: Activity::Turn { name, turn: TurnRead::Decoded(turn.clone()) },
+    };
+    assert_eq!(
+        thread.page(newest),
+        Some(Read::Activity { task: fixtures::SUBJECT_TASK, before: Some(cursor(b"older")) })
+    );
+    assert_eq!(positions(&thread).as_ref(), &[2, 1]);
+    assert_eq!(thread.fresh.rows.len(), 2);
+    assert_eq!(thread.live.len(), 1);
+    let live = Line::Provisional { name: provisional(TURN, b"").turn, text: b"The answer", cut: false };
+    assert_eq!(
+        thread.lines().as_slice(),
+        &[Line::RunBegan { attempt: ATTEMPT }, Line::RunBegan { attempt: ATTEMPT }, live]
+    );
+    thread.run(&run(), Some(&provisional(TURN, b"The answer is")));
+    let live = Line::Provisional { name: provisional(TURN, b"").turn, text: b"The answer is", cut: false };
+    assert!(thread.lines().as_slice().contains(&live));
+    assert_eq!(thread.page(page(&[2, 1], None, Some(b"newer"))), None);
+    assert_eq!(positions(&thread).as_ref(), &[4, 3, 2, 1]);
+    assert_eq!(
+        thread.lines().as_slice(),
+        &[
+            Line::RunBegan { attempt: ATTEMPT },
+            Line::RunBegan { attempt: ATTEMPT },
+            Line::RunBegan { attempt: ATTEMPT },
+            Line::Turn { name, turn: &turn, at: TURN_AT }
+        ]
+    );
+    assert!(thread.live.is_empty());
+}
+#[test]
 fn a_later_retry_replaces_the_same_provisional_turn() {
     let mut thread = model();
     let first = provisional(TURN, b"first");
