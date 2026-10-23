@@ -1416,3 +1416,27 @@ fn an_open_start_takes_the_first_eligible_hosts_answer_in_either_order() {
         }
     }
 }
+
+#[test]
+fn a_bound_failure_is_not_rechecked_while_its_account_waits() {
+    let (mut core, limits) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
+    claim_open(&mut core, &limits, OPEN_ATTEMPT);
+    core.proofs.get_mut(&OPEN_TASK).unwrap().account_terminal = true;
+    let exceeded = tasks::Exceeded { bound: tasks::Bound::Reasoning, value: 2048 };
+    let mut answer = grants_answer(OPEN_ATTEMPT, &[]);
+    let Event::AnswerPayload { end, grants_refused, .. } = &mut answer else { panic!("answer fixture") };
+    *grants_refused = false;
+    *end = tasks::End::Exceeded(exceeded);
+    let _out = step(&mut core, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, answer);
+    assert_eq!(core.proofs.get(&OPEN_TASK).unwrap().terminal.as_ref().unwrap().end, tasks::End::Exceeded(exceeded));
+    let task = core.tasks.task(OPEN_TASK).unwrap();
+    assert_eq!(
+        task.phase,
+        tasks::Phase::Held {
+            was: tasks::Was::Active(tasks::Active::Due),
+            why: tasks::Hold::Exceeded(exceeded),
+            source: None,
+        }
+    );
+    assert_eq!(task.tries, tasks::Tries::NONE);
+}
