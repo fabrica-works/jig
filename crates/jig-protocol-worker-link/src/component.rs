@@ -301,11 +301,6 @@ impl Component {
         }
     }
     fn up(&mut self, now: Time, up: host::LinkUp, parts: &[wire::Part], out: &mut Queue<Request>) {
-        // Transitional: worker wire v6 has no piece; live-text M1's task Tc sends it on v7.
-        if let host::LinkUp::Piece { .. } = up {
-            self.facts = self.facts.saturating_add(1);
-            return;
-        }
         match self.phase {
             Phase::Open { hello: true, .. } => {
                 let limits = sizes::limits(&self.limits.sizes).expect("checked sizes");

@@ -1,11 +1,13 @@
 //! Channel bounds from the owners' numbers (protocol/channel.md, 9 and 11).
-use crate::{Kind, v7};
+use crate::{Kind, v8};
 
 /// Bounds supplied by the domains and the application's protocol layer.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Sizes {
     /// Whole program sources per worker, independent of run slots.
     pub program_sources: u32,
+    /// Bytes in one live piece (protocol/channel.md, 6.4 and 11).
+    pub piece: u32,
     pub charter: u32,
     /// The whole resumed window, including each turn's four-byte length.
     pub transcript: u32,
@@ -54,8 +56,11 @@ pub struct WorkerCap {
 
 /// Map field and count bounds without inspecting any payload or sum.
 #[must_use]
-pub fn limits(sizes: &Sizes) -> Option<v7::Limits> {
-    let limits = v7::Limits {
+pub fn limits(sizes: &Sizes) -> Option<v8::Limits> {
+    let limits = v8::Limits {
+        input_call_id: v8::CEILINGS.input_call_id,
+        input_call_tool: v8::CEILINGS.input_call_tool,
+        piece_bytes: sizes.piece,
         program_source_name: 32,
         sources_sources: sizes.program_sources,
         check_name: 32,
@@ -68,7 +73,7 @@ pub fn limits(sizes: &Sizes) -> Option<v7::Limits> {
         credential_name: sizes.name,
         credential_secret: sizes.secret,
         model_bound_name: sizes.model_name,
-        bounds_program_endpoints: v7::CEILINGS.bounds_program_endpoints,
+        bounds_program_endpoints: v8::CEILINGS.bounds_program_endpoints,
         bounds_models: sizes.models,
         hello_workstreams: sizes.workstreams,
         hello_hosting: sizes.slots,
@@ -84,8 +89,8 @@ pub fn limits(sizes: &Sizes) -> Option<v7::Limits> {
         failed_detail: sizes.detail,
         invalid_start_why: sizes.detail,
         // A provider's code and reason are smith's text, within the detail's bound.
-        account_refused_code: sizes.detail.min(v7::CEILINGS.account_refused_code),
-        account_refused_reason: sizes.detail.min(v7::CEILINGS.account_refused_reason),
+        account_refused_code: sizes.detail.min(v8::CEILINGS.account_refused_code),
+        account_refused_reason: sizes.detail.min(v8::CEILINGS.account_refused_reason),
         answer_refused: sizes.inbox,
         message_sender: sizes.sender,
         message_words: sizes.message,
@@ -96,7 +101,7 @@ pub fn limits(sizes: &Sizes) -> Option<v7::Limits> {
         answered_call_tool: sizes.tool_name,
         credential_value_bytes: sizes.grant,
         application_value_secret: sizes.grant,
-        program_value_name: v7::CEILINGS.program_source_name,
+        program_value_name: v8::CEILINGS.program_source_name,
         assignment_charter: sizes.charter,
         assignment_transcript: sizes.transcript,
         assignment_answered: sizes.answered,
@@ -107,7 +112,7 @@ pub fn limits(sizes: &Sizes) -> Option<v7::Limits> {
         relay_text_text: sizes.answer,
         relayed_name: sizes.call_name,
     };
-    v7::check_limits(&limits).ok()?;
+    v8::check_limits(&limits).ok()?;
     Some(limits)
 }
 
@@ -116,34 +121,34 @@ pub fn largest_body(sizes: &Sizes, kind: Kind) -> Option<u32> {
     body(&limits(sizes)?, kind)
 }
 
-fn body(limits: &v7::Limits, kind: Kind) -> Option<u32> {
+fn body(limits: &v8::Limits, kind: Kind) -> Option<u32> {
     let bytes = match kind {
-        Kind::Hello => v7::Hello::worst_case_bytes(limits),
-        Kind::Turn => v7::Turn::worst_case_bytes(limits),
-        Kind::Call => v7::Call::worst_case_bytes(limits),
-        Kind::Answer => v7::Answer::worst_case_bytes(limits),
-        Kind::Fact => v7::Fact::worst_case_bytes(limits),
-        Kind::Unauthorized => v7::Unauthorized::worst_case_bytes(limits),
-        Kind::Limited => v7::Limited::worst_case_bytes(limits),
-        Kind::AccountRefused => v7::AccountRefused::worst_case_bytes(limits),
-        Kind::Assignment => v7::Assignment::worst_case_bytes(limits),
-        Kind::Message => v7::Inbound::worst_case_bytes(limits),
-        Kind::Relayed => v7::Relayed::worst_case_bytes(limits),
-        Kind::TurnKept => v7::TurnKept::worst_case_bytes(limits),
-        Kind::TurnBusy => v7::TurnBusy::worst_case_bytes(limits),
-        Kind::Acknowledge => v7::Acknowledge::worst_case_bytes(limits),
-        Kind::Cancel => v7::Cancel::worst_case_bytes(limits),
-        Kind::Sources => v7::Sources::worst_case_bytes(limits),
-        Kind::Check => v7::Check::worst_case_bytes(limits),
-        Kind::SignOut => v7::SignOut::worst_case_bytes(limits),
-        Kind::Logins => v7::Logins::worst_case_bytes(limits),
-        Kind::SignedOut => v7::SignedOut::worst_case_bytes(limits),
-        Kind::Grant => v7::Granted::worst_case_bytes(limits),
+        Kind::Hello => v8::Hello::worst_case_bytes(limits),
+        Kind::Turn => v8::Turn::worst_case_bytes(limits),
+        Kind::Call => v8::Call::worst_case_bytes(limits),
+        Kind::Answer => v8::Answer::worst_case_bytes(limits),
+        Kind::Fact => v8::Fact::worst_case_bytes(limits),
+        Kind::Unauthorized => v8::Unauthorized::worst_case_bytes(limits),
+        Kind::Limited => v8::Limited::worst_case_bytes(limits),
+        Kind::AccountRefused => v8::AccountRefused::worst_case_bytes(limits),
+        Kind::Assignment => v8::Assignment::worst_case_bytes(limits),
+        Kind::Message => v8::Inbound::worst_case_bytes(limits),
+        Kind::Relayed => v8::Relayed::worst_case_bytes(limits),
+        Kind::TurnKept => v8::TurnKept::worst_case_bytes(limits),
+        Kind::TurnBusy => v8::TurnBusy::worst_case_bytes(limits),
+        Kind::Acknowledge => v8::Acknowledge::worst_case_bytes(limits),
+        Kind::Cancel => v8::Cancel::worst_case_bytes(limits),
+        Kind::Sources => v8::Sources::worst_case_bytes(limits),
+        Kind::Check => v8::Check::worst_case_bytes(limits),
+        Kind::SignOut => v8::SignOut::worst_case_bytes(limits),
+        Kind::Logins => v8::Logins::worst_case_bytes(limits),
+        Kind::SignedOut => v8::SignedOut::worst_case_bytes(limits),
+        Kind::Grant => v8::Granted::worst_case_bytes(limits),
     }?;
     u32::try_from(bytes).ok()
 }
 
-fn frame(limits: &v7::Limits, kind: Kind) -> Option<u32> {
+fn frame(limits: &v8::Limits, kind: Kind) -> Option<u32> {
     body(limits, kind)?.checked_add(8)
 }
 
@@ -180,7 +185,7 @@ pub fn worker_cap(sizes: &Sizes) -> Option<WorkerCap> {
         .checked_add(frame(&limits, Kind::AccountRefused)?)?;
     let mut bytes = frame(&limits, Kind::Hello)?.checked_add(sizes.slots.checked_mul(run)?)?;
     bytes = bytes.checked_add(sizes.accounts.checked_mul(notices)?)?;
-    // LongDone is the shortest fact: task + attempt + activity tag + header.
+    // LongDone is the shortest fact: task + attempt + value tag + header.
     let fact_frames = sizes.facts / 25;
     let run_frames = sizes.turns.checked_add(1)?.checked_add(sizes.calls)?;
     let mut frames = 1_u32.checked_add(sizes.slots.checked_mul(run_frames)?)?;

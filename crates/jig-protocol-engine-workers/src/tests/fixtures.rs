@@ -9,6 +9,7 @@ pub const SECRET_B: &[u8] = b"secret-b";
 pub const PAYLOAD: u32 = 3;
 pub const SIZES: jig_protocol_worker_wire::sizes::Sizes = jig_protocol_worker_wire::sizes::Sizes {
     program_sources: 2,
+    piece: 16,
     charter: 16,
     transcript: 16,
     turn: 16,
@@ -38,7 +39,7 @@ pub const SIZES: jig_protocol_worker_wire::sizes::Sizes = jig_protocol_worker_wi
     workstreams: 1,
     accounts: 1,
     credentials: 1,
-    facts: 16,
+    facts: 390,
 };
 
 pub const LIMITS: Limits = Limits {
@@ -193,7 +194,7 @@ pub fn fact_record() -> jig_protocol_worker_wire::Fact {
         wire::CountParts { kind: wire::CountKind::LlmStarted, elapsed: Duration::from_secs(2), value: 3 },
     )
     .expect("count");
-    wire::Fact::new(&codec, wire::FactParts { task: 7, attempt: 2, activity: wire::Activity::Count(count) })
+    wire::Fact::new(&codec, wire::FactParts { task: 7, attempt: 2, value: wire::FactValue::Count(count) })
         .expect("fact")
 }
 pub fn unauthorized_record() -> jig_protocol_worker_wire::Unauthorized {
@@ -250,7 +251,7 @@ pub fn refused_account() -> jig_protocol_worker_wire::RunFailure {
     wire::RunFailure::Refused(refused)
 }
 
-fn codec() -> jig_protocol_worker_wire::v7::Limits {
+fn codec() -> jig_protocol_worker_wire::v8::Limits {
     jig_protocol_worker_wire::sizes::limits(&SIZES).expect("small codec")
 }
 fn refused_messages() -> skein_lib::List<jig_protocol_worker_wire::Refused> {

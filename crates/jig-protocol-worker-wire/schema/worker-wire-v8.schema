@@ -1,4 +1,4 @@
-family jig-worker-wire 7
+family jig-worker-wire 8
 
 # The worker's credential (protocol/channel.md, 4.1).
 record Credential { name: text 256 secret: secret 1024 payload: u32 }
@@ -89,8 +89,11 @@ enum CountKind {
 }
 record Count { kind: CountKind elapsed: duration value: u64 }
 record PhaseValue { value: Phase }
-enum Activity { phase: PhaseValue, long: Long, long_done, count: Count }
-record Fact { task: u64 attempt: u64 activity: Activity }
+record InputCall { id: text 256 tool: text 64 }
+enum LiveKind { text, reasoning, input: InputCall }
+record Piece { turn: u32 retry: u32 kind: LiveKind offset: u64 bytes: bytes 4096 }
+enum FactValue { phase: PhaseValue, long: Long, long_done, count: Count, piece: Piece }
+record Fact { task: u64 attempt: u64 value: FactValue }
 record Unauthorized { task: u64 attempt: u64 account: u32 generation: u64 }
 record Limited { task: u64 attempt: u64 account: u32 reset: option duration }
 record AccountRefused { task: u64 attempt: u64 account: u32 code: text 128 reason: text 512 }
@@ -111,11 +114,13 @@ record ApplicationValue { secret: secret 8192 }
 record ProgramValue { name: text 32 }
 enum GrantValue { credential: CredentialValue, application: ApplicationValue, program: ProgramValue }
 record Grant { number: u32 generation: u64 valid: duration value: GrantValue }
+record LiveAsk { text: bool reasoning: bool input: bool }
 record Assignment {
     task: u64 attempt: u64
     identity: fixed 16
     workspace: option Workspace
     save: bool
+    live: LiveAsk
     charter: bytes 67108864
     transcript: bytes 8388608
     answered: list 1024 AnsweredCall

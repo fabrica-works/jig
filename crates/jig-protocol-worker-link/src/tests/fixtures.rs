@@ -6,6 +6,7 @@ pub const PAYLOAD: u32 = 3;
 pub const SEED_ONE: u64 = 1;
 pub const SIZES: jig_protocol_worker_wire::sizes::Sizes = jig_protocol_worker_wire::sizes::Sizes {
     program_sources: 2,
+    piece: 16,
     charter: 16,
     transcript: 16,
     turn: 16,
@@ -35,7 +36,7 @@ pub const SIZES: jig_protocol_worker_wire::sizes::Sizes = jig_protocol_worker_wi
     workstreams: 1,
     accounts: 1,
     credentials: 1,
-    facts: 16,
+    facts: 390,
 };
 
 pub const LIMITS: Limits = Limits {
@@ -61,7 +62,7 @@ use skein_lib::{List, Token, Writer};
 pub const TOKEN_ONE: &[u8] = b"access";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
-pub fn codec() -> wire::v7::Limits {
+pub fn codec() -> wire::v8::Limits {
     wire::sizes::limits(&SIZES).expect("small codec limits")
 }
 pub fn hello() -> host::Hello {
@@ -175,6 +176,8 @@ pub fn assignment_record(transcript: Box<[u8]>) -> wire::Assignment {
             identity: [9; 16],
             workspace: Some(workspace),
             save: true,
+            live: wire::LiveAsk::new(&limits, wire::LiveAskParts { text: false, reasoning: false, input: false })
+                .expect("live ask"),
             charter: b"charter".as_slice().into(),
             transcript,
             answered,

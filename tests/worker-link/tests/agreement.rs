@@ -88,6 +88,42 @@ mod agreement {
     fn a_fact_crosses_unchanged() {
         cross_up(fact(), &fact());
     }
+    #[test]
+    fn every_piece_kind_crosses_unchanged_with_a_full_width_offset() {
+        for kind in [
+            host::LiveKind::Text,
+            host::LiveKind::Reasoning,
+            host::LiveKind::Input { call: vec![b'i'; 256].into_boxed_slice(), tool: vec![b't'; 64].into_boxed_slice() },
+        ] {
+            let record = host::LinkUp::Piece {
+                run: RUN_SEVEN,
+                attempt: ATTEMPT_TWO,
+                piece: host::Piece { turn: 17, retry: 23, kind, offset: u64::MAX, bytes: Box::from([0xff, 0, 0x80]) },
+            };
+            let host::LinkUp::Piece { run, attempt, piece } = &record else { panic!("piece") };
+            let copy = host::LinkUp::Piece { run: *run, attempt: *attempt, piece: piece.clone() };
+            cross_up(copy, &record);
+        }
+    }
+    #[test]
+    fn each_live_ask_crosses_both_translations_unchanged() {
+        for ask in [
+            host::LiveAsk::NONE,
+            host::LiveAsk { text: true, reasoning: false, input: false },
+            host::LiveAsk { text: false, reasoning: true, input: false },
+            host::LiveAsk { text: false, reasoning: false, input: true },
+            host::LiveAsk { text: true, reasoning: true, input: true },
+        ] {
+            let mut world = world();
+            let mut assignment = fixtures::assignment();
+            assignment.assignment.live = ask;
+            world.engine_down(host::LinkDown::Assign { assignment }, fixtures::assignment_parts(), values());
+            world.run();
+            let host::LinkDown::Assign { assignment } = down(&world).0 else { panic!("assignment") };
+            assert_eq!(assignment.assignment.live, ask);
+            world.finish();
+        }
+    }
     fn unauthorized() -> host::LinkUp {
         host::LinkUp::Unauthorized { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, generation: 3 }
     }

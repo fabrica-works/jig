@@ -54,7 +54,7 @@ mod opening {
     #[test]
     fn another_version_is_refused_by_skein_as_version() {
         let mut schema = fixtures::schema();
-        let other = jig_protocol_worker_wire::VERSION.checked_add(1).expect("one past the worker version");
+        let other = 7; // The previous worker wire is refused as another version.
         schema.versions.get_mut(0).expect("one version").version = other;
         let mut world = world();
         let connection = world.connect(fixtures::peer(schema, other, WORKER_A, SECRET_A, PAYLOAD));
