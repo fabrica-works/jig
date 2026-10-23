@@ -1240,8 +1240,13 @@ its codes and access tokens, and decides who is signed in. The routes
 and their addresses are the application's (17.1: no provider route).
 
 - **Configured** by `clients.provider` (`configuration.md`, section 3):
-  its signing key, its clients (each an id, a secret and one redirect
-  URI) and the providers whose subjects are verified addresses. With
+  its signing key (a 3072-bit RSA key, PKCS#8, a file of the
+  service's own user, mode 0600, made on its host and never copied,
+  printed or logged; any other form, size, mode or owner refuses the
+  start, each with its reason), its clients (each an id, a secret and
+  one redirect URI) and the providers whose subjects are verified
+  addresses. Its tests, from the key file's reader up, use a 3072-bit
+  key generated in their scratch directory, one per test binary. With
   none, the component is no provider: `Authorize` is refused
   `no_provider`, and a `Redeem` or a `Claims` is answered as an unknown
   client.
