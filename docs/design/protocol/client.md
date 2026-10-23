@@ -1096,9 +1096,14 @@ prefix; jig's test application mounts it at `/jig`.
   the listener is not (`configuration.md`, section 3). The `Host`
   allow-list holds it beside the listener's own addresses
   (`browser.md`, 12.2), and each exchange is decided by its `Host`
-  alone: one that came by the public name came through the proxy, over
-  TLS, and its cookie is `Secure`; one that came by the listener's
-  address came in plaintext, and its cookie is not. Every answer that
+  alone, byte for byte as the request sent it, with no case folded and
+  no port normalised: one that came by the public name came through the
+  proxy, over TLS, and its cookie is `Secure`; one that came by the
+  listener's address came in plaintext, and its cookie is not. An
+  exchange that names the public name to the loopback listener
+  directly, with no proxy, gets `Secure` too, which is harmless: the
+  browser keeps no such cookie over plaintext, or never sends it back
+  there. Every answer that
   sets or clears the cookie takes that decision: the engine end's at a
   sign-in and a sign-out, and the application's after a `Minted`,
   whose function takes the decision the engine end reads from the
