@@ -222,6 +222,7 @@ mod down_records {
                 name: Token::new(8),
                 sender: Box::from(b"sender".as_slice()),
                 words: Box::from(b"message".as_slice()),
+                finish_requested: false,
             },
             LinkDown::Relayed { run, attempt, call: Box::from([0, 2, 7]), answer: jig_domain_host::Relayed::Busy },
             LinkDown::TurnKept { run, attempt, turn: 3 },

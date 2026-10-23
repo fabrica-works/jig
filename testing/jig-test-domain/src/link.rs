@@ -250,6 +250,7 @@ pub fn down(domain: &mut Domain, delivery: Delivery) -> Delivery {
                 attempt: Token::new(attempt),
                 name: Token::new(word.number),
                 sender: sender(word.from),
+                finish_requested: word.finish_requested(),
                 words: jig_protocol_tools::words(&word),
             },
         ),

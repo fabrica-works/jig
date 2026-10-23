@@ -68,7 +68,7 @@ pub(crate) enum Up {
     Limited(wire::Limited),
     AccountRefused(wire::AccountRefused),
 }
-pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v8::Limits) -> Option<Up> {
+pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v9::Limits) -> Option<Up> {
     let mut found = None;
     for rule in wire::KINDS {
         if rule.kind == kind {
@@ -470,7 +470,7 @@ pub(crate) fn down(
     down: host::LinkDown,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v8::Limits,
+    limits: &wire::v9::Limits,
 ) -> Option<Down> {
     match down {
         host::LinkDown::Sources { sources } => {
@@ -497,10 +497,17 @@ pub(crate) fn down(
         host::LinkDown::Assign { assignment } => {
             Some(Down::Assign(assignment_record(assignment, parts, values, limits)?))
         }
-        host::LinkDown::Message { run, attempt, name, sender, words } => Some(Down::Message(
+        host::LinkDown::Message { run, attempt, name, sender, words, finish_requested } => Some(Down::Message(
             wire::Inbound::new(
                 limits,
-                wire::InboundParts { task: run.raw(), attempt: attempt.raw(), name: name.raw(), sender, words },
+                wire::InboundParts {
+                    task: run.raw(),
+                    attempt: attempt.raw(),
+                    name: name.raw(),
+                    sender,
+                    words,
+                    finish_requested,
+                },
             )
             .ok()?,
         )),
@@ -543,7 +550,7 @@ fn assignment_record(
     assignment: host::Assignment,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v8::Limits,
+    limits: &wire::v9::Limits,
 ) -> Option<wire::Assignment> {
     let run = assignment.assignment;
     let workspace = match run.workspace {
@@ -562,7 +569,12 @@ fn assignment_record(
             .push(
                 wire::Message::new(
                     limits,
-                    wire::MessageParts { name: message.name.raw(), sender: message.sender, words: message.words },
+                    wire::MessageParts {
+                        name: message.name.raw(),
+                        sender: message.sender,
+                        words: message.words,
+                        finish_requested: message.finish_requested,
+                    },
                 )
                 .ok()?,
             )
@@ -630,7 +642,7 @@ fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
     Some(writer.finish())
 }
 /// A grant's form and its value's arm agree, or the grant is not sent.
-fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v8::Limits) -> Option<wire::Grant> {
+fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v9::Limits) -> Option<wire::Grant> {
     let value = match grant.form {
         host::Form::Program(form) => match value {
             crate::GrantValue::Program { name } => {
@@ -677,7 +689,7 @@ const fn grant_scheme(scheme: host::Scheme) -> crate::Scheme {
         host::Scheme::Key => crate::Scheme::Key,
     }
 }
-fn settled(answer: host::SettledAnswer, limits: &wire::v8::Limits) -> Option<wire::SettledAnswer> {
+fn settled(answer: host::SettledAnswer, limits: &wire::v9::Limits) -> Option<wire::SettledAnswer> {
     match answer {
         host::SettledAnswer::Host { error, body } => {
             Some(wire::SettledAnswer::Host(wire::HostAnswer::new(limits, wire::HostAnswerParts { error, body }).ok()?))
@@ -697,7 +709,7 @@ fn settled(answer: host::SettledAnswer, limits: &wire::v8::Limits) -> Option<wir
     }
 }
 
-pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v8::Limits) -> Down {
+pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v9::Limits) -> Down {
     Down::TurnBusy(
         wire::TurnBusy::new(limits, wire::TurnBusyParts { task: run.raw(), attempt: attempt.raw(), number: turn })
             .expect("fixed turn busy fields fit"),

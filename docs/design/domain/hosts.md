@@ -868,6 +868,15 @@ committed keep their ordinary handling.
   a delegate held, and an escalation, carry the hold's revision
   (section 8). The run names the last it read with each turn and when it
   waits.
+- **A grace asks the run to finish.** Jig keeps `FinishRequested { revision }`
+  as a durable inbox kind, separately reserved from merged amendments. Its
+  live message and its carried Start message translate to smith's
+  `finish_requested: true`; every other kind translates to false. The
+  owned kind travels through held deliveries, without querying later task
+  state. In an Open run, admission enters smith's existing wind-down, so
+  its next text parks. Finite runs hear an ordinary amendment; cancellation,
+  refusals and read fences keep their existing meaning. The hub carries the
+  flag without linking smith; application roots only translate it.
 - **The start carries the inbox,** as many of its messages as the run's
   inbox takes, oldest first; the rest are relayed as the run reads
   (tasks.md, 8.2). The run opens on them (smith's `domain/host.md`,

@@ -33,6 +33,7 @@ pub fn words(word: &tasks::Word) -> Box<[u8]> {
         | tasks::MessageKind::News { .. }
         | tasks::MessageKind::Timer { .. }
         | tasks::MessageKind::Met { .. }
+        | tasks::MessageKind::FinishRequested { .. }
         | tasks::MessageKind::Amendment { .. }
         | tasks::MessageKind::Proposal { .. } => return word.words.clone(),
     };

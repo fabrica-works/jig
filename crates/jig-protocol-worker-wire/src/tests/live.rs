@@ -1,5 +1,5 @@
 use super::fixtures::{SIZES_LARGE, SIZES_ONE_SLOT};
-use crate::{self as wire, sizes, v8};
+use crate::{self as wire, sizes, v9};
 use skein_lib::{Reader, Writer};
 
 fn repeated(byte: u8, length: u32) -> Box<[u8]> {
@@ -73,7 +73,7 @@ fn piece_content_at_its_ceiling_decodes_and_one_past_is_refused() {
         } else {
             assert_eq!(
                 result.unwrap_err(),
-                v8::Problem { path: v8::Path::PieceBytes, reason: skein_codec::Reason::Bound }
+                v9::Problem { path: v9::Path::PieceBytes, reason: skein_codec::Reason::Bound }
             );
         }
     }
@@ -81,7 +81,7 @@ fn piece_content_at_its_ceiling_decodes_and_one_past_is_refused() {
 #[test]
 fn input_call_fields_at_their_ceilings_decode_and_one_past_is_refused() {
     for (id, tool, problem) in
-        [(256_u32, 64_u32, None), (257, 64, Some(v8::Path::InputCallId)), (256, 65, Some(v8::Path::InputCallTool))]
+        [(256_u32, 64_u32, None), (257, 64, Some(v9::Path::InputCallId)), (256, 65, Some(v9::Path::InputCallTool))]
     {
         let mut writer = Writer::new(8 + usize::try_from(id + tool).unwrap());
         writer.put(&id.to_be_bytes()).unwrap();
@@ -95,7 +95,7 @@ fn input_call_fields_at_their_ceilings_decode_and_one_past_is_refused() {
                 let call = result.unwrap();
                 assert_eq!(call.measure(), 328);
             }
-            Some(path) => assert_eq!(result.unwrap_err(), v8::Problem { path, reason: skein_codec::Reason::Bound }),
+            Some(path) => assert_eq!(result.unwrap_err(), v9::Problem { path, reason: skein_codec::Reason::Bound }),
         }
     }
 }

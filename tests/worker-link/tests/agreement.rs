@@ -124,6 +124,20 @@ mod agreement {
             world.finish();
         }
     }
+    #[test]
+    fn start_messages_keep_the_finish_fact_across_both_codecs() {
+        for finish_requested in [false, true] {
+            let mut world = world();
+            let mut assignment = fixtures::assignment();
+            assignment.messages[0].finish_requested = finish_requested;
+            world.engine_down(host::LinkDown::Assign { assignment }, fixtures::assignment_parts(), values());
+            world.run();
+            let host::LinkDown::Assign { assignment } = down(&world).0 else { panic!("assignment") };
+            assert_eq!(assignment.messages[0].finish_requested, finish_requested);
+            assert_eq!(assignment.messages[0].words.as_ref(), b"words");
+            world.finish();
+        }
+    }
     fn unauthorized() -> host::LinkUp {
         host::LinkUp::Unauthorized { run: RUN_SEVEN, attempt: ATTEMPT_TWO, account: 1, generation: 3 }
     }
@@ -183,18 +197,21 @@ mod agreement {
             world.finish();
         }
     }
-    fn message() -> host::LinkDown {
+    fn message(finish_requested: bool) -> host::LinkDown {
         host::LinkDown::Message {
             run: RUN_SEVEN,
             attempt: ATTEMPT_TWO,
             name: Token::new(6),
             sender: b"sender".as_slice().into(),
             words: b"later".as_slice().into(),
+            finish_requested,
         }
     }
     #[test]
     fn a_message_crosses_unchanged() {
-        cross_down(message(), &message());
+        for finish_requested in [false, true] {
+            cross_down(message(finish_requested), &message(finish_requested));
+        }
     }
     #[test]
     fn a_relayed_answer_crosses_unchanged() {

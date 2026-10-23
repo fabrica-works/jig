@@ -9,7 +9,7 @@ pub mod proposals;
 pub mod record;
 pub mod state;
 pub mod value;
-use crate::tasks_v8 as wire;
+use crate::tasks_v9 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{Reader, Writer};

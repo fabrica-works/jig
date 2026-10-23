@@ -251,7 +251,7 @@ pub fn refused_account() -> jig_protocol_worker_wire::RunFailure {
     wire::RunFailure::Refused(refused)
 }
 
-fn codec() -> jig_protocol_worker_wire::v8::Limits {
+fn codec() -> jig_protocol_worker_wire::v9::Limits {
     jig_protocol_worker_wire::sizes::limits(&SIZES).expect("small codec")
 }
 fn refused_messages() -> skein_lib::List<jig_protocol_worker_wire::Refused> {
@@ -339,6 +339,7 @@ pub fn assignment() -> jig_domain_host::Assignment {
             name: Token::new(8),
             sender: Box::from(b"sender".as_slice()),
             words: Box::from(b"message".as_slice()),
+            finish_requested: true,
         }]),
     }
 }

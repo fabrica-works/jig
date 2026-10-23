@@ -451,9 +451,12 @@ impl Worker {
                 &mut self.process_events,
                 &mut self.io,
             ),
-            smith::Down::Message { name, label, text } => {
-                process.send_message(name, label, text, token, &mut self.process_events, &mut self.io)
-            }
+            smith::Down::Message { name, label, text, finish_requested } => process.send_message(
+                smith_host_domain::Message { name, label, text, finish_requested },
+                token,
+                &mut self.process_events,
+                &mut self.io,
+            ),
             smith::Down::Answer { call, reply } => {
                 process.send_reply(call, reply, token, &mut self.process_events, &mut self.io)
             }

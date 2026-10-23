@@ -31,7 +31,9 @@ fn a_partys_cancel_with_a_grace_ends_the_chat_when_the_grace_ends() {
     );
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Cancelled { task })));
     assert_eq!(live_row(&world, task).grace.as_ref().expect("finish requested").reason.as_ref(), b"wrap up");
-    assert_eq!(world.inbound.last().expect("the run hears the finish word").words.as_ref(), b"wrap up");
+    let finish = world.inbound.last().expect("the run hears the finish word");
+    assert_eq!(finish.words.as_ref(), b"wrap up");
+    assert_eq!(finish.kind, tasks::MessageKind::FinishRequested { revision: 1 });
     world.advance(Duration::from_secs(5));
     world.end(tasks::End::Parked, 0);
     let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) =

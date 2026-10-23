@@ -314,6 +314,7 @@ fn core_held(
                     attempt,
                     name: message.name,
                     sender: crate::assemble::sender(message_word.from),
+                    finish_requested: message_word.finish_requested(),
                     words: jig_protocol_tools::words(&message_word),
                 })),
             );
@@ -535,6 +536,7 @@ fn core_ask(
                                 | tasks::MessageKind::EffectNotMade { .. }
                                 | tasks::MessageKind::Words
                                 | tasks::MessageKind::Met { .. }
+                                | tasks::MessageKind::FinishRequested { .. }
                                 | tasks::MessageKind::Amendment { .. }
                                 | tasks::MessageKind::Question
                                 | tasks::MessageKind::Answer { .. }

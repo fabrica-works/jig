@@ -79,7 +79,9 @@ pub fn kind(value: &tasks::MessageKind, limits: &Limits) -> Result<client::Owner
         }
         tasks::MessageKind::Words => client::OwnerMessageKind::Words,
         tasks::MessageKind::EffectNotMade { entry } => client::OwnerMessageKind::EffectNotMade { entry: *entry },
-        tasks::MessageKind::Amendment { revision } => client::OwnerMessageKind::Amendment { revision: *revision },
+        tasks::MessageKind::Amendment { revision } | tasks::MessageKind::FinishRequested { revision } => {
+            client::OwnerMessageKind::Amendment { revision: *revision }
+        }
         tasks::MessageKind::Met { dependency, removed } => {
             client::OwnerMessageKind::Met { dependency: *dependency, removed: *removed }
         }

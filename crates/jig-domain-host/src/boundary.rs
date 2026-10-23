@@ -166,6 +166,7 @@ pub enum Request {
         name: Token,
         sender: Box<[u8]>,
         words: Box<[u8]>,
+        finish_requested: bool,
     },
     /// Answer a call under the agent's opaque name.
     Reply {
@@ -244,6 +245,7 @@ pub enum ToAgent {
         name: Token,
         sender: Box<[u8]>,
         words: Box<[u8]>,
+        finish_requested: bool,
     },
     /// Answer a call under the agent's opaque name.
     Answer {
@@ -390,7 +392,9 @@ impl Request {
     #[expect(clippy::result_large_err, reason = "the root receives an owned link record with its refusal metadata")]
     pub fn to_agent(self) -> Result<ToAgent, Request> {
         match self {
-            Request::Message { agent, name, sender, words } => Ok(ToAgent::Message { agent, name, sender, words }),
+            Request::Message { agent, name, sender, words, finish_requested } => {
+                Ok(ToAgent::Message { agent, name, sender, words, finish_requested })
+            }
             Request::Reply { agent, call, reply } => Ok(ToAgent::Answer { agent, call, reply }),
             Request::Start { owner, start } => Ok(ToAgent::Start { owner, start }),
 
@@ -431,6 +435,7 @@ pub struct StartMessage {
     pub name: Token,
     pub sender: Box<[u8]>,
     pub words: Box<[u8]>,
+    pub finish_requested: bool,
 }
 
 /// The form in which a grant lends its value (protocol/channel.md, section 8).

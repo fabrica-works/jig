@@ -5,7 +5,7 @@ use skein_channel::{Direction, Role, Term};
 use skein_lib::{Duration, List, Reader};
 
 // Existing hello 178 + list count 4 + the independent 64 endpoint identities.
-const HELLO_MAX: u32 = 178 + 4 + crate::v8::CEILINGS.bounds_program_endpoints * 4;
+const HELLO_MAX: u32 = 178 + 4 + crate::v9::CEILINGS.bounds_program_endpoints * 4;
 fn hello_schema() -> skein_channel::Schema {
     crate::schema(&fixtures::LIMITS).expect("small schema")
 }
@@ -35,8 +35,8 @@ fn down_terms() -> List<Term> {
     let mut terms = List::with_capacity(11);
     // Independently summed from field widths and the fixture limits.
     for (kind, largest) in [
-        (0x0180, 565),
-        (0x0181, 80),
+        (0x0180, 567),
+        (0x0181, 81),
         (0x0182, 74),
         (0x0183, 20),
         (0x0184, 20),
@@ -168,8 +168,8 @@ fn a_hello_past_the_endpoint_ceiling_is_refused_at_its_bound() {
         (at_cap, Ok(ENDPOINT_CAP)),
         (
             past_cap,
-            Err(crate::v8::Problem {
-                path: crate::v8::Path::BoundsProgramEndpoints,
+            Err(crate::v9::Problem {
+                path: crate::v9::Path::BoundsProgramEndpoints,
                 reason: skein_codec::Reason::Bound,
             }),
         ),
@@ -207,7 +207,7 @@ fn a_reason_below_256_reads_as_none() {
 #[test]
 fn the_schema_lists_the_hello_from_the_initiator() {
     let schema = hello_schema();
-    let version = schema.version(8).expect("one version");
+    let version = schema.version(9).expect("one version");
     assert_eq!(schema.magic, *b"jigw");
     assert_eq!(version.kinds.len(), 21);
     assert_eq!(
@@ -345,7 +345,7 @@ fn through_bytes<T>(
     value: &T,
     measure: fn(&T) -> u32,
     encode: fn(&T, &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow>,
-    decode: fn(&crate::v8::Limits, &mut Reader<'_>) -> Result<T, crate::v8::Problem>,
+    decode: fn(&crate::v9::Limits, &mut Reader<'_>) -> Result<T, crate::v9::Problem>,
 ) -> T {
     let mut writer = skein_lib::Writer::new(usize::try_from(measure(value)).expect("small notice"));
     encode(value, &mut writer).expect("measured room");
@@ -483,6 +483,8 @@ fn an_assignment_keeps_its_start_messages_in_order() {
     assert_eq!(decoded.messages().len(), 2);
     assert_eq!(decoded.messages().get(0).expect("first start message").name(), fixtures::MESSAGE_FIRST);
     assert_eq!(decoded.messages().get(1).expect("second start message").name(), fixtures::MESSAGE_SECOND);
+    assert!(!decoded.messages().get(0).expect("ordinary").finish_requested());
+    assert!(decoded.messages().get(1).expect("finish").finish_requested());
     assert_eq!(decoded, assignment);
 }
 
@@ -577,7 +579,7 @@ fn an_assignment_past_its_grant_bound_is_refused() {
 #[test]
 fn the_schema_lists_every_down_kind_from_the_responder() {
     let schema = hello_schema();
-    let version = schema.version(8).expect("one version");
+    let version = schema.version(9).expect("one version");
     assert_eq!(version.kinds.len(), 21);
     for term in &down_terms() {
         assert_eq!(

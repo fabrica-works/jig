@@ -1,6 +1,6 @@
 //! Complete durable tasks and all remaining row kinds (protocol/store.md, 5.1).
 use super::{bound_problem, fixtures, saved_tasks, tasks_limits};
-use crate::{codec::tasks, tasks_v8 as wire};
+use crate::{codec::tasks, tasks_v9 as wire};
 use jig_domain_tasks as domain;
 use skein_lib::{Duration, Token, Wall};
 
@@ -133,6 +133,7 @@ fn each_message_kind_reads_back() {
         domain::MessageKind::ProposalDecision { proposal: 43, accepted: false },
         domain::MessageKind::Words,
         domain::MessageKind::EffectNotMade { entry: 11 },
+        domain::MessageKind::FinishRequested { revision: 1 },
         domain::MessageKind::Amendment { revision: 3 },
         domain::MessageKind::Question,
         domain::MessageKind::Answer { question: 5 },

@@ -38,10 +38,12 @@ pub fn message_kind(value: &t::MessageKind, limits: &w::Limits) -> Result<w::Own
         t::MessageKind::EffectNotMade { entry } => w::OwnerMessageKind::EffectNotMade(
             w::OwnerMessageKindEffectNotMade::new(limits, w::OwnerMessageKindEffectNotMadeParts { entry: *entry })?,
         ),
-        t::MessageKind::Amendment { revision } => w::OwnerMessageKind::Amendment(w::OwnerMessageKindAmendment::new(
-            limits,
-            w::OwnerMessageKindAmendmentParts { revision: *revision },
-        )?),
+        t::MessageKind::Amendment { revision } | t::MessageKind::FinishRequested { revision } => {
+            w::OwnerMessageKind::Amendment(w::OwnerMessageKindAmendment::new(
+                limits,
+                w::OwnerMessageKindAmendmentParts { revision: *revision },
+            )?)
+        }
         t::MessageKind::Answer { question } => w::OwnerMessageKind::Answer(w::OwnerMessageKindAnswer::new(
             limits,
             w::OwnerMessageKindAnswerParts { question: *question },

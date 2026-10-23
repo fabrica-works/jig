@@ -868,7 +868,9 @@ circle, each for another of the set, so that none of them could end.
   longest the tasks child allows (section 11), so that a task finishes
   what it can before it is cut off: a conversation closed by its person,
   a run asked to report what it has. The task hears that it is asked to
-  finish, as it hears an amendment (8.1): an agent's run is woken by it,
+  finish, with the durable `FinishRequested { revision }` message kind
+  (8.1), separately reserved and never merged with amendments: an agent's
+  run is woken by it,
   and a procedure's connector and a person task's holder hear it as they
   hear an amendment. It is cancelled, as above and with the cancel's
   reason, when the grace ends, unless it ended first. The grace's end is

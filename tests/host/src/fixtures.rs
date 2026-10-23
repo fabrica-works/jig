@@ -19,7 +19,7 @@ pub fn assign_with(assignment: RunAssignment, messages: Box<[jig_domain_host::St
 
 #[must_use]
 pub fn inbound(run: Token, attempt: Token, name: Token, words: Box<[u8]>) -> Event {
-    Event::Down(LinkDown::Message { run, attempt, name, sender: Box::new([]), words })
+    Event::Down(LinkDown::Message { run, attempt, name, sender: Box::new([]), words, finish_requested: false })
 }
 #[must_use]
 pub fn called(owner: Token, call: Token, ask: Ask) -> Event {
@@ -75,6 +75,7 @@ pub fn messages(limits: &jig_domain_host::Limits) -> Box<[jig_domain_host::Start
             name: Token::new(u64::from(name)),
             sender: Box::new([]),
             words: vec![0; len].into_boxed_slice(),
+            finish_requested: false,
         })
         .collect()
 }

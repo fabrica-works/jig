@@ -81,7 +81,7 @@ fn a_cancel_with_a_grace_asks_the_task_to_finish_first() {
     let row = world.record(TASK);
     assert!(matches!(row.phase, Phase::Active(_)));
     assert_eq!(row.inbox.len(), 1);
-    assert_eq!(row.inbox[0].kind, MessageKind::Amendment { revision: 1 });
+    assert_eq!(row.inbox[0].kind, MessageKind::FinishRequested { revision: 1 });
     assert_eq!(row.inbox[0].number, FIRST_WORD);
     assert_eq!(row.inbox[0].words.as_ref(), b"wrap up");
 }
@@ -179,6 +179,8 @@ fn a_graces_ask_never_merges_into_a_waiting_amendment() {
     world.restart();
     let inbox = &world.record(TASK).inbox;
     assert_eq!(inbox.len(), 2);
+    assert_eq!(inbox[0].kind, MessageKind::FinishRequested { revision: 2 });
+    assert_eq!(inbox[1].kind, MessageKind::Amendment { revision: 3 });
     assert_eq!(inbox[0].words.as_ref(), b"wrap up");
     assert_eq!(inbox[1].words.as_ref(), b"ordinary amendment");
 }
@@ -193,7 +195,7 @@ fn a_person_task_cancelled_with_a_grace_shows_its_holder_the_ask() {
     world.send(Event::TakePerson { reply_to, task: TASK, person: HOLDER });
     cancel(&mut world, Some(Duration::from_secs(5)), b"wrap up");
     assert_eq!(world.record(TASK).taken_by, Some(HOLDER));
-    assert_eq!(world.record(TASK).inbox[0].kind, MessageKind::Amendment { revision: 1 });
+    assert_eq!(world.record(TASK).inbox[0].kind, MessageKind::FinishRequested { revision: 1 });
     assert_eq!(world.record(TASK).inbox[0].words.as_ref(), b"wrap up");
     world.elapse(Duration::from_secs(5));
     world.settle(TASK);
@@ -209,4 +211,35 @@ fn a_graces_ask_keeps_room_for_the_whole_cancellation_reason() {
     assert_eq!(cancel(&mut world, Some(Duration::from_secs(5)), &[b'x'; 32]), Reply::Done);
     world.restart();
     assert_eq!(world.record(TASK).inbox[0].words.as_ref(), &[b'x'; 32]);
+}
+
+#[test]
+fn a_restored_finish_word_requires_its_matching_grace() {
+    const RESTORE_SEED: u64 = 194;
+    let mut world = world();
+    cancel(&mut world, Some(Duration::from_secs(5)), b"wrap up");
+    let original = world.record(TASK).clone();
+    let mut missing = original.clone();
+    missing.grace = None;
+    let mut wrong_name = original.clone();
+    wrong_name.grace.as_mut().expect("grace fixture").message += 1;
+    let mut ordinary = original;
+    ordinary.inbox[0].kind = MessageKind::Words;
+    for record in [missing, wrong_name, ordinary] {
+        let mut domain = jig_tasks_world::domain(&LIMITS, RESTORE_SEED);
+        let mut out = skein_lib::Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
+        jig_domain_tasks::step(
+            &mut domain,
+            &world.env,
+            Event::Restore { record: Stored::Live(Box::new(record)) },
+            &mut out,
+        );
+        let mut refusals = Vec::new();
+        while let Some(request) = out.pop() {
+            if let jig_domain_tasks::Request::RestoreRefused { problem } = request {
+                refusals.push(problem.why);
+            }
+        }
+        assert_eq!(refusals, [Refusal::Restore]);
+    }
 }

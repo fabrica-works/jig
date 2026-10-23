@@ -322,7 +322,10 @@ fn a_procedure_asked_to_finish_by_a_grace_steps_as_on_an_amendment() {
     let (step, _, _, context) = world.procedure_inputs.last().expect("finish wake");
     assert_eq!(*step, 2);
     assert_eq!(live_row(&world, procedure).grace.as_ref().expect("durable grace").reason.as_ref(), b"finish procedure");
-    assert_eq!(context.inbox.last().expect("finish amendment").kind, tasks::MessageKind::Amendment { revision: 1 });
+    assert_eq!(
+        context.inbox.last().expect("finish amendment").kind,
+        tasks::MessageKind::FinishRequested { revision: 1 }
+    );
     decide(
         &mut world,
         procedure,

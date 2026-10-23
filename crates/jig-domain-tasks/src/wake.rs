@@ -25,6 +25,7 @@ fn category(kind: &MessageKind) -> u8 {
     match kind {
         MessageKind::Words => 0,
         MessageKind::EffectNotMade { .. }
+        | MessageKind::FinishRequested { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::Met { .. }
         | MessageKind::ProposalDecision { .. }
@@ -47,6 +48,7 @@ fn rule(domain: &Domain, number: u64, word: &Word) -> WakeRule {
             Party::Task(_) | Party::Deployment { .. } => task.wake.words,
         },
         MessageKind::EffectNotMade { .. }
+        | MessageKind::FinishRequested { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::Met { .. }
         | MessageKind::ProposalDecision { .. }
@@ -169,6 +171,7 @@ pub(crate) fn after_message(
             MessageKind::News { .. } | MessageKind::PersonStalled { .. } => rule(domain, number, &word),
             MessageKind::EffectNotMade { .. }
             | MessageKind::Words
+            | MessageKind::FinishRequested { .. }
             | MessageKind::Amendment { .. }
             | MessageKind::Met { .. }
             | MessageKind::ProposalDecision { .. }

@@ -48,7 +48,7 @@ fn the_accounts_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_tasks_familys_code_and_goldens_have_no_drift() {
-    check("tasks", 8);
+    check("tasks", 9);
 }
 
 #[test]

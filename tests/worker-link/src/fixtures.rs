@@ -116,7 +116,7 @@ pub const TOKEN_TWO: &[u8] = b"app-access";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
 #[must_use]
-pub fn codec() -> wire::v8::Limits {
+pub fn codec() -> wire::v9::Limits {
     wire::sizes::limits(&SIZES).expect("small codec limits")
 }
 #[must_use]
@@ -253,7 +253,12 @@ pub fn assignment_record(transcript: Box<[u8]>) -> wire::Assignment {
         .push(
             wire::Message::new(
                 &limits,
-                wire::MessageParts { name: 5, sender: b"sender".as_slice().into(), words: b"words".as_slice().into() },
+                wire::MessageParts {
+                    name: 5,
+                    sender: b"sender".as_slice().into(),
+                    words: b"words".as_slice().into(),
+                    finish_requested: false,
+                },
             )
             .expect("message"),
         )
@@ -328,6 +333,7 @@ pub fn down_frames() -> Vec<skein_channel::Frame> {
             name: 6,
             sender: b"sender".as_slice().into(),
             words: b"later".as_slice().into(),
+            finish_requested: false,
         },
     )
     .expect("message");
@@ -441,6 +447,7 @@ pub fn assignment() -> host::Assignment {
             name: Token::new(5),
             sender: b"sender".as_slice().into(),
             words: b"words".as_slice().into(),
+            finish_requested: false,
         }]),
     }
 }

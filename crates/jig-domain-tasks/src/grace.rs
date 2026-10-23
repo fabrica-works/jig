@@ -72,7 +72,7 @@ pub(crate) fn check_finish(
     let word = Word {
         number: message,
         from: by,
-        kind: MessageKind::Amendment { revision },
+        kind: MessageKind::FinishRequested { revision },
         words: words.into(),
         at: env.wall,
         hits: 1,

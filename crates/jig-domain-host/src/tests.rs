@@ -359,6 +359,35 @@ fn cancelling_a_preparing_run_waits_for_the_workspace_terminal() {
 }
 
 #[test]
+fn held_finish_messages_reach_the_agent_after_start() {
+    for finish_requested in [false, true] {
+        let mut h = Harness::new();
+        let (owner, workspace) = h.assign(1);
+        let name = Token::new(42);
+        h.step(Event::Down(LinkDown::Message {
+            run: Token::new(1),
+            attempt: Token::new(1001),
+            name,
+            sender: Box::from(b"requester".as_slice()),
+            words: Box::from(b"wrap up".as_slice()),
+            finish_requested,
+        }));
+        h.step(Event::Prepared { owner, workspace });
+        let agent = Token::new(301);
+        assert_eq!(
+            &*h.step(Event::Started { owner, agent }),
+            &[Request::Message {
+                agent,
+                name,
+                sender: Box::from(b"requester".as_slice()),
+                words: Box::from(b"wrap up".as_slice()),
+                finish_requested,
+            }]
+        );
+    }
+}
+
+#[test]
 fn messages_held_during_a_failed_prepare_are_returned_by_name() {
     let mut h = Harness::new();
     let (owner, _) = h.assign(1);
@@ -445,7 +474,7 @@ mod fixtures {
         })
     }
     pub fn inbound(run: Token, attempt: Token, name: Token, words: Box<[u8]>) -> Event {
-        Event::Down(LinkDown::Message { run, attempt, name, sender: Box::new([]), words })
+        Event::Down(LinkDown::Message { run, attempt, name, sender: Box::new([]), words, finish_requested: false })
     }
     pub fn called(owner: Token, call: Token, ask: Ask) -> Event {
         Event::Called { owner, call: Box::from(call.raw().to_be_bytes()), ask }

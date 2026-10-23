@@ -52,8 +52,9 @@ fn arbitrary(seed: u64, check: fn(&[u8])) {
 }
 fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
     let version = match family {
-        "core" => "v4",
-        "tasks" | "people" => "v7",
+        "core" => "v5",
+        "tasks" => "v9",
+        "people" => "v8",
         "component" => "v2",
         _ => "v1",
     };
@@ -109,8 +110,8 @@ fn mutated_accounts_goldens_never_panic() {
 }
 
 fn tasks(bytes: &[u8]) {
-    use jig_protocol_store::tasks_v8;
-    if let Ok(row) = tasks_v8::Row::decode(&tasks_v8::CEILINGS, &mut Reader::new(bytes)) {
+    use jig_protocol_store::tasks_v9;
+    if let Ok(row) = tasks_v9::Row::decode(&tasks_v9::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -160,10 +161,10 @@ fn mutated_core_goldens_never_panic() {
 }
 
 fn frames(bytes: &[u8]) {
-    use jig_protocol_store::{codec, core_v5, notes_v1, tasks_v8, transcripts::frame};
+    use jig_protocol_store::{codec, core_v5, notes_v1, tasks_v9, transcripts::frame};
     let limits = codec::Limits {
         core: core_v5::CEILINGS,
-        tasks: tasks_v8::CEILINGS,
+        tasks: tasks_v9::CEILINGS,
         people: people_v8::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
@@ -177,10 +178,10 @@ fn arbitrary_frames_never_panic_and_round_trip_when_they_decode() {
 }
 #[test]
 fn mutated_and_short_frames_never_panic() {
-    use jig_protocol_store::{codec, core_v5, notes_v1, tasks_v8, transcripts::frame};
+    use jig_protocol_store::{codec, core_v5, notes_v1, tasks_v9, transcripts::frame};
     let limits = codec::Limits {
         core: core_v5::CEILINGS,
-        tasks: tasks_v8::CEILINGS,
+        tasks: tasks_v9::CEILINGS,
         people: people_v8::CEILINGS,
         notes: notes_v1::CEILINGS,
     };

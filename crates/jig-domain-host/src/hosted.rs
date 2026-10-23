@@ -85,6 +85,7 @@ pub(crate) struct NamedEvent {
     pub(crate) name: Token,
     event: Box<[u8]>,
     sender: Option<Box<[u8]>>,
+    finish_requested: bool,
 }
 
 #[derive(Debug)]
@@ -253,9 +254,17 @@ pub(crate) fn inbound(
     name: Token,
     sender: Box<[u8]>,
     words: Box<[u8]>,
+    finish_requested: bool,
     out: &mut Queue<Request>,
 ) {
-    inbound_named(domain, env, run, attempt, NamedEvent { name, event: words, sender: Some(sender) }, out);
+    inbound_named(
+        domain,
+        env,
+        run,
+        attempt,
+        NamedEvent { name, event: words, sender: Some(sender), finish_requested },
+        out,
+    );
 }
 
 fn inbound_named(
@@ -1034,7 +1043,13 @@ fn answer(
 
 fn deliver_message(agent: Token, message: NamedEvent, out: &mut Queue<Request>) {
     match message.sender {
-        Some(sender) => out.push(Request::Message { agent, name: message.name, sender, words: message.event }),
+        Some(sender) => out.push(Request::Message {
+            agent,
+            name: message.name,
+            sender,
+            words: message.event,
+            finish_requested: message.finish_requested,
+        }),
         None => unreachable!("every held message retains its sender label"),
     }
 }

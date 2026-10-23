@@ -138,7 +138,9 @@ The opening is skein's (skein's `channel.md`, section 5): `Open` from the
 worker, `Accept` or `Refuse` from the engine, then each side's `Terms`.
 
 - **The magic** names jig's channel; the schema gives its four bytes.
-- **One version at a time.** jig's worker channel speaks version 8.
+- **One version at a time.** jig's worker channel speaks version 9.
+  Its messages, live and carried in an assignment, include the boolean
+  `finish_requested` (version 9; `../domain/hosts.md`, section 9).
   Its assignment carries the ask for live content and its fact record
   a piece of it (version 8: 5.1, 5.2 and 6.4); a run's typed failure
   may name the configured bound it exceeded (version 7:

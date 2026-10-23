@@ -284,6 +284,7 @@ pub fn channel_records() -> Box<[(crate::Delivery, host::LinkDown)]> {
                 name: Token::new(7),
                 sender: b"8".as_slice().into(),
                 words: b"Proposal accepted 9:\nHello".as_slice().into(),
+                finish_requested: false,
             },
         ))
         .expect("seven complete records");

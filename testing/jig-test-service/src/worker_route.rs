@@ -166,7 +166,12 @@ pub(super) fn decode(run: Token, source: hub::Start, agent: &crate::Agent) -> Re
     let mut messages = List::with_capacity(u32::try_from(source.messages.len()).or(Err(Invalid::Charter))?);
     for message in source.messages {
         messages
-            .push(smith::Message { name: message.name, label: message.sender, text: message.words })
+            .push(smith::Message {
+                name: message.name,
+                label: message.sender,
+                text: message.words,
+                finish_requested: message.finish_requested,
+            })
             .expect("inbox count");
     }
     let mut grants = List::with_capacity(u32::try_from(source.grants.len()).or(Err(Invalid::Charter))?);

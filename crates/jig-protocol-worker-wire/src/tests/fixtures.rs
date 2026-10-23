@@ -1,6 +1,6 @@
 use crate::{
     Bounds, BoundsParts, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,
-    ModelBoundParts, Phase, v8,
+    ModelBoundParts, Phase, v9,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Secret, Writer};
@@ -9,7 +9,7 @@ pub const WORKER_A: &[u8] = b"worker-a";
 pub const WORKER_B: &[u8] = b"worker-b";
 pub const MODEL_SMALL: &[u8] = b"small";
 
-pub const LIMITS: v8::Limits = v8::Limits {
+pub const LIMITS: v9::Limits = v9::Limits {
     input_call_id: 256,
     input_call_tool: 64,
     piece_bytes: 32,
@@ -26,7 +26,7 @@ pub const LIMITS: v8::Limits = v8::Limits {
     credential_secret: 32,
     model_bound_name: 16,
     bounds_models: 2,
-    bounds_program_endpoints: v8::CEILINGS.bounds_program_endpoints,
+    bounds_program_endpoints: v9::CEILINGS.bounds_program_endpoints,
     hello_workstreams: 2,
     hello_hosting: 2,
     turn_refused: 2,
@@ -84,8 +84,8 @@ pub fn hello_fullest() -> Hello {
     let mut models = List::with_capacity(2);
     models.push(model()).expect("first model slot");
     models.push(model()).expect("second model slot");
-    let mut program_endpoints = List::with_capacity(v8::CEILINGS.bounds_program_endpoints);
-    for endpoint in 0..v8::CEILINGS.bounds_program_endpoints {
+    let mut program_endpoints = List::with_capacity(v9::CEILINGS.bounds_program_endpoints);
+    for endpoint in 0..v9::CEILINGS.bounds_program_endpoints {
         program_endpoints.push(endpoint).unwrap();
     }
     let bounds = Bounds::new(
@@ -247,7 +247,7 @@ pub fn grant(value: crate::GrantValue, number: u32, generation: u64) -> crate::G
         .expect("grant within small limits")
 }
 
-pub fn granted_key(limits: &v8::Limits, key: &[u8]) -> crate::Granted {
+pub fn granted_key(limits: &v9::Limits, key: &[u8]) -> crate::Granted {
     let value = crate::CredentialValue::new(
         limits,
         crate::CredentialValueParts { scheme: crate::Scheme::Key, bytes: Secret::new(key.into()) },
@@ -269,7 +269,12 @@ pub fn granted_key(limits: &v8::Limits, key: &[u8]) -> crate::Granted {
 fn start_message(name: u64) -> crate::Message {
     crate::Message::new(
         &LIMITS,
-        crate::MessageParts { name, sender: b"person".as_slice().into(), words: b"message".as_slice().into() },
+        crate::MessageParts {
+            name,
+            sender: b"person".as_slice().into(),
+            words: b"message".as_slice().into(),
+            finish_requested: name == MESSAGE_SECOND,
+        },
     )
     .expect("start message")
 }
@@ -395,7 +400,7 @@ pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
     facts: 4470,
 };
 
-fn one_slot_limits() -> v8::Limits {
+fn one_slot_limits() -> v9::Limits {
     crate::sizes::limits(&SIZES_ONE_SLOT).expect("small size bounds")
 }
 
@@ -423,7 +428,7 @@ pub fn fullest_turn() -> crate::Turn {
     .expect("full turn")
 }
 
-fn fullest_call(limits: &v8::Limits) -> crate::AnsweredCall {
+fn fullest_call(limits: &v9::Limits) -> crate::AnsweredCall {
     let answer = crate::HostAnswer::new(limits, crate::HostAnswerParts { error: true, body: full_bytes() })
         .expect("full host answer");
     crate::AnsweredCall::new(
@@ -433,7 +438,7 @@ fn fullest_call(limits: &v8::Limits) -> crate::AnsweredCall {
     .expect("full answered call")
 }
 
-fn fullest_grants(limits: &v8::Limits) -> List<crate::Grant> {
+fn fullest_grants(limits: &v9::Limits) -> List<crate::Grant> {
     let mut grants = List::with_capacity(2);
     for number in [5, 6] {
         let mut name =
@@ -464,7 +469,12 @@ pub fn fullest_assignment() -> crate::Assignment {
         .push(
             crate::Message::new(
                 &limits,
-                crate::MessageParts { name: MESSAGE_FIRST, sender: full_bytes(), words: full_bytes() },
+                crate::MessageParts {
+                    name: MESSAGE_FIRST,
+                    sender: full_bytes(),
+                    words: full_bytes(),
+                    finish_requested: false,
+                },
             )
             .expect("full message"),
         )

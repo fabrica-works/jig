@@ -652,6 +652,7 @@ fn object(
                     | tasks::MessageKind::Answer { .. }
                     | tasks::MessageKind::EffectNotMade { .. }
                     | tasks::MessageKind::Met { .. }
+                    | tasks::MessageKind::FinishRequested { .. }
                     | tasks::MessageKind::Amendment { .. }
                     | tasks::MessageKind::Proposal { .. }
                     | tasks::MessageKind::ProposalDecision { .. }

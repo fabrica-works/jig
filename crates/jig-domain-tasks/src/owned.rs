@@ -230,6 +230,7 @@ fn kind_bytes(kind: &crate::MessageKind) -> Option<u64> {
         | crate::MessageKind::ProposalDecision { .. }
         | crate::MessageKind::Words
         | crate::MessageKind::EffectNotMade { .. }
+        | crate::MessageKind::FinishRequested { .. }
         | crate::MessageKind::Amendment { .. }
         | crate::MessageKind::Met { .. }
         | crate::MessageKind::Question
@@ -259,6 +260,7 @@ fn word_bytes(word: &crate::Word) -> Option<u64> {
         | crate::MessageKind::ProposalDecision { .. }
         | crate::MessageKind::Words
         | crate::MessageKind::EffectNotMade { .. }
+        | crate::MessageKind::FinishRequested { .. }
         | crate::MessageKind::Amendment { .. }
         | crate::MessageKind::Met { .. }
         | crate::MessageKind::Question

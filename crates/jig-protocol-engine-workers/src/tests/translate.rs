@@ -196,7 +196,7 @@ fn down(record: jig_domain_host::LinkDown) -> translate::Down {
     };
     translated.expect("complete output")
 }
-fn codec() -> jig_protocol_worker_wire::v8::Limits {
+fn codec() -> jig_protocol_worker_wire::v9::Limits {
     jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).expect("small codec")
 }
 fn assignment_output() -> jig_domain_host::LinkDown {
@@ -221,6 +221,7 @@ fn an_assignment_keeps_its_start_messages_and_identity() {
     assert_eq!(message.name(), 8);
     assert_eq!(message.sender(), b"sender");
     assert_eq!(message.words(), b"message");
+    assert!(message.finish_requested());
 }
 #[test]
 fn an_assignments_items_come_from_their_part() {
@@ -385,18 +386,22 @@ fn an_assignments_committed_call_keeps_its_answer() {
 
 #[test]
 fn a_message_record_keeps_its_name_sender_and_words() {
-    let translate::Down::Message(record) = down(jig_domain_host::LinkDown::Message {
-        run: Token::new(7),
-        attempt: Token::new(2),
-        name: Token::new(8),
-        sender: Box::from(b"sender".as_slice()),
-        words: Box::from(b"message".as_slice()),
-    }) else {
-        panic!("message");
-    };
-    assert_eq!((record.task(), record.attempt(), record.name()), (7, 2, 8));
-    assert_eq!(record.sender(), b"sender");
-    assert_eq!(record.words(), b"message");
+    for finish_requested in [false, true] {
+        let translate::Down::Message(record) = down(jig_domain_host::LinkDown::Message {
+            run: Token::new(7),
+            attempt: Token::new(2),
+            name: Token::new(8),
+            sender: Box::from(b"sender".as_slice()),
+            words: Box::from(b"message".as_slice()),
+            finish_requested,
+        }) else {
+            panic!("message");
+        };
+        assert_eq!((record.task(), record.attempt(), record.name()), (7, 2, 8));
+        assert_eq!(record.sender(), b"sender");
+        assert_eq!(record.words(), b"message");
+        assert_eq!(record.finish_requested(), finish_requested);
+    }
 }
 #[test]
 fn a_relayed_answer_keeps_its_text_and_error() {

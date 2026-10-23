@@ -103,6 +103,7 @@ pub(crate) fn message(task: &mut TaskRecord, word: &Word, bound: u32, out: &mut 
         | MessageKind::Escalation { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::ProposalDecision { .. }
+        | MessageKind::FinishRequested { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::Met { .. }
         | MessageKind::Notice { .. }

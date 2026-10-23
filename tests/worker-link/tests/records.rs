@@ -150,7 +150,7 @@ fn a_transcript_piece_that_does_not_split_is_refused_as_invalid() {
     }
 }
 
-fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v8::Limits) {
+fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v9::Limits) {
     let turn = wire::Turn::decode(limits, &mut Reader::new(&records[1].body)).expect("turn");
     assert_eq!(
         (turn.task(), turn.attempt(), turn.number(), turn.spent(), *turn.read(), turn.opens_window(), turn.body()),
@@ -217,7 +217,8 @@ fn check_down_records(world: &World, records: &[&host::LinkDown]) {
             attempt: Token::new(2),
             name: Token::new(6),
             sender: b"sender".as_slice().into(),
-            words: b"later".as_slice().into()
+            words: b"later".as_slice().into(),
+            finish_requested: false
         }
     );
     assert_eq!(*records[2], host::LinkDown::TurnKept { run: Token::new(7), attempt: Token::new(2), turn: 1 });

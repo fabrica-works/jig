@@ -83,6 +83,7 @@ impl CompoundTask<'_> {
                 | crate::MessageKind::Words
                 | crate::MessageKind::Proposal { .. }
                 | crate::MessageKind::Escalation { .. }
+                | crate::MessageKind::FinishRequested { .. }
                 | crate::MessageKind::Amendment { .. }
                 | crate::MessageKind::Met { .. }
                 | crate::MessageKind::ProposalDecision { .. }

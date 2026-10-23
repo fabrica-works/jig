@@ -9,7 +9,7 @@ pub enum LinkDown {
     Check { name: SourceName },
     SignOut { name: SourceName },
     Assign { assignment: Assignment },
-    Message { run: Token, attempt: Token, name: Token, sender: Box<[u8]>, words: Box<[u8]> },
+    Message { run: Token, attempt: Token, name: Token, sender: Box<[u8]>, words: Box<[u8]>, finish_requested: bool },
     Relayed { run: Token, attempt: Token, call: Box<[u8]>, answer: Relayed },
     TurnKept { run: Token, attempt: Token, turn: u32 },
     Acknowledge { run: Token, attempt: Token },

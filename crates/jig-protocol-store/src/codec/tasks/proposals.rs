@@ -1,6 +1,6 @@
 //! Proposals and immutable task history (protocol/store.md, 5.1, None).
 use super::{phase, value};
-use crate::tasks_v8 as wire;
+use crate::tasks_v9 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};

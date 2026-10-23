@@ -1,6 +1,6 @@
 //! Durable task values translated exhaustively (protocol/store.md, 5.1).
 use super::{proposals, value};
-use crate::tasks_v8 as wire;
+use crate::tasks_v9 as wire;
 use jig_domain_tasks as domain;
 use skein_lib::Wall;
 
@@ -134,6 +134,9 @@ pub fn message_kind(source: &domain::MessageKind, limits: &wire::Limits) -> Resu
             limits,
             wire::AmendmentMessageParts { revision: *revision },
         )?),
+        domain::MessageKind::FinishRequested { revision } => wire::MessageKind::FinishRequested(
+            wire::AmendmentMessage::new(limits, wire::AmendmentMessageParts { revision: *revision })?,
+        ),
         domain::MessageKind::Met { dependency, removed } => wire::MessageKind::Met(wire::MetMessage::new(
             limits,
             wire::MetMessageParts { dependency: *dependency, removed: *removed },
@@ -197,6 +200,10 @@ pub fn read_message_kind(
         wire::MessageKind::Amendment(source) => {
             let wire::AmendmentMessageParts { revision } = source.into_parts();
             domain::MessageKind::Amendment { revision }
+        }
+        wire::MessageKind::FinishRequested(source) => {
+            let wire::AmendmentMessageParts { revision } = source.into_parts();
+            domain::MessageKind::FinishRequested { revision }
         }
         wire::MessageKind::Met(source) => {
             let wire::MetMessageParts { dependency, removed } = source.into_parts();

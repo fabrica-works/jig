@@ -1,4 +1,4 @@
-family jig-worker-wire 8
+family jig-worker-wire 9
 
 # The worker's credential (protocol/channel.md, 4.1).
 record Credential { name: text 256 secret: secret 1024 payload: u32 }
@@ -99,7 +99,7 @@ record Limited { task: u64 attempt: u64 account: u32 reset: option duration }
 record AccountRefused { task: u64 attempt: u64 account: u32 code: text 128 reason: text 512 }
 
 # Engine-to-worker records (protocol/channel.md, 5.2, 7 and 8).
-record Message { name: u64 sender: text 1024 words: text 1048576 }
+record Message { name: u64 sender: text 1024 words: text 1048576 finish_requested: bool }
 record Workspace { workstream: u64 items: bytes 1048576 }
 record HostAnswer { error: bool body: bytes 1048576 }
 enum DeliveryOutcome { delivered, nothing, stale, refused, failed }
@@ -127,7 +127,7 @@ record Assignment {
     messages: list 1024 Message
     grants: list 64 Grant
 }
-record Inbound { task: u64 attempt: u64 name: u64 sender: text 1024 words: text 1048576 }
+record Inbound { task: u64 attempt: u64 name: u64 sender: text 1024 words: text 1048576 finish_requested: bool }
 record RelayText { error: bool text: bytes 1048576 }
 enum RelayAnswer { text: RelayText, busy }
 record Relayed { task: u64 attempt: u64 name: bytes 64 answer: RelayAnswer }

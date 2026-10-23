@@ -96,6 +96,8 @@ pub enum MessageKind {
     EffectNotMade { entry: u64 },
     /// Latest committed amendment, always waking and merging by task.
     Amendment { revision: u64 },
+    /// A cancel grace asks its executor to finish, in its own reserved slot.
+    FinishRequested { revision: u64 },
     /// A bounded question for which the sender keeps answer room.
     Question,
     /// Answer to a named question previously asked of this sender.
@@ -159,6 +161,28 @@ pub struct Word {
 }
 
 impl Word {
+    /// Whether this message asks an agent to finish (domain/hosts.md, section 9).
+    #[must_use]
+    pub fn finish_requested(&self) -> bool {
+        match self.kind {
+            MessageKind::FinishRequested { .. } => true,
+            MessageKind::Escalation { .. }
+            | MessageKind::Proposal { .. }
+            | MessageKind::PersonStalled { .. }
+            | MessageKind::ProposalDecision { .. }
+            | MessageKind::Words
+            | MessageKind::EffectNotMade { .. }
+            | MessageKind::Amendment { .. }
+            | MessageKind::Question
+            | MessageKind::Answer { .. }
+            | MessageKind::Notice { .. }
+            | MessageKind::Timer { .. }
+            | MessageKind::News { .. }
+            | MessageKind::Result(_)
+            | MessageKind::Met { .. } => false,
+        }
+    }
+
     /// Whole admitted payload, including the opaque state of an approval result.
     #[must_use]
     pub fn payload_bytes(&self) -> Option<usize> {
@@ -181,6 +205,7 @@ impl Word {
             | MessageKind::ProposalDecision { .. }
             | MessageKind::Words
             | MessageKind::EffectNotMade { .. }
+            | MessageKind::FinishRequested { .. }
             | MessageKind::Amendment { .. }
             | MessageKind::Met { .. }
             | MessageKind::Question

@@ -108,6 +108,7 @@ pub(crate) fn assignment(
             .push(host::StartMessage {
                 name: Token::new(word.number),
                 sender: sender(word.from),
+                finish_requested: word.finish_requested(),
                 words: jig_protocol_tools::words(&word),
             })
             .ok()?;

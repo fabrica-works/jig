@@ -54,6 +54,7 @@ pub struct RelayedCall {
 
 /// The message the scripted agent received from the host.
 pub struct ReceivedMessage {
+    pub finish_requested: bool,
     pub name: Token,
     pub sender: Box<[u8]>,
     pub words: Box<[u8]>,
@@ -364,6 +365,7 @@ impl World {
             name,
             sender: Box::new([]),
             words: Box::from(&b"message"[..]),
+            finish_requested: false,
         }));
     }
     pub fn preparing(&mut self) {
@@ -442,12 +444,17 @@ impl World {
 
     /// The engine sends a named message with its label and words.
     pub fn message_from(&mut self) {
+        self.message_with_finish(false);
+    }
+
+    pub fn message_with_finish(&mut self, finish_requested: bool) {
         self.send(Event::Down(LinkDown::Message {
             run: RUN,
             attempt: ATTEMPT,
             name: Token::new(17),
             sender: Box::from(&b"requester"[..]),
             words: Box::from(&b"please check"[..]),
+            finish_requested,
         }));
     }
 
@@ -619,9 +626,9 @@ impl World {
                 self.answered_call = Some(call);
                 self.stats.replies += 1;
             }
-            Request::Message { agent, name, sender, words } => {
+            Request::Message { agent, name, sender, words, finish_requested } => {
                 assert_eq!(agent, AGENT);
-                self.received_message = Some(ReceivedMessage { name, sender, words });
+                self.received_message = Some(ReceivedMessage { finish_requested, name, sender, words });
             }
             Request::Start { owner, start } => {
                 self.refusals.admitted(owner, RUN, ATTEMPT);

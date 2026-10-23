@@ -287,8 +287,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             LinkDown::Sources { sources } => crate::sources::replace(&mut domain.sources, env, sources, out),
             LinkDown::Check { name } => crate::sources::check(&mut domain.sources, env, name, out),
             LinkDown::SignOut { name } => crate::sources::sign_out(&mut domain.sources, env, name, out),
-            LinkDown::Message { run, attempt, name, sender, words } => {
-                hosted::inbound(domain, env, run, attempt, name, sender, words, out);
+            LinkDown::Message { run, attempt, name, sender, words, finish_requested } => {
+                hosted::inbound(domain, env, run, attempt, name, sender, words, finish_requested, out);
             }
             LinkDown::Assign { assignment } => hosted::assign(domain, env, assignment, out),
             LinkDown::TurnKept { run, attempt, turn } => hosted::acknowledge_turn(domain, env, run, attempt, turn, out),

@@ -28,6 +28,17 @@ fn a_message_reaches_the_agent_with_its_label_and_words() {
     assert_eq!(message.name, Token::new(17));
     assert_eq!(&*message.sender, b"requester");
     assert_eq!(&*message.words, b"please check");
+    assert!(!message.finish_requested);
+}
+
+#[test]
+fn a_finish_request_reaches_the_live_agent() {
+    let mut world = World::new();
+    world.assign_conversation(Box::new([]), Box::new([]));
+    world.message_with_finish(true);
+    let message = world.received_message().expect("finish request delivered");
+    assert!(message.finish_requested);
+    assert_eq!(&*message.words, b"please check");
 }
 
 #[test]
@@ -232,11 +243,13 @@ fn a_start_carries_its_messages_before_any_later_message() {
             name: Token::new(5),
             sender: Box::from(&b"person"[..]),
             words: Box::from(&b"first"[..]),
+            finish_requested: false,
         },
         jig_domain_host::StartMessage {
             name: Token::new(6),
             sender: Box::from(&b"person"[..]),
             words: Box::from(&b"second"[..]),
+            finish_requested: true,
         },
     ]);
     world.assign_start([0; 16], messages);
@@ -246,6 +259,8 @@ fn a_start_carries_its_messages_before_any_later_message() {
     assert_eq!(&*start.messages[0].words, b"first");
     assert_eq!(start.messages[1].name, Token::new(6));
     assert_eq!(&*start.messages[1].words, b"second");
+    assert!(!start.messages[0].finish_requested);
+    assert!(start.messages[1].finish_requested);
     assert!(world.received_message().is_none());
     world.message_from();
     assert_eq!(world.received_message().expect("later message").name, Token::new(17));
@@ -263,7 +278,12 @@ fn a_start_carries_its_identity_unchanged() {
 fn a_start_beyond_the_inbox_is_refused_as_invalid_messages() {
     let mut world = World::new();
     let messages = (1..=5)
-        .map(|name| jig_domain_host::StartMessage { name: Token::new(name), sender: Box::new([]), words: Box::new([]) })
+        .map(|name| jig_domain_host::StartMessage {
+            name: Token::new(name),
+            sender: Box::new([]),
+            words: Box::new([]),
+            finish_requested: false,
+        })
         .collect();
     world.assign_start([0; 16], messages);
     assert!(world.started_state().is_none());
@@ -277,8 +297,12 @@ fn a_start_beyond_the_inbox_is_refused_as_invalid_messages() {
 #[test]
 fn a_start_message_beyond_the_byte_bound_is_refused() {
     let mut world = World::new();
-    let message =
-        jig_domain_host::StartMessage { name: Token::new(5), sender: Box::from([1; 32]), words: Box::from([2; 33]) };
+    let message = jig_domain_host::StartMessage {
+        name: Token::new(5),
+        sender: Box::from([1; 32]),
+        words: Box::from([2; 33]),
+        finish_requested: false,
+    };
     world.assign_start([0; 16], Box::new([message]));
     assert!(world.started_state().is_none());
     assert_eq!(

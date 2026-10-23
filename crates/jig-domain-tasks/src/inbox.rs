@@ -31,7 +31,8 @@ fn merge_key(kind: &MessageKind) -> Option<(u8, u64)> {
         | MessageKind::News { subscription, .. } => Some((1, *subscription)),
         MessageKind::Amendment { .. } => Some((0, 0)),
         MessageKind::Met { .. } => Some((2, 0)),
-        MessageKind::EffectNotMade { .. }
+        MessageKind::FinishRequested { .. }
+        | MessageKind::EffectNotMade { .. }
         | MessageKind::Words
         | MessageKind::Question
         | MessageKind::Answer { .. }
@@ -124,6 +125,7 @@ pub(crate) fn prepare_staged(
                 | MessageKind::Result(_)
                 | MessageKind::Notice { .. }
                 | MessageKind::Timer { .. }
+                | MessageKind::FinishRequested { .. }
                 | MessageKind::Amendment { .. }
                 | MessageKind::Met { .. }
                 | MessageKind::News { class: NewsClass::Kept | NewsClass::Dropped, .. } => {}
@@ -179,7 +181,7 @@ fn room_staged(
     let mut extra_bytes = 0_usize;
     for word in record.inbox {
         match word.kind {
-            MessageKind::Amendment { .. } | MessageKind::Met { .. } => {
+            MessageKind::Amendment { .. } | MessageKind::FinishRequested { .. } | MessageKind::Met { .. } => {
                 extra_count = extra_count.checked_add(1).expect("bounded merged slots");
                 extra_bytes = extra_bytes.checked_add(word.words.len()).expect("bounded amendment bytes");
             }
@@ -301,6 +303,7 @@ pub(crate) fn check_message(
         MessageKind::EffectNotMade { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
+        | MessageKind::FinishRequested { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::Met { .. }
         | MessageKind::ProposalDecision { .. }
@@ -399,6 +402,7 @@ pub(crate) fn check_message(
         MessageKind::EffectNotMade { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
+        | MessageKind::FinishRequested { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::Met { .. }
         | MessageKind::ProposalDecision { .. }
@@ -514,6 +518,7 @@ pub(crate) fn delegate_result(
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::ProposalDecision { .. }
+        | MessageKind::FinishRequested { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::Met { .. }
         | MessageKind::Question

@@ -2,7 +2,7 @@ use crate::{Request, tests::fixtures, translate};
 use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Queue, Reader, Time, Token};
-fn translated(kind: u16, bytes: &[u8], limits: &wire::v8::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
+fn translated(kind: u16, bytes: &[u8], limits: &wire::v9::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
     let mut parts = List::with_capacity(1);
     let mut values = Queue::with_capacity(4);
     let down =
@@ -104,7 +104,12 @@ fn an_assignment_record_keeps_its_start_messages_in_order() {
             .push(
                 wire::Message::new(
                     &limits,
-                    wire::MessageParts { name, sender: b"sender".as_slice().into(), words: b"words".as_slice().into() },
+                    wire::MessageParts {
+                        name,
+                        sender: b"sender".as_slice().into(),
+                        words: b"words".as_slice().into(),
+                        finish_requested: name == 6,
+                    },
                 )
                 .expect("message"),
             )
@@ -119,35 +124,39 @@ fn an_assignment_record_keeps_its_start_messages_in_order() {
     let host::LinkDown::Assign { assignment } = link else { panic!("assignment") };
     let mut names = List::with_capacity(2);
     for message in assignment.messages {
-        names.push(message.name).expect("two names");
+        names.push((message.name, message.finish_requested)).expect("two names");
     }
-    assert_eq!(names.into_boxed().as_ref(), [Token::new(5), Token::new(6)]);
+    assert_eq!(names.into_boxed().as_ref(), [(Token::new(5), false), (Token::new(6), true)]);
 }
 #[test]
 fn a_message_record_becomes_the_hubs_inbound_message() {
-    let record = wire::Inbound::new(
-        &fixtures::codec(),
-        wire::InboundParts {
-            task: 7,
-            attempt: 2,
-            name: 5,
-            sender: b"sender".as_slice().into(),
-            words: b"words".as_slice().into(),
-        },
-    )
-    .expect("message");
-    let bytes = fixtures::inbound_bytes(&record);
-    let (link, _, _) = translated(0x0181, &bytes, &fixtures::codec());
-    assert_eq!(
-        link,
-        host::LinkDown::Message {
-            run: Token::new(7),
-            attempt: Token::new(2),
-            name: Token::new(5),
-            sender: b"sender".as_slice().into(),
-            words: b"words".as_slice().into()
-        }
-    );
+    for finish_requested in [false, true] {
+        let record = wire::Inbound::new(
+            &fixtures::codec(),
+            wire::InboundParts {
+                task: 7,
+                attempt: 2,
+                name: 5,
+                sender: b"sender".as_slice().into(),
+                words: b"words".as_slice().into(),
+                finish_requested,
+            },
+        )
+        .expect("message");
+        let bytes = fixtures::inbound_bytes(&record);
+        let (link, _, _) = translated(0x0181, &bytes, &fixtures::codec());
+        assert_eq!(
+            link,
+            host::LinkDown::Message {
+                run: Token::new(7),
+                attempt: Token::new(2),
+                name: Token::new(5),
+                sender: b"sender".as_slice().into(),
+                words: b"words".as_slice().into(),
+                finish_requested
+            }
+        );
+    }
 }
 #[test]
 fn a_named_part_missing_from_the_root_is_dropped() {
@@ -367,7 +376,7 @@ fn a_refused_later_program_grant_leaves_no_value_queued() {
 
 #[test]
 fn the_hosts_endpoint_cap_is_the_worker_wires_ceiling() {
-    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v8::CEILINGS.bounds_program_endpoints);
+    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v9::CEILINGS.bounds_program_endpoints);
 }
 
 fn hello_with_program_endpoints(count: u32) -> host::Hello {

@@ -4,6 +4,14 @@ Updated 2026-10-23. How far jig's code is from its design, and the
 work that takes it there. Owners keep the rows their work changes
 (skein's owners.md, 4.4).
 
+A cancel grace emits durable `FinishRequested { revision }`, translated to
+smith's finish flag live and in Start; clients still see Amendment. Tasks
+store 8 -> 9 and worker wire 8 -> 9 are incompatible. Other store families
+and client versions are unchanged. Downstream applications must repin Jig
+and Smith d9a67aca together, update live/Start translation and worker9 peers,
+and handle tasks9 format refusal under the existing store policy. Jig's
+Skein pin remains 057a415c.
+
 ## 1. Plans
 
 | Plan | State | Takes the design to | Where |

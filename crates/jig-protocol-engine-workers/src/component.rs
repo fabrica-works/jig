@@ -26,7 +26,7 @@ pub struct Component {
     pub(crate) limits: Limits,
     pub(crate) workers: Box<[Worker]>,
     pub(crate) payload: u32,
-    pub(crate) codec: wire::v8::Limits,
+    pub(crate) codec: wire::v9::Limits,
     pub(crate) connections: Map<Token, Connection>,
     schema: skein_channel::Schema,
     next_channel: u64,
