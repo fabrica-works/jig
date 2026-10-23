@@ -778,9 +778,12 @@ suite.
   - smith's facts reaching the views as activity;
   - a conversation's reply, the fake LLM's text in several held pieces,
     reaching the views from its agent process as the run's text before
-    its turn: each piece's prefix seen by the views before the next
-    hold is released, then the turn committed; and a task the
-    conversation delegates, its run not asked, giving no text;
+    its turn: each piece's prefix seen by the run's watcher before the
+    next hold is released, then the turn committed. A task the
+    conversation delegates is not asked and gives no text; no story
+    here runs a delegate, so the lower worlds check it: the core world
+    its ask, the host world the hub's fence, the reference worker's
+    step tests that an unasked run hands up no piece;
   - a run on a program source, its agent process running smith's fake
     `claude` (smith's `protocol/programs.md`, section 8) with the
     source's configuration directory: the login reported usable, not
