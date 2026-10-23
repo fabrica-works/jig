@@ -1,6 +1,6 @@
 # Agents and their hosts
 
-Provisional, 2026-10-07, revised 2026-10-21. Where an application's
+Provisional, 2026-10-07, revised 2026-10-23. Where an application's
 agents run, and what hosts them: the contract between the core and a
 host, the three shapes an application may take, the agent as a
 capability of two kinds, both smith's, jig's one host for runs wherever
@@ -558,17 +558,32 @@ Nothing decides on a fact.
   its kind: `text`, `reasoning`, or `input`, a tool call's input as it
   streams, named by the call's provider id and its tool; and the offset
   of its first byte within that retry's stream of that kind
-  (`../protocol/llm.md`, section 3). Only `text` is produced and kept
-  now: smith builds no other kind, so a host hands up none, and a piece
-  of another kind that reaches the engine is dropped where it enters,
-  counted, until the views keep it (engine.md, section 11).
+  (`../protocol/llm.md`, section 3), counted as smith counts it, in 64
+  bits, in the hub's vocabulary and on jig's channel alike. Only `text`
+  is produced and kept now: smith builds no other kind, so a host hands
+  up none. A piece of another kind that reaches the engine, and one
+  whose offset is past the 32 bits the views count, is dropped by the
+  engine's root as it hands the piece to the core, counted, until the
+  views keep it (engine.md, section 11).
 - **No piece after its turn.** A piece of a turn goes up before that
   turn's record; once the turn is sent, none of it follows, and a retry's
   content starts again at offset 0. The engine's views rely on it, and
   keep a run's text by turn, retry and offset (engine.md, section 11).
+  The hub holds to it, whatever its agent sends: it forwards a piece
+  only from the agent of its run's current attempt, while that attempt
+  is live (active or waiting), of a kind its
+  assignment asked for, within its bound on a piece's bytes, and of a
+  turn it has not yet taken from the agent; and it checks the last
+  again as the piece leaves its queue, since its root drains facts at
+  its own pace. It drops any other piece, counted apart from the pieces
+  it had no room for.
 - **Best effort, and gaps.** A piece goes up only while the link leaves
-  room for everything else, as every fact does; smith holds a bounded
-  amount of unsent content and drops the rest, counted (smith's
+  room for everything else, as every fact does. In the hub, it waits
+  with the run's activity in the same bounded queue, and takes room
+  there only while half of it is free, so that a run's text never
+  crowds out its activity; it is dropped and counted otherwise. smith
+  holds a bounded amount of unsent content and drops the rest, counted
+  (smith's
   `protocol/channel.md`, section 7). A drop shows as a gap, a piece
   whose offset is past the last one's end, which the views mark as cut.
 - **One text, whatever its host.** Above the hub, the core's views, the
@@ -635,7 +650,9 @@ reach past the grace.
   - **Up,** each turn, call name and result is encoded for the hub, and
     each of smith's channel facts is decoded into jig's typed activity
     (6.5), so the hub and jig's channel carry jig's activity, never
-    smith's facts.
+    smith's facts. Each live piece from smith's channel goes to the hub
+    as jig's typed piece, and to the agent process's watchdog as its
+    progress, as before (5.1).
 - **Who links smith:** `jig-protocol-charter` (section 8), a client's
   decoding of turns (`../client/domain/client.md`, section 10), and an
   application's roots that compose smith's agent capability, with their
@@ -882,7 +899,9 @@ committed keep their ordinary handling.
   drops, as in the engine; agent capabilities of both kinds, smith's:
   `smith-host-domain` over smith's agent processes over skein's fake LLM,
   which
-  progress, call, take turns, some opening a window, wait, park and end,
+  progress, hand up a conversation's text in pieces at their
+  assignment's ask, call, take turns, some opening a window, wait, park
+  and end,
   refuse messages and leave them unread, but also hang, crash, break
   rules and ignore cancels; and `smith-inline-agent`'s runs, smith's real
   domain over skein's fake LLM, which answer, wait, park and resume from
@@ -893,7 +912,8 @@ committed keep their ordinary handling.
   every relayed call is answered once, every message relayed ends once,
   read, refused or unread, each refusal inside a turn or answer no later
   than the first whose fence passes it, nothing touches a workspace
-  while a run's agent may, and nothing is live once it settles.
+  while a run's agent may, no piece goes up after its turn or for a kind
+  its assignment did not ask for, and nothing is live once it settles.
 - **The application's worlds** run its hosts, with its own workspace or
   none, against jig's core on the conformance world (testing.md,
   section 5).

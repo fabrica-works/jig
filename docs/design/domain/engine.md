@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-22. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-23. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -529,9 +529,11 @@ is due again once its dependencies are done.
      the run reads (7.4);
    - its **ask** for live content (`hosts.md`, section 2): `text` set when
      its task is flagged conversation (tasks.md, section 3), `reasoning`
-     and `input` never yet. The core sets it, the root copies it into the
-     assignment, and no host decides it. A task a conversation delegates
-     is not flagged, so its run is not asked (`hosts.md`, section 12);
+     and `input` never yet. The core sets it with the run's prepared
+     parts (step 2), from which the root puts the assignment together;
+     the root copies it, kind by kind, and no host decides it. A task a
+     conversation delegates is not flagged, so its run is not asked
+     (`hosts.md`, section 12);
    - its charter, in the core's terms: the task's instructions, the
      brief, the tools its authority gives, the outcome its result
      contract asks for; its budget for the run: turns, spend and time,
@@ -1057,9 +1059,12 @@ computes for them is said below (11.1 to 11.5).
   reports it for (hosts.md, 6.5), and delivered from the offset each
   watcher has; never stored, and marked provisional. The core keeps kind
   `text` only: a piece of another kind is dropped where it enters the
-  engine, by the engine's side of the workers' channel as it translates
-  the fact record (`../protocol/channel.md`, 6.4 and 10.2), and counted,
-  until the views keep it. A later retry
+  core, by the engine's root as it translates the hub's piece into the
+  core's text, and counted, until the views keep it. So is a piece whose
+  offset is past the 32 bits the views count, where a host counts
+  smith's 64 (`hosts.md`, 6.5). The protocol layer carries every kind
+  and offset as it is (`../protocol/channel.md`, 6.4), and the same root
+  route serves the engine's own hub and its workers'. A later retry
   replaces an earlier one's text; text that starts past what the views
   hold of its retry, because facts were dropped between, marks that
   turn's text cut, as text past its bound does. It decides nothing and

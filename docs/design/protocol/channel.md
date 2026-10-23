@@ -1,6 +1,6 @@
 # jig's channel
 
-Provisional, 2026-10-10, revised 2026-10-19. The channel between an
+Provisional, 2026-10-10, revised 2026-10-23. The channel between an
 engine and each of its workers: the contract of `../domain/hosts.md`,
 section 2, carried as frames of skein's framed channel (skein's
 `channel.md`) with records generated from schemas (skein's `codec.md`).
@@ -138,10 +138,12 @@ The opening is skein's (skein's `channel.md`, section 5): `Open` from the
 worker, `Accept` or `Refuse` from the engine, then each side's `Terms`.
 
 - **The magic** names jig's channel; the schema gives its four bytes.
-- **One version at a time.** jig's worker channel speaks version 6,
-  whose `GrantValue` is a credential, an application's credential or a
-  program source's name (tags 0 to 2: section 8), with no other form,
-  and which keeps the kind numbers. A worker of another version is
+- **One version at a time.** jig's worker channel speaks version 7,
+  whose assignment carries the ask for live content and whose fact
+  record a piece of it (5.1, 5.2 and 6.4), whose `GrantValue` is a
+  credential, an application's credential or a program source's name
+  (tags 0 to 2: section 8), with no other form, and which keeps the
+  kind numbers. A worker of another version is
   refused with skein's *version*, and nothing is translated (skein's
   `codec.md`, section 5). An engine and its workers are one application,
   released together.
@@ -225,7 +227,7 @@ answer, and a **notice** is not answered.
 | turn | task, attempt; its number within the attempt; its cumulative spend; the last message it read, by name, if any; the messages refused since the run's previous turn, each by name with smith's reason: too large as the run reads it, the run's inbox full, a name in use, or the run ending; whether it opens a window; its bytes, smith's (6.1) | notice, kept by the hub until acknowledged |
 | call | task, attempt; the run's name for the call, as bytes (section 7); the host tool's name; whether it writes; its input; the time left on its deadline | call |
 | answer | task, attempt; the turns it took; what it spent; the last message it read, by name, if any: the unread fence; the messages refused since the run's last turn, each by name with smith's reason, as a turn carries them; how it ended: refused (busy, or invalid and what), ended with its result, smith's bytes (6.1), parked, or failed with its typed failure and bounded detail; what it left on resources and what it saved, each the application's bytes (6.2) | answer to an assignment, kept by the hub until acknowledged; a refusal, kept by nothing (below) |
-| fact | task, attempt; activity: the run's phase, a long operation begun (checks, an LLM completion or a command, with its span) or ended, or a count from smith's channel facts (its kind, its time, its count), all jig's typed activity, never smith's bytes; or a piece of live content: its turn, retry, kind (`text`, `reasoning` or `input`) and offset, and its bytes, when the assignment asked; or, from a host that gives it, a tool begun with its call's name, its tool and its input (6.4) | notice, best effort |
+| fact | task, attempt; its value, activity or a piece (the schema's `FactValue`, so that "activity" stays the name of what carries no content): activity: the run's phase, a long operation begun (checks, an LLM completion or a command, with its span) or ended, or a count from smith's channel facts (its kind, its time, its count), all jig's typed activity, never smith's bytes; or a piece of live content: its turn, retry, kind (`text`, `reasoning` or `input`) and offset, and its bytes, when the assignment asked; or, from a host that gives it, a tool begun with its call's name, its tool and its input (6.4) | notice, best effort |
 | limited | task, attempt; an LLM account and its source; how long until it may be used again, only where its provider said | notice |
 | refused | task, attempt; an LLM account and its source; its provider's code and reason, as text within the detail's bound | notice |
 | unauthorized | task, attempt; an LLM account and its source; the generation its provider refused, or whose program login was lost | notice |
@@ -457,9 +459,10 @@ holds, and neither of its components reads them.
   6.8; smith's `protocol/channel.md`, section 4). The wire carries all
   three kinds, so that reasoning and a tool's input need no new version;
   only `text` has a producer now. A worker never sends a piece of a kind
-  its agents do not build; the engine's side drops one that arrives,
-  counted, as it translates the fact record (10.2;
-  `../domain/engine.md`, section 11).
+  its agents do not build. One that arrives crosses the engine's side as
+  it is, every field translated and nothing decided, and the engine's
+  root drops it, counted, as it hands the piece to the core
+  (`../domain/engine.md`, section 11).
 - **A tool begun with its call comes only from a host that gives it:** a
   tool begun with its call's name, its tool and its input within the
   views' bound. smith drains it only in the host's process, so a hub
@@ -468,9 +471,12 @@ holds, and neither of its components reads them.
   record. A worker whose agents are processes gives none; the views
   show its runs by their activity and their text.
 - **A piece** crosses with its turn, retry, kind and offset as
-  `../domain/hosts.md`, 6.5 names them, and its bytes; the views keep it
-  (`../domain/engine.md`, section 11). It keeps the order that section
-  gives: pieces of a turn before its turn record, none after.
+  `../domain/hosts.md`, 6.5 names them, its offset smith's 64 bits, and
+  its bytes within the sizes' bound on a piece (section 11); the views
+  keep it (`../domain/engine.md`, section 11), and the engine's root
+  drops, counted, one whose offset is past what they count. It keeps the
+  order that section gives: pieces of a turn before its turn record,
+  none after.
 - **The ask is not a flow-control matter.** A worker whose assignment
   asks for nothing sends no piece; one that asks is still best effort,
   by the rule of this section's first item.
@@ -694,8 +700,8 @@ and resends what it must after the next hello.
 - **`jig-protocol-worker-wire`'s sizes** are a plain struct of numbers,
   each taken from the domains' limits by the components that use them: the
   largest charter, transcript (the resume limit, which bounds a current
-  window), turn, message, call input, answer, result, fact, detail and
-  grant; the application's largest items, left work, saved work and
+  window), turn, message, call input, answer, result, fact, piece,
+  detail and grant; the application's largest items, left work, saved work and
   evidence, which the application's limits give; slots, calls per run,
   turns kept per run, the messages a run's inbox takes (a start's, and a
   record's refusals), the models a hello may declare, LLM accounts'
@@ -736,7 +742,9 @@ suite.
   silence, stall, the hello late, grants filled and dropped, of both
   owners and of each kind of value (a bearer, a key, a program source's
   name), sources, checks, logins and sign-outs, relays across channels,
-  and the grace passing and not. smith's
+  the ask and a piece of each kind, every field both ways, a piece
+  dropped for room counted with the facts, and the grace passing and
+  not. smith's
   payloads are opaque bytes there, as they are to the components.
   The existing worker-link incompatible-terms and malformed-body
   fixtures assert the independent literal wire reasons 2 and 3,
@@ -767,9 +775,12 @@ suite.
   - a run resumed after a compaction, sent only its current window, with
     its conversation's identity;
   - an assignment whose charter or transcript does not decode;
-  - smith's facts reaching the views as activity, and a conversation's
-    text reaching them from agent processes, by turn, retry and offset,
-    only when its assignment asked;
+  - smith's facts reaching the views as activity;
+  - a conversation's reply, the fake LLM's text in several held pieces,
+    reaching the views from its agent process as the run's text before
+    its turn: each piece's prefix seen by the views before the next
+    hold is released, then the turn committed; and a task the
+    conversation delegates, its run not asked, giving no text;
   - a run on a program source, its agent process running smith's fake
     `claude` (smith's `protocol/programs.md`, section 8) with the
     source's configuration directory: the login reported usable, not
