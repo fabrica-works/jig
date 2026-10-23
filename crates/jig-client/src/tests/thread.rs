@@ -112,6 +112,29 @@ fn a_committed_turn_replaces_its_provisional_text() {
     );
 }
 #[test]
+fn a_later_retry_replaces_the_same_provisional_turn() {
+    let mut thread = model();
+    let first = provisional(TURN, b"first");
+    let mut retry = provisional(TURN, b"replacement");
+    retry.turn.retry = 1;
+    thread.run(&run(), Some(&first));
+    thread.run(&run(), Some(&retry));
+    thread.run(&run(), Some(&first));
+    assert_eq!(thread.lines().as_slice(), &[Line::Provisional { name: retry.turn, text: b"replacement", cut: false }]);
+}
+
+#[test]
+fn a_new_attempt_clears_every_provisional_turn() {
+    let mut thread = model();
+    thread.run(&run(), Some(&provisional(TURN, b"first")));
+    thread.run(&run(), Some(&provisional(TURN + 1, b"second")));
+    let mut next = run();
+    next.attempt = Some(ATTEMPT + 1);
+    thread.run(&next, None);
+    assert!(thread.lines().is_empty());
+}
+
+#[test]
 fn a_turn_that_does_not_decode_stays_a_line_saying_why() {
     let mut thread = model();
     commit(&mut thread, TurnRead::Undecodable { why: TurnProblem::Version { found: 99 } });

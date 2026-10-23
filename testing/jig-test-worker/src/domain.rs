@@ -142,6 +142,19 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             hub(domain, env, host::Event::RelayCancelled { run, attempt, call });
         }
         Event::Process(event) => agent(domain, env, smith::Input::Process(*event)),
+        Event::Live { agent: source, piece } => {
+            let mut owner = None;
+            for (client, agent) in &domain.agents {
+                if *agent == source {
+                    owner = Some(*client);
+                    break;
+                }
+            }
+            if let Some(owner) = owner {
+                agent(domain, env, smith::Input::Process(smith::process::Event::Progress { owner: source }));
+                hub(domain, env, host::Event::Piece { owner, piece });
+            }
+        }
         Event::Decoded { agent: owner, start } => decoded(domain, env, owner, start),
         Event::Encoded { owner, encoded: value } => {
             encoded(domain, env, owner, value);

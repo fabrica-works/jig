@@ -177,7 +177,15 @@ pub(super) fn decode(run: Token, source: hub::Start, agent: &crate::Agent) -> Re
     }
     Ok(Box::new(smith::Start {
         identity: Some(smith_domain_run::Identity::new(source.identity)),
-        live: None,
+        live: if source.live == hub::LiveAsk::NONE {
+            None
+        } else {
+            Some(smith::channel::LiveAsk {
+                text: source.live.text,
+                reasoning: source.live.reasoning,
+                input: source.live.input,
+            })
+        },
         logical_run: run,
         activation: source.activation,
         workspace: source.workspace,
@@ -218,7 +226,30 @@ pub(super) fn process(event: smith_host_protocol::ProcessEvent) -> Option<jig_te
         ProcessEvent::Reaped { agent, detail } => smith::process::Event::Reaped { owner: agent, detail },
         ProcessEvent::Channel { agent, event } => match *event {
             OpenEvent::Opened { .. } | OpenEvent::WriteFailed => return None,
-            OpenEvent::Live { .. } => smith::process::Event::Progress { owner: agent },
+            OpenEvent::Live { turn, retry, kind, offset, bytes, call } => {
+                let kind = match kind {
+                    smith_channel::LiveKind::Text => {
+                        if call.is_some() {
+                            return None;
+                        }
+                        hub::LiveKind::Text
+                    }
+                    smith_channel::LiveKind::Reasoning => {
+                        if call.is_some() {
+                            return None;
+                        }
+                        hub::LiveKind::Reasoning
+                    }
+                    smith_channel::LiveKind::Input => {
+                        let call = call?.into_parts();
+                        hub::LiveKind::Input { call: call.id, tool: call.tool }
+                    }
+                };
+                return Some(jig_test_worker::Event::Live {
+                    agent,
+                    piece: hub::Piece { turn, retry, kind, offset, bytes },
+                });
+            }
             OpenEvent::Hangup { .. } => smith::process::Event::Hangup { owner: agent },
             OpenEvent::Sent { .. } => smith::process::Event::Sent { owner: agent },
             OpenEvent::Unsent { .. } => smith::process::Event::Unsent { owner: agent },
@@ -269,4 +300,106 @@ fn channel(event: smith_host_protocol::OpenEvent) -> Option<smith::Up> {
         | OpenEvent::Sent { .. }
         | OpenEvent::Unsent { .. } => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use smith_host_protocol::{OpenEvent, ProcessEvent};
+
+    const AGENT: Token = Token::new(71);
+    const RUN: Token = Token::new(43);
+    const TURN: u32 = 7;
+    const RETRY: u32 = 3;
+    // An offset wider than the core keeps must still cross this hand-out whole.
+    const OFFSET: u64 = 1_u64 << 32;
+
+    fn call() -> smith_channel::LiveCall {
+        smith_channel::LiveCall::new(
+            &smith_channel::CEILINGS,
+            smith_channel::LiveCallParts { id: b"provider-call".as_slice().into(), tool: b"tool".as_slice().into() },
+        )
+        .expect("bounded call")
+    }
+
+    fn live(kind: smith_channel::LiveKind, call: Option<smith_channel::LiveCall>) -> ProcessEvent {
+        ProcessEvent::Channel {
+            agent: AGENT,
+            event: Box::new(OpenEvent::Live {
+                turn: TURN,
+                retry: RETRY,
+                kind,
+                offset: OFFSET,
+                bytes: b"piece".as_slice().into(),
+                call,
+            }),
+        }
+    }
+
+    #[test]
+    fn each_live_kind_keeps_every_field() {
+        for (kind, call, expected) in [
+            (smith_channel::LiveKind::Text, None, hub::LiveKind::Text),
+            (smith_channel::LiveKind::Reasoning, None, hub::LiveKind::Reasoning),
+            (
+                smith_channel::LiveKind::Input,
+                Some(call()),
+                hub::LiveKind::Input { call: b"provider-call".as_slice().into(), tool: b"tool".as_slice().into() },
+            ),
+        ] {
+            assert_eq!(
+                process(live(kind, call)),
+                Some(jig_test_worker::Event::Live {
+                    agent: AGENT,
+                    piece: hub::Piece {
+                        turn: TURN,
+                        retry: RETRY,
+                        kind: expected,
+                        offset: OFFSET,
+                        bytes: b"piece".as_slice().into()
+                    },
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn a_live_kind_disagreeing_with_its_call_is_dropped() {
+        for (kind, call) in [
+            (smith_channel::LiveKind::Text, Some(call())),
+            (smith_channel::LiveKind::Reasoning, Some(call())),
+            (smith_channel::LiveKind::Input, None),
+        ] {
+            assert_eq!(process(live(kind, call)), None);
+        }
+    }
+
+    #[test]
+    fn the_start_passes_each_ask_and_omits_an_empty_one() {
+        let agent = crate::tests::fixtures::agent();
+        for text in [false, true] {
+            for reasoning in [false, true] {
+                for input in [false, true] {
+                    let hub::LinkDown::Assign { assignment } = crate::tests::fixtures::worker_assignment() else {
+                        panic!("fixture assignment")
+                    };
+                    let source = hub::Start {
+                        live: hub::LiveAsk { text, reasoning, input },
+                        workspace: None,
+                        charter: assignment.assignment.charter,
+                        activation: 1,
+                        identity: assignment.assignment.identity,
+                        turns: Box::new([]),
+                        answered: Box::new([]),
+                        messages: Box::new([]),
+                        grants: Box::new([]),
+                    };
+                    assert_eq!(
+                        decode(RUN, source, &agent).expect("decoded fixture").live,
+                        (text || reasoning || input).then_some(smith::channel::LiveAsk { text, reasoning, input })
+                    );
+                }
+            }
+        }
+    }
 }

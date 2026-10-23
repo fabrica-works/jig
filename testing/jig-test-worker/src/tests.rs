@@ -107,6 +107,40 @@ fn a_channel_fact_reaches_the_hub_as_activity() {
     );
 }
 
+fn live_piece() -> host::Piece {
+    host::Piece { turn: 1, retry: 2, kind: host::LiveKind::Text, offset: 7, bytes: Box::from(&b"reply"[..]) }
+}
+
+#[test]
+fn a_live_piece_reaches_the_hub_and_refreshes_progress() {
+    let mut worker = Worker::asking(Box::new([]), host::LiveAsk { text: true, reasoning: false, input: false });
+    let before = worker.domain.next_deadline().expect("watchdog armed");
+    worker.env.now = skein_lib::Time::ZERO.saturating_add(skein_lib::Duration::from_secs(1));
+    worker.step(Event::Live { agent: worker.process, piece: live_piece() });
+    assert_eq!(
+        link_notice(&mut worker),
+        Some(host::LinkUp::Piece { run: fixtures::RUN, attempt: fixtures::ATTEMPT, piece: live_piece() })
+    );
+    assert_eq!(worker.domain.next_deadline(), Some(before.saturating_add(skein_lib::Duration::from_secs(1))));
+}
+
+#[test]
+fn a_live_piece_for_an_unknown_agent_goes_nowhere() {
+    let mut worker = Worker::started();
+    let before = worker.domain.next_deadline();
+    worker.env.now = skein_lib::Time::ZERO.saturating_add(skein_lib::Duration::from_secs(1));
+    worker.step(Event::Live { agent: skein_lib::Token::new(u64::MAX), piece: live_piece() });
+    assert!(worker.out.is_empty());
+    assert_eq!(worker.domain.next_deadline(), before);
+}
+
+#[test]
+fn an_unasked_run_gives_no_live_piece() {
+    let mut worker = Worker::started();
+    worker.step(Event::Live { agent: worker.process, piece: live_piece() });
+    assert_eq!(link_notice(&mut worker), None);
+}
+
 #[test]
 fn a_deliver_is_answered_with_its_title_and_body() {
     let mut worker = Worker::started();
