@@ -13,7 +13,7 @@ pub use directories::{Directories, Directory};
 mod domain;
 mod projects;
 pub use domain::{Deployment, Provider, ProviderKind};
-pub use projects::Project;
+pub use projects::{Policy, Project};
 mod check;
 mod worker;
 pub use worker::{Agent, Graces, Worker, stop_bound, worker};
@@ -48,6 +48,7 @@ pub struct Engine {
     pub providers: Box<[Provider]>,
     pub rules: jig_domain_authority::Rules,
     pub projects: Box<[Project]>,
+    pub policies: Box<[Policy]>,
     pub connectors: Box<[u16]>,
     pub memory: u64,
     pub charters: Box<[jig_domain_core::Charter]>,
@@ -58,7 +59,6 @@ pub struct Engine {
     pub limits: Limits,
 }
 /// Parse jig's engine member before startup constructs any component.
-#[expect(clippy::too_many_lines, reason = "one engine object consumes and validates its complete member vocabulary")]
 pub fn engine(document: &skein_json::Document, at: u32, directories: &Directories) -> Result<Engine, Problems> {
     let path = Path::root();
     let mut problems = Problems::empty();
@@ -122,6 +122,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
     if let Some(at) = object.required(document, b"projects", &path, &mut problems) {
         projects = projects::projects(document, at, &path.member(b"projects"), &limits, configured, &mut problems);
     }
+    let policies = projects::configured_policies(&mut object, document, &limits, configured, &mut problems);
     let mut connectors = None;
     if let Some(at) = object.required(document, b"connectors", &path, &mut problems) {
         connectors =
@@ -139,6 +140,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
         providers: providers.expect("required member checked"),
         rules: rules.expect("required member checked"),
         projects: projects.expect("required member checked"),
+        policies: policies.expect("optional policies checked"),
         connectors: connectors.expect("required member checked"),
         owners: Box::default(),
         acts,
@@ -150,13 +152,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
         clients: clients.expect("required member checked"),
         limits,
     };
-    engine.owners = domain::owners(
-        document,
-        owners.expect("required member checked"),
-        &path.member(b"owners"),
-        &engine,
-        &mut problems,
-    );
+    engine.owners = domain::owners(document, owners.expect("required member checked"), &engine, &mut problems);
     domain::whole(&engine, &mut problems);
     if !problems.is_empty() {
         return Err(problems);

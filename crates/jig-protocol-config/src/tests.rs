@@ -13,6 +13,7 @@ mod read;
 mod templates;
 mod worker;
 
+mod policies;
 mod project_names;
 
 mod acts;

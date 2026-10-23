@@ -104,6 +104,8 @@ fn both_shipped_profiles_round_trip_a_policy_whose_roles_name_models() {
         name: Box::from("Tally"),
         project: 1,
         value: people::PolicyValue {
+            ceiling: role(0, Some(people::Models::ALL)).authority,
+            escalation_role: Some(0),
             period_spend: 0,
             projections: Box::new([]),
             roles: Box::new([

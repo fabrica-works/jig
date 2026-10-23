@@ -161,36 +161,29 @@ fn inbox_across_projects_stories() {
     use jig_core_world::watches::Parties;
     use jig_domain_authority as authority;
     use jig_domain_people as people;
-    use skein_lib::{List, Map, Queue};
     let (mut config, mut limits) = super::amendment_world_fixture(788);
     limits.core.tasks.tasks = 4;
     // Both configured projects and the deployment's roles.
     limits.core.people.projects = 3;
     limits.core.people.initial_owners = 2;
     limits.core.authority.projects = 2;
-    let policy = config.core.authority.policy(1).expect("configured policy").clone();
+    let policy = config.core.seed_projects[0].policy.policy.clone();
     let rules = config.core.authority.rules().clone();
     config.core.authority = authority::Domain::new(rules, limits.core.authority).expect("two policies");
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    for project in [1, 2] {
-        authority::step(
-            &mut config.core.authority,
-            authority::Event::Policy { project, policy: policy.clone() },
-            &mut facts,
-        );
-        while facts.pop().is_some() {}
-    }
     let first = config.core.owners[0].clone();
     config.core.owners = Box::new([first.clone(), people::InitialOwner { project: 2, identity: first.identity }]);
-    config.core.template_overrides = Map::with_capacity(2);
-    config.core.names = jig_core_world::fixtures::project_names();
-    config.core.projects = List::with_capacity(2);
-    let permissions = config.core.permission_roles.get(&1).expect("permissions").clone();
-    config.core.permission_roles = Map::with_capacity(2);
-    for project in [1, 2] {
-        config.core.projects.push(project).expect("two projects");
-        config.core.permission_roles.insert(project, permissions.clone()).expect("two permissions");
-    }
+    config.core.seed_projects = [1, 2]
+        .into_iter()
+        .map(|number| core::SeedProject {
+            number,
+            name: format!("Project {number}").into_boxed_str(),
+            policy: core::ConfiguredPolicy {
+                policy: policy.clone(),
+                permissions: config.core.seed_projects[0].policy.permissions.clone(),
+                templates: Box::new([]),
+            },
+        })
+        .collect();
     limits.core.people.amendment_bytes = 256;
     limits.core.people.inbox_recipients = 16;
     jig_core_world::peers::journal(&mut limits);

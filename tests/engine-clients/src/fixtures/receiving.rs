@@ -2,7 +2,7 @@
 use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_people as people;
-use skein_lib::{Duration, Env, List, Map, ReplyTo, Time, Token, Wall};
+use skein_lib::{Duration, Env, Map, ReplyTo, Time, Token, Wall};
 
 /// The one configured model, which the charter names.
 fn model() -> core::Model {
@@ -70,10 +70,8 @@ fn configuration(limits: &core::Limits) -> core::Config {
         owners: Box::new([]),
         grants: Box::new([]),
         authority: authority::Domain::new(rules, limits.authority).expect("bounded authority"),
-        projects: List::with_capacity(0),
-        names: Map::with_capacity(limits.authority.projects),
-        permission_roles: Map::with_capacity(0),
-        template_overrides: Map::with_capacity(limits.authority.projects),
+        seed_projects: Box::new([]),
+        policies: Map::with_capacity(0),
         connectors: Box::new([]),
         settings: core::Settings {
             templates: Box::new([]),

@@ -42,7 +42,7 @@ pub fn person_batch_config(seed: u64) -> jig_test_domain::Config {
     use jig_domain_authority as a;
     let mut config = super::batch_config(seed);
     let mut rules = config.core.authority.rules().clone();
-    let mut policy = config.core.authority.policy(1).expect("project policy").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     let kinds: Box<[a::Executor]> = Box::new([a::Executor::Charter(1), a::Executor::Role(0)]);
     rules.ceiling.delegation.kinds.clone_from(&kinds);
     policy.ceiling.delegation.kinds.clone_from(&kinds);
@@ -51,7 +51,8 @@ pub fn person_batch_config(seed: u64) -> jig_test_domain::Config {
     let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
     a::step(&mut authority, a::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: 1 }));
-    config.core.authority = authority;
+    config.core.seed_projects[0].policy.policy = authority.policy(1).expect("checked seed policy").clone();
+    config.core.authority = a::Domain::new(authority.rules().clone(), *authority.limits()).expect("checked rules");
     config
 }
 #[must_use]

@@ -21,14 +21,16 @@ fn topic_world(seed: u64, grant: bool) -> World {
     };
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.grants = Box::new([read_grant.clone()]);
-    let mut policy = configuration.core.authority.policy(1).expect("policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.grants = Box::new([read_grant.clone()]);
     policy.roles[0].authority.grants = if grant { Box::new([read_grant]) } else { Box::new([]) };
     let mut domain = authority::Domain::new(rules, limits.core.authority).expect("topic rules");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = domain;
+    configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
     World::configured(seed, false, configuration, limits)
 }
 

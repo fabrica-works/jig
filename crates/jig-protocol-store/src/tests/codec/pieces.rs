@@ -1,12 +1,12 @@
 //! Byte-summed pieces preserve the domain's admissions (codec.md, 3).
 use super::fixtures;
 use crate::codec::{people, tasks};
-use crate::{people_v10, tasks_v9};
+use crate::{people_v11, tasks_v9};
 use jig_domain_people as person;
 use jig_domain_tasks as task;
 use skein_lib::{List, Reader, Writer};
 
-fn people_limits() -> people_v10::Limits {
+fn people_limits() -> people_v11::Limits {
     let mut core = fixtures::CORE_LIMITS;
     core.people.amendment_bytes = 8192;
     core.policy_bytes = 8192;
@@ -43,7 +43,7 @@ fn the_pattern_piece_admits_512_segments_and_refuses_513() {
             let mut out = Writer::new(usize::try_from(encoded.measure()).expect("measured size"));
             encoded.encode(&mut out).expect("measured pattern");
             let bytes = out.finish();
-            let decoded = people_v10::Pattern::decode(&limits, &mut Reader::new(&bytes)).expect("encoded pattern");
+            let decoded = people_v11::Pattern::decode(&limits, &mut Reader::new(&bytes)).expect("encoded pattern");
             assert_eq!(people::policy::decode_pattern(decoded, &limits), Ok(value), "{label}");
         } else {
             assert_eq!(encoded, Err(people_problem()), "{label}");
@@ -60,7 +60,7 @@ fn a_whole_amendment_admits_its_full_sum_and_refuses_one_byte_past_it() {
     let mut out = Writer::new(usize::try_from(encoded.measure()).expect("measured size"));
     encoded.encode(&mut out).expect("measured amendment");
     let bytes = out.finish();
-    let decoded = people_v10::Amendment::decode(&limits, &mut Reader::new(&bytes)).expect("whole amendment");
+    let decoded = people_v11::Amendment::decode(&limits, &mut Reader::new(&bytes)).expect("whole amendment");
     assert_eq!(people::policy::decode_amendment(decoded, &limits), Ok(value.clone()));
     let mut past = value;
     past.reason = Box::new([1]);
@@ -68,7 +68,7 @@ fn a_whole_amendment_admits_its_full_sum_and_refuses_one_byte_past_it() {
     assert_eq!(people::policy::encode_amendment(&past, &limits), Err(people_problem()), "encoded past_sum");
     let mut parts = encoded.into_parts();
     parts.reason = Box::new([1]);
-    let forged = people_v10::Amendment::new(&limits, parts).expect("each scalar still fits");
+    let forged = people_v11::Amendment::new(&limits, parts).expect("each scalar still fits");
     assert_eq!(people::policy::decode_amendment(forged, &limits), Err(people_problem()), "decoded past_sum");
 }
 
@@ -133,6 +133,6 @@ fn the_encoded_piece_bound_holds_a_verdict_at_the_domain_sum_exactly() {
     assert_eq!(limits.verdict_message_fields, 6656);
 }
 
-fn people_problem() -> people_v10::Problem {
-    people_v10::Problem { path: people_v10::Path::RowValue, reason: skein_codec::Reason::Bound }
+fn people_problem() -> people_v11::Problem {
+    people_v11::Problem { path: people_v11::Path::RowValue, reason: skein_codec::Reason::Bound }
 }

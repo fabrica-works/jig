@@ -33,16 +33,10 @@ impl Story {
         let mut config = jig_core_world::world::config(seed);
         let mut rules = config.core.authority.rules().clone();
         rules.maximum_run_spend = 20;
-        let policy = config.core.authority.policy(PROJECT).expect("chat project policy").clone();
+        let policy = config.core.seed_projects[0].policy.policy.clone();
         config.core.authority = jig_domain_authority::Domain::new(rules, fixtures::owner_limits().core.authority)
             .expect("chat run budget leaves room for its delegate");
-        let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-        jig_domain_authority::step(
-            &mut config.core.authority,
-            jig_domain_authority::Event::Policy { project: PROJECT, policy },
-            &mut out,
-        );
-        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: PROJECT }));
+        config.core.seed_projects[0].policy.policy = policy;
         let mut story = Self {
             front: Front::new(seed),
             second: None,

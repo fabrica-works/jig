@@ -501,7 +501,7 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation = policy::Delegation { kinds, tasks: 6, depth: 3 };
     rules.maximum_run_spend = 20;
-    let mut project = configuration.core.authority.policy(1).expect("peer policy").clone();
+    let mut project = configuration.core.seed_projects[0].policy.policy.clone();
     project.ceiling = rules.ceiling.clone();
     let mut owner = project.roles[0].clone();
     owner.authority.delegation =
@@ -523,7 +523,9 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     let mut out = skein_lib::Queue::with_capacity(policy::POLICY_MAX_OUT);
     policy::step(&mut checked, policy::Event::Policy { project: 1, policy: project }, &mut out);
     assert_eq!(out.pop(), Some(policy::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = checked;
+    configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
     (configuration, limits)
 }
 

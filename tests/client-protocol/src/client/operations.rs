@@ -113,12 +113,10 @@ impl Story {
         let mut config = crate::fixtures::batch_config(seed);
         if !holder {
             use jig_domain_authority as a;
-            let mut policy = config.core.authority.policy(1).expect("project policy").clone();
+            let mut policy = config.core.seed_projects[0].policy.policy.clone();
             policy.escalation_role = None;
             policy.roles[0].decides = a::Proposals(0);
-            let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
-            a::step(&mut config.core.authority, a::Event::Policy { project: 1, policy }, &mut out);
-            assert_eq!(out.pop(), Some(a::PolicyFact::Changed { project: 1 }));
+            config.core.seed_projects[0].policy.policy = policy;
         }
         let mut story = Self::configured(seed, &limits, config);
         story.sign_in();

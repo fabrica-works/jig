@@ -6,7 +6,7 @@ use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
-use skein_lib::{Duration, Queue, ReplyTo, Token};
+use skein_lib::{Duration, ReplyTo, Token};
 
 #[must_use]
 pub fn research_charter() -> core::Charter {
@@ -30,14 +30,13 @@ pub fn two_charters(seed: u64) -> (root::Config, root::Limits) {
         Box::new([authority::Executor::Charter(1), authority::Executor::Charter(2), authority::Executor::Procedure(1)]);
     let mut rules = config.core.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
-    let mut policy = config.core.authority.policy(1).expect("project policy").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
     policy.roles[0].authority.delegation.kinds.clone_from(&kinds);
 
     config.core.authority = authority::Domain::new(rules, limits.core.authority).expect("charter policy");
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut config.core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+
+    config.core.seed_projects[0].policy.policy = policy;
     let research = research_charter();
     config.core.settings.models = Box::new([config.core.settings.models[0].clone(), research.policy.model.clone()]);
     config.core.settings.charters = Box::new([config.core.settings.charters[0].clone(), research]);

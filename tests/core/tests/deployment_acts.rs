@@ -330,7 +330,20 @@ fn a_failed_key_keep_returns_the_value_before_its_answer() {
 
 fn adoption_core(seed: u64) -> (core::Core, Env<core::Limits>) {
     let (config, limits) = configuration(seed);
+    let seeded = jig_core_world::fixtures::seeded_project_rows(&config.core);
     let mut core = core::Core::new(config.core, &limits.core).expect("bounded deployment act fixture");
+    for row in seeded {
+        let restored = match row {
+            core::Record::Core(row) => core.restore_core(row, &limits.core) != core::Restored::Rejected,
+            core::Record::People(people::Stored::Policy { project, name, value }) => {
+                core.restore_policy(&limits.core, project, name, value)
+            }
+            core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) | core::Record::Accounts(_) => {
+                false
+            }
+        };
+        assert!(restored, "a seeded project's row restores");
+    }
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.core };
     core::step(&mut core, &env, core::Event::People(people::Event::Restored));
     (core, env)

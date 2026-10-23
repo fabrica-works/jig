@@ -54,7 +54,7 @@ mod model_names;
 mod numbers;
 mod person_task;
 mod policy;
-pub use policy::{authority_to_people, pattern_to_people};
+pub use policy::{authority_to_people, pattern_to_people, snapshot as policy_snapshot};
 mod projections;
 pub use projections::{
     MilestoneId, Projection, ProjectionFeed, ProjectionGoal, ProjectionKey, ProjectionMilestone, ProjectionRecord,
@@ -114,6 +114,22 @@ use jig_domain_tasks as tasks;
 use jig_domain_views as views;
 use skein_lib::{List, Map, Queue, Token, Wall};
 
+/// Policy copied into a later project (configuration.md, 3; core.md, 6.1).
+#[derive(Debug)]
+pub struct ConfiguredPolicy {
+    pub policy: authority::Policy,
+    pub permissions: Box<[people::PermissionRole]>,
+    pub templates: Box<[people::TemplateOverride]>,
+}
+
+/// One first-start project seed (configuration.md, 3; core.md, 6.1).
+#[derive(Debug)]
+pub struct SeedProject {
+    pub number: u32,
+    pub name: Box<str>,
+    pub policy: ConfiguredPolicy,
+}
+
 /// Application-supplied initial core state, in jig's vocabulary
 /// (`engine.md`, 6; `configuration.md`, 3).
 #[derive(Debug)]
@@ -136,14 +152,10 @@ pub struct Config {
     pub authority: authority::Domain,
     /// Deployment and run settings retained by the core.
     pub settings: Settings,
-    /// Configured project identifiers for bootstrap.
-    pub projects: List<u32>,
-    /// Project names in shape and unique under simple case folding (core.md, 6.1).
-    pub names: Map<u32, Box<str>>,
-    /// Policy-controlled connector permissions per project.
-    pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
-    /// Template overrides retained with each project policy.
-    pub template_overrides: Map<u32, Box<[people::TemplateOverride]>>,
+    /// Projects used only by the first start (configuration.md, 3).
+    pub seed_projects: Box<[SeedProject]>,
+    /// Configured policies for projects made after the first start.
+    pub policies: Map<u32, ConfiguredPolicy>,
     /// Numbered connectors the application routes for task lifecycle handoffs.
     pub connectors: Box<[u16]>,
 }
@@ -323,12 +335,15 @@ pub struct Core {
     pub relaying: Map<u64, PendingRelay>,
     /// Configured project identifiers for bootstrap.
     pub projects: List<u32>,
+    #[cfg_attr(not(test), expect(dead_code, reason = "retained for later project creation"))]
+    pub(crate) policies: Map<u32, ConfiguredPolicy>,
     /// Names seeded or restored with the project policies (core.md, 6.1).
     pub(crate) names: Map<u32, Box<str>>,
     /// Mutable connector permission mappings approved by policy edits.
     pub permission_roles: Map<u32, Box<[people::PermissionRole]>>,
     /// Template overrides retained with each project policy.
     pub template_overrides: Map<u32, Box<[people::TemplateOverride]>>,
+    pub(crate) seed_projects: Box<[SeedProject]>,
     pub(crate) seed_owners: Box<[people::InitialOwner]>,
     /// Immutable settings for core decisions.
     pub settings: Settings,
@@ -555,30 +570,31 @@ impl Core {
         );
         charters::assert_configured(&config.settings, limits);
         templates::assert_configured(&config, limits);
-        assert!(config.projects.capacity() <= limits.authority.projects, "core prices configured projects");
-        assert!(config.names.capacity() <= limits.authority.projects, "core prices project names");
-        for &project in &config.projects {
-            let name = config.names.get(&project).expect("every configured project has a name");
-            assert!(people::name_rule(name).is_none(), "configured project names are in shape");
-            for (&other, previous) in &config.names {
-                assert!(project == other || !people::same_name(name, previous), "configured project names are unique");
-            }
-        }
         assert!(
-            config.projects.len() < limits.people.projects,
-            "people prices configured project rosters and the deployment's"
+            config.seed_projects.len() <= usize::try_from(limits.authority.projects).expect("project bound"),
+            "core prices seed projects"
         );
-        assert!(config.permission_roles.len() <= limits.authority.projects, "core prices project permissions");
-        for (_, roles) in &config.permission_roles {
-            let bytes = u64::try_from(roles.len())
-                .expect("permission count fits u64")
-                .checked_mul(u64::try_from(size_of::<people::PermissionRole>()).expect("role size fits u64"));
+        assert!(config.policies.capacity() <= limits.authority.projects, "core prices configured policies");
+        assert!(
+            config.seed_projects.len() < usize::try_from(limits.people.projects).expect("people project bound"),
+            "people prices seed rosters and the deployment's"
+        );
+        for (index, project) in config.seed_projects.iter().enumerate() {
+            assert!(project.number != 0, "seed project numbers start at one");
+            assert!(people::name_rule(&project.name).is_none(), "seed project names are in shape");
+            for previous in config.seed_projects.iter().take(index) {
+                assert!(project.number != previous.number, "seed project numbers are unique");
+                assert!(!people::same_name(&project.name, &previous.name), "seed project names are unique");
+            }
+            let value =
+                policy::snapshot(&project.policy.policy, &project.policy.permissions, &project.policy.templates)
+                    .expect("seed policy snapshot");
             assert!(
-                match bytes {
+                match people::policy_bytes(&value) {
                     Some(bytes) => bytes <= limits.policy_bytes,
                     None => false,
                 },
-                "core prices configured permission roles"
+                "core prices seed policies"
             );
         }
         let fleet_needs = fleet_needs::configured(&config, limits);
@@ -611,6 +627,7 @@ impl Core {
             restart_attempts: limits.fleet.attempts,
             counters: Counters::bootstrap(config.deployment),
             seed_owners: config.owners.clone(),
+            seed_projects: config.seed_projects,
             view_subjects: Map::with_capacity(limits.views.watchers),
             view_names: skein_lib::Slab::with_capacity(limits.views.watchers),
             changed_views: skein_lib::Set::with_capacity(limits.views.watchers),
@@ -635,10 +652,11 @@ impl Core {
             creating_delegates: Map::with_capacity(limits.call_records),
             creating_procedures: Map::with_capacity(limits.tasks.tasks),
             relaying: Map::with_capacity(limits.tasks.tasks),
-            projects: config.projects,
-            names: config.names,
-            permission_roles: config.permission_roles,
-            template_overrides: config.template_overrides,
+            projects: List::with_capacity(limits.authority.projects),
+            policies: config.policies,
+            names: Map::with_capacity(limits.authority.projects),
+            permission_roles: Map::with_capacity(limits.authority.projects),
+            template_overrides: Map::with_capacity(limits.authority.projects),
             connectors: config.connectors,
             pending_calls: Map::with_capacity(limits.call_records),
             call_parts: Map::with_capacity(limits.call_records),

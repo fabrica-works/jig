@@ -259,6 +259,7 @@ pub fn header(commits: u64) -> jig_test_domain::Write {
             runs: 1,
             calls: 0,
             connector_rows: 0,
+            projects: 0,
             applications: 0,
             commits,
         }),

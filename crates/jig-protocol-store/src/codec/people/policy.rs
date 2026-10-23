@@ -289,10 +289,21 @@ pub(super) fn encode_policy_value(
     value: &domain::PolicyValue,
     limits: &wire::Limits,
 ) -> Result<wire::PolicyValue, wire::Problem> {
-    let domain::PolicyValue { period_spend, projections, roles, requirements, permissions, templates } = value;
+    let domain::PolicyValue {
+        ceiling,
+        escalation_role,
+        period_spend,
+        projections,
+        roles,
+        requirements,
+        permissions,
+        templates,
+    } = value;
     wire::PolicyValue::new(
         limits,
         wire::PolicyValueParts {
+            ceiling: encode_authority(ceiling, limits)?,
+            escalation_role: *escalation_role,
             period_spend: *period_spend,
             templates: encode_templates(templates, limits, limits.policy_value_templates)?,
             projections: encode_grants(projections, limits)?,
@@ -311,9 +322,19 @@ pub(super) fn decode_policy_value(
     value: wire::PolicyValue,
     limits: &wire::Limits,
 ) -> Result<domain::PolicyValue, wire::Problem> {
-    let wire::PolicyValueParts { period_spend, projections, roles, requirements, permissions, templates } =
-        value.into_parts();
+    let wire::PolicyValueParts {
+        ceiling,
+        escalation_role,
+        period_spend,
+        projections,
+        roles,
+        requirements,
+        permissions,
+        templates,
+    } = value.into_parts();
     Ok(domain::PolicyValue {
+        ceiling: decode_authority(ceiling, limits)?,
+        escalation_role,
         templates: decode_templates(templates),
         period_spend,
         projections: decode_grants(projections, limits)?,

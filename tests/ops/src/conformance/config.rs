@@ -108,7 +108,9 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     limits.observability.answer_bytes = 2048;
     limits.infrastructure.tasks = 8;
     limits.infrastructure.procedures = 8;
-    config.core.authority = policy_domain(&limits.core.authority, environment_chat);
+    let (domain, policy) = policy_domain(&limits.core.authority, environment_chat);
+    config.core.authority = domain;
+    config.core.seed_projects[0].policy.policy = policy;
     if environment_chat {
         config.core.owners = Box::new([jig_domain_people::InitialOwner {
             project: 1,
@@ -217,7 +219,8 @@ pub fn environment_authority(spend: u64, person: bool) -> authority::Authority {
     value
 }
 
-fn policy_domain(limits: &authority::Limits, environment_chat: bool) -> authority::Domain {
+/// The rules' domain, empty of projects, and project 1's policy, which the first start seeds.
+fn policy_domain(limits: &authority::Limits, environment_chat: bool) -> (authority::Domain, authority::Policy) {
     let requirements: Box<[_]> = [
         authority::Requirement {
             connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Infrastructure),
@@ -246,7 +249,7 @@ fn policy_domain(limits: &authority::Limits, environment_chat: bool) -> authorit
     ]
     .into();
     let ceiling = if environment_chat { environment_authority(1000, true) } else { authority(1000, true) };
-    let mut domain = authority::Domain::new(
+    let domain = authority::Domain::new(
         authority::Rules {
             ceiling: ceiling.clone(),
             period_spend: 1000,
@@ -258,40 +261,35 @@ fn policy_domain(limits: &authority::Limits, environment_chat: bool) -> authorit
         *limits,
     )
     .expect("bounded scenario policy");
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(
-        &mut domain,
-        authority::Event::Policy {
-            project: 1,
-            policy: authority::Policy {
-                projections: Box::new([]),
-                escalation_role: Some(0),
-                ceiling,
-                period_spend: 1000,
-                roles: Box::new([authority::Role {
-                    number: 0,
-                    authority: if environment_chat {
-                        let mut value = environment_authority(20, false);
-                        value.delegation.tasks += 1;
-                        value.delegation.depth += 1;
-                        value
-                    } else {
-                        let mut value = authority(100, false);
-                        value.delegation.tasks += 1;
-                        value.delegation.depth += 1;
-                        value
-                    },
-                    period_spend: 500,
-                    requests: authority::Requests::ALL,
-                    decides: authority::Proposals::ALL,
-                }]),
-                requirements: Box::new([]),
+    let mut scratch = authority::Domain::new(domain.rules().clone(), *limits).expect("bounded scenario policy");
+    let policy = authority::Policy {
+        projections: Box::new([]),
+        escalation_role: Some(0),
+        ceiling,
+        period_spend: 1000,
+        roles: Box::new([authority::Role {
+            number: 0,
+            authority: if environment_chat {
+                let mut value = environment_authority(20, false);
+                value.delegation.tasks += 1;
+                value.delegation.depth += 1;
+                value
+            } else {
+                let mut value = authority(100, false);
+                value.delegation.tasks += 1;
+                value.delegation.depth += 1;
+                value
             },
-        },
-        &mut out,
-    );
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    domain
+            period_spend: 500,
+            requests: authority::Requests::ALL,
+            decides: authority::Proposals::ALL,
+        }]),
+        requirements: Box::new([]),
+    };
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut scratch, authority::Event::Policy { project: 1, policy: policy.clone() }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "a checked scenario policy");
+    (domain, policy)
 }
 
 #[must_use]

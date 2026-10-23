@@ -5,16 +5,15 @@ use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
-use skein_lib::{Queue, ReplyTo, Token};
+use skein_lib::{ReplyTo, Token};
 
 fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowing_after_restart() {
     let (mut configuration, limits) = fixture(170, true);
-    let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.projections.clone_from(&policy.ceiling.grants);
     policy.roles[0].authority.grants = Box::new([]);
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
-    assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+
+    configuration.core.seed_projects[0].policy.policy = policy;
     let mut world = World::configured(170, true, configuration, limits);
     let goal = tracked_goal(&mut world);
     let record = world
@@ -152,7 +151,7 @@ fn tree_world() -> (World, root::Config) {
     limits.routes = 500;
     limits.journal.commits = 8;
     jig_core_world::peers::journal(&mut limits);
-    let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.projections.clone_from(&policy.ceiling.grants);
     policy.ceiling.delegation.depth = 3;
     policy.ceiling.delegation.tasks = 4;
@@ -162,8 +161,8 @@ fn tree_world() -> (World, root::Config) {
     rules.ceiling.delegation.depth = 3;
     rules.ceiling.delegation.tasks = 4;
     configuration.core.authority = authority::Domain::new(rules, limits.core.authority).expect("tree policy");
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
+
+    configuration.core.seed_projects[0].policy.policy = policy;
     jig_core_world::world::edit_role(&mut configuration.core, |role| {
         role.authority.delegation =
             authority::Delegation { kinds: Box::new([authority::Executor::Charter(1)]), tasks: 3, depth: 3 };
@@ -172,14 +171,8 @@ fn tree_world() -> (World, root::Config) {
     restart_configuration.core.authority =
         authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
             .expect("same deployment rules");
-    authority::step(
-        &mut restart_configuration.core.authority,
-        authority::Event::Policy {
-            project: 1,
-            policy: configuration.core.authority.policy(1).expect("tree policy").clone(),
-        },
-        &mut Queue::with_capacity(authority::POLICY_MAX_OUT),
-    );
+    restart_configuration.core.seed_projects[0].policy.policy =
+        configuration.core.seed_projects[0].policy.policy.clone();
     (World::configured(171, false, configuration, limits), restart_configuration)
 }
 
@@ -320,13 +313,9 @@ fn projections_scenario_family() {
 
 fn untracked_configuration(seed: u64) -> (root::Config, root::Limits) {
     let (mut configuration, limits) = fixture(seed, false);
-    let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.projections.clone_from(&policy.ceiling.grants);
-    authority::step(
-        &mut configuration.core.authority,
-        authority::Event::Policy { project: 1, policy },
-        &mut Queue::with_capacity(authority::POLICY_MAX_OUT),
-    );
+    configuration.core.seed_projects[0].policy.policy = policy;
     (configuration, limits)
 }
 

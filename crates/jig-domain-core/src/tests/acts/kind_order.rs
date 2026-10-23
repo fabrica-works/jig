@@ -17,21 +17,19 @@ fn configured(pairs: Box<[authority::Implication]>, rows: u32) -> (Core, Limits)
     limits.authority.implications = u32::try_from(pairs.len()).unwrap();
     let mut cfg = config(41);
     let mut rules = cfg.authority.rules().clone();
-    let mut value = cfg.authority.policy(1).unwrap().clone();
+    let mut value = cfg.seed_projects[0].policy.policy.clone();
     rules.implies = authority::Implies::new(pairs, limits.authority.implications).unwrap();
     rules.ceiling.grants = Box::new([grant(2, authority::Last::Open(Box::new([])))]);
     value.ceiling.grants = rules.ceiling.grants.clone();
     value.roles[0].authority.grants = Box::new([grant(2, authority::Last::Open(b"a".as_slice().into()))]);
     value.roles[0].period_spend = 1000;
     cfg.authority = authority::Domain::new(rules, limits.authority).unwrap();
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut cfg.authority, authority::Event::Policy { project: 1, policy: value }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    let mut given = cfg.authority.role(1, 0).unwrap().authority.clone();
+    cfg.seed_projects[0].policy.policy = value;
+    let mut given = cfg.seed_projects[0].policy.policy.roles[0].authority.clone();
     given.grants = Box::new([grant(1, authority::Last::Exact(b"alpha".as_slice().into()))]);
-    set_role_authority(&mut cfg.authority, given);
+    set_seed_role_authority(&mut cfg, given);
     let (prepared, _) = core();
-    let mut core = Core::new(cfg, &limits).expect("fixture core configuration");
+    let mut core = seeded_core(cfg, &limits).expect("fixture core configuration");
     core.people = prepared.people;
     make_task(&mut core, &limits, 1);
     send_task(

@@ -26,7 +26,7 @@ fn a_configured_project_keeps_its_name() {
     let engine = fixtures::engine(&document).expect("named project");
     assert_eq!(engine.projects[0].name.as_ref(), "Tally");
     let core = super::domain::core_config(&document);
-    assert_eq!(core.names.get(&1).map(Box::as_ref), Some("Tally"));
+    assert_eq!(core.seed_projects[0].name.as_ref(), "Tally");
 }
 
 #[test]

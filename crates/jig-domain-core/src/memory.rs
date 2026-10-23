@@ -404,6 +404,22 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         Queue::<Box<[u8]>>::worst_case(limits.resume_bytes)?.checked_add(u64::from(limits.resume_bytes))?,
     )?)?;
     total = total.checked_add(bytes(limits.authority.projects, limits.policy_bytes)?)?;
+    // First-start seeds coexist with the configured policy table until people restore.
+    total = total.checked_add(List::<crate::SeedProject>::worst_case(limits.authority.projects)?)?;
+    total = total.checked_add(authority::worst_case(&limits.authority)?)?;
+    total = total.checked_add(bytes(
+        limits.authority.projects,
+        limits.policy_bytes.checked_add(u64::try_from(people::NAME_BYTES).ok()?)?,
+    )?)?;
+    // The configured table owns full authority policies, permission mappings and overrides.
+    // Authority's bound conservatively includes its rules and table as well as policy heap.
+    total = total.checked_add(Map::<u32, crate::ConfiguredPolicy>::worst_case(limits.authority.projects)?)?;
+    total = total.checked_add(authority::worst_case(&limits.authority)?)?;
+    total = total.checked_add(bytes(limits.authority.projects, limits.policy_bytes)?)?;
+    total = total.checked_add(bytes(
+        limits.authority.projects,
+        List::<people::TemplateOverride>::worst_case(limits.templates)?,
+    )?)?;
     total = total.checked_add(bytes(
         limits.people.initial_owners,
         sizeof(size_of::<people::InitialOwner>())?.checked_add(u64::from(limits.people.identity_bytes))?,

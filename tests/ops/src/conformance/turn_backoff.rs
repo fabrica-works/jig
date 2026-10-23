@@ -23,6 +23,7 @@ impl World {
         limits.core.fleet.turns = 1;
         limits.host.turns = 2;
         let rows = jig_core_world::fixtures::account_rows(&configuration.core.settings.llm_providers);
+        let seeded = jig_core_world::fixtures::seeded_project_rows(&configuration.core);
         let mut world = Self {
             domain: root::Domain::new(configuration, &limits).expect("fixture core configuration"),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
@@ -30,6 +31,10 @@ impl World {
             saved: Vec::new(),
             kept: Vec::new(),
         };
+        for row in seeded {
+            world.send(root::Event::Store(root::Store::Restore(root::Record::Core(row))));
+            world.settle();
+        }
         for row in rows {
             let jig_test_domain::Record::Core(core::Record::Accounts(record)) = row else {
                 panic!("account fixture row")

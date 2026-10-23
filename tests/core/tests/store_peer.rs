@@ -196,6 +196,7 @@ const HEADER: core::Deployment = core::Deployment {
     runs: 0,
     calls: 0,
     connector_rows: 0,
+    projects: 0,
     applications: 0,
     commits: 0,
 };

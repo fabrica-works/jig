@@ -86,10 +86,10 @@ pub(crate) fn providers(document: &Document, at: u32, path: &Path, problems: &mu
 pub(crate) fn owners(
     document: &Document,
     at: u32,
-    path: &Path,
     engine: &crate::Engine,
     problems: &mut Problems,
 ) -> Box<[InitialOwner]> {
+    let path = &Path::root().member(b"owners");
     let mut owners = List::<InitialOwner>::with_capacity(engine.limits.core.people.initial_owners);
     let Some(items) = items(document, at, engine.limits.core.people.initial_owners, path, problems) else {
         return owners.into_boxed();
@@ -222,56 +222,17 @@ pub(crate) fn whole(engine: &crate::Engine, problems: &mut Problems) {
     if let Err(what) = crate::fits(engine.memory, shares.as_slice()) {
         problems.push(Path::root().member(b"memory_bytes"), what);
     }
-    let Some(mut authority) = jig_domain_authority::Domain::new(engine.rules.clone(), limits.authority) else { return };
-    let mut facts = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
     for (index, project) in engine.projects.iter().enumerate() {
         let path = check::index(&Path::root().member(b"projects"), index);
-        jig_domain_authority::step(
-            &mut authority,
-            jig_domain_authority::Event::Policy { project: project.number, policy: project.policy.clone() },
-            &mut facts,
-        );
-        match facts.pop().expect("one policy admission fact") {
-            jig_domain_authority::PolicyFact::Added { .. } | jig_domain_authority::PolicyFact::Changed { .. } => {}
-            jig_domain_authority::PolicyFact::Refused { .. } | jig_domain_authority::PolicyFact::Dropped { .. } => {
-                problems.push(path.member(b"policy"), What::Bound);
-            }
+        if !check_policy(engine, project.number, &project.policy, &project.roles, &project.templates, &path, problems) {
+            problems.push(path.member(b"policy"), What::Bound);
         }
-        crate::templates::check_overrides(
-            engine,
-            &project.templates,
-            &path.member(b"policy").member(b"templates"),
-            problems,
-        );
-        for (index, role) in project.roles.iter().enumerate() {
-            let path = check::index(&path.member(b"roles"), index);
-            connector(engine, role.connector, &path.member(b"connector"), problems);
-            let mut known = false;
-            for configured in &project.policy.roles {
-                known |= configured.number == role.role;
-            }
-            if !known {
-                problems.push(path.member(b"role"), What::Refers);
-            }
+    }
+    for (index, policy) in engine.policies.iter().enumerate() {
+        let path = check::index(&Path::root().member(b"policies"), index);
+        if !check_policy(engine, policy.number, &policy.policy, &policy.roles, &policy.templates, &path, problems) {
+            problems.push(path, What::Bound);
         }
-        authority_refs(
-            engine,
-            &project.policy.ceiling,
-            &path.member(b"policy").member(b"ceiling"),
-            Some(&project.policy),
-            problems,
-        );
-        for (index, role) in project.policy.roles.iter().enumerate() {
-            let path = check::index(&path.member(b"policy").member(b"roles"), index);
-            authority_refs(engine, &role.authority, &path.member(b"authority"), Some(&project.policy), problems);
-        }
-        grant_refs(engine, &project.policy.projections, &path.member(b"policy").member(b"projections"), problems);
-        requirement_refs(
-            engine,
-            &project.policy.requirements,
-            &path.member(b"policy").member(b"requirements"),
-            problems,
-        );
     }
     authority_refs(engine, &engine.rules.ceiling, &Path::root().member(b"rules").member(b"ceiling"), None, problems);
     requirement_refs(
@@ -289,6 +250,59 @@ pub(crate) fn whole(engine: &crate::Engine, problems: &mut Problems) {
         );
     }
 }
+fn check_policy(
+    engine: &crate::Engine,
+    number: u32,
+    policy: &jig_domain_authority::Policy,
+    roles: &[jig_domain_people::PermissionRole],
+    templates: &[jig_domain_people::TemplateOverride],
+    path: &Path,
+    problems: &mut Problems,
+) -> bool {
+    let Some(mut authority) = jig_domain_authority::Domain::new(engine.rules.clone(), engine.limits.core.authority)
+    else {
+        return false;
+    };
+    let mut facts = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+    jig_domain_authority::step(
+        &mut authority,
+        jig_domain_authority::Event::Policy { project: number, policy: policy.clone() },
+        &mut facts,
+    );
+    let admitted = match facts.pop().expect("one policy admission fact") {
+        jig_domain_authority::PolicyFact::Added { .. } | jig_domain_authority::PolicyFact::Changed { .. } => true,
+        jig_domain_authority::PolicyFact::Refused { .. } | jig_domain_authority::PolicyFact::Dropped { .. } => false,
+    };
+    crate::templates::check_overrides(engine, templates, &path.member(b"policy").member(b"templates"), problems);
+    for (index, role) in roles.iter().enumerate() {
+        let path = check::index(&path.member(b"roles"), index);
+        connector(engine, role.connector, &path.member(b"connector"), problems);
+        let mut known = false;
+        for configured in &policy.roles {
+            known |= configured.number == role.role;
+        }
+        if !known {
+            problems.push(path.member(b"role"), What::Refers);
+        }
+    }
+    authority_refs(engine, &policy.ceiling, &path.member(b"policy").member(b"ceiling"), Some(policy), problems);
+    for (index, role) in policy.roles.iter().enumerate() {
+        let path = check::index(&path.member(b"policy").member(b"roles"), index);
+        authority_refs(engine, &role.authority, &path.member(b"authority"), Some(policy), problems);
+    }
+    grant_refs(engine, &policy.projections, &path.member(b"policy").member(b"projections"), problems);
+    requirement_refs(engine, &policy.requirements, &path.member(b"policy").member(b"requirements"), problems);
+    let bytes = match jig_domain_core::policy_snapshot(policy, roles, templates) {
+        Some(value) => jig_domain_people::policy_bytes(&value),
+        None => None,
+    };
+    let bounded = match bytes {
+        Some(bytes) => bytes <= engine.limits.core.policy_bytes,
+        None => false,
+    };
+    admitted && bounded
+}
+
 fn connector(engine: &crate::Engine, number: u16, path: &Path, problems: &mut Problems) {
     if !engine.connectors.contains(&number) {
         problems.push(path.clone(), What::Refers);

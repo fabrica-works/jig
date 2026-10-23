@@ -4,36 +4,27 @@ use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
 use jig_domain_core as domain;
 use skein_io::Addr;
-use skein_lib::{List, Map, Queue};
+use skein_lib::{List, Map};
 
 /// Build the core's values after startup reads `files` and replaces each charter's
 /// `policy.instructions` file name with its bounded contents. No file is read here.
 #[must_use]
 pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config {
     let limits = &engine.limits.core;
-    let mut authority = authority::Domain::new(engine.rules.clone(), limits.authority).expect("checked rules");
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    let mut projects = List::with_capacity(limits.authority.projects);
-    let mut names = Map::with_capacity(limits.authority.projects);
-    let mut template_overrides = Map::with_capacity(limits.authority.projects);
-    let mut permission_roles = Map::with_capacity(limits.authority.projects);
+    let authority = authority::Domain::new(engine.rules.clone(), limits.authority).expect("checked rules");
+    let mut seed_projects = List::with_capacity(limits.authority.projects);
     for project in &engine.projects {
-        authority::step(
-            &mut authority,
-            authority::Event::Policy { project: project.number, policy: project.policy.clone() },
-            &mut facts,
-        );
-        match facts.pop().expect("one checked policy admission") {
-            authority::PolicyFact::Added { .. } | authority::PolicyFact::Changed { .. } => {}
-            authority::PolicyFact::Dropped { .. } | authority::PolicyFact::Refused { .. } => {
-                unreachable!("checked project policies")
-            }
-        }
-        template_overrides.insert(project.number, project.templates.clone()).expect("checked projects");
-        projects.push(project.number).expect("checked project count");
-        names.insert(project.number, project.name.clone()).expect("checked project count");
-        let previous = permission_roles.insert(project.number, project.roles.clone()).expect("checked project count");
-        assert!(previous.is_none(), "checked unique project");
+        seed_projects
+            .push(domain::SeedProject {
+                number: project.number,
+                name: project.name.clone(),
+                policy: domain::ConfiguredPolicy {
+                    policy: project.policy.clone(),
+                    permissions: project.roles.clone(),
+                    templates: project.templates.clone(),
+                },
+            })
+            .expect("checked seed project count");
     }
     let mut deployment_provider = None;
     for provider in &engine.providers {
@@ -98,10 +89,26 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
                 .min(engine.limits.clients.wire.keyed_value_some),
             llm_providers: accounts::Providers { providers: llm_providers.into_boxed() },
         },
-        projects,
-        names,
-        permission_roles,
-        template_overrides,
+        seed_projects: seed_projects.into_boxed(),
+        policies: configured_policies(engine),
         connectors: engine.connectors.clone(),
     }
+}
+
+fn configured_policies(engine: &Engine) -> Map<u32, domain::ConfiguredPolicy> {
+    let mut policies = Map::with_capacity(engine.limits.core.authority.projects);
+    for policy in &engine.policies {
+        let previous = policies
+            .insert(
+                policy.number,
+                domain::ConfiguredPolicy {
+                    policy: policy.policy.clone(),
+                    permissions: policy.roles.clone(),
+                    templates: policy.templates.clone(),
+                },
+            )
+            .expect("checked configured policy count");
+        assert!(previous.is_none(), "checked unique configured policy");
+    }
+    policies
 }

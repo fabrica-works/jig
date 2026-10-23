@@ -1,5 +1,5 @@
 //! People rows translated exhaustively (protocol/store.md, 5.1).
-use crate::people_v10 as wire;
+use crate::people_v11 as wire;
 use alloc::boxed::Box;
 use jig_domain_core as core;
 use jig_domain_people as domain;
@@ -226,6 +226,9 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits, names: &[Box<[u8]>]) -> Resul
             let wire::StoredPolicyParts { project, name, value, models } = value.into_parts();
             let mut value = decode_policy_value(value, limits)?;
             let moved = model_moves(&models, names);
+            if let Some(models) = value.ceiling.models {
+                value.ceiling.models = Some(models.remap(&moved));
+            }
             for role in &mut value.roles {
                 if let Some(models) = role.authority.models {
                     role.authority.models = Some(models.remap(&moved));

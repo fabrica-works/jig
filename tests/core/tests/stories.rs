@@ -337,14 +337,16 @@ fn a_note_written_corrected_by_a_person_and_recalled_keeps_the_corrected_body() 
     let (mut configuration, limits) = fixture(121, false);
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.notes = authority::Scopes::PROJECT;
-    let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.notes = authority::Scopes::PROJECT;
     policy.roles[0].authority.notes = authority::Scopes::PROJECT;
     let mut checked = authority::Domain::new(rules, limits.core.authority).expect("bounded note policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut checked, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = checked;
+    configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
 
     let mut world = World::configured(121, false, configuration, limits);
     let key = world.call_key(1);
@@ -1045,14 +1047,16 @@ pub(crate) fn person_world_fixture(seed: u64) -> (root::Config, root::Limits) {
 
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
-    let mut policy = configuration.core.authority.policy(1).expect("plan policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
     policy.roles[0].authority.delegation.kinds = kinds;
     let mut domain = authority::Domain::new(rules, limits.core.authority).expect("bounded person-task policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = domain;
+    configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
     (configuration, limits)
 }
 
@@ -1188,14 +1192,18 @@ mod watches;
 fn amendment_world_fixture(seed: u64) -> (root::Config, root::Limits) {
     let (mut configuration, limits) = fixture(seed, false);
     let rules = configuration.core.authority.rules().clone();
-    let mut policy = configuration.core.authority.policy(1).expect("amendment policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.roles[0].period_spend = 1000;
 
     let mut authority_domain = authority::Domain::new(rules, limits.core.authority).expect("bounded amendment policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut authority_domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = authority_domain;
+    configuration.core.seed_projects[0].policy.policy =
+        authority_domain.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(authority_domain.rules().clone(), *authority_domain.limits())
+            .expect("checked rules");
     (configuration, limits)
 }
 
@@ -1838,14 +1846,16 @@ fn procedure_configuration(seed: u64) -> (root::Config, root::Limits) {
 
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
-    let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
     policy.roles[0].authority.delegation.kinds = kinds;
     let mut domain = authority::Domain::new(rules, limits.core.authority).expect("procedure policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = domain;
+    configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
     (configuration, limits)
 }
 

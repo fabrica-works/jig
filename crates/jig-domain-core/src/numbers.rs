@@ -1,4 +1,4 @@
-//! Deployment numbers owned by the core (domain/engine.md, 3 and 5.4).
+//! Deployment numbers owned by the core (domain/engine.md, 3 and 5.4; domain/core.md, 6.1).
 
 /// Core to store, then store to core at startup: one fixed-size deployment
 /// header with allocated high-water marks. Every writing decision saves it
@@ -31,6 +31,8 @@ pub struct Deployment {
     /// Last issued ordered commit. A restored header is already durable; a live journal may await
     /// this number's store terminal.
     pub commits: u64,
+    /// Largest seeded or allocated project number.
+    pub projects: u64,
 }
 
 /// Core-selected counter for `fresh`; each is a separate checked `u64` high-water
@@ -38,6 +40,8 @@ pub struct Deployment {
 /// Selecting a family is pure; allocating it dirties the journal header.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Family {
+    /// Project identities, past all seeded and made projects.
+    Project,
     /// Task identities saved with the task row.
     Task,
     /// Person candidates supplied to people sign-in admission.
@@ -59,7 +63,7 @@ pub enum Family {
 /// Deployment numbers retained by the core.
 #[derive(Debug)]
 pub struct Counters {
-    deployment: Deployment,
+    pub(crate) deployment: Deployment,
     header: Header,
 }
 
@@ -87,6 +91,7 @@ impl Counters {
             connector_rows: 0,
             applications: 0,
             commits: 0,
+            projects: 0,
         };
         Counters { deployment, header: Header::Dirty }
     }
@@ -158,6 +163,7 @@ pub fn fresh(counters: &mut Counters, family: Family) -> Option<u64> {
         Header::Clean | Header::Dirty => {}
     }
     let counter = match family {
+        Family::Project => &mut counters.deployment.projects,
         Family::Task => &mut counters.deployment.tasks,
         Family::Person => &mut counters.deployment.people,
         Family::SignIn => &mut counters.deployment.sign_ins,
@@ -171,4 +177,28 @@ pub fn fresh(counters: &mut Counters, family: Family) -> Option<u64> {
     *counter = next;
     counters.header = Header::Dirty;
     Some(next)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_restored_projects_mark_allocates_the_next_number() {
+        let mut header = Counters::bootstrap([1; 16]).deployment();
+        header.projects = 5;
+        let mut counters = Counters::new(header);
+        assert_eq!(fresh(&mut counters, Family::Project), Some(6));
+        assert_eq!(counters.next_commit().projects, 6);
+    }
+
+    #[test]
+    fn an_exhausted_projects_mark_refuses_without_changing_the_header() {
+        let mut header = Counters::bootstrap([1; 16]).deployment();
+        header.projects = u64::MAX;
+        let mut counters = Counters::new(header);
+        assert_eq!(fresh(&mut counters, Family::Project), None);
+        assert_eq!(counters.deployment(), header);
+        assert!(!counters.dirty());
+    }
 }

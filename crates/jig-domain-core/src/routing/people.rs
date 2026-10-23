@@ -32,6 +32,7 @@ pub(super) fn route_people(
             }
         }
         core.seed_owners = Box::new([]);
+        core.seed_projects = Box::new([]);
     }
     if let people::Event::Forget { task, .. } = &event {
         drop(core.archived_chats.remove(task));

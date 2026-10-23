@@ -54,7 +54,7 @@ pub(crate) use watch_marks::finish_watches;
 
 pub(crate) mod account_requests;
 mod children;
-mod first_start;
+pub(crate) mod first_start;
 mod historical;
 #[path = "notes.rs"]
 mod note_routes;

@@ -463,6 +463,10 @@ pub(super) fn engine_startup(
     };
     let core = config::core(&parsed.engine, seeds.deployment, seeds.seed);
     let root = root::Config { core, first: parsed.first, second: parsed.second };
+    let mut first_periods = List::with_capacity(parsed.limits.root.core.authority.projects);
+    for project in &root.core.seed_projects {
+        first_periods.push((project.number, project.policy.policy.period_spend)).expect("seed project bound");
+    }
     let connector = parsed.limits.root.connector;
     let mut systems =
         [System::new(connector.resources, connector.made), System::new(connector.resources, connector.made)];
@@ -483,9 +487,7 @@ pub(super) fn engine_startup(
         store,
     );
     // configuration.md, 5: the smallest source opens only an empty deployment.
-    for project in &parsed.engine.projects {
-        engine.first_periods.push((project.number, project.policy.period_spend)).expect("configured project bound");
-    }
+    engine.first_periods = first_periods;
     Ok((engine, parsed.limits.io, bytes, parsed.engine.memory))
 }
 

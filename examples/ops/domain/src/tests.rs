@@ -344,6 +344,10 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
     use jig_domain_tasks as tasks;
     let (mut domain, env) = fixture();
     restore_chat_account(&mut domain, &env);
+    for row in jig_core_world::fixtures::seeded_project_rows(&jig_core_world::world::config(17).core) {
+        step(&mut domain, &env, Event::Store(Store::Restore(crate::Record::Core(row))));
+        settle(&mut domain, &env);
+    }
     for event in [
         core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) }),
         core::Event::People(people::Event::Restored),

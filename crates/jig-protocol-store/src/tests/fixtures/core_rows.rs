@@ -15,6 +15,7 @@ pub fn deployment() -> core::Deployment {
         runs: 15,
         calls: 16,
         connector_rows: 17,
+        projects: 20,
         applications: 18,
         commits: 19,
     }

@@ -285,7 +285,7 @@ fn requester_template_overrides_refuse_invalid_ending_authority_without_changing
         );
         assert_eq!(template_policy(&core), before);
         assert_eq!(core.settings.templates, templates);
-        assert_eq!(core.template_overrides.len(), 0);
+        assert!(core.template_overrides.get(&PROJECT).expect("seed overrides").is_empty());
     }
 }
 
@@ -298,13 +298,14 @@ fn requester_template_restore_refuses_invalid_ending_authority_without_changing_
         core.settings.templates = Box::new([requester_template(conversation)]);
         let templates = core.settings.templates.clone();
         let before = template_policy(&core);
+        clear_projects(&mut core, &limits);
         let mut restored = before.clone();
         restored.templates =
             Box::new([people::TemplateOverride { executor: Some(executor), ..executor_override(PROJECT) }]);
         assert!(!core.restore_policy(&limits, PROJECT, Box::from("Project 1"), restored));
-        assert_eq!(template_policy(&core), before);
+        assert!(core.authority.policy(PROJECT).is_none());
         assert_eq!(core.settings.templates, templates);
-        assert_eq!(core.template_overrides.len(), 0);
+        assert!(core.template_overrides.is_empty());
     }
 }
 
@@ -344,11 +345,12 @@ fn invalid_restored_template_overrides_leave_the_entire_policy_unchanged() {
         ("unknown charter", Box::from([executor_override(UNKNOWN)])),
         ("duplicate template", Box::from([executor_override(PROJECT), executor_override(PROJECT)])),
     ] {
+        clear_projects(&mut core, &limits);
         let mut restored = before.clone();
         restored.period_spend = 1; // A second field must not slip through a refused restore.
         restored.templates = overrides;
         assert!(!core.restore_policy(&limits, PROJECT, Box::from("Project 1"), restored), "{name}");
-        assert_eq!(template_policy(&core), before, "{name}");
+        assert!(core.authority.policy(PROJECT).is_none(), "{name}");
     }
 }
 
@@ -359,6 +361,7 @@ fn a_valid_template_override_changes_and_restores_the_policy() {
     let value = core
         .change_policy(&limits, OWNER, PROJECT, people::PolicyChange::Templates { overrides: overrides.clone() })
         .expect("compatible override");
+    clear_projects(&mut core, &limits);
     assert!(core.restore_policy(&limits, PROJECT, Box::from("Project 1"), value));
     assert_eq!(core.template_overrides.get(&PROJECT), Some(&overrides));
 }
@@ -368,12 +371,12 @@ fn a_valid_template_override_changes_and_restores_the_policy() {
 fn startup_rejects_an_incompatible_merged_template() {
     let mut config = config(41);
     config.settings = template_settings();
-    config.template_overrides.insert(PROJECT, Box::new([executor_override(OTHER_CHARTER)])).expect("project room");
+    config.seed_projects[0].policy.templates = Box::new([executor_override(OTHER_CHARTER)]);
     let mut limits = limits();
     limits.tasks.charters = OTHER_CHARTER;
     for charter in &config.settings.charters {
         let bytes = policy_owned_bytes(&charter.policy).expect("bounded fixture policy");
         limits.run_bytes = limits.run_bytes.max(u32::try_from(bytes).expect("fixture policy size"));
     }
-    drop(Core::new(config, &limits).expect("fixture core configuration"));
+    drop(seeded_core(config, &limits).expect("fixture core configuration"));
 }
