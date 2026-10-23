@@ -129,8 +129,12 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   - the operations of `../client/domain/contract.md`, 3.2, one record
     each, by their names: `Create`, `Propose`, `Withdraw`, `Message`,
     `Amend`, `Cancel`, `Release`, `Stop`, `Move`, `Decide`, `Answer`,
-    `Take`, `HandBack`, `Seen`, `MakeProject`, and the project's own; and
-    `Compound { project, operations }` (3.4 of it);
+    `Take`, `HandBack`, `Seen`, `MakeProject`, `ChangeSettings`,
+    `MoveToNewest`, and the project's own; and
+    `Compound { project, operations }` (3.4 of it). A change of settings
+    carries each value as the configuration's member describes it, field
+    for field, a charter's instructions as text and an application's
+    kind's value as its bytes (`../domain/engine.md`, 17.1 and 17.5);
   - their answers, with refusals' facts (section 4 of it), *version not
     served* among them;
   - the reads of its section 6 and their pages, the task query among
@@ -906,7 +910,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   an opening is refused busy, within the views' limits on a party's
   watches and on all (`../domain/engine.md`, section 13); exchanges in
   flight per sign-in, which its clients share, since an exchange names
-  no stream, and in all; a message's bytes, what a stream may have
+  no stream, and in all; a message's bytes, which bound a change of
+  settings (`../domain/engine.md`, 17.8), what a stream may have
   queued before nothing more is handed out, the heartbeat's span, mints
   in flight.
 - **The default mapping's,** at each end: its HTTP machines', TLS's, and

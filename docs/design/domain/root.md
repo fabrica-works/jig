@@ -190,6 +190,15 @@ It inspects nothing it holds. What jig asks of it:
   core. What the core says of a procedure's step, the task it made, goes
   to the procedure's connector in the same decision, and is never
   dropped (connectors.md, 6.3).
+- **Settings of the application's kinds** (engine.md, 17.5): a change's
+  items of a kind go, as a hand-off within the change's step, to the
+  connector the kind names, and its acceptance or refusal back to the
+  core; the values committed, and at a start the current ones, go to it
+  in the same decision. The root routes by the kind's connector number,
+  which may name any child of its own, and reads nothing of the values.
+  A child of the application that needs a value reads it through the
+  core, by kind, scope and number, as the root reads a task's charter
+  through `charter_of` (engine.md, 17.3).
 - **A project made** (`people.md`, 5.2): the core's word that it was
   made, released once its commit is durable, goes to the application's
   period source, which, keeping a calendar, says the project's periods
@@ -272,10 +281,11 @@ in the root between steps; each owner hands over its part once.
 
 The core runs restart as a script (engine.md, section 6). The root:
 
-1. loads the core's live ranges and restores them into the core, then
-   says done;
-2. for each connector the core names, asks it for its live ranges, loads
-   them, restores them into it, then says done;
+1. loads the core's live ranges, the deployment's and then the
+   settings' first, and restores them into the core, then says done;
+2. for each connector the core names, hands it its kinds' settings as
+   the core gives them, asks it for its live ranges, loads them,
+   restores them into it, then says done;
 3. tells the core when the fleet's claims have been given, and passes on
    workers' hellos as they dial in;
 4. asks each connector to read afresh, and says done when each has;

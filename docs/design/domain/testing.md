@@ -1,6 +1,6 @@
 # Testing the domain
 
-Provisional, 2026-10-07, revised 2026-10-22. How jig's domain is tested,
+Provisional, 2026-10-07, revised 2026-10-23. How jig's domain is tested,
 and how it tests an application's: the worlds of jig's own parts, the
 core's world, and the conformance world every application runs its
 domain on, with the referee that holds it to jig's promises. It applies
@@ -49,7 +49,8 @@ referee in the loop, the heap counted at every iteration
 - **tasks:** batches, lifecycle, holds and queues, inboxes, wakes,
   proposals; a task's label, flags and last activity, cancels with a
   grace across a restart, goals per project, the ended indexes saved as
-  tasks end, and what parties and agents ask alike (tasks.md,
+  tasks end, what parties and agents ask alike, and each task's
+  revision, its moves and its charter version's models (tasks.md,
   section 12).
 - **authority:** step tests only, as a decision over data; one batch
   under a task and under a party answering alike, and `AsAllowed`
@@ -67,7 +68,9 @@ referee in the loop, the heap counted at every iteration
   retained replay and conflicts, legacy `Seen` answers restored through
   original expiry, and reprocessing to a maximum watermark are checked
   without a new harness, tier or budget (people.md, 5.1 and section 6).
-- **fleet:** hosts of both kinds, placement, fencing, graces, adoption.
+- **fleet:** hosts of both kinds, placement, fencing, graces, adoption;
+  host needs per charter version, a run of an older version placed on a
+  host its version allows and the newest's does not (engine.md, 17.3).
 - **brief:** sections planned, gathered, cut by size, a required one
   missing; connectors' sections as sizes and tokens only.
 - **views:** watches of jig's subjects marked by generated commits: a
@@ -128,6 +131,18 @@ The existing charters and templates stories check `me`'s
 and omitted intent, a chosen executor, no eligible model, and account,
 policy, membership and effective-executor changes that refresh the
 preview. The resolver and payer are Create's own (engine.md, 11.1).
+
+Settings (engine.md, section 17) are tested where each part lives, most
+of it below this world: the current settings from defaults and changes,
+the check, a charter's version for a revision, the held revisions'
+accounting and the bounds' arithmetic as step tests of the core's
+settings functions, pure and fast; the records' round trip and
+goldens in the store's tests (`../protocol/store.md`, section 14); the
+document's members read as defaults, and the new limits, in the
+configuration's tests; the change's and the move's records in the
+client wire's. This world holds what needs the decision and the
+children together: the stories of engine.md, section 15. None needs a
+process: the world's cold restart shows what a restart keeps.
 
 First-start and restart stories use people roster capacities equal to
 and above the actual configured project count; they seed the whole set
@@ -262,6 +277,11 @@ becomes observations:
   connector's mechanics; no amendment or release made against a
   revision that had moved since the one its party, run or procedure
   named.
+- **A run reads its revision:** every assignment a host saw carries the
+  charter version of the revision its run was prepared under, and every
+  task's revision in the store was the newest when it was made or
+  moved; every change of settings is in the store whole or not at all,
+  and a refused one left nothing.
 - **Bounded:** the heap within the worst case at every iteration, and
   every story ending within its bound.
 
@@ -290,8 +310,9 @@ more than one world needs them (testing-strategy.md, section 4):
   conditions, late copies and uncertainty, requirements guarded and
   observed, judged on its facts, procedures that step, wait, delegate,
   amend, cancel with a grace, message and finish, topics with classified
-  news, some offered to agents, drift, and a fake system beneath it that
-  reports what it saw. The core's world runs two of them, so that
+  news, some offered to agents, drift, kinds of settings of its own,
+  judged on its facts, accepting or refusing as the seed draws, and a
+  fake system beneath it that reports what it saw. The core's world runs two of them, so that
   judges, resources and kinds cross connectors, with names and kinds
   generated from the seed;
 - **the referee and the harness** of the conformance world.
@@ -321,6 +342,19 @@ read positions, revisions named by runs and procedures) join the
 scenarios of the worlds they belong to, a few cuts each in the focused
 suite and swept with the rest in the fuzzy one: none needs a suite of
 its own.
+
+Settings' tests are priced so (engine.md, section 17). Their step tests
+are pure functions over a few settings, each well under a millisecond.
+The core's world gains about a dozen focused scenarios (half with the
+change, half with revisions and moves), the tasks child's and the
+fleet's a few each, each as long as the scenarios beside it, a few cuts
+each: about what the runtime projects' stories added, a small part of
+the focused suite's 30 seconds. The fuzzy suite gains no sweep: a change
+of settings, and a move, become two more operations its random worlds
+draw, at the cost of the steps they take. Each milestone that adds them
+measures both suites before and after on the gate; past a budget, it
+finds the cost first, and if the cover needs more time than the budget
+gives, it says so to the user rather than cutting the cover.
 
 ## 10. Open questions
 

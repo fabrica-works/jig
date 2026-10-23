@@ -204,7 +204,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 | Operation | Names | Becomes |
 |---|---|---|
 | `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person, or a role, which is the project's: roles are per project, `../../domain/people.md`, section 1), spec, result contract (a report, a change or a verdict: an approval is a procedure's, `../../domain/people.md`, section 8), authority, whose spend and deadline are the task's budget and deadline (`../../domain/authority.md`, section 3), that budget as named there or `AsAllowed`, that deadline a wall or a span (below), wake policy, or none for its executor's default (`../../domain/tasks.md`, 8.3), as an agent's delegate may leave it, dependencies and inputs, the grants named after it (`../../domain/authority.md`, section 4), tracked and priority, label and flags, and its LLM choice (its main model with its effort, the models its run's sub-agents may use with theirs, and an account, any of them left out for its charter's default: `../../domain/tasks.md`, section 3); and the dependencies among its tasks. The other resources a task will write are those its connectors name from its executor and spec (`../../domain/tasks.md`, section 4) | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks numbered consecutively in the batch's order, the first and the last answered, and the `AsAllowed` task, if any, with what it was given |
-| `Propose` | a project; the action: a batch, or an amendment (a widening of a task's authority among them); a party makes no effect (`../../domain/people.md`, 5.1); a reason | a proposal to whoever may accept it, its number answered (3.5) |
+| `Propose` | a project; the action: a batch, or an amendment (a widening of a task's authority among them); a party makes no effect (`../../domain/people.md`, 5.1); or, in the deployment's scope, a change of settings, as `ChangeSettings` names it but for whether running work moves (`../../domain/engine.md`, 17.6); a reason | a proposal to whoever may accept it, its number answered (3.5) |
 | `Withdraw` | the party's own pending proposal | withdrawn |
 | `Message` | a task; the words | words in its inbox, their message number answered |
 | `Amend` | a task; its spec's revision, or a person task's for its address; the change: spec and parameters, instructions, authority, wake policy, its dependencies as a whole list (those it names anew added, those it leaves out removed: `../../domain/tasks.md`, section 7), a person task's address, tracked and priority, its LLM choice, which its next run takes; a reason | amended; an active task given a pending dependency kept until it is done (`../../domain/tasks.md`, 5.7). A change of priority alone names no revision: the first commit decides |
@@ -212,11 +212,13 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 | `Release` | a held task; its hold's revision; for an uncertain effect that cannot be recovered, whether to make it again | its hold lifted, judged afresh |
 | `Stop` | a task | its run cancelled, the task held for the party |
 | `Move` | a task the party may amend; a reason | the party its requester, its reservation moved to their pool (`../../domain/tasks.md`, section 7) |
-| `Decide` | a proposal, by its proposer and number: accept, reject with a reason, or pass up; or an escalation, by its held task and its hold's revision: release, leave held with a reason, or pass up | as `../../domain/tasks.md`, section 9 has it; or decided first, by whom and how |
+| `Decide` | a proposal, by its proposer and number: accept, for a proposal of settings with whether running work moves, reject with a reason, or pass up; or an escalation, by its held task and its hold's revision: release, leave held with a reason, or pass up | as `../../domain/tasks.md`, section 9 has it; or decided first, by whom and how |
 | `Answer` | a question, by its task and message, with the words; or a person task, by its revision, with the answer its contract asks (a choice, words, or the state an approval approves) or that it cannot be done | an answer to the question; the person task's result |
 | `Take`, `HandBack` | a person task addressed to a role the party holds | held by them, or back to the role |
 | `Seen` | how far the party has read: their results, or one conversation's turns | their durable read position advanced to `max(old, through)`; after completion a retry checks current subject and authority and may return `Unknown` after forget or `Role` after authority loss, never recreating history or replaying a new completed answer (3.1; `../../domain/people.md`, section 6) |
-| `MakeProject` | the deployment, its scope (7.5); the new project's name (`../../domain/core.md`, 6.1); a configured policy's number (`../../protocol/configuration.md`, section 3) | a project, its policy a copy of the configured one, its maker its owner and only party (`../../domain/people.md`, 5.2), its number answered; the maker's `me` gains it. Not among a compound request's operations (3.4) |
+| `ChangeSettings` | the deployment, its scope (7.5); the revision the party saw; the items, at most one per setting, each a setting (a charter, a template or a policy by number, the rules, or an application's kind, scope and number) and what becomes of it: set to a value whole, a charter's instructions as text, removed, or reset to its default; whether running work stays or moves (`../../domain/engine.md`, 17.2) | the settings changed in one decision, the new revision's number answered; the deployment's `settings` and every `me` whose templates changed marked. Not among a compound request's operations (3.4) |
+| `MoveToNewest` | the deployment, its scope (7.5); a revision held | every live task on it that may move set to the newest revision in one decision, the count of those that could not answered (`../../domain/engine.md`, 17.4) |
+| `MakeProject` | the deployment, its scope (7.5); the new project's name (`../../domain/core.md`, 6.1); the number of a policy among the settings, the newest's (`../../domain/engine.md`, 17.1) | a project, its policy a copy of that one, its maker its owner and only party (`../../domain/people.md`, 5.2), its number answered; the maker's `me` gains it. Not among a compound request's operations (3.4) |
 | the project's own | notes, by the revision recalled; its name (`../../domain/core.md`, 6.1); the policy, its templates' overrides among them (3.6); roles; a party's pool; services, a service's credential answered once; as `../../domain/people.md`, 5.1 and 5.2 | the note or the project changed |
 | adopting a resource | the application's own request (3.3), its form the application's; the engine's root makes the people request on the party's behalf | the project changed |
 | the party's LLM accounts | as `../../domain/accounts.md`, section 5 has them: signing in with an LLM provider; signing a source out; adding or replacing a key, carrying its value (3.1), of at most the bytes `me` states (5.1), and removing one; declaring a program's login under a name; checking a program source's login; an account's place among the holder's and its sources' order; its uses; resuming a limited source; removing an account, which signs each of its sources out and erases its keys; moving an account out, saying it *written* by the move's number, and moving one in, carrying the moved file as its value (3.1; `../../domain/accounts.md`, section 6). The party's own accounts, or, for an owner, the deployment's | an account made, renewed or changed. A sign-in is answered done with the address to open in a browser on the engine's machine, and ends on the `accounts` watch (7.1), made, renewed or refused; a sign-out's answer says whether the provider confirmed revocation, and names each host that did not sign a program's login out; a program's login declared is answered with the source's name, by which the application's own command signs the program in on each host; a move out is answered *moving out*, naming the account and the move's number, with the moved record to write, once (3.1); *written* is answered done; a move in is answered *moved in*, naming the account and whether it renewed one |
@@ -475,7 +477,16 @@ Every request has one answer, of one of these kinds:
     rename gives, under simple case folding (`../../domain/core.md`,
     6.1); it names no project, which the party may not see;
   - *not offered:* the deployment does not offer it (an executor it does
-    not have);
+    not have, a charter its newest revision removed);
+  - *stale:* a change or a proposal of settings names a revision other
+    than the newest, which it names (`../../domain/engine.md`, 17.2);
+  - *judged:* an application's connector refused an item of its kind of
+    settings, naming the item and with its reason, in its own words
+    (`../../domain/engine.md`, 17.5);
+  - *full:* the settings' revisions or charter versions held would pass
+    their limits, naming the oldest revision held and its live tasks,
+    cut at their limit, which a `MoveToNewest` may move
+    (`../../domain/engine.md`, 17.8);
   - *circle:* the batch or the dependencies an amendment adds would close
     a circle of waits, with the live tasks or among its own: the circle's
     tasks, in order, each waiting for the next, cut at its limit
@@ -488,7 +499,9 @@ Every request has one answer, of one of these kinds:
   - *not well formed:* which task or operation, and why (two tasks of a
     batch giving `AsAllowed`; the conversation flag on a task that is not
     an agent's; a proposed batch giving `AsAllowed`; a project's name out
-    of shape, saying which rule);
+    of shape, saying which rule; a change of settings whose settings
+    would fail their check, naming the item and what fails, or that
+    changes nothing);
   - *key conflict:* the key names another ask, which is a client's bug
     where the client drew the key (3.1);
   - *account move:* an account's move refused, saying why: *not signed
@@ -631,6 +644,15 @@ served is held, kept and unsent, for its owner's version (client.md,
     check the party asked is in progress
     (`../../domain/accounts.md`, sections 3 and 5). It holds no value,
     and the words and screens are the application's.
+  - *the settings:* the newest revision's number; each setting, by kind,
+    scope and number, with its name where it has one, whether it
+    follows its default or a change, and the revision that last changed
+    it; each revision held, with who decided it, when, the proposal it
+    came from, and how many live tasks hold it; the pending proposals of
+    settings, by number (`../../domain/engine.md`, section 17). It
+    carries no value: one setting is read whole on its own, from the
+    newest or a held revision (section 6). Seen by a party with a
+    deployment role, and a project's items by a party with a role there.
 Program host facts use each worker's whole configured name. Inventory still awaited
 is unknown, including after a reconnect; a disconnected worker's earlier inventory
 is not a current login fact. The deployment lists all issued names, including
@@ -925,6 +947,7 @@ party reads is therefore never lost by a crash.
 | `tasks{query}`: a task query's page (6.1) | live state, then the store's indexes of ended tasks |
 | a project; its spend, a page; its notes, a page | live state; the store; the notes child |
 | the deployment | live state |
+| `settings`; `setting{kind, scope, number, revision}`: one setting's value whole, as the newest reads it, or, for a charter, as a held revision reads it; a revision's items, as it set them | live state; the store's history, for a revision no longer held (`../../domain/engine.md`, 17.7) |
 | an application's read, naming its owner, its scope and its window (7.5) | its owner, the connector, through the engine's root |
 
 - **An ended subject is read, not watched.** A watch on a subject that
@@ -1021,6 +1044,7 @@ party reads is therefore never lost by a crash.
 | `tasks{query}` | the live task lines a query selects (6.1), in its order, within the watch's window, saying whether there are more | a party with a role in the project it names; a query naming no project, only the party, for tasks whose requester they are |
 | `run{n}` | a task's live run: its attempt, its provisional text and current call (7.3) | a party who may see the task |
 | `deployment` | hosts, accounts, capacity | a party with a deployment role |
+| `settings` | the settings (5.1) | a party with a deployment role; a project's items, a party with a role there |
 | `accounts` | the party's accounts (5.1): their own LLM accounts, their sources and states, their sign-ins and checks under way, and whether an account serving their work is *usable* and everything they asked is *settled* | the party, always |
 | an application's subject, naming its owner, its scope and its window | the application's document | a party the scope admits (7.5); what of it they may see, as its owner, the application's connector, says |
 

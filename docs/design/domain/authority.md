@@ -1,6 +1,6 @@
 # Authority
 
-Provisional, 2026-10-07, revised 2026-10-19. What a task may do, and how
+Provisional, 2026-10-07, revised 2026-10-23. What a task may do, and how
 the core holds it there: authority as a value, its order and how
 delegation narrows it, where it comes from, budgets and what is spent,
 the checks every action passes, what a proposal needs and what accepting
@@ -196,12 +196,14 @@ deployment's rules       the most any project may have; requirements on effects
         its delegates    narrowed at every level
 ```
 
-- **The deployment's rules** are configuration: the connectors and the
-  kinds of effect any project may be granted, the models any project may
-  use, the deployment's spend per period, the charters and procedures it
-  has, the limits, and the
-  requirements every project's effects meet. A rule may forbid what no
-  project may grant at all.
+- **The deployment's rules** are a setting (engine.md, section 17): the
+  binary's default, with the change an owner of the deployment stored
+  over it, read afresh by every decision: the connectors and the kinds
+  of effect any project may be granted, the models any project may use,
+  the deployment's spend per period, the charters and procedures it
+  has, the limits, and the requirements every project's effects meet. A
+  rule may forbid what no project may grant at all. A change of them is
+  a narrowing or a widening below.
 - **A project's policy** is in the store, whole, from its seed or, for
   a project made after the first start, copied from a configured policy
   (`../protocol/configuration.md`, section 3); changed by the parties
@@ -589,7 +591,10 @@ proposals wait and how they move is tasks.md, section 9.
   requirement refused. A party proposes a batch or an amendment, a
   widening of a task's authority among them: a party makes no effect,
   and their own authority is their role, which the policy sets
-  (people.md, 5.1).
+  (people.md, 5.1). A change of settings may be proposed by a party
+  with a role or by a run its charter lets (engine.md, 17.6); no task's
+  authority covers one, so only owners accept it, and accepting it
+  funds nothing: a setting is spent from by what is made under it.
 - **Proposing is explicit,** for tasks and parties alike. An action
   beyond authority is refused, naming what it lacked and whether a
   proposal could be accepted; who would accept it is the offer's to say

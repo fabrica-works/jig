@@ -77,6 +77,8 @@ application root            routes between the core and every connector
   | keep this effect under this key, or under this proposal; drop it | — (part of the decision) |
   | make this outbox entry (the journal released it) | made, with what it made; failed; uncertain |
   | judge this requirement for this effect's state | met; wait, for what; refuse, on which fact |
+  | judge these items of your kinds of settings, for the revision they would make (section 17) | accept; refuse, why |
+  | your kinds' settings now: at a start, and in each change's decision | — (part of the decision) |
   | a procedure task: made with its parameters; activated; a message; closing; what its step made, with the revisions it names; a step refused, and why | a step's decision: effects, batches, amendments, cancels, proposals, messages, a hold, a result |
   | project this goal: its state, its plan, its milestones | the projection's effects |
   | release what this closing task held | the release's effects |
@@ -716,7 +718,8 @@ Each connector keeps its system's request budget:
 At a restart (engine.md, section 6), a connector is given, when the core
 asks for each step:
 
-1. **its records:** its live resources, its procedures' states and
+1. **its settings, then its records:** its kinds' current settings
+   (section 17); its live resources, its procedures' states and
    parameters, its outbox, its projections' states, what it made by key,
    and its own state, loaded from its live ranges;
 2. **a fresh read:** it reads afresh what its system owns of its live
@@ -766,3 +769,26 @@ history making the same calls while idle.
   section 13).
 - **Freshness defaults:** how fresh each kind of observed requirement
   must be by default, before a policy says.
+
+## 17. An application's settings
+
+A connector may own kinds of settings of the application's (engine.md,
+17.5): the application declares each kind with its connector's number,
+and the core keeps, stores and revisions the values as bytes it never
+reads.
+
+- **Judged in the change's decision.** A change naming items of its
+  kinds reaches it as a hand-off within the decision's step, as a
+  requirement's verdict does (section 7): the items, each its kind,
+  scope and number and the value it would leave or its removal (a reset
+  as the default it returns to), and the revision they would make. It accepts, or refuses with a reason in its own words,
+  which the change's refusal carries to the party. A judge reads only its
+  own state, and decides what the items mean in its system's terms.
+- **Told in the same decision.** Once the change is committed, it hears
+  its kinds' new values, and acts on them from then on; at a start it
+  hears them before its records (section 14), judged again by nobody,
+  and refuses the start only for a value it cannot read.
+- **Never pinned:** it reads the newest, whatever revision a task it
+  serves was made in.
+- **Its world** scripts changes of its kinds, judged both ways, and a
+  restart that hands them back (section 15).

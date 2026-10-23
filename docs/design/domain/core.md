@@ -1,6 +1,6 @@
 # The model
 
-Provisional, 2026-10-07, revised 2026-10-22. What jig's domain is
+Provisional, 2026-10-07, revised 2026-10-23. What jig's domain is
 beneath its parts: an engine core that runs work done by agents,
 procedures and people, keeps it in its own store, and drives external
 systems through an application's connectors. Every other document in
@@ -29,8 +29,9 @@ gives the order and the names). The mechanics are those of skein's
   coding agent spawns sub-agents; the core makes it durable, schedules
   it, and holds it to its authority.
 - **The core owns its state.** Projects, tasks, their inboxes and
-  results, transcripts, proposals, notes and the outbox live in the
-  application's store, which only its engine reads and writes. The engine
+  results, transcripts, proposals, notes, the outbox and the settings'
+  changes live in the application's store, which only its engine reads
+  and writes. The engine
   holds bounded working sets, rebuilt from the store and the connectors
   after a restart. A connector's system keeps what is the system's.
 - **A decision commits once** (section 4): its change of state and the
@@ -56,6 +57,11 @@ gives the order and the names). The mechanics are those of skein's
   chat is sugar over them, built only from plumbing.
 - **Mechanics are code, judgement is an LLM's.** Procedures carry out
   what needs no judgement. An LLM is woken for what does.
+- **Settings change at runtime** (section 13). Charters, templates, the
+  policies projects are made from and the rules are the binary's
+  defaults with the store's changes over them; a change is one decision,
+  and makes a revision. New work takes the newest; a task's runs keep
+  the charter of the revision it was made in, until it moves.
 - **Bounded, and complete in its domain.** What the engine holds grows
   with the work in progress, never with history. Every entity has a
   limit, refused at the entrance. A world of domains and fakes runs
@@ -296,7 +302,7 @@ A project begins in one of two ways:
   (`../protocol/configuration.md`, sections 3 and 8).
 - **Made** after it, by a party whose role in the deployment is owner
   (people.md, 5.1): with the name its maker chose, a copy of a
-  configured policy (`../protocol/configuration.md`, section 3), and its
+  policy among the settings (section 13), and its
   maker as its owner and only party (people.md, 5.2). Its number is the
   deployment's next, past every project seeded or made, and never given
   again.
@@ -667,6 +673,11 @@ transport carries its messages, nothing above them can break them.
   make.
 - **Bounded.** What the engine holds stays within its limits, whatever
   the history in the store; every story ends within a bound.
+- **A run reads its revision.** What a run is given of its charter is
+  the version its task's revision read when the run was prepared,
+  whatever changed since; what it may do is the authority that stands
+  when it decides. A change of settings is committed whole or not at
+  all.
 
 Where these stop, above the API, the application holds:
 
@@ -694,3 +705,36 @@ Where these stop, above the API, the application holds:
   triage news before a coordinator wakes. Tuned from use (tasks.md,
   section 13).
 - **Scaling out:** one engine per deployment until it binds.
+
+## 13. Settings
+
+What configures work, beyond what a process needs before it reads its
+store, is the deployment's settings: its **charters**, its
+**templates**, the **policies** its projects are made from, its
+**rules**, and an application's own kinds (engine.md, section 17).
+
+- **Defaults, and changes over them.** The binary holds the defaults;
+  the store holds what was changed, setting by setting. A setting never
+  changed follows its default, so a release that improves one reaches
+  every deployment that kept it. A reset erases a change.
+- **A change is one decision** (section 4): a set of settings, checked
+  whole as a start checks them, against the revision it names, and
+  refused as stale when another is the newest. The deployment's owners
+  change the deployment's settings, and a project's owners an
+  application's settings kept per project; a project's own policy stays
+  its owners' (people.md, 5.2). Anyone else proposes, and an owner's
+  acceptance is the same decision (tasks.md, section 9).
+- **A revision is the settings as a change left them.** Each task
+  records the newest when it is made, and its runs read their charter
+  from it: its instructions, models, tool families, hosts, waiting,
+  resume and budget. Templates, policies and the rules are read only as
+  things are made or decided, so the newest is the one.
+- **Running work keeps its charter.** A change reaches a running task
+  only when it moves: a conversation at its next run, other work when
+  a change or an owner moves it, each only if the newest still offers
+  its charter. A removed charter lives while a task holds it; a task
+  that cannot move finishes where it is.
+- **What a task may do is never pinned:** its authority is the rules'
+  and its project's policy's as they stand (authority.md, section 6).
+- **Bounded:** revisions held and the charter versions they read are
+  limits, sized at the start (engine.md, 17.8).

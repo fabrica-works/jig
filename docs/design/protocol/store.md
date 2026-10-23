@@ -193,9 +193,11 @@ child puts live first.
 | component | the installation's identifier, at its reserved key in the accounts' family (01 04 03): drawn by the shell at each start (`configuration.md`, section 8) and kept by the store's first commit, beside the format row (5.3), so that each later start's draw is ignored | none: one row | at open, handed up as the store opens, never by the restart's ranges (7.2) |
 | component | transcripts' places: each task's committed length and its current window's start; each attempt's first turn | task; task, attempt | at open, the run proofs' tasks' lengths (8.4); the rest when read |
 | core | the deployment: its id, its numbers (the next project's among them, past every project seeded or made), the last commit | none: one row | at start |
+| core | settings (`../domain/engine.md`, 17.7): the defaults the newest revision was made with, a record per setting; the changes over them, a record per setting changed (its value whole, or its removal, with the revision that made it); the held revisions' records; the charter versions held revisions read and the newest does not; pending proposals' sets | kind, then scope (0 for the deployment, a project's number), then number, for defaults and changes; revision; charter, then the revision that made it; proposal | at start, after the deployment's row, before every other family of the core's |
+| core | settings' history: the records of revisions no longer held, each with its number, the revision it was made against, when, who decided it, the proposal it came from, whether it moved running work, and its items with the values they set; within the history limit, the oldest erased by the decision that makes a newer one | revision | on demand |
 | core | goals' projections (feed, plan rows, pending milestones), run proofs, calls committed since a live task's last turn, live agent tasks' conversations (their first attempt, their current window's start) | a goal's, then its own; task; task, attempt, completion, position; task | at start |
 | core | turns (in transcripts' files, section 8), terminals, decisions on proposals and escalations | task, attempt, turn; task, attempt; proposer, proposal; task, revision | on demand |
-| tasks | live tasks, stubs naming ended results, the funders' live periods, writer slots, pools' slots, pending proposals | task; task; funder; slot; proposal | at start |
+| tasks | live tasks, each with its revision and its claim's (`../domain/engine.md`, 17.3), stubs naming ended results, the funders' live periods, writer slots, pools' slots, pending proposals | task; task; funder; slot; proposal | at start |
 | tasks | ended tasks, past periods, decided proposals, history, milestones, activity | task, then a position or revision; funder, period; proposal | on demand |
 | people | parties, sign-ins (no secret), roles, projects' names and whole policies (their ceilings, escalation roles and overrides of templates among them), seeded and made alike, read positions over results and over live conversations, answered keys within the retention, a party's or, for the deployment's acts, a connector's (`../domain/people.md`, 5.3), including program declarations and checks, their declared names, and sign-out/removal answers naming unconfirmed configured workers with their original failure reasons | as the people child keys them; a live conversation's position by party, then task | at start |
 | people | ended conversations' read positions (7.4) | task, then party | at start, by the census, every row (7.2); otherwise on demand |
@@ -220,6 +222,16 @@ refuse to open under the existing format check; no migration is added.
 Component2/core5/people8/notes1 remain unchanged. The accounts family
 is version 2: a source's hold adds *moving* (`../domain/accounts.md`,
 section 6); accounts version 1 stores refuse to open likewise.
+
+Settings (`../domain/engine.md`, section 17) add the core's settings
+family's records (4.4) and a revision on each task's record and claim,
+each a new version of its family, taken from main's constants when its
+milestone lands. A store of an earlier version refuses to open under the
+format check (5.3), as every change of format before the baseline does;
+nothing is translated. A deployment made again from the same document,
+with no change stored, behaves as it did. Each record of a setting
+holds its value whole, a charter's instructions as text; their sizes
+follow from the limits that bound each kind (5.4).
 
 ### 5.1 Codecs
 
@@ -412,7 +424,9 @@ The core's restart script (`../domain/engine.md`, section 6) asks the
 root for one step at a time, and the root asks the store:
 
 - **the core's live ranges,** in the order the core restores them: the
-  deployment's header first, then the accounts' family (its counter,
+  deployment's header first, then the settings' live ranges (defaults,
+  changes, held revisions, charter versions, pending proposals' sets),
+  which every later record is judged against, then the accounts' family (its counter,
   accounts and sources: the interval stops before the installation's
   identifier, which the component keeps), then people's families (live
   conversations' read positions among them, ended ones never), then the

@@ -317,6 +317,7 @@ The operations as the client sends them are
 |---|---|---|
 | `Create`, a batch | member, within their role's authority and their pool (authority.md, 8.4); its dependencies and inputs within their reach, and a holder for its escalations (below) | its tasks, with their dependencies, checked whole and made at once (tasks.md, section 4), each with the fields it names (tasks.md, section 3); the party their requester and their funder; a budget given `AsAllowed` resolved, and what was given answered (authority.md, section 7) |
 | `Propose`, an action | member; a batch or an amendment beyond their authority, of a kind a role the project's policy names may accept | a proposal of theirs, waiting for that role (tasks.md, section 9), its number answered |
+| `Propose`, a change of settings, in the deployment's scope | a role in the deployment or a project; the revision they saw; an owner who may accept each item (engine.md, 17.6) | a proposal of settings, waiting for those owners, its number answered |
 | `Withdraw` | their own pending proposal | withdrawn (tasks.md, section 9) |
 | `Message` | the task in their tree, or maintainer | words in its inbox (tasks.md, 8.1), their message number answered |
 | `Amend` | the task in their tree, or maintainer, and a change within their authority; the spec's revision they saw, but for a change of priority alone; maintainer, for tracked or priority; dependencies added within their reach, as a batch's | tasks.md, section 7: its spec, instructions, authority, wake policy, a person task's address, whether it is tracked, its priority, its dependencies added or removed; a widened task funded from their pool (authority.md, section 7) |
@@ -324,13 +325,15 @@ The operations as the client sends them are
 | `Release` | the task in their tree, or maintainer; the hold's revision they saw; for an effect held uncertain, whether to make it again | its hold lifted, the task judged again (tasks.md, 5.5) |
 | `Stop` | the task in their tree, or maintainer | its run cancelled and its task held for a party's stop |
 | `Move` | they may amend the task; a holder for its escalations (below) | the party its requester, funded from their pool (tasks.md, section 7) |
-| `Decide` | the proposal or escalation waiting for them, as the requester of its tree or in a role the policy names; for an escalation, its hold's revision | accepted, if their authority covers it, and funded from their pool (authority.md, section 9: a batch's tasks, an effect's price, the task an amendment or a widening changes); rejected, with a reason; or passed up (tasks.md, section 9) |
+| `Decide` | the proposal or escalation waiting for them, as the requester of its tree or in a role the policy names; for an escalation, its hold's revision; for a proposal of settings, whether running work moves | accepted, if their authority covers it, and funded from their pool (authority.md, section 9: a batch's tasks, an effect's price, the task an amendment or a widening changes), or, for a proposal of settings, by an owner of each item it names, funding nothing (engine.md, 17.6); rejected, with a reason; or passed up (tasks.md, section 9) |
 | `Answer` | addressed to them or their role; a person task's revision as they saw it; for a person task, none of its dependencies pending (section 8) | an answer to a question, or a person task's result (section 8) |
 | `Take`, `HandBack` | a person task addressed to a role they hold | held by them, so no other answers it; or back to the role (section 8) |
 | `Seen` | the party themselves | their read position moved over results, or over one conversation's turns (section 6) |
 | a compound request | one project; each operation's own needs; within operations per request | its operations made in one decision, or none of them (below) |
 | adopt a resource, as a home or not; rename the project; change the policy, roles or services | owner; a name no other project holds, in shape (core.md, 6.1) | the project changed (5.2) |
-| `MakeProject`, in the deployment's scope | owner in the deployment (section 3); a name in shape that no other project holds (core.md, 6.1); a configured policy (`../protocol/configuration.md`, section 3); room in the deployment's projects | a project, numbered next, its policy a copy of the configured one, its maker its owner and only party (5.2) |
+| `ChangeSettings`, in the deployment's scope | owner in the deployment for the deployment's items, and owner of each project whose items it names (section 3 and 4); the revision they saw, the newest; the set within the checks and bounds of engine.md, 17.1 and 17.8; every connector judging an item of its kinds accepting it | the settings changed in one decision, the new revision answered; running work staying or moved, as it asks (engine.md, 17.2 and 17.4) |
+| `MoveToNewest`, in the deployment's scope | owner in the deployment; a revision held | every live agent task on it that may move set to the newest, in one decision, those that could not counted in the answer (engine.md, 17.4) |
+| `MakeProject`, in the deployment's scope | owner in the deployment (section 3); a name in shape that no other project holds (core.md, 6.1); a policy among the settings (engine.md, 17.1); room in the deployment's projects | a project, numbered next, its policy a copy of the configured one, its maker its owner and only party (5.2) |
 | edit or delete a note | the note's scope within their role | the note revised (engine.md, section 10) |
 | set a party's pool | owner | the pool opened or resized in the current period, what was spent and reserved kept |
 | an account request: sign in, sign out, add, replace or remove a key, declare or check a program's login, order, uses, resume, remove an account | the account's holder, not a role: a person for their own, a first owner for the deployment's (authority.md, 8.4) | accounts.md, section 5: the account's sources, states and uses changed; a value never committed |
@@ -354,7 +357,8 @@ The operations as the client sends them are
   7.3). A service is a program, so the same holds for it. `Propose` asks,
   with a reason, and the party is its proposer: its decision, a
   rejection included, reaches them. A party proposes a batch, or an
-  amendment, a widening of a task's authority among them; an effect and
+  amendment, a widening of a task's authority among them, or a change
+  of settings (engine.md, 17.6); an effect and
   a widening of a proposer's own authority are what tasks propose, since
   a party makes no effect, and their own authority is their role, which
   the policy sets (5.2; authority.md, section 9). Each document offers
@@ -367,7 +371,9 @@ The operations as the client sends them are
   (tasks.md, section 9). When the policy names none, `Propose` is refused
   at admission as lacking authority, saying that no proposal could be
   accepted; it is never committed as a proposal nobody may decide. A
-  proposal already pending, and the proposals tasks make, wait as
+  proposal of settings waits instead for the owners of its items, in
+  the deployment and in the projects it names, and is refused so when
+  there are none (engine.md, 17.6). A proposal already pending, and the proposals tasks make, wait as
   tasks.md, section 9 says.
 - **A party's root has someone to escalate to.** Every task a party's
   `Create` makes is a root, the party its requester. A party becomes a

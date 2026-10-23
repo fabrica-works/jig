@@ -4,8 +4,8 @@ Provisional, 2026-10-07, revised 2026-10-23. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
-how it runs agents, and the capabilities it keeps (the fleet, briefs,
-notes, views, accounts). The model is core.md; tasks are tasks.md,
+how it runs agents, the capabilities it keeps (the fleet, briefs,
+notes, views, accounts), and its settings, changed at runtime. The model is core.md; tasks are tasks.md,
 authority authority.md, connectors connectors.md, parties people.md,
 hosts hosts.md, LLM accounts accounts.md; what the application's root
 does with all of it is root.md. The mechanics are those of skein's
@@ -47,6 +47,11 @@ does with all of it is root.md. The mechanics are those of skein's
 - **Bounded.** The core holds live work only: live tasks, their inboxes
   and proposals, the runs in flight. Ended tasks, transcripts, history
   and notes are in the store, loaded when wanted.
+- **Settings are the binary's defaults with the store's changes over
+  them** (section 17): charters, templates, the policies projects are
+  made from, the rules, and an application's own kinds. An owner's
+  change is one decision and makes a revision; a task records the
+  revision it was made in, and its runs read their charter from it.
 - **The domain is complete** (programming-model.md, section 4): a world
   of domains and fakes runs everything the core does, with no protocol
   and no io (section 15).
@@ -118,7 +123,9 @@ translates between them with small total functions.
     by attempt and name, with the core's part of their answers (7.3);
   - the decisions in progress, between the hand-offs the root completes
     within one step (4.3);
-  - the restart script's state (section 6).
+  - the restart script's state (section 6);
+  - the settings: the defaults, the changes over them, the held
+    revisions and their charter versions (section 17).
 
 ## 4. Its vocabulary toward the root
 
@@ -332,10 +339,12 @@ answers to a run's reads.
 | Record | Written by | Loaded |
 |---|---|---|
 | the deployment: its id, made at its first start, and its numbers | the core | at start |
+| settings: the defaults the newest revision was made with, the changes over them, the held revisions' records, the charter versions they read and pending proposals' sets (17.7) | the core | at start, after the deployment, before every other record |
+| settings' history: the records of revisions no longer held, within the history limit (17.7) | the core | on demand |
 | projects: resources and roles, homes, policy, parties' roles | people | at start |
 | parties: identities, sign-ins | people | those with a live sign-in or a role, at start; others as they sign in |
 | parties' requests' keys, with their answers, for a retention | people | at start, those within it |
-| tasks: every field of tasks.md, section 3 (its label, flags, last activity, LLM choice and kept account among them), holds and their queues, writer slots, the last turn committed for a live attempt | tasks | live ones at start; ended ones on demand |
+| tasks: every field of tasks.md, section 3 (its label, flags, last activity, LLM choice, kept account and revision among them), holds and their queues, writer slots, the last turn committed for a live attempt, and the revision a claim was prepared under (17.3) | tasks | live ones at start; ended ones on demand |
 | LLM accounts: each account's holder, LLM provider, subject and display name, uses, and its sources in their order, each with its kind, a program's name, its state and a limit's reset; never a program's login on a host, which hosts report (accounts.md, 3.1 and 3.5) | accounts | at start |
 | the indexes of ended tasks: by requester, every ended task a party requested; by project, the ended tasks flagged listed; each saved in the decision that ends its task (11.2; `../protocol/store.md`, 7.4) | tasks | on demand |
 | parties' read positions over conversations: a live one's; an ended one's, moved by the decision that ends the task and erased with it (11.4) | people | live ones at start; ended ones on demand |
@@ -416,7 +425,8 @@ the store and the connectors, and makes nothing twice. The core runs it
 as a script: it asks the root for one step at a time, and asks for the
 next only once the root says this one is done (root.md, section 8).
 
-1. **The core's records:** the deployment's numbers; projects, their
+1. **The core's records:** the deployment's numbers; the settings,
+   checked whole (17.7), before every other record; projects, their
    policies and parties' roles; parties with a live sign-in or a role,
    and their requests' keys within the retention; parties' read
    positions over live conversations, never ended ones' (11.4); live
@@ -427,10 +437,13 @@ next only once the root says this one is done (root.md, section 8).
    each live agent task's conversation; the funders' numbers; LLM
    accounts. The core's limits bound what is live (tasks.md,
    section 11), so what is loaded fits; a live set past limits lowered
-   since refuses the start, saying which.
-2. **Each connector's records,** connector by connector: the root loads
-   that connector's live ranges and restores them into it
-   (connectors.md, section 14).
+   since refuses the start, saying which. A live task names its
+   revision, which is held (17.3). Once all of it is restored, new
+   defaults make the release's revision, checked against the limits
+   with the live tasks' revisions held (17.7).
+2. **Each connector's records,** connector by connector: the root hands
+   it its kinds' current settings (17.5), then loads that connector's
+   live ranges and restores them into it (connectors.md, section 14).
 3. **The runs adopted.** Every task claimed or running names its attempt
    and the kind of host it was placed on. Claims placed in the engine
    died with it, and are settled at once as lost, or as not started if
@@ -510,7 +523,7 @@ is due again once its dependencies are done.
    committed after its task's last committed turn: a resumed run as a
    note after the transcript, a fresh one as a section of its brief.
 3. **Commits the claim:** the task claimed, with its new attempt number,
-   the host kind it is placed on, the accounts and sources its check
+   the revision its preparation began under (17.3), the host kind it is placed on, the accounts and sources its check
    chose, the task's kept account among them (accounts.md, 4.3), the
    writer slots of the holds its workspace writes (tasks.md, 6.3), and
    the messages its start carries (tasks.md, 8.2).
@@ -683,6 +696,7 @@ These per-tool declarations change within the existing call envelope.
 | `decide` | accepts, rejects or passes up a proposal or an escalation waiting for it, an escalation naming its hold's revision (tasks.md, section 9) | done; beyond its authority, and passed up; moved, with what it is now |
 | `propose` | an action beyond its authority, with a reason: a batch, an amendment, an effect, or a widening of its own authority (authority.md, section 9) | proposed, and to whom; refused, when nobody may accept it (tasks.md, section 9) |
 | `withdraw` | its own pending proposal (tasks.md, section 9) | withdrawn; already decided, and how |
+| `settings`, when its charter gives the family | reads the settings, or one setting whole, as a party's read does (`../client/domain/contract.md`, 5.1); proposes a change of settings against the revision it read, with a reason (17.6) | the settings; proposed, and to whom; stale, naming the newest; refused, when nobody may accept it |
 | `introduce` | two tasks it references, each given a reference to the other, within their limits (tasks.md, 8.5) | done; no reference; refused, and why |
 | `subscribe`, `unsubscribe` | a topic a connector offers to agents (connectors.md, 5.3), under a read grant on the resources the connector says it concerns (authority.md, 8.5); a referenced task's state; a timer (tasks.md, 8.4) | done; refused, and why |
 | `effect` | one of a connector's kinds of effect offered to agents (connectors.md, 4.5) | made, with what it made; committed and pending, past the call's deadline; waiting for a verdict; failed; refused, naming them, for a kind that waits for dependencies while its task is kept (tasks.md, 5.7) |
@@ -1094,7 +1108,8 @@ Nothing the core decides depends on a view arriving.
   What it carries, field by field, is the client's contract's
   (`../client/domain/contract.md`, 5.1).
 - **Templates are served, never used.** The core keeps the
-  configuration's templates (`../protocol/configuration.md`, 3.1) and
+  current templates, the newest revision's (section 17;
+  `../protocol/configuration.md`, 3.1), and
   each project's policy's overrides of them (authority.md, section 6)
   only to merge them, per project, into `me`. No decision reads one: the
   client fills a template into an ordinary request, which the core
@@ -1297,8 +1312,10 @@ worst case (programming-model.md, 6.3):
 - parties signed in, and their pending requests; their read positions
   over live conversations, one per live task flagged conversation
   (11.4);
-- the configuration's templates and each live project's overrides of
-  them, which the core only serves (11.1);
+- the settings (17.8): the defaults and the changes over them, the
+  held revisions and the charter versions they read;
+- each live project's overrides of the templates, which the core only
+  serves (11.1);
 - the calls committed since each live task's last turn, and the funders'
   numbers;
 - hosts, their runs, and the calls and messages relayed;
@@ -1453,6 +1470,27 @@ within; a procedure amending, cancelling and messaging its delegates,
 one amendment refused as moved and the procedure stepping again on what
 it is told.
 
+Its stories of settings (section 17): an owner's change of a charter,
+a template and a policy in one set, committed in one decision, then
+`me` re-read with the template, the next `MakeProject` copying the
+policy, a narrowed rule refusing the next effect of a task made before
+it, and a restart restoring the same settings; a change refused as
+stale, as out of shape, and by a connector judging an application's
+kind, each committing nothing; a restart with other defaults, recorded
+as the release's, a changed setting kept over them and a reset
+returning one to the new default; a charter changed while its task's
+run is live, the run finishing on its version and its delegates made on
+the newest; a conversation moved at its next run, and one whose charter
+was removed staying where it is; a change moving running work, and a
+removed charter living while a task holds it, a delegation to it
+refused as not offered; a restart with old revisions held and a run
+adopted on its version; the bound reached, the change refused naming
+the oldest revision's tasks, those moved with `MoveToNewest`, and the
+change then made; a revision leaving memory as its last holder ends.
+Its stories of a proposal of settings (17.6): one proposed by a run and
+accepted by an owner, moving running work; one made stale by another
+change and withdrawn, its proposer told.
+
 Its referee holds the core to core.md, section 11, seen from outside;
 applications' worlds reuse it on jig's conformance world (testing.md,
 section 5).
@@ -1483,3 +1521,356 @@ section 5).
 - **What a model is good at:** a description in configuration, or
   structured capabilities a planning agent could filter on. Default: a
   description (section 9).
+- **A release's removed default that a change names** (a template
+  changed to run a charter the release drops): the start is refused,
+  naming both (17.7), or the default is kept as a change of its own,
+  recorded in the release's revision. Default: refused, as a document
+  naming a charter it lacks is. The refusal is the backstop: a release
+  that drops such a default carries its own patch for the stored
+  changes that name it, as every landing that changes what is stored
+  does from the baseline on (temper's draft `upgrades.md`, section 4),
+  so only a release that forgot its patch meets the refusal.
+- **An application's kinds pinned,** a value read from a task's
+  revision as a charter is, should an application's setting shape what a
+  running task is given. Default: never pinned (17.5).
+- **Delegates on their parent's revision,** so that a goal's subtree
+  keeps the settings its plan was made under, as a change's option.
+  Default: later; delegates take the newest (17.3).
+
+## 17. Settings
+
+A deployment's charters, templates, the policies its projects are made
+from, its rules, and an application's settings of its own are its
+**settings**: the binary's defaults, with the changes the store keeps
+over them. A change is one decision; each makes a revision; a task's
+runs read their charter from the revision the task was made in. This
+section is the mechanics; the model is core.md, section 13; who asks
+is people.md, 5.1; what crosses to a connector is connectors.md,
+section 17; the records are `../protocol/store.md`, 4.4.
+
+### 17.1 What a setting is
+
+- **A setting is named by its kind and its number,** and, for an
+  application's kind kept per project, its project:
+
+  | Kind | Number | Value | Read |
+  |---|---|---|---|
+  | charter | the charter's, from 1 | a charter whole: its instructions as text, its models, tool families, hosts, waiting, resume and default budget (`../protocol/configuration.md`, section 3) | at each run's preparation, from the run's revision (17.3) |
+  | template | the template's, from 1 | a template whole (`../protocol/configuration.md`, 3.1) | when `me` is served (11.1): the newest |
+  | policy | the policy's, from 1 | a whole policy in a seed's format, a project made from it copying it (core.md, 6.1) | at each `MakeProject`: the newest |
+  | rules | none: one setting | the deployment's rules, whole (authority.md, section 6) | at every decision: the newest |
+  | an application's kind | the application's | bytes jig never reads (17.5) | by its connector: the newest |
+
+- **The defaults are the binary's.** The application passes them as
+  values when it builds the core (`Config`'s defaults): its charters,
+  policies and rules, its templates, jig's chat and goal among them
+  where it wants them, which jig gives as values made for the charter
+  they run (`../protocol/configuration.md`, 3.1), and its own kinds'
+  (17.5). An application that passes none has `jig-protocol-config`
+  read them from the document (17.7).
+- **The current settings are the defaults with the stored changes over
+  them.** A change sets a setting's value whole, or removes a default,
+  so that it is no longer offered. A setting no change names follows its
+  default, whatever the binary makes it. A reset erases a setting's
+  change: it follows its default again. A setting no default has is
+  added by a change that sets it, and its removal, like its reset,
+  erases that change. The rules are set or reset, never removed.
+- **Checked whole, by one check.** The core checks settings as a start
+  has always checked the document (`../protocol/configuration.md`,
+  sections 3, 3.1 and 6): each value in its shape and within its bound
+  (a charter's instructions within the journal's run bytes, its budgets
+  above its reserve and holding one of its default model's costliest
+  completions, its models configured; a template's charter offered and
+  its grace within the tasks child's span; a policy within the rules,
+  its roles well formed, its overrides' templates offered, its owner
+  role able to be a root's requester), the counts within their limits
+  (charters within `tasks.charters`, templates within `templates`,
+  policies within theirs), and the references among them, across the
+  set. One function of the core's runs it: at each start over the
+  defaults and the current settings, and for a change over the settings
+  it would leave. Its refusal names a setting by kind and number, which
+  the parser maps to the document's path when the document gave it.
+- **What is not a setting:** the limits, which size memory at the
+  start; the hosts, the LLM providers and models, the connectors, the
+  clients and the first owners, the document's; and each project's own
+  policy, which its owners change (people.md, 5.2).
+
+### 17.2 A change
+
+- **A set, against a revision.** An owner's `ChangeSettings` (people.md,
+  5.1) names the revision it was made against and its items, at most
+  one per setting, each a setting and what becomes of it: *set* to a
+  value, whole; *removed*; or *reset* to its default. It says, too,
+  whether running work *stays* on its revision or *moves* (17.4).
+- **Refused whole,** nothing of it committed, when it is:
+  - *stale:* another revision is the newest, which the refusal names;
+  - *not theirs:* an item of the deployment's (jig's kinds, and an
+    application's kept for the deployment) from a party who is not an
+    owner in the deployment (people.md, section 3), or an item of a
+    project's from one who is not that project's owner (people.md,
+    section 4). A set touching both needs one party who is both;
+  - *out of shape:* the settings it would leave fail 17.1's check,
+    which names the item and what fails;
+  - *judged:* a connector refuses an item of its kinds (17.5), saying
+    why;
+  - *full:* the revisions or the charter versions held once the
+    decision is done, its moves included, would pass their limits
+    (17.8). The refusal names the oldest revision held and its
+    live tasks, within the limit on the tasks a refusal names (tasks.md,
+    section 11), so the owner may move them (17.4) and send it again;
+  - *empty:* it changes nothing of the current settings.
+- **One decision.** Its commit holds the changes saved and erased, the
+  revision it makes with its record (17.3 and 17.7), the charter
+  versions it makes and those no held revision reads any longer, the
+  answer under the request's key, naming the new revision, and what each
+  part hears of it, in the same decision: the tasks child and the fleet
+  the charter versions added and dropped; authority the rules; the
+  views a mark on every `me`, when a template changed, and on every
+  watch of the settings; the connectors their kinds' values (17.5); and, when
+  it moves running work, the tasks moved (17.4). After a crash the old
+  revision holds or the new one does, never a mix (core.md, section 4).
+- **What follows it.** A narrowed rule reaches every later decision,
+  tasks already made included, and a widened one widens no existing
+  task (authority.md, section 6); a live project's policy is not checked
+  against new rules, only the policies projects are made from are. The
+  next `MakeProject` copies the policy as changed; a project made before
+  keeps its own copy (people.md, 5.2). Clients re-read `me`'s templates,
+  and a template removed leaves its number unused (`../protocol/configuration.md`,
+  3.1). A task made after the change reads its
+  charter from the new revision; running work, 17.4.
+- **Asking is deciding.** A change is an owner's direct request,
+  decided as it is admitted. One proposed by someone who may not make it
+  is a proposal of settings (17.6), and accepting it makes this same
+  decision.
+
+### 17.3 Revisions
+
+- **A revision is the settings as a change left them,** numbered from
+  1, the first start's, and each change makes the next. A start whose
+  defaults change the current settings makes one too, recorded as the
+  release's (17.7). Everything made reads the newest.
+- **A task records its revision:** the newest, when it is made, by
+  whatever makes it (a party's batch, a run's delegation, a procedure's
+  step, a recurring task, an accepted proposal), whatever revision its
+  parent runs under. It keeps it, live and ended, until it moves
+  (17.4). A delegation to a charter the newest does not offer is refused
+  as not offered, as any create naming one is, and the agent adapts. A
+  procedure's or a person's task reads nothing of a charter: its
+  revision is its history alone, and it holds none.
+- **A run records the revision it is prepared under:** its task's, as
+  its preparation begins (7.1, after a conversation's move, 17.4),
+  committed with its claim. What the run is given of its charter is
+  that revision's: its instructions, models, tool families, hosts,
+  waiting, resume and budget; and so is what the core decides from the
+  charter while the run lives: its calls' checks, its placement, its
+  finish. A change made during its preparation or its run changes
+  neither.
+- **Charter versions.** A charter's version is its value as one
+  revision set it, named by the charter's number and the revision that
+  made it, and kept once, however many revisions read it. A revision
+  reads, for each charter, the latest version made at or before it; a
+  removal is a version too, from which on the charter is not offered.
+  So a revision costs only the charters it changed. Only charters are
+  kept by version: every other kind is read at the newest (17.1), and of
+  an older revision only its record says what it set of them.
+- **Two lookups.** `charter_of(task)` is the version of the task's live
+  run, or, with none live, of the task's revision; `charter(number)` is
+  the newest's, for what is about to be made. Every site of the core
+  that reads a charter reads it through one of them. An application
+  that reads a task's charter through `charter_of` reads the task's own
+  version with no change of its own: temper's forge routing, which
+  takes an effect call's timeout from `charter_of(task)`, needs none.
+  An amendment of a task's LLM choice is checked against its own
+  version's models, a delegate's against the newest's.
+- **Held revisions.** The newest is held, and so is every revision a
+  live agent task records or a run in flight was prepared under (its
+  preparation, its claim, its placement). A revision nothing holds,
+  other than the newest, leaves memory in the decision that ends its
+  last holder: the charter versions no held revision reads go with it,
+  from the core, the children and the store, and its record stays as
+  history (17.7).
+- **The children keep versions, not revisions.** The core tells the
+  tasks child and the fleet each charter version a held revision reads
+  as it is made (to the tasks child, the models its tasks may choose; to
+  the fleet, the host needs of its runs), and each one dropped. The
+  tasks child finds a task's version by its charter and its revision,
+  the latest at or before it, from its own table; the fleet is given the
+  version with each run it places. No other child reads a charter.
+- **What documents show.** A document that shows a task's charter (its
+  tree, its waits, its LLM choice) reads the version its revision reads
+  while that revision is held; once it is not, as for a task ended long
+  since, it names the charter and the revision, and nothing read from
+  the charter.
+
+### 17.4 Moving running work
+
+- **A move** sets a live agent task's revision to the newest. A task moves
+  only when the newest offers its charter and allows its LLM choice
+  (tasks.md, section 3); one that cannot stays on its revision and
+  finishes there. A move takes effect at the task's next run: a live
+  run goes on with the version it was prepared under, until it ends or
+  an owner cancels it, and holds that revision until then.
+- **A conversation moves at its next run.** A task flagged
+  conversation, which its requester ends and which never ends on its
+  own (tasks.md, 5.8), moves as each of its runs begins to be prepared,
+  when it may. So a fix to its charter reaches its next turn.
+- **A change may move running work:** committed with *moves*, it moves,
+  in its decision, every live agent task on an older revision that may
+  move.
+- **An owner moves running work later** with `MoveToNewest` (people.md,
+  5.1), naming a revision: every live agent task on it that may move moves, in
+  one decision, and the answer counts those that could not. It is what
+  a change refused as full offers.
+- **What a task may do is never pinned.** Its authority is the rules',
+  its project's policy's and its chain's as they stand (authority.md,
+  section 6); only what its runs are given is its charter version's.
+
+### 17.5 An application's settings
+
+An application's own settings ride the same mechanism: defaulted,
+stored, changed, recorded in revisions and decided as jig's are,
+without jig reading them. No trait and no generic: a kind is a number,
+a value is bytes, and its connector judges it within the change's
+decision.
+
+- **Declared with the defaults.** For each of its kinds the application
+  gives its number, in a space of its own beside jig's kinds; its scope,
+  the deployment or each project; the connector that owns it, by number
+  (core.md, 3.5), which the root may route to any child of its own; its
+  bounds, a value's largest bytes and the values per scope, which the
+  worst case prices; and its defaults, each a number and bytes.
+- **Values are bytes.** The core keeps them, the store keeps their
+  changes, and a revision records them as it records jig's; the core
+  checks only their bounds. They are never pinned: whatever reads one
+  reads the newest.
+- **Judged in the change's decision.** A change naming items of a kind
+  hands them, each as the value it would leave (a reset as the default
+  it returns to, or as a removal where there is none), with the
+  revision they would make, to that kind's
+  connector through the root, within the decision's step (4.3), as a
+  requirement's verdict is asked (connectors.md, section 7). The
+  connector accepts, or refuses with its reason, which the change's
+  refusal carries. A set commits only when every connector it names
+  accepts.
+- **Told in the same decision.** Once committed, each connector hears
+  its kinds' new values, its state running ahead of the commit as every
+  child's does (5.1). At each start, each connector hears its kinds'
+  current values before its records are restored (section 6, step 2),
+  judged again by nobody: a stored value was judged when its change was
+  made, and the defaults are the application's own. A release reads the
+  values its kinds took before, as it reads its records; one it cannot
+  read refuses the start, naming it, as a record it cannot read does.
+- **Read by the application.** What a connector keeps of them is its
+  own. The root, and through it the application's own children, read a
+  value through the core by kind, scope and number, as they read a
+  charter.
+- **The root routes, never judges** (root.md, section 11): the judging
+  is the connector's, in the connector's own terms.
+
+### 17.6 A proposal of settings
+
+Its code comes after the rest (`../STATUS.md`).
+
+- **Proposed by a member or a run.** A party with a role in the
+  deployment or in a project proposes a set with `Propose` (people.md,
+  5.1); a run with its `propose` call, when its charter gives it the
+  settings family (7.3), which reads the settings and proposes a set;
+  never a procedure. A proposal names its revision, its items and its
+  reason, as a change does, and leaves to its accepter whether running
+  work moves.
+- **In the deployment's scope.** No task's authority covers settings,
+  so a proposal of settings waits for parties from the start: the
+  deployment's owners for the deployment's items, and a project's owners
+  for that project's; a set touching both waits for parties holding all
+  of them. One no party may accept is refused at its entrance, as every
+  proposal nobody may accept is (tasks.md, section 9).
+- **The owner keeps the value.** The tasks child keeps the proposal as
+  it keeps every proposal: its proposer, reason, where it waits and its
+  state. The core keeps its set, by the proposal's number, in memory and
+  in the store, restored with it.
+- **Accepting it is the change** of 17.2, with the accepter's choice of
+  whether running work moves, checked again then. An acceptance refused
+  (out of shape, judged, full) leaves the proposal pending, and the
+  accepter is told why. Its revision records the proposal and its
+  accepter.
+- **Stale is withdrawn.** The decision that makes a revision withdraws
+  each pending proposal of settings made against an older one, as no
+  longer applying (tasks.md, section 9), and its proposer hears so; a
+  fresh proposal names the newest.
+- **Bounded:** pending proposals of settings in the deployment are a
+  limit of their own, each priced at a whole set (17.8), beside the
+  tasks child's limits on pending proposals.
+
+### 17.7 In the store, and at a start
+
+- **What the store keeps** (the core's settings family,
+  `../protocol/store.md`, 4.4): the defaults the newest revision was
+  made with, setting by setting; the changes, each a setting's value whole or its
+  removal, with the revision that made it; a record per revision, with
+  its number, the revision it was made against, when, who decided it (a
+  party, the release, the first start), the proposal it came from,
+  whether it moved running work, and its items with the values they
+  set; each charter version a held revision reads and the newest does
+  not; and pending proposals' sets. The tasks family keeps each
+  task's revision, live and ended, and each claim's.
+- **History** is the revision records, kept for every revision held
+  and for the latest ones within the history limit (17.8); the decision
+  that makes a revision, or that ends the last holder of one, erases
+  those that fall out. Restoring a version
+  proposes its items again, against the newest.
+- **A start** reads the settings right after the deployment's
+  numbers, before any other record of the core's (section 6, step 1):
+  the stored defaults, the changes, the held revisions' records and the
+  charter versions. It then compares the
+  defaults it is given with those stored:
+  - *a first start* makes revision 1 from its defaults, recorded as the
+    first start's;
+  - *defaults that differ* are stored, and when they change the current
+    settings (a setting no change is over), they make a revision
+    recorded as the release's, with no proposal, once the core's
+    records are restored (section 6, step 1); like any revision, it
+    withdraws stale proposals of settings (17.6); new work takes it,
+    running work keeps its own;
+  - *the current settings are checked whole* (17.1): a start whose
+    settings fail is refused, naming the setting, the change over it if
+    any, and what fails, as a document failing its check always was;
+  - *past limits:* held revisions or charter versions past limits
+    lowered since, or a release's revision that would pass them, refuse
+    the start, saying which, as a live set past lowered limits does.
+
+  All of it, the release's revision included, is committed before the
+  core admits anything.
+- **The document's members as defaults.** An application that passes
+  no defaults gives the document's `charters`, `templates`, `policies`
+  and `rules` (`../protocol/configuration.md`, section 3), and the
+  store's changes lie over them as over any defaults. A deployment that
+  restarts with the same document and no change behaves as it did; a
+  document edited between starts gives the release's new defaults
+  (above); a stored change wins over the document's member; a reset
+  returns the setting to the document's value.
+
+### 17.8 Bounds
+
+- **Two limits of the core's, sized at the start**
+  (`../protocol/configuration.md`, section 6): the *revisions held*
+  besides the newest, and the *charter versions held* besides the
+  newest's. A held revision costs its record's head, never its items'
+  values; a charter version costs a charter at its bound (the journal's
+  run bytes and the core's part of a charter), the tasks child's models
+  for it and the fleet's needs. The core's worst case prices both, and
+  the tasks child's and the fleet's tables are sized for the charters
+  and the versions together.
+- **The current settings** cost the defaults and the changes, each
+  within its kind's bounds (17.1): at most two whole sets, priced so.
+- **History** is a third number, of revision records the store keeps
+  beyond those held, within the store's fill (`../protocol/store.md`,
+  11.2). The core holds none of it.
+- **Proposals of settings** bring a fourth limit, of pending ones, each
+  priced at a whole set (17.6).
+- **A change fits one request:** its items within the clients'
+  component's message bytes (`../protocol/client.md`, section 13). A
+  set larger is several changes, each against the revision the last
+  made.
+- **A full bound names its holders:** a change refused as full names
+  the oldest held revision's live tasks, and moving them is the way on
+  (17.4).

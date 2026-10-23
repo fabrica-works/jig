@@ -12,7 +12,8 @@ when configuration is read. What is still open is listed in section 9.
 - **Read once, before the loop.** A process's shell reads its
   configuration file whole, within a bound, with skein's startup kit
   (skein's `shell.md`, 6.1), and parses it before io starts. Nothing is
-  read again while the process runs: a change is a restart.
+  read again while the process runs: a change of the document is a
+  restart. Settings change at runtime, in the store (below).
 - **JSON, strict.** The file is a JSON document read with skein's JSON
   reader (skein's `json.md`). Unknown fields, missing fields, values past
   their bounds and duplicate names refuse the start, saying which, as
@@ -44,9 +45,16 @@ when configuration is read. What is still open is listed in section 9.
   requests. Configuration seeds projects, their names, their policies
   and their parties' roles on a deployment's first start only;
   resources and homes come by adoption after it (section 3).
+- **Settings are the binary's defaults with the store's changes over
+  them** (`../domain/engine.md`, section 17): charters, templates, the
+  policies projects are made from and the rules. The application passes
+  the defaults as values when it builds the engine; one that passes
+  none has this document's `charters`, `templates`, `policies` and
+  `rules` read as the defaults, and the store's changes lie over them
+  (section 8).
 - **Templates are data the engine serves and never expands.** The
   application's shapes of work (jig's chat and goal among them) are
-  numbered templates in jig's part; a project's policy may override some
+  numbered templates among the settings; a project's policy may override some
   of their defaults; the engine serves each project's merged templates
   to the client, which fills them into ordinary requests (3.1).
 - **The server is the application's.** The clients' listener, its
@@ -86,11 +94,11 @@ the application's main (its shell)
 | deployment | the deployment's directory, a data path, which holds the store, transcripts and the secrets' store; retention's horizons (`store.md`, 11.1); the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
 | owners | the deployment's first owners, each a provider and a subject (`../domain/people.md`, section 3), each an owner of every project seeded with it and of the deployment's roles | the people child, on a first start |
 | providers | the numbers and kinds that identities name (`../domain/people.md`, section 3), and nothing else: jig runs no provider's exchange. Of kind *link*, the printed link's; of kind *deployment*, exactly one, the deployment's own, for services' credentials; of kind *application*, each of the application's ways of signing in, whose identities its server verifies on its own routes and asks the clients' component to mint a credential for (`client.md`, section 8). The settings and secrets of the application's sign-in are its own members | the people child; `jig-protocol-engine-clients`, which mints a printed link's credential for the first owner it names, a service's under the deployment's provider, and a `Mint`'s only for an identity whose provider is of kind application |
-| rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6). A ceiling, the rules' or a project policy's, names in `models` the configured models it allows, from the llm member's, or every one without it; a role's authority names its models the same way: they seed the role on a first start, and the store keeps them by name (`store.md`, 5.1) | authority |
+| rules | the deployment's rules, as the default of that setting when the application passes none (`../domain/engine.md`, 17.7): the ceilings every project's policy is under (`../domain/authority.md`, section 6). A ceiling, the rules' or a project policy's, names in `models` the configured models it allows, from the llm member's, or every one without it; a role's authority names its models the same way: they seed the role on a first start, and the store keeps them by name (`store.md`, 5.1) | authority |
 | projects | each project seeded on a first start: its number, from 1, since 0 is the deployment's roles' and refused here (`What::Bound` at the number; `../domain/people.md`, section 3); its name, which may be left out for "Project N", N its number, the seed's names unique and in shape or the start refused (`../domain/core.md`, 6.1); its policy, with its spend per period, its roles (each one's authority, the spend a party in it may allot per period, the kinds of proposal it decides; `../domain/authority.md`, section 6) and its overrides of templates' defaults (3.1); its parties' roles. Its resources and homes come by adoption (below) | the core, on a first start |
-| policies | each policy a project made after the first start starts from (`../domain/core.md`, 6.1): numbered from 1 and never renumbered, as templates are (3.1); each a whole policy in a seed's format: its ceiling, its spend per period, its roles, its escalation role, its requirements, its projections' authority, its permissions' roles for adoption and its overrides of templates' defaults. Checked at every start as a seed's policy is: within the rules, its roles well formed, its overrides' templates configured, and its owner role able to be a root's requester (`../domain/people.md`, 5.1); one that fails refuses the start, at its path. A project made from one keeps a copy, which no later change or removal here reaches (`../domain/people.md`, 5.2). With none, no project is made after the first start | the core, at each `MakeProject` |
-| charters | each charter the deployment offers, numbered: its instructions (a file it names, a configuration path), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8). Its models are those it allows, in order, or every configured one; a task that names none takes the first whose LLM provider has a usable account serving its payer (`../domain/tasks.md`, section 3). It names no account: the core chooses one with each run's check (`../domain/accounts.md`, 4.3) | the core; `jig-protocol-charter` |
-| templates | each template the application defines, numbered and never renumbered, with its defaults; jig's chat and goal among them unless the application drops them (3.1) | the core, only to serve each project's merged templates in `me` (`../client/domain/contract.md`, 5.1); the client, which fills them in |
+| policies | each policy a project made after the first start starts from (`../domain/core.md`, 6.1), as defaults when the application passes none (`../domain/engine.md`, 17.7), with the store's changes over them: numbered from 1 and never renumbered, as templates are (3.1); each a whole policy in a seed's format: its ceiling, its spend per period, its roles, its escalation role, its requirements, its projections' authority, its permissions' roles for adoption and its overrides of templates' defaults. Checked at every start as a seed's policy is: within the rules, its roles well formed, its overrides' templates configured, and its owner role able to be a root's requester (`../domain/people.md`, 5.1); one that fails refuses the start, at its path. A project made from one keeps a copy, which no later change or removal here reaches (`../domain/people.md`, 5.2). With none, no project is made after the first start | the core, at each `MakeProject` |
+| charters | each charter the deployment offers, as defaults when the application passes none (`../domain/engine.md`, 17.7), with the store's changes over them, numbered: its instructions (a file it names, a configuration path), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8). Its models are those it allows, in order, or every configured one; a task that names none takes the first whose LLM provider has a usable account serving its payer (`../domain/tasks.md`, section 3). It names no account: the core chooses one with each run's check (`../domain/accounts.md`, 4.3) | the core; `jig-protocol-charter` |
+| templates | each template the application defines, as defaults when the application passes none (`../domain/engine.md`, 17.7), with the store's changes over them, numbered and never renumbered, with its defaults; jig's chat and goal among them unless the application drops them (3.1) | the core, only to serve each project's merged templates in `me` (`../client/domain/contract.md`, 5.1); the client, which fills them in |
 | hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest, a data path; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, data paths, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
 | llm | the LLM providers (`../domain/providers.md`), each numbered, with its name for showing; its endpoints, each with the models it serves and an optional `program` named among that model provider's `programs`; each model's window, output, the efforts it takes, in order, the first being the one a task given no LLM choice takes (`../domain/tasks.md`, section 3), or none, and the rest of what smith's agent configuration declares of it (smith's `protocol/agent.md`, section 4), its prices (input, cached input, output, and cache writes when priced apart) and its optional `description`, what it is good at, for the brief's catalogue (`../domain/engine.md`, section 9); the sources it offers: a sign-in, with its public registration (its entry client id, its name hint, its authorization, token, revocation and published keys' addresses with their transport, its issuer, its scopes and those that must be granted, its resource, its redirect's path, and its port where fixed, an ephemeral loopback port for each sign-in otherwise), a key, a program, named `claude_code` where the program is Claude Code (smith's `protocol/programs.md`, section 3), or none; a sign-in waits for its redirect within the profile's sign-in deadline, as a limit of the driver (section 6; skein's `oauth.md`, section 3); and the facts its terms ask an application to show: whether a signed-in source is a plan, and its manage-usage address (`../domain/providers.md`, 2.6). No account, key or record: accounts are made at runtime and kept in the store (`../domain/accounts.md`, 3.1; `llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
 | clients | the heartbeat of the clients' streams (`client.md`, section 4); whether the clients' component gives a printed link's one-time secret at start, whose URL the application's startup prints (`client.md`, section 8), only where its clients reach it on loopback, which that startup checks against its own listener (`service.md`, section 3). The listener, its certificate and key, and what serves a browser are the application's service's own members (`service.md`, section 7) | `jig-protocol-engine-clients` |
@@ -434,6 +442,20 @@ host's half reports it (`llm.md`, 5.5).
   `../domain/people.md`, 5.1). Whether a host's agent takes messages that
   large, and runs the engine's charters, is the fleet's to check at its
   hello, never configuration's (`../domain/engine.md`, section 8).
+- **Settings' limits,** the core's (`../domain/engine.md`, 17.8): the
+  revisions held besides the newest, and the charter versions they read
+  besides the newest's, each priced in the core's worst case, the tasks
+  child's and the fleet's tables sized for the charters and the
+  versions together; the history, the revision records the store keeps
+  beyond those held; and the pending proposals of settings, each priced
+  at a whole set. The current settings, the defaults and the changes
+  over them, are priced at two whole sets within the counts and bytes
+  above. Each is positive, or the start is refused, naming it; settings
+  held past one lowered since refuse the start, saying which.
+- **An application's kinds of settings** declare a value's largest
+  bytes and the values per scope (`../domain/engine.md`, 17.5), which
+  enter the core's worst case; a default past either refuses the start,
+  naming the kind.
 - **The application's limits** are its own members, checked in the same
   sum.
 
@@ -487,29 +509,39 @@ memory sum even when every run slot is occupied.
 - **Every later start** reads the deployment from the store, and the
   installation's identifier, ignoring the one the shell drew. The
   configuration's projects are ignored, every project, seeded or made,
-  restored from the store alone, and its `policies` matter only to the
-  next project made; its rules, charters, templates,
-  limits, hosts and LLM providers apply as configured, and a narrowing
-  reaches every later decision, as a policy's does
-  (`../domain/authority.md`, section 6). LLM accounts are the store's,
+  restored from the store alone. The settings are the defaults with the
+  store's changes over them (`../domain/engine.md`, 17.7): where the
+  application passes no defaults, the document's `rules`, `charters`,
+  `templates` and `policies` are them, so a restart with the same
+  document and no change behaves as before; a document edited since the
+  last start gives new defaults, which a setting no change is over
+  follows, recorded as the release's revision, while a stored change
+  stays over its member and a reset returns to it. The policies matter
+  only to the next project made. Its limits, hosts and LLM providers
+  apply as configured, and a narrowing reaches every later decision, as
+  a policy's does (`../domain/authority.md`, section 6). LLM accounts are the store's,
   made at runtime; an LLM provider whose source is *none*, configured
   for the first time, gets the deployment's account at that start
   (`../domain/accounts.md`, 3.1).
-- **What the store holds and the configuration does not name** (a charter
-  removed, a connector gone) is the domain's to judge at restart, as it
-  judges a live set past limits lowered since (`../domain/engine.md`,
-  section 6); what it decides is open (section 9). A template dropped
-  is not among them: no task depends on one (3.1).
+- **What the store holds and the configuration does not name** (a
+  connector gone, an LLM provider removed) is the domain's to judge at
+  restart, as it judges a live set past limits lowered since
+  (`../domain/engine.md`, section 6); what it decides is open (section
+  9). A charter removed is not among them: it lives in the revisions
+  that hold it while tasks use them, and work under it finishes there,
+  while nothing new may name it (`../domain/engine.md`, 17.3 and 17.4).
+  Nor is a template dropped: no task depends on one (3.1).
 
 ## 9. Open questions
 
-- **Reloading without a restart:** a deployment's rules, charters and
-  limits changed while it runs, which the domain would hear as an event,
-  as a policy change is, in place of a restart.
-- **Removed parts at restart:** whether a charter, a connector or an
-  LLM provider that live work or accounts name may be removed, and what
-  becomes of that work: a refused start, saying which, or the work's
-  runs failing as not offered.
+- **Reloading without a restart:** a deployment's limits changed while
+  it runs. Its rules, charters, templates and policies change at
+  runtime as settings (`../domain/engine.md`, section 17).
+- **Removed parts at restart:** whether a connector or an LLM provider
+  that live work or accounts name may be removed, and what becomes of
+  that work: a refused start, saying which, or the work's runs failing
+  as not offered. A removed charter is answered: it lives while tasks
+  hold it (section 8).
 - **Profiles' numbers,** from the first deployments' measurements.
 - **A configuration's format version,** once a deployment's configuration
   must survive a release that changes it.

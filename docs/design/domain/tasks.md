@@ -130,6 +130,12 @@ it is live:
   fresh, and which hosts may run it (engine.md, 7.1). It names no
   effort: each model declares its efforts, in order, in the deployment's
   configuration (`../protocol/configuration.md`, section 3).
+- **Its revision:** the settings' revision it was made in, the newest
+  then, whatever its parent's (engine.md, 17.3). An agent task's runs
+  read its charter from it, until a move sets it to a newer one
+  (engine.md, 17.4); each claim keeps the revision its run was prepared
+  under. Every task keeps it, live and ended; only an agent task's holds
+  its revision (engine.md, 17.3).
 - **Its LLM choice,** for an agent task, what its runs' LLMs are:
   - *main:* a configured model, and an effort among those the model
     declares (`../protocol/configuration.md`, section 3); its runs use
@@ -1054,7 +1060,18 @@ proposed, what an action needs, and what an acceptance funds.
   amendment, an effect, or a widening of its own authority. A party
   proposes a batch or an amendment: a party makes no effect, and their
   authority is their role's, which the project's owners change
-  (people.md, 5.2).
+  (people.md, 5.2). Either may propose a change of settings, in the
+  deployment's scope (below).
+- **A proposal of settings** (engine.md, 17.6) holds a set of settings
+  against a revision. It is proposed by a party with a role in the
+  deployment or a project, or by a run whose charter gives it the
+  settings family; no task's authority covers it, so it waits from the
+  start for the owners its items need: the deployment's, and each
+  project's whose items it names. The core keeps its set under its
+  number; this child keeps the rest as for every proposal. Accepting it
+  is the change's decision, the accepter choosing whether running work
+  moves; a revision made since its own withdraws it, as no longer
+  applying.
 - **Their state.** A proposal: its proposer, a task or a party; the
   action, as the call, the step or the request asked for it; its reason,
   in words;
@@ -1163,7 +1180,8 @@ worst case (engine.md, section 13):
   reads (8.2);
 - subscriptions, references, holds and saved resources per task;
 - waiters per resource's queue, and how long a task may wait for holds;
-- the tasks a circle of waits names, in a refusal or a hold (6.7);
+- the tasks a circle of waits names, in a refusal or a hold (6.7), and
+  those a change of settings refused as full names (engine.md, 17.2);
 - pending proposals per task, and in the deployment; open questions per
   task;
 - tries per class of failure, and their backoff;
@@ -1176,6 +1194,11 @@ are refused, and the creator hears why.
 
 A compound request is bounded by the people child's operations per
 request (people.md, 5.1), and its worst case is engine.md, section 13's.
+
+The models each charter's tasks may choose are kept per charter
+version, for the charters and the versions held together, the core's
+limits (engine.md, 17.8); this child's live tasks per revision are
+counted within the revisions held.
 
 ## 12. The world
 
@@ -1248,6 +1271,16 @@ reordered in one compound request, its priorities naming no revision; a
 task's last activity moving with words, a turn and a delegate's end; a
 conversation forgotten once its party has read it, and one kept.
 
+Its stories of revisions (engine.md, 17.3 and 17.4): a task made by a
+batch, a delegation, a procedure's step, a recurring task and an
+accepted proposal, each on the newest revision, a delegate on the
+newest whatever its parent's; a task's LLM choice amended, checked
+against its own charter version's models, not the newest's; a move
+refused for a charter the newest drops or an LLM choice it no longer
+allows, the task staying; live and ended records restored with their
+revisions and claims; the count of live tasks per revision reaching
+zero as the last one ends.
+
 Its referee: a task starts only after its dependencies are done and its
 holds taken; batches are made whole or not at all, and compound requests
 too; one run at most per task; a resource has one holder, and a pool
@@ -1262,7 +1295,8 @@ that moved; nothing becomes a proposal unasked but a result's
 follow-ups; no committed message is lost, and none is refused once
 committed; every proposal and escalation waits where a holder can decide
 it; nothing beyond a task's limits is held, goals per project
-included.
+included; every task's revision was the newest when it was made, or
+the newest when it moved.
 
 ## 13. Open questions
 
