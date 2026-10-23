@@ -52,7 +52,7 @@ pub struct Limits {
     /// Facts kept until the parent drains them. Beyond them, facts are
     /// dropped and counted.
     pub facts: u32,
-    /// Typed activity kept for the core while the link cannot take it.
+    /// Activity and live pieces kept for the core while the link cannot take it.
     pub told: u32,
     /// Normal retained turns per attempt. One additional agent window of
     /// this size is reserved for turns sent before stopping.
@@ -98,7 +98,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let calls =
         Slab::<Call>::worst_case(call_count)?.checked_add(u64::from(call_count).checked_mul(limits.event_bytes)?)?;
     let facts = Queue::<Fact>::worst_case(limits.facts)?;
-    let told = Queue::<LinkUp>::worst_case(limits.told)?;
+    // Price every queue slot as a maximum piece, including Input's wire-bounded
+    // call id (256 bytes) and tool (64 bytes), even though pieces use only half.
+    let piece = u64::from(limits.piece_bytes).checked_add(256)?.checked_add(64)?;
+    let told = Queue::<LinkUp>::worst_case(limits.told)?.checked_add(u64::from(limits.told).checked_mul(piece)?)?;
     let capacity = limits.slots.checked_mul(limits.turns)?.checked_mul(2)?;
     let refusal_bytes = u64::from(limits.inbox).checked_mul(u64::try_from(size_of::<crate::Refused>()).ok()?)?;
     let turns = Map::<Name, Pending>::worst_case(capacity)?

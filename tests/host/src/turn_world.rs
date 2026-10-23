@@ -35,6 +35,7 @@ pub struct Stats {
 
 /// The committed conversation state received by the scripted agent.
 pub struct StartedState {
+    pub live: host::LiveAsk,
     pub identity: [u8; 16],
     pub messages: Box<[host::StartMessage]>,
     pub activation: u64,
@@ -100,6 +101,12 @@ impl World {
     /// A small window that can hold two maximum bodies.
     #[must_use]
     pub fn new() -> Self {
+        Self::with_piece_limits(2, 4096)
+    }
+
+    /// The same peers with explicit live-piece and shared activity bounds.
+    #[must_use]
+    pub fn with_piece_limits(told: u32, piece_bytes: u32) -> Self {
         let mut limits = crate::Settings::calm(1).host;
         limits.slots = 1;
         limits.transcript_bytes = 512;
@@ -107,7 +114,8 @@ impl World {
         limits.turn_bytes = 32;
         limits.turns = 2;
         limits.turn_queue_bytes = 64;
-        limits.told = 2;
+        limits.told = told;
+        limits.piece_bytes = piece_bytes;
         assert!(host::worst_case(&limits).is_some());
         Self {
             limits,
@@ -164,6 +172,11 @@ impl World {
     #[must_use]
     pub fn lost_facts(&self) -> u64 {
         self.host.activity_lost()
+    }
+
+    #[must_use]
+    pub fn piece_counts(&self) -> (u64, u64) {
+        (self.host.pieces_fenced(), self.host.pieces_lost())
     }
 
     #[must_use]
@@ -257,13 +270,23 @@ impl World {
 
     /// Assign a resumed run with each turn and its settled call tail intact.
     pub fn assign_conversation(&mut self, turns: Box<[Box<[u8]>]>, answered: Box<[AnsweredCall]>) {
+        self.assign_live_conversation(turns, answered, host::LiveAsk::NONE);
+    }
+
+    /// Assign a conversation with its ask passed through to the scripted agent.
+    pub fn assign_live_conversation(
+        &mut self,
+        turns: Box<[Box<[u8]>]>,
+        answered: Box<[AnsweredCall]>,
+        live: host::LiveAsk,
+    ) {
         let assignment = RunAssignment {
             identity: [0; 16],
             run: RUN,
             attempt: ATTEMPT,
             workspace: None,
             save: false,
-            live: jig_domain_host::LiveAsk::NONE,
+            live,
             charter: Box::from(&b"charter"[..]),
             grants: Box::new([]),
         };
@@ -361,6 +384,9 @@ impl World {
     }
     pub fn activity(&mut self, activity: host::Activity) {
         self.agent_report(host::FromAgent::Activity { owner: self.owner.expect("assigned"), activity });
+    }
+    pub fn piece(&mut self, piece: host::Piece) {
+        self.agent_report(host::FromAgent::Piece { owner: self.owner(), piece });
     }
     pub fn agent_report(&mut self, report: host::FromAgent) {
         self.send(Event::from_agent(report));
@@ -691,8 +717,7 @@ impl World {
     }
 
     fn start(&mut self, owner: Token, start: host::Start) {
-        let host::Start { workspace, charter, activation, identity, turns, answered, messages, grants, live: _ } =
-            start;
+        let host::Start { workspace, charter, activation, identity, turns, answered, messages, grants, live } = start;
         assert_eq!(workspace, if self.space_live { Some(SPACE) } else { None });
         assert_eq!(&*charter, b"charter");
         for grant in &grants {
@@ -701,7 +726,7 @@ impl World {
         self.owner = Some(owner);
         self.agent_live = true;
         self.reading = true;
-        self.started_state = Some(StartedState { identity, messages, activation, turns, answered });
+        self.started_state = Some(StartedState { live, identity, messages, activation, turns, answered });
         self.events.push_back(Event::Started { owner, agent: AGENT });
     }
 
@@ -718,6 +743,9 @@ impl World {
 
     fn receive_report(&mut self, record: host::LinkUp) {
         if self.connected {
+            if matches!(record, LinkUp::Piece { .. }) {
+                self.link_words.push("piece");
+            }
             self.reports.push(record);
         }
     }
@@ -743,7 +771,7 @@ impl World {
                 if !matches!(record, LinkUp::Activity { activity: host::Activity::Phase(_), .. }) {
                     self.stats.facts += 1;
                 }
-                self.reports.push(record);
+                self.receive_report(record);
             }
         }
         while self.host.pop_fact().is_some() {}
