@@ -118,6 +118,7 @@ pub enum DeploymentPhrase {
     AccountStateMisconfigured,
     AccountDetail(AccountPhrase),
     AccountStateClosing,
+    AccountStateMoving,
     HelloRefusalReservedChannel,
     HelloRefusalWorkers,
     HelloRefusalPosition,
@@ -230,7 +231,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 280] = [
+pub const ALL: [DeploymentPhrase; 281] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -380,6 +381,7 @@ pub const ALL: [DeploymentPhrase; 280] = [
     DeploymentPhrase::AccountDetail(AccountPhrase::ReadinessCut),
     DeploymentPhrase::AccountDetail(AccountPhrase::SignInPlan),
     DeploymentPhrase::AccountStateClosing,
+    DeploymentPhrase::AccountStateMoving,
     DeploymentPhrase::HelloRefusalReservedChannel,
     DeploymentPhrase::HelloRefusalWorkers,
     DeploymentPhrase::HelloRefusalPosition,
@@ -623,6 +625,7 @@ impl DeploymentPhrase {
                 Self::Agent(phrase) => phrase.number(),
                 Self::ProgramDetail(phrase) => phrase.number(),
                 Self::AccountStateClosing => 9300,
+                Self::AccountStateMoving => 9485,
                 Self::HelloRefusalReservedChannel => 9301,
                 Self::HelloRefusalWorkers => 9302,
                 Self::HelloRefusalPosition => 9718,
@@ -801,6 +804,7 @@ impl DeploymentPhrase {
             | Self::AccountStateSignInAgain
             | Self::AccountStateMisconfigured
             | Self::AccountStateClosing
+            | Self::AccountStateMoving
             | Self::HelloRefusalReservedChannel
             | Self::HelloRefusalWorkers
             | Self::HelloRefusalStopBound
@@ -1059,6 +1063,7 @@ impl DeploymentPhrase {
             Self::Agent(phrase) => phrase.label(),
             Self::ProgramDetail(phrase) => phrase.label(),
             Self::AccountStateClosing => b"Account State Closing",
+            Self::AccountStateMoving => b"moving",
             Self::HelloRefusalReservedChannel => b"Channel zero belongs to the engine's own host",
             Self::HelloRefusalWorkers => b"No room for another worker",
             Self::HelloRefusalPosition => b"Unconfigured or occupied worker position ",

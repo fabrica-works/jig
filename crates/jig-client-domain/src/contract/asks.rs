@@ -212,6 +212,8 @@ pub enum Made {
     PersonResult { task: u64 },
     /// A note in its scope.
     Note { note: u64, scope: NoteScope },
+    /// An account record delivered once (client/domain/client.md, 6).
+    MovingOut { account: u32, number: u32, record: skein_lib::Secret },
 }
 
 /// The one terminal the request table hands to this domain.
@@ -236,4 +238,7 @@ pub enum AccountChange {
     MoveAccount { account: u32, place: u32 },
     MoveSource { account: u32, source: u32, place: u32 },
     SetUses { account: u32, uses: Option<Box<[super::OwnerAccountUse]>> },
+    MoveOut { account: u32 },
+    Written { number: u32 },
+    MoveIn { digest: [u8; 32] },
 }

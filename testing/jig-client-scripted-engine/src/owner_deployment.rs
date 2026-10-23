@@ -124,6 +124,7 @@ impl Payload for OwnerAccountState {
             | Self::Misconfigured
             | Self::Unloaded { .. }
             | Self::Cancelled
+            | Self::Moving
             | Self::Closing => Some(0),
         }
     }

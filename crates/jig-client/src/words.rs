@@ -12,7 +12,7 @@ pub use decision::DecisionWord;
 use skein_lib::List;
 use skein_ui::phrases::{HoleKind, HoleShape, Language, PhraseId, PhraseShape};
 /// Phrase count, for a caller composing a bounded phrasebook.
-pub const PHRASES: u32 = 106;
+pub const PHRASES: u32 = 111;
 /// Owner of jig's public enum vocabulary.
 pub const OWNER: skein_ui::Owner = skein_ui::Owner { number: 65_537 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,6 +70,11 @@ pub enum RefusalWord {
     AccountProvider,
     AccountUses,
     AccountLimited,
+    AccountMoveNotSignedIn,
+    AccountMoveNotOurs,
+    AccountMoveHeld,
+    AccountMoveCancelled,
+    AccountMoveMoving,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WaitingWord {
@@ -144,6 +149,13 @@ impl Word {
             Refusal::NotOffered => RefusalWord::NotOffered,
             Refusal::KeyConflict => RefusalWord::KeyConflict,
             Refusal::Llm { .. } => RefusalWord::Llm,
+            Refusal::AccountMove { why } => match why {
+                crate::contract::AccountMoveWhy::NotSignedIn => RefusalWord::AccountMoveNotSignedIn,
+                crate::contract::AccountMoveWhy::NotOurs => RefusalWord::AccountMoveNotOurs,
+                crate::contract::AccountMoveWhy::Held => RefusalWord::AccountMoveHeld,
+                crate::contract::AccountMoveWhy::Cancelled => RefusalWord::AccountMoveCancelled,
+                crate::contract::AccountMoveWhy::Moving => RefusalWord::AccountMoveMoving,
+            },
             Refusal::Account { why, .. } => match why {
                 crate::contract::AccountWhy::Unknown => RefusalWord::AccountUnknown,
                 crate::contract::AccountWhy::Provider => RefusalWord::AccountProvider,
@@ -191,7 +203,7 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 106] = [
+pub const ALL: [Word; 111] = [
     Word::Hold(HoldWord::Exceeded(Bound::Reasoning)),
     Word::Hold(HoldWord::Exceeded(Bound::Metadata)),
     Word::Hold(HoldWord::Exceeded(Bound::Items)),
@@ -257,6 +269,11 @@ pub const ALL: [Word; 106] = [
     Word::Refusal(RefusalWord::AccountProvider),
     Word::Refusal(RefusalWord::AccountUses),
     Word::Refusal(RefusalWord::AccountLimited),
+    Word::Refusal(RefusalWord::AccountMoveNotSignedIn),
+    Word::Refusal(RefusalWord::AccountMoveNotOurs),
+    Word::Refusal(RefusalWord::AccountMoveHeld),
+    Word::Refusal(RefusalWord::AccountMoveCancelled),
+    Word::Refusal(RefusalWord::AccountMoveMoving),
     Word::Waiting(WaitingWord::Party),
     Word::Waiting(WaitingWord::Delegates),
     Word::Waiting(WaitingWord::News),

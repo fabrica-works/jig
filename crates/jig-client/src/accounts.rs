@@ -31,7 +31,7 @@ pub fn add_key(
         key,
         name,
         request: Ask::Jig(Box::new(crate::contract::Ask::AccountChange { holder, change })),
-        value,
+        value: Some(value),
     }
 }
 
@@ -43,7 +43,7 @@ pub fn replace_key(key: Key, name: RequestKey, holder: AccountHolder, source: u3
         key,
         name,
         request: Ask::Jig(Box::new(crate::contract::Ask::AccountChange { holder, change })),
-        value,
+        value: Some(value),
     }
 }
 
@@ -63,4 +63,37 @@ pub fn declare_program(
 #[must_use]
 pub fn check_program(key: Key, request: RequestKey, holder: AccountHolder, source: u32) -> Event {
     account_change(key, request, holder, AccountChange::CheckProgram { source })
+}
+
+/// Move an account out once, returning its record (client/domain/client.md, 6).
+#[must_use]
+pub fn move_out(key: Key, name: RequestKey, holder: AccountHolder, account: u32) -> Event {
+    Event::Carry {
+        key,
+        name,
+        request: Ask::Jig(Box::new(crate::contract::Ask::AccountChange {
+            holder,
+            change: AccountChange::MoveOut { account },
+        })),
+        value: None,
+    }
+}
+/// Confirm a moved record was written (client/domain/client.md, 6).
+#[must_use]
+pub fn written(key: Key, name: RequestKey, holder: AccountHolder, number: u32) -> Event {
+    account_change(key, name, holder, AccountChange::Written { number })
+}
+/// Move a file's account in, carrying its bytes once (client/domain/client.md, 6).
+#[must_use]
+pub fn move_in(key: Key, name: RequestKey, holder: AccountHolder, file: Secret) -> Event {
+    let digest = skein_lib::sha256::digest(file.expose());
+    Event::Carry {
+        key,
+        name,
+        request: Ask::Jig(Box::new(crate::contract::Ask::AccountChange {
+            holder,
+            change: AccountChange::MoveIn { digest },
+        })),
+        value: Some(file),
+    }
 }

@@ -23,9 +23,11 @@ impl Payload for OwnerEscalationChoice {
 impl Payload for OwnerOutcome {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Created { .. } | Self::Compound { .. } | Self::AccountKeyKept { .. } | Self::AccountChanged => {
-                Some(0)
-            }
+            Self::Created { .. }
+            | Self::Compound { .. }
+            | Self::AccountKeyKept { .. }
+            | Self::AccountMovedIn { .. }
+            | Self::AccountChanged => Some(0),
             Self::AccountProgramDeclared { name, .. } => {
                 if !jig_client_domain::contract::valid_program_name(name) {
                     return None;

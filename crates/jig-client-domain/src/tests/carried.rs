@@ -12,7 +12,7 @@ fn value(bytes: &[u8]) -> Secret {
     Secret::new(Box::from(bytes))
 }
 fn carry(c: &mut Client, key: Key, bytes: &[u8]) {
-    c.step(Event::Carry { key, name: NAME, request: ask(), value: value(bytes) });
+    c.step(Event::Carry { key, name: NAME, request: ask(), value: Some(value(bytes)) });
 }
 /// A live client with one carried request in flight; its attempt.
 fn carried() -> (Client, Token) {
@@ -128,15 +128,136 @@ fn a_carried_key_sent_to_the_table_is_a_loud_key_conflict() {
 #[test]
 fn a_carried_request_past_the_client_s_bounds_is_answered_at_once() {
     let mut c = Client::live();
-    c.step(Event::Carry { key: KEY, name: NAME, request: ask(), value: Secret::new(Box::new([0; VALUE_BYTES + 1])) });
+    c.step(Event::Carry {
+        key: KEY,
+        name: NAME,
+        request: ask(),
+        value: Some(Secret::new(skein_lib::bytes::zeroed(VALUE_BYTES + 1))),
+    });
     assert_eq!(c.told().as_ref(), &[Told::Answered { key: KEY, outcome: Outcome::Limit }]);
     for number in 0..4 {
         let name = [u8::try_from(number).expect("small"); 16];
-        c.step(Event::Carry { key: Key { asker: KEY.asker, number }, name, request: ask(), value: value(b"key") });
+        c.step(Event::Carry {
+            key: Key { asker: KEY.asker, number },
+            name,
+            request: ask(),
+            value: Some(value(b"key")),
+        });
     }
     c.downs();
     c.told();
-    c.step(Event::Carry { key: OTHER_KEY, name: [9; 16], request: ask(), value: value(b"key") });
+    c.step(Event::Carry { key: OTHER_KEY, name: [9; 16], request: ask(), value: Some(value(b"key")) });
     assert_eq!(c.told().as_ref(), &[Told::Answered { key: OTHER_KEY, outcome: Outcome::Limit }]);
     assert!(c.downs().is_empty());
+}
+
+const ACCOUNT: u32 = 7;
+const MOVE: u32 = 9;
+fn change(change: contract::AccountChange) -> Ask {
+    Ask::Jig(Box::new(contract::Ask::AccountChange { holder: contract::AccountHolder::Own, change }))
+}
+fn move_out() -> Ask {
+    change(contract::AccountChange::MoveOut { account: ACCOUNT })
+}
+fn moving_out(record: &[u8]) -> Answered {
+    Answered::Jig(contract::Answer::Done(contract::Outcome::Made {
+        what: contract::Made::MovingOut { account: ACCOUNT, number: MOVE, record: value(record) },
+    }))
+}
+fn moving() -> (Client, Token) {
+    let mut c = Client::live();
+    c.step(Event::Carry { key: KEY, name: NAME, request: move_out(), value: None });
+    let downs = c.downs();
+    let [Down::Send { attempt, key: NAME, request, value: None }] = downs.as_ref() else {
+        panic!("one move-out exchange without Save: {downs:?}");
+    };
+    assert_eq!(*request, move_out());
+    c.told();
+    (c, *attempt)
+}
+#[test]
+fn a_move_out_is_sent_once_without_a_save() {
+    let (mut c, _) = moving();
+    never_sent_again(&mut c);
+}
+#[test]
+fn a_move_out_answer_hands_its_record_to_its_caller() {
+    let (mut c, attempt) = moving();
+    let done = moving_out(b"moved record");
+    answer(&mut c, attempt, RequestEnvelope::Final, Some(done.clone()));
+    assert_eq!(c.told().as_ref(), &[Told::Answered { key: KEY, outcome: Outcome::Answered(done) }]);
+    assert!(c.downs().is_empty());
+    never_sent_again(&mut c);
+}
+#[test]
+fn a_move_out_answer_with_no_record_is_lost() {
+    let (mut c, attempt) = moving();
+    answer(&mut c, attempt, RequestEnvelope::Final, Some(moving_out(b"")));
+    assert_eq!(c.told().as_ref(), &[Told::Answered { key: KEY, outcome: Outcome::Lost }]);
+    never_sent_again(&mut c);
+}
+#[test]
+fn a_busy_move_out_is_unsent_without_a_retry() {
+    let (mut c, attempt) = moving();
+    answer(&mut c, attempt, RequestEnvelope::Again, None);
+    assert_eq!(c.told().as_ref(), &[Told::Answered { key: KEY, outcome: Outcome::Unsent }]);
+    never_sent_again(&mut c);
+}
+#[test]
+fn a_move_out_without_a_whole_answer_is_lost() {
+    for envelope in [RequestEnvelope::Lost, RequestEnvelope::Final] {
+        let (mut c, attempt) = moving();
+        answer(&mut c, attempt, envelope, None);
+        assert_eq!(c.told().as_ref(), &[Told::Answered { key: KEY, outcome: Outcome::Lost }]);
+        never_sent_again(&mut c);
+    }
+}
+#[test]
+fn a_move_in_goes_once_with_its_value_without_a_save() {
+    let mut c = Client::live();
+    let file = value(b"moved record");
+    let request = change(contract::AccountChange::MoveIn { digest: skein_lib::sha256::digest(file.expose()) });
+    c.step(Event::Carry { key: KEY, name: NAME, request: request.clone(), value: Some(file.clone()) });
+    let downs = c.downs();
+    let [Down::Send { key: NAME, request: sent, value: Some(sent_file), .. }] = downs.as_ref() else {
+        panic!("one move-in exchange without Save: {downs:?}");
+    };
+    assert_eq!((sent, sent_file), (&request, &file));
+    never_sent_again(&mut c);
+}
+#[test]
+fn written_is_saved_before_send_and_retried_after_busy() {
+    let mut c = Client::live();
+    // Keep the retry inside retention, past the fixture's one-second margin.
+    c.step(Event::Up { up: me(super::fixtures::PARTY, Duration::from_secs(30)) });
+    c.downs();
+    c.told();
+    let request = change(contract::AccountChange::Written { number: MOVE });
+    c.step(Event::Send { key: KEY, name: Some(NAME), request: request.clone() });
+    let downs = c.downs();
+    let [Down::Save { record }, Down::Send { attempt, key: NAME, request: sent, value: None }] = downs.as_ref() else {
+        panic!("written saved before send: {downs:?}");
+    };
+    assert_eq!((&record.request.request, sent), (&request, &request));
+    answer(&mut c, *attempt, RequestEnvelope::Again, None);
+    c.downs();
+    c.at(next_deadline(&c.domain).unwrap());
+    let downs = c.downs();
+    let [Down::Send { key: NAME, request: sent, value: None, .. }] = downs.as_ref() else {
+        panic!("written retried under its name: {downs:?}");
+    };
+    assert_eq!(*sent, request);
+}
+#[test]
+fn an_empty_carry_joins_without_becoming_a_value() {
+    let (mut c, _) = moving();
+    c.step(Event::Carry { key: KEY, name: NAME, request: move_out(), value: None });
+    assert!(c.downs().is_empty());
+    assert!(c.told().is_empty());
+}
+#[test]
+#[should_panic(expected = "request key conflict")]
+fn a_missing_value_differs_from_an_empty_value() {
+    let (mut c, _) = moving();
+    c.step(Event::Carry { key: KEY, name: NAME, request: move_out(), value: Some(value(b"")) });
 }

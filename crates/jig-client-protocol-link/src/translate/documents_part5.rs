@@ -354,5 +354,6 @@ pub(crate) fn owner_account_state_fields(value: &w::OwnerAccountState, limits: &
         },
         w::OwnerAccountState::Cancelled => c::OwnerAccountState::Cancelled,
         w::OwnerAccountState::Closing => c::OwnerAccountState::Closing,
+        w::OwnerAccountState::Moving => c::OwnerAccountState::Moving,
     }
 }

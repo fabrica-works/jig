@@ -41,6 +41,7 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             | OwnerOutcome::PolicyChanged { .. }
             | OwnerOutcome::AccountProgramDeclared { .. }
             | OwnerOutcome::AccountKeyKept { .. }
+            | OwnerOutcome::AccountMovedIn { .. }
             | OwnerOutcome::AccountChanged
             | OwnerOutcome::AccountRemoved { .. }
             | OwnerOutcome::AccountSignInStarted { .. }
@@ -58,7 +59,9 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
                     Route::Other
                 }
             }
-            Made::Service { .. } | Made::PersonResult { .. } | Made::Note { .. } => Route::Other,
+            Made::MovingOut { .. } | Made::Service { .. } | Made::PersonResult { .. } | Made::Note { .. } => {
+                Route::Other
+            }
         },
         Outcome::Proposed { .. } => Route::Proposed,
         Outcome::Decided { .. } | Outcome::DecidedFirst { .. } | Outcome::Changed => Route::Other,

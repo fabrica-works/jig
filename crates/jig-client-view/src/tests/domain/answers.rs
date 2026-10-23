@@ -169,6 +169,7 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
             | Refusal::NoFurther
             | Refusal::Role { .. }
             | Refusal::Ended { .. }
+            | Refusal::AccountMove { .. }
             | Refusal::Provider
             | Refusal::Unknown
             | Refusal::NameTaken
@@ -366,3 +367,27 @@ fn owner_historical_proposal_choices_keep_the_named_winner_and_clock_without_exp
 }
 
 use jig_client::contract::DecideOn;
+
+#[test]
+fn a_moving_out_card_keeps_numbers_without_the_record() {
+    let (mut domain, _) = live();
+    let id = install(&mut domain, Body::Task(Box::new(task())));
+    let request = send(&mut domain, ObjectKey::Task(8));
+    answered(
+        &mut domain,
+        request,
+        Answer::Done(Outcome::Made {
+            what: Made::MovingOut {
+                account: 19,
+                number: 23,
+                record: skein_lib::Secret::new(Box::from(b"private moved record".as_slice())),
+            },
+        }),
+    );
+    assert_eq!(
+        domain.objects().get(id).unwrap().answer,
+        Some(Answer::Done(Outcome::Made {
+            what: Made::MovingOut { account: 19, number: 23, record: skein_lib::Secret::new(Box::new([])) },
+        }))
+    );
+}

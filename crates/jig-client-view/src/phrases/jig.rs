@@ -239,6 +239,7 @@ pub enum JigPhrase {
     MadeResult,
     /// Made note (0).
     MadeNote,
+    MovingOut,
     /// Project (0): requires role (1).
     RoleMissing,
     /// Your pool has (0) left; this needs (1).
@@ -1236,6 +1237,7 @@ impl JigPhrase {
             Self::MadeService => 55,
             Self::MadeResult => 56,
             Self::MadeNote => 57,
+            Self::MovingOut => 7838,
             Self::RoleMissing => 58,
             Self::BudgetMissing => 59,
             Self::GrantMissing => 60,
@@ -2252,7 +2254,8 @@ impl JigPhrase {
             | Self::LiteralGrant
             | Self::LiteralGrantMissing
             | Self::NoteWriterTask
-            | Self::ScopedResourceNotes => Box::new([
+            | Self::ScopedResourceNotes
+            | Self::MovingOut => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
@@ -2334,7 +2337,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 618] = [
+pub const ALL: [JigPhrase; 619] = [
     JigPhrase::ActRename,
     JigPhrase::NameTaken,
     JigPhrase::NameEmpty,
@@ -2521,6 +2524,7 @@ pub const ALL: [JigPhrase; 618] = [
     JigPhrase::MadeService,
     JigPhrase::MadeResult,
     JigPhrase::MadeNote,
+    JigPhrase::MovingOut,
     JigPhrase::RoleMissing,
     JigPhrase::BudgetMissing,
     JigPhrase::GrantMissing,

@@ -56,3 +56,40 @@ fn a_carried_request_the_link_cannot_post_is_unsent() {
     h.send(Token::new(9), fixtures::KEY, fixtures::message());
     assert_eq!(h.answered(Token::new(9)), Some((RequestEnvelope::Lost, None)), "the table's attempt is lost");
 }
+
+fn move_out(h: &mut Harness, attempt: Token) {
+    h.link.step(
+        Time::ZERO,
+        Event::Send {
+            attempt,
+            key: CARRIED_KEY,
+            ask: Ask::Jig(Box::new(c::Ask::AccountChange {
+                holder: c::AccountHolder::Own,
+                change: c::AccountChange::MoveOut { account: u32::MAX },
+            })),
+            value: None,
+        },
+        &mut h.out,
+    );
+}
+#[test]
+fn a_move_out_leaves_while_the_table_waits_on_a_write() {
+    let mut h = Harness::new(&limits());
+    h.save(fixtures::saved_table(fixtures::message()));
+    h.send_kept(Token::new(5));
+    move_out(&mut h, ATTEMPT);
+    assert_eq!(h.exchanges(), 1);
+    assert_eq!(posted(&h).expect("move out left").value(), &None);
+    h.write_failed();
+    assert_eq!(h.answered(ATTEMPT), None);
+}
+#[test]
+fn a_move_out_the_link_cannot_post_is_unsent() {
+    let mut h = Harness::new(&limits());
+    for number in 0..limits().exchanges {
+        h.send(Token::new(u64::from(number)), [u8::try_from(number).unwrap(); 16], fixtures::message());
+    }
+    move_out(&mut h, ATTEMPT);
+    assert_eq!(h.answered(ATTEMPT), Some((RequestEnvelope::Again, None)));
+    assert!(posted(&h).is_none());
+}

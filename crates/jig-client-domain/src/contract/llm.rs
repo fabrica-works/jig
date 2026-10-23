@@ -121,6 +121,7 @@ pub enum TaskSourceState {
     Unloaded { at: super::OwnerAccountPlace, why: super::OwnerAccountUnread },
     Cancelled,
     Closing,
+    Moving,
 }
 
 /// Configured public source offers; no private account identity is carried.

@@ -234,6 +234,7 @@ pub enum OwnerAccountState {
     Unloaded { at: OwnerAccountPlace, why: OwnerAccountUnread },
     Cancelled,
     Closing,
+    Moving,
 }
 
 /// The supplied closed hellorefusal vocabulary.

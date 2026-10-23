@@ -296,3 +296,33 @@ fn project_name_refusals_say_the_failed_rule_and_projects_limit() {
         assert!(contains(&render(Refusal::Malformed { at: 0, why: Malformed::Name(rule) }), words));
     }
 }
+
+#[test]
+fn account_move_refusals_show_the_supplied_reason() {
+    for (why, words) in [
+        (AccountMoveWhy::NotSignedIn, b"not signed in".as_slice()),
+        (AccountMoveWhy::NotOurs, b"not ours"),
+        (AccountMoveWhy::Held, b"held by another holder"),
+        (AccountMoveWhy::Cancelled, b"cancelled"),
+        (AccountMoveWhy::Moving, b"moving"),
+    ] {
+        assert!(contains(&render(Refusal::AccountMove { why }), words));
+    }
+}
+#[test]
+fn moving_out_words_show_only_account_and_move_numbers() {
+    let mut builder = Builder::new(&limits());
+    builder.open(Role::Page);
+    let outcome = Outcome::Made {
+        what: Made::MovingOut {
+            account: 19,
+            number: 23,
+            record: skein_lib::Secret::new(Box::from(b"private moved record".as_slice())),
+        },
+    };
+    shared_words().outcome(&mut builder, &outcome);
+    builder.close();
+    let tree = builder.finish();
+    assert!(contains(&tree, b"Account 19: moving out, move 23"));
+    assert!(!contains(&tree, b"private moved record"));
+}

@@ -4,12 +4,12 @@
 extern crate alloc;
 
 #[rustfmt::skip]
-#[path = "generated/v16.rs"]
-pub mod v16;
-pub use v16::*;
+#[path = "generated/v17.rs"]
+pub mod v17;
+pub use v17::*;
 
 /// The client wire version this release reads and writes.
-pub const VERSION: u32 = 16;
+pub const VERSION: u32 = 17;
 
 #[cfg(test)]
 mod tests;

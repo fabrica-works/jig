@@ -158,6 +158,11 @@ pub enum OwnerOutcome {
         name: Box<[u8]>,
     },
     AccountChanged,
+    /// A moved account was adopted or renewed (domain/accounts.md, 6).
+    AccountMovedIn {
+        account: u32,
+        renewed: bool,
+    },
     AccountRemoved {
         confirmed: bool,
         failed_hosts: Box<[AccountHostFailure]>,

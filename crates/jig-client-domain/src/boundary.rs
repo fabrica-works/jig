@@ -88,8 +88,8 @@ pub enum Why {
 pub enum Event {
     Start { kept: List<RequestRecord<Held>> },
     Send { key: Key, name: Option<RequestKey>, request: Ask },
-    // A request carrying a value: sent once under its name, never kept (client.md, 6).
-    Carry { key: Key, name: RequestKey, request: Ask, value: Secret },
+    // A value carried either way: sent once under its name, never kept (client.md, 6).
+    Carry { key: Key, name: RequestKey, request: Ask, value: Option<Secret> },
     Watch { handle: Handle, subject: Watchable },
     Unwatch { handle: Handle },
     Read { handle: Handle, read: Readable },

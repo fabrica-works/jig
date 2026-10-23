@@ -2,7 +2,7 @@
 use crate::translate::too_large;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v17 as w;
 use skein_lib::{List, Writer, bytes};
 pub(crate) fn wire_revision(value: c::Revision, limits: &w::Limits) -> Result<w::Revision, w::Problem> {
     w::Revision::new(limits, w::RevisionParts { value: value.value })
@@ -702,6 +702,18 @@ fn account_holder(value: c::AccountHolder) -> w::AccountHolder {
 
 fn account_change(value: &c::AccountChange, limits: &w::Limits) -> Result<w::AccountChange, w::Problem> {
     Ok(match value {
+        c::AccountChange::MoveOut { account } => w::AccountChange::MoveOut(w::AccountChangeMoveOut::new(
+            limits,
+            w::AccountChangeMoveOutParts { account: *account },
+        )?),
+        c::AccountChange::Written { number } => w::AccountChange::Written(w::AccountChangeWritten::new(
+            limits,
+            w::AccountChangeWrittenParts { number: *number },
+        )?),
+        c::AccountChange::MoveIn { digest } => w::AccountChange::MoveIn(w::AccountChangeMoveIn::new(
+            limits,
+            w::AccountChangeMoveInParts { digest: *digest },
+        )?),
         c::AccountChange::DeclareProgram { provider, join, name } => {
             if !c::valid_program_name(name) {
                 return Err(super::piece_problem(skein_codec::Reason::Malformed));
@@ -749,45 +761,50 @@ fn account_change(value: &c::AccountChange, limits: &w::Limits) -> Result<w::Acc
                 w::AccountChangeMoveSourceParts { account: *account, source: *source, place: *place },
             )?)
         }
-        c::AccountChange::SetUses { account, uses } => w::AccountChange::SetUses(w::AccountChangeSetUses::new(
-            limits,
-            w::AccountChangeSetUsesParts {
-                account: *account,
-                uses: match uses {
-                    None => None,
-                    Some(uses) => {
-                        if uses.len()
-                            > usize::try_from(limits.account_change_set_uses_uses_some.min(c::ACCOUNT_USES))
-                                .expect("account uses bound fits")
-                        {
-                            return Err(w::Problem {
-                                path: w::Path::AccountChangeSetUsesUses,
-                                reason: skein_codec::Reason::Bound,
-                            });
-                        }
-                        let mut rows =
-                            List::with_capacity(u32::try_from(uses.len()).expect("account uses bounded by the wire"));
-                        for use_ in uses {
-                            rows.push(match use_ {
-                                c::OwnerAccountUse::Party(value) => {
-                                    w::OwnerAccountUse::Party(w::OwnerAccountUseParty::new(
-                                        limits,
-                                        w::OwnerAccountUsePartyParts { party: *value },
-                                    )?)
-                                }
-                                c::OwnerAccountUse::Project(value) => {
-                                    w::OwnerAccountUse::Project(w::OwnerAccountUseProject::new(
-                                        limits,
-                                        w::OwnerAccountUseProjectParts { project: *value },
-                                    )?)
-                                }
-                            })
-                            .expect("reserved uses");
-                        }
-                        Some(rows)
-                    }
-                },
-            },
-        )?),
+        c::AccountChange::SetUses { account, uses } => account_set_uses(*account, uses.as_deref(), limits)?,
     })
+}
+
+fn account_set_uses(
+    account: u32,
+    uses: Option<&[c::OwnerAccountUse]>,
+    limits: &w::Limits,
+) -> Result<w::AccountChange, w::Problem> {
+    Ok(w::AccountChange::SetUses(w::AccountChangeSetUses::new(
+        limits,
+        w::AccountChangeSetUsesParts {
+            account,
+            uses: match uses {
+                None => None,
+                Some(uses) => {
+                    if uses.len()
+                        > usize::try_from(limits.account_change_set_uses_uses_some.min(c::ACCOUNT_USES))
+                            .expect("account uses bound fits")
+                    {
+                        return Err(w::Problem {
+                            path: w::Path::AccountChangeSetUsesUses,
+                            reason: skein_codec::Reason::Bound,
+                        });
+                    }
+                    let mut rows =
+                        List::with_capacity(u32::try_from(uses.len()).expect("account uses bounded by the wire"));
+                    for use_ in uses {
+                        rows.push(match use_ {
+                            c::OwnerAccountUse::Party(value) => w::OwnerAccountUse::Party(
+                                w::OwnerAccountUseParty::new(limits, w::OwnerAccountUsePartyParts { party: *value })?,
+                            ),
+                            c::OwnerAccountUse::Project(value) => {
+                                w::OwnerAccountUse::Project(w::OwnerAccountUseProject::new(
+                                    limits,
+                                    w::OwnerAccountUseProjectParts { project: *value },
+                                )?)
+                            }
+                        })
+                        .expect("reserved uses");
+                    }
+                    Some(rows)
+                }
+            },
+        },
+    )?))
 }

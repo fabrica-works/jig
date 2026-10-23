@@ -9,7 +9,14 @@ use jig_client::contract::{
 use skein_lib::{Wall, bytes::copy_of};
 
 fn phrase_limits() -> PhraseLimits {
-    PhraseLimits { languages: 2, phrases: 64, holes: 1, segments: 200, text_bytes: 8192, hole_bytes: 0 }
+    PhraseLimits {
+        languages: 2,
+        phrases: u32::try_from(phrases::ALL.len()).unwrap(),
+        holes: 1,
+        segments: 200,
+        text_bytes: 8192,
+        hole_bytes: 0,
+    }
 }
 fn words() -> Words {
     Words::new(Phrasebook::load(phrases::shapes(), Box::new([phrases::english()]), &phrase_limits()).unwrap(), 0, 0)
@@ -467,4 +474,14 @@ fn project_outcomes_say_what_was_made_or_renamed_and_keep_the_number() {
     let words = words();
     expect_lines(&render(&OwnerOutcome::Renamed { project: 17 }, &words), &[b"Renamed the project", b"Project: 17"]);
     expect_lines(&render(&OwnerOutcome::ProjectMade { project: 19 }, &words), &[b"Made project", b"Project: 19"]);
+}
+
+#[test]
+fn moved_in_outcomes_show_whether_the_account_was_renewed() {
+    let words = words();
+    for (renewed, expected) in [(false, b"moved in".as_slice()), (true, b"renewed")] {
+        let tree = render(&OwnerOutcome::AccountMovedIn { account: u32::MAX, renewed }, &words);
+        assert!(super::cards::contains(&tree, expected));
+        assert!(super::cards::contains(&tree, b"4294967295"));
+    }
 }
