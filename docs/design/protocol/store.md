@@ -669,8 +669,8 @@ the committed length. The next open cuts the file to its committed length
 - **A page of a task's turns,** forwards or backwards, from a cursor that
   is an offset the component gives and takes back.
 - **A tail,** for a fresh run's brief: the window's last turns as text,
-  each rendered by the host's protocol layer when loaded, within the
-  tail's own budget.
+  each rendered by the host's protocol layer when loaded, and each turn's
+  text at most the tail's own budget, as the core's memory prices it.
 - **Never past what is committed.**
 - **A frame that fails its checksum** fails the read as unread. The core
   treats the transcript as one the agent cannot use: the run fails as
