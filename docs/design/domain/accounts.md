@@ -517,7 +517,7 @@ among their own (`../client/domain/contract.md`, 7.1).
 | check a program's login | has each host's half check the source's login now (3.4) |
 | order, uses, resume | the holder's: an account's place among theirs and its sources' order, its uses, a limited source resumed |
 | remove an account | signs each of its sources out, as sign out does, and erases its keys; its number is never reused, and a task that kept it chooses again (4.3); the deployment's also by the deployment's `RemoveAccount` (people.md, 5.3) |
-| move out | withdraws the account's signed-in source and hands its record to the client that asked, never in a committed answer, naming the move; refused "not signed in" without a signed-in source holding a record (section 6) |
+| move out | withdraws the account's signed-in source and hands its record to the client that asked, once, never in a committed answer, naming the move; sent once, never kept by the client (`../client/domain/contract.md`, 3.1); refused "not signed in" without a signed-in source holding a record (section 6) |
 | written | the client wrote the moved record: erases the source, and the account with it when no source is left; refused "cancelled" for a move not under way |
 | move in | takes a moved record carried as a key is: refused "not ours" for another application's, "held" for a subject another holder holds; makes the account or renews the holder's of its subject, refreshing the record once before it is usable (section 6) |
 
@@ -531,7 +531,9 @@ among their own (`../client/domain/contract.md`, 7.1).
   never keeps nor resends it
   (`../protocol/client.md`, sections 5 and 10). A moved-out record goes
   the other way once, with the answer to the client that asked, and is
-  never in the answer kept (section 6).
+  never in the answer kept (section 6): the request is sent once, and a
+  second answer under its key, without the record, is *lost* to the
+  client.
 - **The sign-in's redirect is on the engine's machine.** The engine
   binds a loopback listener on an ephemeral port for each sign-in, or
   on the port its configuration fixes (`../protocol/llm.md`, section 5),
@@ -568,8 +570,10 @@ construction, never by a person deleting a copy.
   *moving*, stored. Once the protocol layer has read the source's
   latest record and made the file's bytes (`../protocol/llm.md`, 5.6),
   the request is answered *moving out*, naming the move's number; the
-  bytes go to the client that asked with that answer, never in a
-  committed one. The client writes the file new and private, and says
+  bytes go to the client that asked with that answer, once, never in a
+  committed one: an answer lost on its way, or the request's key sent
+  again, leaves the move with no file, and its deadline cancels it.
+  The client writes the file new and private, and says
   *written*, naming the move: the child then erases the source and its
   record, and the account with them when it has no other source; its
   number is never reused. The file is then the only holder.

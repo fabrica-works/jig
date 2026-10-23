@@ -379,7 +379,14 @@ section 2).
   on its directory: the source is restored and usable, a run's grant
   the LLM peer refuses is refreshed at the issuer and the run answered
   on the newer generation, and the sign-out is confirmed by the
-  issuer's revocation, the account gone. A binary told to stop with a
+  issuer's revocation, the account gone. An account moves between two
+  binaries, each on its own directory, against one fake issuer: signed
+  in on the first, moved out through the native client, the file
+  written by the test as the application's shell writes it, and
+  *written*; moved into the second, where it is usable once refreshed
+  at the issuer, a run answered on it; the first, restarted, holds
+  nothing, the second, restarted, still holds it, and the file's
+  refresh token is refused by the issuer. A binary told to stop with a
   sign-in under way ends at once. `ops`'s binary proves its own shape the
   same way.
 - **The live layer:** `jig-test` with a real LLM account, a key added

@@ -261,6 +261,19 @@ changes no core or task store version or layout, requires no migration,
 and leaves application-family versions separate. Implementation status
 is in `../STATUS.md`.
 
+The account's move (`../domain/accounts.md`, section 6) adds to jig's
+wire, in the version after v16: the account changes `move_out { account
+}`, `written { number }` and `move_in { digest }`, the last carrying the
+moved file as the keyed request's value (section 5), whose bound grows
+to 128 KiB; the answer `Made::moving_out { account, number, record }`,
+the record a secret of at most 128 KiB filled for the asking exchange
+alone (section 5), and the outcome `account_moved_in { account,
+renewed }` (*written* is answered `account_changed`); the refusal
+`account_move { why }`, `why` one of `not_signed_in`, `not_ours`,
+`held`, `cancelled` and `moving`; and `moving` in each source state an
+account document or a task's wait shows. Existing tags stay fixed; new
+variants go last.
+
 ## 4. The connection
 
 A client keeps one connection to the engine, whatever carries it, of
@@ -423,7 +436,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   request always has the same digest. A request carrying a value
   (below) has a digest of its own.
 - **A request carrying a value,** an LLM account's key added or
-  replaced (`../client/domain/contract.md`, 3.2), or an application's
+  replaced, or a moved account's file moved in
+  (`../client/domain/contract.md`, 3.2), or an application's
   request that carries one, is sent once and never kept: the client
   never stores it in the small store, and never sends it again by
   itself (`../client/domain/client.md`, section 6). Its key is its
@@ -450,7 +464,31 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
     answered with its first answer, and erases unused a value kept for
     it again.
   - *No value is in a record kept:* not in the small store, the core's
-    commits, an answer, a log or a progress report.
+    commits, an answer kept for its key, a log or a progress report.
+  - *Its bound* is the wire's: a keyed request's value is at most
+    128 KiB, which holds a moved file under each profile's record bound
+    (`llm.md`, 5.6); startup refuses a configuration whose moved file's
+    bound would pass it. The engine refuses a key past the bytes `me`
+    states, and a moved file past its form's bound, as a limit.
+- **A request whose answer carries a value,** an account moved out
+  (`../client/domain/contract.md`, 3.2), goes the same way: sent once,
+  never kept, never sent again by the client, since its value is given
+  once and a second answer would not carry it.
+  - *The engine's side* fills the value as it encodes the answer for
+    the exchange that asked, never before the core's commit: the core's
+    outcome names what holds it (the moving source), and the clients'
+    component asks the application's root for it, which takes it from
+    the accounts' protocol layer (`llm.md`, 5.6), once. The value is in
+    no commit, no answer kept for the key, no log and no progress
+    report, as a service's minted credential is not.
+  - *A second answer under the key,* to the request sent again or to a
+    join, is the kept answer, its value empty: the value went with the
+    first. The client answers its caller *lost* for it (as for an
+    exchange that ended with no whole answer): the engine made the
+    request, the value is gone with the exchange that carried it, and
+    the account's move is cancelled at its deadline
+    (`../domain/accounts.md`, section 6). Its caller asks again under a
+    new name once it is.
 
 ## 6. Reads
 
@@ -747,8 +785,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   for it, its owner and version, and when it was first sent; and the
   name of the client's stream (section 4), under a key of its own, which
   no request's key can be (a request's is 16 bytes); nothing else of the
-  client's, and never a credential, an answer or a request carrying a
-  value (section 5). New top-level `Seen` has no stored record. Each
+  client's, and never a credential, an answer, a request carrying a
+  value, or one whose answer carries one (section 5). New top-level `Seen` has no stored record. Each
   kept record is encoded with jig's wire, with its store version.
 - **The stream's name** is saved at each hello, in a write of its own,
   and replaces the last; nothing waits for it, and a write of it not
@@ -767,8 +805,9 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   is each request
   whose record that write was the last to carry not sent, parked or not,
   answered *not kept* (`../client/domain/client.md`, section 11). A
-  request carrying a value is never stored, and leaves at once, once
-  (section 5).
+  request carrying a value, or whose answer carries one, is never
+  stored, and leaves at once, once (section 5). An account's move
+  *written* is an ordinary request: kept, and sent again under its key.
 - **`Seen` has no save of its own.** The client domain consumes its
   table save before the composed client or link registers a store write
   (`../client/domain/client.md`, section 6). Its exchange still waits
@@ -916,10 +955,12 @@ section 2).
   link's expiry as drawn; a `Mint` and a service's sign-in answered busy
   for full; a
   service signing in, a key added, sent again under its key with the
-  same value and with another. Its referee: one reply per exchange; one
+  same value and with another; an account moved out, its record in the
+  first answer alone and empty in the kept answer sent again, and a
+  moved file moved in under its key. Its referee: one reply per exchange; one
   streamed message in flight per stream; no credential reaches a
-  domain; no key is in the small store, a committed request or an
-  answer.
+  domain; no key and no moved record is in the small store, a
+  committed request or an answer kept.
 - **The default mapping's ends,** each against a scripted peer of bytes:
   every route, the stream's events cut at random, the credential as a
   cookie and as a bearer, the printed link's route (a browser's link

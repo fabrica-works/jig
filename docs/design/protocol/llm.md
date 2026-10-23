@@ -380,9 +380,12 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
   routing removes it from the driver; at `removed`, it reads the
   source's record from the secrets' store, and the moves make the
   file's bytes and hold them for the client that asked, telling the
-  child it is withdrawn. They go out once: the clients' protocol layer
-  takes them as it encodes the answer *moving out*, which names the
-  source (`client.md`, section 5). They are dropped when the move is
+  child it is withdrawn. They go out once: the clients' protocol layer,
+  encoding the answer *moving out* for the exchange that asked, after
+  its commit, asks the root for the bytes of the source the answer
+  names, and the root takes them from the moves (`Moves::take`); a
+  second take gives none, and the answer goes with an empty record
+  (`client.md`, section 5). They are dropped when the move is
   written (the record then erased from the secrets' store), cancelled,
   or the engine closes, and are never committed, logged or kept
   elsewhere. A source whose record cannot be read is withdrawn unread,

@@ -334,9 +334,11 @@ handles, as every presentation does (sections 7 and 8).
   answer `Unknown` after forget or `Role` after authority loss
   (contract.md, 3.1 and 3.2).
 - **A request carrying a value,** such as an LLM account's key added or
-  replaced (contract.md, 3.2), or an application's request's credential,
-  is sent once and never kept, so that no value is ever in the small
-  store (`../../protocol/client.md`, section 5):
+  replaced, or a moved file moved in (contract.md, 3.2), or an
+  application's request's credential, is sent once and never kept, so
+  that no value is ever in the small store
+  (`../../protocol/client.md`, section 5); and so is a request whose
+  answer carries one, an account moved out, whose record comes once:
   - *beside the table:* it carries a name, the engine key its caller
     gives and never makes from the value (contract.md, 3.1), and goes
     as one exchange: never in a `Save`, never parked, never sent again
@@ -348,7 +350,21 @@ handles, as every presentation does (sections 7 and 8).
     exchange ended with no whole answer: the engine may have made it;
   - *its caller asks again* under the same name, with the value; within
     its retention the engine answers a name it has answered with its
-    first answer (contract.md, 3.1).
+    first answer (contract.md, 3.1);
+  - *a moved-out answer with no record,* the engine's answer to the
+    name sent again, is answered *lost*: the record went with the first
+    answer, and the move is cancelled at its deadline. Its caller asks
+    again under a new name once it is (`../../domain/accounts.md`,
+    section 6).
+- **An account's move, in `jig-client`'s API:** `move_out` sends the
+  request once and hands its caller the moved record and the move's
+  number in its answer; the caller writes the file, then sends
+  `written` with the number, an ordinary request, kept and sent again
+  under its key; `move_in` carries the file's bytes as a key's value
+  is carried. `jig-client` never writes or reads a file, and never
+  keeps the record: the file is the application's shell's, written
+  new, private and synced before *written*, and removed once a move
+  in is answered, or once a *written* is refused *cancelled*.
 - **Progress, for showing.** `Pending { key }` says the request's
   progress changed: in flight, retrying, parked (offline, signed out, or
   another party's), or held for its owner's version (8.2). Retrying
@@ -377,7 +393,7 @@ handles, as every presentation does (sections 7 and 8).
     another request. It is answered at once, and nothing of it is kept
     or sent (above).
   - *unsent* and *lost,* the client's own, for a request carrying a
-    value only: the engine did not make it, or may have; its caller asks
+    value, or whose answer carries one, only: the engine did not make it, or may have; its caller asks
     again under its name (above).
 
   Done and refused come only once the engine's commit is durable

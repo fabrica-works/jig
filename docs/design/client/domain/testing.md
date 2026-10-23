@@ -197,6 +197,15 @@ one:
 - **The engine's faults** reach the client, and through it the person:
   crashes at commits, held commits, restarts, as the conformance world
   makes them.
+- **An account's move** through `jig-client`, against the core world's
+  scripted accounts component: moved out, its record handed once, the
+  account shown *moving*, then *written* and gone; the record moved in
+  and the account made; the move's key sent again answered *lost*, no
+  record with it; a late *written* refused *cancelled*; a move under
+  way at a restart cancelled. The record's checks, the one refresh and
+  the dead copy are the accounts' worlds' (`../../protocol/llm.md`,
+  section 8), and two deployments against one issuer the end-to-end
+  tier's (`../../protocol/service.md`, section 8).
 
 ## 6. The referee
 
