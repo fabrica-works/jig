@@ -5,7 +5,7 @@
       "overrides": {
         "tasks.result_bytes": 32,
         "people.amendment_bytes": 64,
-        "core.policy_bytes": 256,
+        "core.policy_bytes": 512,
         "tasks.spec_bytes": 128,
         "tasks.message_bytes": 512,
         "tasks.hold_bytes": 64,

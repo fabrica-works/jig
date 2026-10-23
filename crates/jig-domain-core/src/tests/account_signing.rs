@@ -24,7 +24,7 @@ fn signing_core() -> (Core, Env<Limits>) {
             offers,
         }]),
     };
-    let mut core = Core::new(config, &limits).expect("fixture core configuration");
+    let mut core = seeded_core(config, &limits).expect("fixture core configuration");
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     signed_in(&mut core, &env);
     drop(step(&mut core, &env, Event::Account(accounts::Event::Want)));

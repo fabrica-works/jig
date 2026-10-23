@@ -20,7 +20,7 @@ pub fn fixture(seed: u64, requirement: bool) -> (root::Config, root::Limits) {
     let mut configuration = crate::world::config(seed);
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.grants = Box::new([grant()]);
-    let mut policy = configuration.core.authority.policy(1).expect("configured policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.grants = Box::new([grant()]);
     policy.roles[0].authority.grants = Box::new([grant()]);
     policy.roles[0].authority.budget.spend = 300;
@@ -38,7 +38,9 @@ pub fn fixture(seed: u64, requirement: bool) -> (root::Config, root::Limits) {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = domain;
+    configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
     configuration.first.procedures = Box::new([connector::ProcedureSpec {
         number: 1,
         actions: Box::new([
@@ -80,6 +82,18 @@ impl World {
     #[must_use]
     pub fn first_start(configuration: root::Config, limits: root::Limits) -> World {
         let mut world = Self::empty(configuration, &limits);
+        world.send(root::Event::RestartBegin);
+        world
+    }
+
+    /// Walking scenarios preload their fake account records before startup wants sources.
+    pub(crate) fn first_start_with_accounts(configuration: root::Config, limits: &root::Limits) -> World {
+        let rows = crate::fixtures::account_rows(&configuration.core.settings.llm_providers);
+        let mut world = Self::empty(configuration, limits);
+        let env = world.env();
+        for row in rows {
+            assert!(root::restore_record(&mut world.domain, &env, row));
+        }
         world.send(root::Event::RestartBegin);
         world
     }
@@ -156,10 +170,7 @@ impl World {
         let mut bootstrap = crate::world::config(seed);
         if *bootstrap.core.authority.limits() != limits.core.authority {
             let rules = bootstrap.core.authority.rules().clone();
-            let policy = bootstrap.core.authority.policy(1).expect("bootstrap policy").clone();
             bootstrap.core.authority = authority::Domain::new(rules, limits.core.authority).expect("bootstrap bounds");
-            let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-            authority::step(&mut bootstrap.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
         }
         let mut world = Self::empty(bootstrap, &limits);
         world.creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
@@ -167,11 +178,9 @@ impl World {
         world.send(root::Event::Core(core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) })));
         let projects: Vec<_> = configuration
             .core
-            .projects
+            .seed_projects
             .iter()
-            .map(|project| {
-                (*project, configuration.core.authority.policy(*project).expect("project policy").period_spend)
-            })
+            .map(|project| (project.number, project.policy.policy.period_spend))
             .collect();
         world.observer = crate::observations::Observer::new(&configuration);
         world.bootstrap_owners = configuration.core.owners.to_vec();
@@ -231,7 +240,7 @@ impl World {
         let observer = crate::observations::Observer::new(&configuration);
         let heap = crate::observations::Heap::new(limits);
         let creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
-        let initial_ask = if configuration.core.projects.is_empty() {
+        let initial_ask = if configuration.core.seed_projects.is_empty() {
             people::Ask::MarkSeen { seen: people::Seen::Results { through: 0 } }
         } else {
             crate::fixtures::create_chat(&creating, 1, 0, b"make an effect".as_slice().into())

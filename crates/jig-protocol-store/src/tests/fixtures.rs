@@ -403,6 +403,8 @@ pub fn model_names(names: &[&[u8]]) -> Box<[Box<[u8]>]> {
 
 pub fn people_policy() -> people::PolicyValue {
     people::PolicyValue {
+        ceiling: people_authority(),
+        escalation_role: Some(0),
         templates: Box::new([
             people::TemplateOverride {
                 template: 1,

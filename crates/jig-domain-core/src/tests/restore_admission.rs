@@ -91,6 +91,7 @@ fn an_unknown_header_cannot_allocate_any_family_or_become_dirty_on_time() {
     let expected = core.counters.deployment();
     assert_eq!(core.restart_begin(), RestartRequest::Step(RestartStep::LoadCore));
     for family in [
+        Family::Project,
         Family::Task,
         Family::Person,
         Family::SignIn,
@@ -528,4 +529,15 @@ fn the_census_restores_unread_ended_replies_beside_the_result() {
             assert_eq!(conversation.conversation, Some(ConversationRead { seen: 0, unread: Count::Known(REPLIES) }));
         }
     }
+}
+
+#[test]
+fn a_restored_projects_mark_precedes_the_next_project_allocation() {
+    let limits = env().limits;
+    let mut core = Core::new(config(50), &limits).expect("fixture core");
+    let mut header = core.counters.deployment();
+    header.projects = 5;
+    core.restart_begin();
+    assert_eq!(core.restore_core(CoreRecord::Deployment(header), &limits), Restored::Deployment { commits: 0 });
+    assert_eq!(fresh(&mut core.counters, Family::Project), Some(6));
 }

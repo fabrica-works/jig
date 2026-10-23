@@ -18,7 +18,7 @@ fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &
 
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
-    let mut policy = configuration.core.authority.policy(1).expect("actual procedure policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
     for role in &mut policy.roles {
         role.authority.delegation.kinds.clone_from(&kinds);
@@ -28,7 +28,9 @@ fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &
     let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
     jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = checked;
+    configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
     configuration.first.procedures = Box::new([jig_test_connector::ProcedureSpec {
         number: 1,
         actions: Box::new([jig_test_connector::ProcedureAction::Stall]),
@@ -133,14 +135,16 @@ fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig
 
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.grants = Box::new([grant.clone()]);
-    let mut policy = configuration.core.authority.policy(1).expect("actual effect policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.grants = Box::new([grant.clone()]);
     policy.roles[0].authority.grants = Box::new([grant]);
     let mut checked = jig_domain_authority::Domain::new(rules, owner.core.authority).expect("declared grant bounds");
     let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
     jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = checked;
+    configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
 }
 
 #[test]

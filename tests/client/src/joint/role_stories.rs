@@ -78,7 +78,7 @@ fn configured_with_bounds(
 
     let mut authority_rules = configuration.core.authority.rules().clone();
     authority_rules.ceiling.delegation.kinds = kinds.clone();
-    let mut policy = configuration.core.authority.policy(1).expect("role policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds = kinds.clone();
     for role in &mut policy.roles {
         role.authority.delegation.kinds = kinds.clone();
@@ -86,13 +86,7 @@ fn configured_with_bounds(
     policy.roles[0].authority.budget.spend = 500;
     configuration.core.authority =
         jig_domain_authority::Domain::new(authority_rules, owner.core.authority).expect("role scenario bounds");
-    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-    jig_domain_authority::step(
-        &mut configuration.core.authority,
-        jig_domain_authority::Event::Policy { project: 1, policy },
-        &mut out,
-    );
-    assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
+    configuration.core.seed_projects[0].policy.policy = policy;
     configure(&mut configuration, &owner);
     jig_core_world::peers::journal(&mut owner);
     let roles = [PartyRole::Owner, PartyRole::Maintainer, PartyRole::Member, PartyRole::Observer];

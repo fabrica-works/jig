@@ -611,10 +611,6 @@ impl Stored {
 /// Root-to-child inputs; authenticated identity, authoritative roles and restored records
 /// cross this boundary without protocol secrets. (domain/people.md, sections 3–5).
 #[derive(PartialEq, Eq, Debug)]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "bounded whole keyed requests stay inline and event storage is priced by size_of"
-)]
 pub enum Event {
     /// Move a live conversation and start its new requester with nothing read.
     MoveChat { task: u64, project: u32, from: u64, to: u64 },

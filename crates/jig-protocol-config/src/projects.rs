@@ -16,6 +16,64 @@ pub struct Project {
     pub policy: authority::Policy,
 }
 
+/// A numbered policy copied into projects made after the first start (configuration.md, 3).
+#[derive(Debug)]
+pub struct Policy {
+    pub number: u32,
+    pub roles: Box<[PermissionRole]>,
+    pub templates: Box<[jig_domain_people::TemplateOverride]>,
+    pub policy: authority::Policy,
+}
+
+pub(crate) fn configured_policies(
+    object: &mut read::Object,
+    document: &Document,
+    limits: &crate::Limits,
+    configured: &[Model],
+    problems: &mut Problems,
+) -> Option<Box<[Policy]>> {
+    let Some(at) = object.member(document, b"policies") else { return Some(Box::new([])) };
+    policies(document, at, &Path::root().member(b"policies"), limits, configured, problems)
+}
+
+fn policies(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    limits: &crate::Limits,
+    configured: &[Model],
+    problems: &mut Problems,
+) -> Option<Box<[Policy]>> {
+    let items = domain::items(document, at, limits.core.authority.projects, path, problems)?;
+    let mut policies = List::<Policy>::with_capacity(items.len());
+    for (index, at) in items.iter().enumerate() {
+        let path = check::index(path, index);
+        let Some(mut object) = check::object(document, *at, &path, problems) else { continue };
+        let number = check::count(&mut object, document, b"number", &path, problems);
+        let at = object.required(document, b"policy", &path, problems);
+        let policy = policy(document, at, &path.member(b"policy"), limits, configured, problems);
+        let roles = permissions(&mut object, document, &path, limits, problems);
+        object.finish(document, &path, problems);
+        if let Some(number) = number
+            && let Some((policy, templates)) = policy
+            && let Some(roles) = roles
+        {
+            if number == 0 {
+                problems.push(path.member(b"number"), What::Bound);
+                continue;
+            }
+            for previous in &policies {
+                if previous.number == number {
+                    problems.push(path.member(b"number"), What::Unique);
+                    break;
+                }
+            }
+            policies.push(Policy { number, roles, templates, policy }).expect("bounded policy input");
+        }
+    }
+    Some(policies.into_boxed())
+}
+
 pub(crate) fn rules(
     document: &Document,
     at: u32,

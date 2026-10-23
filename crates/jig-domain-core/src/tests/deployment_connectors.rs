@@ -10,7 +10,7 @@ fn source(connectors: &[u16], lines: u32) -> (Core, Limits) {
     let mut config = config(71);
     config.worker_names = Box::new([b"alpha".as_slice().into()]);
     config.connectors = connectors.into();
-    let mut core = Core::new(config, &limits).expect("fixture core configuration");
+    let mut core = seeded_core(config, &limits).expect("fixture core configuration");
     restore_key_account(&mut core, &limits, 0, 1, 1);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     let mut out = Queue::with_capacity(people::max_out(&limits.people));

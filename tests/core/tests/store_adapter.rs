@@ -23,6 +23,7 @@ fn header(commits: u64) -> root::Write {
         runs: 1,
         calls: 0,
         connector_rows: 0,
+        projects: 0,
         applications: 0,
         commits,
     }))

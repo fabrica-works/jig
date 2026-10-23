@@ -556,7 +556,7 @@ fn core_limits() -> jig_domain_core::Limits {
     fixtures::CORE_LIMITS
 }
 
-fn people_limits() -> crate::people_v9::Limits {
+fn people_limits() -> crate::people_v10::Limits {
     crate::codec::people::limits(&core_limits()).expect("within people's ceilings")
 }
 
@@ -573,7 +573,7 @@ fn ask_round_trip(ask: jig_domain_people::Ask) {
     let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("bounded length"));
     value.encode(&mut writer).expect("measured room");
     let bytes = writer.finish();
-    let read = crate::people_v9::Ask::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("saved ask");
+    let read = crate::people_v10::Ask::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("saved ask");
     assert_eq!(crate::codec::people::decode_ask(read, &limits), Ok(ask));
 }
 
@@ -585,7 +585,11 @@ fn a_projects_policy_reads_back() {
     people_round_trip(jig_domain_people::Stored::Policy {
         project: 3,
         name: Box::from("Tally"),
-        value: fixtures::people_policy(),
+        value: {
+            let mut value = fixtures::people_policy();
+            value.ceiling.models = Some(jig_domain_people::Models::Named(1));
+            value
+        },
     });
 }
 
@@ -593,12 +597,14 @@ fn a_roles_models_follow_their_names_to_todays_configuration() {
     let limits = people_limits();
     let mut value = fixtures::people_policy();
     value.roles[0].authority.models = Some(jig_domain_people::Models::Named(0b111));
+    value.ceiling.models = Some(jig_domain_people::Models::Named(0b011));
     let row = jig_domain_people::Stored::Policy { project: 3, name: Box::from("Tally"), value: value.clone() };
     let then = fixtures::model_names(&[b"first", b"second", b"third"]);
     let bytes = crate::codec::people::encode(&row, &limits, &then).expect("within people's bounds");
     // "third" moved to the front, "second" is no longer configured, "fourth" is new.
     let now = fixtures::model_names(&[b"third", b"fourth", b"first"]);
     value.roles[0].authority.models = Some(jig_domain_people::Models::Named(0b101));
+    value.ceiling.models = Some(jig_domain_people::Models::Named(0b100));
     assert_eq!(
         crate::codec::people::decode(&bytes, &limits, &now),
         Ok(jig_domain_people::Stored::Policy { project: 3, name: Box::from("Tally"), value })
@@ -681,8 +687,8 @@ fn a_person_identity_field_past_its_limit_is_refused() {
             &people_limits(),
             &fixtures::model_names(&[])
         ),
-        Err(crate::people_v9::Problem {
-            path: crate::people_v9::Path::IdentityKeySubject,
+        Err(crate::people_v10::Problem {
+            path: crate::people_v10::Path::IdentityKeySubject,
             reason: skein_codec::Reason::Bound
         })
     );
@@ -693,11 +699,11 @@ fn a_people_row_of_another_version_does_not_decode() {
     let row = jig_domain_people::Stored::ReadResults { party: 1, through: 2 };
     let names = fixtures::model_names(&[]);
     let mut bytes = crate::codec::people::encode(&row, &limits, &names).expect("fixed row");
-    *bytes.get_mut(1).expect("version prefix") = 8;
+    *bytes.get_mut(1).expect("version prefix") = 9;
     assert_eq!(
         crate::codec::people::decode(&bytes, &limits, &names),
-        Err(crate::people_v9::Problem {
-            path: crate::people_v9::Path::RowVersion,
+        Err(crate::people_v10::Problem {
+            path: crate::people_v10::Path::RowVersion,
             reason: skein_codec::Reason::Version
         })
     );
@@ -796,7 +802,7 @@ fn a_carried_change_reads_back_as_its_own_family() {
 
 fn core_limits_past_the_settled_answer_ceiling_are_refused() {
     let mut domain = core_limits();
-    domain.call_answer_bytes = crate::core_v5::CEILINGS.settled_answer_host_body + 1;
+    domain.call_answer_bytes = crate::core_v6::CEILINGS.settled_answer_host_body + 1;
     assert!(crate::codec::core::limits(&domain).is_none());
 }
 
@@ -1302,7 +1308,7 @@ fn retained_people_answers_keep_dependency_refusal_facts() {
 #[test]
 #[expect(clippy::disallowed_macros, reason = "ordinary tests build boundary text")]
 fn a_stored_project_name_is_bounded_and_utf8() {
-    use crate::people_v9 as wire;
+    use crate::people_v10 as wire;
     use skein_lib::{Reader, Writer};
     // store.md, 4.4: the name is UTF-8 text, at most 64 bytes.
     const NAME_BOUND: usize = 64;

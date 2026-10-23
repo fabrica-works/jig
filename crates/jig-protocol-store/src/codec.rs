@@ -12,9 +12,9 @@ use jig_domain_core as domain;
 /// All store families' bounds, validated once by their owners.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
-    pub core: crate::core_v5::Limits,
+    pub core: crate::core_v6::Limits,
     pub tasks: crate::tasks_v9::Limits,
-    pub people: crate::people_v9::Limits,
+    pub people: crate::people_v10::Limits,
     pub notes: crate::notes_v1::Limits,
 }
 

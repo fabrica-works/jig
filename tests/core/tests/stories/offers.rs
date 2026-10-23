@@ -154,7 +154,7 @@ fn a_policy_narrowed_withdraws_an_offer_in_the_next_delivery() {
     );
     let first = world.watches.as_ref().expect("watches").deliveries.len();
     let (configuration, _) = fixture(183, false);
-    let role = configuration.core.authority.policy(1).expect("policy").roles[0].clone();
+    let role = configuration.core.seed_projects[0].policy.policy.roles[0].clone();
     let change = people::PolicyChange::Role(people::PolicyRole {
         number: role.number,
         authority: people::Authority {

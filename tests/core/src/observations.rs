@@ -299,8 +299,10 @@ impl Observer {
         let mut roles = BTreeMap::new();
         let mut decisions_by_role = BTreeMap::new();
         // The testing application's configured projects are contiguous and small.
-        for &project in &configuration.core.projects {
-            if let Some(value) = configuration.core.authority.policy(project) {
+        for seed in &configuration.core.seed_projects {
+            let project = seed.number;
+            {
+                let value = &seed.policy.policy;
                 policy.projects.insert(project, scope(&value.ceiling));
                 policy.projections.insert(project, authority_grants(&value.projections));
                 for role in &value.roles {

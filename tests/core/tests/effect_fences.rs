@@ -22,6 +22,7 @@ fn recovered_with(
             assert!(matches!(core.restore_core(row.clone(), &env.limits), core::Restored::Deployment { .. }));
         }
     }
+    jig_core_world::fixtures::restore_project_policies(&mut core, &env.limits, &world.store);
     for row in world.store.rows.values() {
         if let root::Record::Core(core::Record::Tasks(row)) = row {
             if !row.key().live() {
@@ -572,7 +573,7 @@ fn a_dependency_added_while_judges_answer_refuses_a_waiting_effect() {
     let &(task, attempt) = world.assignments.iter().find(|(number, _)| *number == task).expect("live caller");
     let (mut core, env) = plan_core(&world, SEED);
     let (configuration, _) = fixture(SEED, true);
-    let policy = configuration.core.authority.policy(1).expect("judged policy").clone();
+    let policy = configuration.core.seed_projects[0].policy.policy.clone();
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
     let key = core::CallKey { task, attempt, completion: 1, position: 0 };

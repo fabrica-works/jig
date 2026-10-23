@@ -4,7 +4,7 @@ use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
-use skein_lib::{Queue, ReplyTo, Token};
+use skein_lib::{ReplyTo, Token};
 pub const WORKSPACE_CREDENTIAL: u32 = 7;
 pub const CREDENTIAL_RESOURCE: u64 = 1;
 #[must_use]
@@ -219,24 +219,29 @@ pub fn two_projects(seed: u64) -> (root::Config, root::Limits) {
     limits.core.people.projects = 3;
     limits.core.people.initial_owners = 2;
     crate::peers::journal(&mut limits);
-    let policy = config.core.authority.policy(1).expect("first policy").clone();
+    let policy = config.core.seed_projects[0].policy.policy.clone();
     config.core.authority =
         authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority).expect("two projects");
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    for project in [1, 2] {
-        let mut policy = policy.clone();
-        policy.period_spend = if project == 1 { 1000 } else { 700 };
-        authority::step(&mut config.core.authority, authority::Event::Policy { project, policy }, &mut facts);
-        assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
-    }
-    let permissions = config.core.permission_roles.get(&1).expect("first permission map").clone();
-    config.core.permission_roles = skein_lib::Map::with_capacity(2);
-    config.core.permission_roles.insert(1, permissions).expect("first permission map");
-    config.core.template_overrides = skein_lib::Map::with_capacity(2);
-    config.core.names = project_names();
-    config.core.projects = skein_lib::List::with_capacity(2);
-    config.core.projects.push(1).expect("first project");
-    config.core.projects.push(2).expect("second project");
+    config.core.seed_projects = [1, 2]
+        .into_iter()
+        .map(|number| {
+            let mut policy = policy.clone();
+            policy.period_spend = if number == 1 { 1000 } else { 700 };
+            core::SeedProject {
+                number,
+                name: format!("Project {number}").into_boxed_str(),
+                policy: core::ConfiguredPolicy {
+                    policy,
+                    permissions: if number == 1 {
+                        config.core.seed_projects[0].policy.permissions.clone()
+                    } else {
+                        Box::new([])
+                    },
+                    templates: Box::new([]),
+                },
+            }
+        })
+        .collect();
     config.core.owners = Box::new([
         config.core.owners[0].clone(),
         people::InitialOwner { project: 2, identity: config.core.owners[0].identity.clone() },
@@ -413,16 +418,15 @@ impl Creating {
     #[must_use]
     pub fn new(config: &core::Config, tasks: u32) -> Self {
         let roles = config
-            .projects
+            .seed_projects
             .iter()
             .flat_map(|project| {
-                config
-                    .authority
-                    .policy(*project)
-                    .expect("fixture policy")
+                project
+                    .policy
+                    .policy
                     .roles
                     .iter()
-                    .map(move |role| ((*project, role.number), role.authority.clone()))
+                    .map(move |role| ((project.number, role.number), role.authority.clone()))
             })
             .collect();
         Self { roles, tasks }
@@ -585,16 +589,18 @@ pub fn configured_sources(
 /// Complete policy rows for worlds that hand-bootstrap rosters before cold restore.
 pub(crate) fn project_policy_rows(config: &core::Config) -> Vec<root::Record> {
     config
-        .projects
+        .seed_projects
         .iter()
         .map(|project| {
-            let policy = config.authority.policy(*project).expect("configured policy");
+            let policy = &project.policy.policy;
             let grant = |value: &authority::Grant| people::Grant {
                 connector: value.connector,
                 kind: value.kind,
                 pattern: core::pattern_to_people(&value.pattern),
             };
             let value = people::PolicyValue {
+                ceiling: core::authority_to_people(&policy.ceiling).expect("bounded ceiling"),
+                escalation_role: policy.escalation_role,
                 period_spend: policy.period_spend,
                 projections: policy.projections.iter().map(grant).collect(),
                 roles: policy
@@ -627,12 +633,12 @@ pub(crate) fn project_policy_rows(config: &core::Config) -> Vec<root::Record> {
                         must_be_guarded: requirement.must_be_guarded,
                     })
                     .collect(),
-                permissions: config.permission_roles.get(project).cloned().unwrap_or_else(|| Box::new([])),
-                templates: config.template_overrides.get(project).cloned().unwrap_or_else(|| Box::new([])),
+                permissions: project.policy.permissions.clone(),
+                templates: project.policy.templates.clone(),
             };
             root::Record::Core(core::Record::People(people::Stored::Policy {
-                project: *project,
-                name: config.names.get(project).expect("configured project name").clone(),
+                project: project.number,
+                name: project.name.clone(),
                 value,
             }))
         })
@@ -646,4 +652,13 @@ pub fn project_names() -> skein_lib::Map<u32, Box<str>> {
     names.insert(1, Box::from("Project 1")).expect("first project name");
     names.insert(2, Box::from("Project 2")).expect("second project name");
     names
+}
+
+/// Restore project policies from a world's durable rows before its tasks.
+pub fn restore_project_policies(core: &mut core::Core, limits: &core::Limits, store: &crate::Store) {
+    for row in store.rows.values() {
+        if let root::Record::Core(core::Record::People(people::Stored::Policy { project, name, value })) = row {
+            assert!(core.restore_policy(limits, *project, name.clone(), value.clone()), "durable policy restores");
+        }
+    }
 }

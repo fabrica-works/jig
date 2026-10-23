@@ -125,7 +125,6 @@ fn a_seeded_policy_overriding_a_template_twice_refuses_the_start() {
 
 #[test]
 fn a_seeded_override_reaches_the_cores_config() {
-    const PROJECT: u32 = 1;
     const GOAL: u32 = 2;
     let document = fixtures::with(
         fixtures::ENGINE_SMALL,
@@ -135,7 +134,7 @@ fn a_seeded_override_reaches_the_cores_config() {
     let engine = fixtures::engine(&document).expect("seeded override");
     let config = crate::core(&engine, [0; 16], 7);
     assert_eq!(
-        config.template_overrides.get(&PROJECT),
+        Some(&config.seed_projects[0].policy.templates),
         Some(&Box::from([jig_domain_people::TemplateOverride {
             template: GOAL,
             executor: None,
@@ -329,10 +328,8 @@ fn a_seeded_executor_override_keeps_a_compatible_choice() {
     );
     let engine = fixtures::engine(&document).expect("compatible override");
     let config = crate::core(&engine, [0; 16], 7);
-    let merged = jig_domain_core::templates::merged(
-        &config.settings.templates,
-        config.template_overrides.get(&CHAT).expect("project templates"),
-    );
+    let merged =
+        jig_domain_core::templates::merged(&config.settings.templates, &config.seed_projects[0].policy.templates);
     assert_eq!(merged.first().expect("chat").executor, TemplateExecutor::Charter(CHAT));
     assert_eq!(
         merged.first().expect("chat").llm,

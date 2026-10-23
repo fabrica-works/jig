@@ -98,7 +98,7 @@ fn ready(none: bool) -> (Core, Limits) {
         offers: accounts::Offers { sign_in: !none, key: false, programs: Box::new([]) },
     };
     config.settings.llm_providers.providers = Box::new([config.settings.llm_providers.providers[0].clone(), provider]);
-    let mut core = Core::new(config, &limits).expect("fixture core configuration");
+    let mut core = seeded_core(config, &limits).expect("fixture core configuration");
     core.people = base.people;
     restore_key_account(&mut core, &limits, 0, 1, 1);
     if !none {

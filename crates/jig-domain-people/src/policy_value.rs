@@ -25,9 +25,11 @@ pub enum PolicyChange {
     Templates { overrides: Box<[crate::TemplateOverride]> },
 }
 
-/// Mutable project policy saved as one full committed value.
+/// Whole project policy saved as one full committed value.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PolicyValue {
+    pub ceiling: Authority,
+    pub escalation_role: Option<u32>,
     pub period_spend: u64,
     /// Grants for goal projection writes.
     pub projections: Box<[crate::Grant]>,
@@ -86,6 +88,9 @@ pub struct Requirement {
 pub fn policy_bytes(policy: &PolicyValue) -> Option<u64> {
     let mut total =
         u64::try_from(policy.roles.len()).ok()?.checked_mul(u64::try_from(size_of::<PolicyRole>()).ok()?)?;
+    total = total.checked_add(crate::authority_bytes(&policy.ceiling)?)?;
+    total = total.checked_add(u64::try_from(size_of::<Authority>()).ok()?)?;
+    total = total.checked_add(u64::try_from(size_of::<Option<u32>>()).ok()?)?;
     for role in &policy.roles {
         total = total.checked_add(crate::authority_bytes(&role.authority)?)?;
     }

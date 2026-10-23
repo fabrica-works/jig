@@ -61,14 +61,15 @@ pub fn batch_config(seed: u64) -> jig_test_domain::Config {
     use jig_domain_authority as a;
     let mut config = jig_core_world::world::config(seed);
     let current = &config.core.authority;
-    let policy = current.policy(1).expect("project policy").clone();
+    let policy = config.core.seed_projects[0].policy.policy.clone();
     let mut bounds = *current.limits();
     bounds.batch = 2;
     let mut authority = a::Domain::new(current.rules().clone(), bounds).expect("two-member authority");
     let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
     a::step(&mut authority, a::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: 1 }));
-    config.core.authority = authority;
+    config.core.seed_projects[0].policy.policy = authority.policy(1).expect("checked seed policy").clone();
+    config.core.authority = a::Domain::new(authority.rules().clone(), *authority.limits()).expect("checked rules");
     config
 }
 #[must_use]
@@ -84,7 +85,7 @@ mod tests {
     use jig_domain_authority as a;
     #[test]
     fn the_create_story_authority_admits_both_members() {
-        let config = super::batch_config(super::super::SEED);
+        let mut config = super::batch_config(super::super::SEED);
         let given = |spend| a::Delegate {
             executor: a::Executor::Charter(1),
             symbolic: Box::new([]),
@@ -98,6 +99,12 @@ mod tests {
                 note_resources: Box::new([]),
             },
         };
+        let mut admitted = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
+        a::step(
+            &mut config.core.authority,
+            a::Event::Policy { project: 1, policy: config.core.seed_projects[0].policy.policy.clone() },
+            &mut admitted,
+        );
         let ask = a::PersonAsk {
             project: 1,
             role: 0,

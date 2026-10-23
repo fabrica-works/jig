@@ -70,11 +70,13 @@ impl Config {
             limits.core.authority.batch = 2;
             let mut domain = authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority)
                 .expect("compound authority bounds");
-            let policy = config.core.authority.policy(1).expect("compound policy").clone();
+            let policy = config.core.seed_projects[0].policy.policy.clone();
             let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
             authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
             assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-            config.core.authority = domain;
+            config.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
+            config.core.authority =
+                jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
             limits.core.fleet.slots = 3;
             limits.core.people.operations = 3;
         }
@@ -106,7 +108,7 @@ impl Config {
         }
         if matches!(self.scenario, Some(Scenario::ChangedJudge | Scenario::NarrowingPolicy)) {
             let rules = config.core.authority.rules().clone();
-            let mut policy = config.core.authority.policy(1).expect("scenario policy").clone();
+            let mut policy = config.core.seed_projects[0].policy.policy.clone();
             policy.requirements = Box::new([authority::Requirement {
                 connector: 1,
                 kind: 5,
@@ -119,7 +121,9 @@ impl Config {
             let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
             authority::step(&mut checked, authority::Event::Policy { project: 1, policy }, &mut out);
             assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-            config.core.authority = checked;
+            config.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
+            config.core.authority =
+                jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
         }
         jig_core_world::peers::journal(&mut limits);
         (config, limits)

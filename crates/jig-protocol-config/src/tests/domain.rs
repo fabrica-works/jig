@@ -132,15 +132,16 @@ fn the_shipped_profiles_hold_operations_per_request() {
 fn the_cores_config_takes_the_charters_and_projects() {
     let core = core_config(fixtures::ENGINE_SMALL);
     assert_eq!(core.settings.charters.len(), 1);
-    assert_eq!(core.projects.as_slice(), &[1]);
+    assert_eq!(core.seed_projects.len(), 1);
+    assert_eq!(core.seed_projects[0].number, 1);
     assert_eq!(core.settings.charters[0].policy.instructions.as_ref(), b"Answer the question.");
 }
 #[test]
 fn the_cores_policy_and_permissions_are_seeded_per_project() {
     let core = core_config(&two_projects(b'2'));
-    assert_eq!(core.authority.policy(2).unwrap().period_spend, 100);
+    assert_eq!(core.seed_projects[1].policy.policy.period_spend, 100);
     assert_eq!(
-        core.permission_roles.get(&2).unwrap().as_ref(),
+        core.seed_projects[1].policy.permissions.as_ref(),
         &[jig_domain_people::PermissionRole { connector: 1, permission: 1, role: 1 }]
     );
 }
@@ -484,7 +485,12 @@ fn memory_below_the_components_sum_is_refused() {
         // a 336-byte map and two 64-byte names, plus two codec scratch copies.
         + 1_189_328
         // Owner project name: 20 document reservations * (24-byte Text + 4,096 payload bytes).
-        + 82_400;
+        + 82_400
+        // Configured policy table, authority policy heap, permission bytes and
+        // template overrides at the small profile.
+        + 190_256
+        // First-start seed policy heap, names and their retained table.
+        + 187_504;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
@@ -579,4 +585,10 @@ fn the_catalogue_key_bound_respects_the_carried_value_limit() {
     let engine = engine();
     let core = crate::core(&engine, [0; 16], 1);
     assert_eq!(core.settings.key_bytes, engine.limits.clients.wire.keyed_value_some);
+}
+
+#[test]
+fn a_seed_policy_whose_whole_value_exceeds_its_byte_limit_refuses_start() {
+    // Permission mappings fit 256 bytes, but the role and whole ceiling do not.
+    refuses(br#""profile": "small""#, br#""profile": "small", "overrides": {"core.policy_bytes": 256}"#, What::Bound);
 }

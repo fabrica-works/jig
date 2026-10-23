@@ -9,13 +9,10 @@ impl Story {
     /// The existing owner policy with a finite first deadline and an unbounded ceiling.
     #[must_use]
     pub fn live_span_goal(seed: u64, first: Wall) -> Self {
-        use jig_domain_authority as a;
         let mut config = jig_core_world::world::config(seed);
-        let mut policy = config.core.authority.policy(1).expect("project policy").clone();
+        let mut policy = config.core.seed_projects[0].policy.policy.clone();
         policy.roles[0].authority.budget.deadline = Some(first);
-        let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
-        a::step(&mut config.core.authority, a::Event::Policy { project: 1, policy }, &mut out);
-        assert_eq!(out.pop(), Some(a::PolicyFact::Changed { project: 1 }));
+        config.core.seed_projects[0].policy.policy = policy;
         let mut story = Self::configured(seed, &fixtures::owner_limits(), config);
         story.sign_in();
         assert!(story.run_until(|s| s.client.link().state == client::Link::Live, READY));

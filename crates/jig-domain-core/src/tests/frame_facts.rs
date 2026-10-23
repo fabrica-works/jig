@@ -152,13 +152,13 @@ fn the_frame_offers_both_charters_for_goals() {
         Box::new([authority::Executor::Charter(1), authority::Executor::Charter(2), authority::Executor::Procedure(1)]);
     let mut rules = config.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
-    let mut policy = config.authority.policy(1).expect("project policy").clone();
+    let mut policy = config.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
     policy.roles[0].authority.delegation.kinds = kinds;
     config.authority = authority::Domain::new(rules, limits.authority).expect("charter policy");
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut config.authority, authority::Event::Policy { project: 1, policy }, &mut out);
-    let mut core = Core::new(config, &limits).expect("fixture core configuration");
+
+    config.seed_projects[0].policy.policy = policy;
+    let mut core = seeded_core(config, &limits).expect("fixture core configuration");
     core.people = old.people;
     let frame = frame(&core, &limits);
     let crate::acts::Creating { within: crate::acts::Bounds::Create { charters, .. }, .. } =
