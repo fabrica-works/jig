@@ -1,5 +1,5 @@
 //! Whole pages and single documents (protocol/client.md, 3 and 6).
-use super::{Limits, List, Wall, c, text, too_large, turn_fields, w};
+use super::{Limits, List, Wall, c, carried_turn_fields, text, too_large, w};
 pub(crate) fn owner_message_proposal_kind_fields(
     value: &w::OwnerMessageProposalKind,
     _limits: &Limits,
@@ -198,7 +198,7 @@ pub(crate) fn archived_turn_fields(value: &w::ArchivedTurn, limits: &Limits) -> 
         read: opt0,
         at: Wall::from_nanos(value.at()),
         turn: match value.turn() {
-            w::TurnBytes::Carried(row) => turn_fields(row.bytes(), limits),
+            w::TurnBytes::Carried(row) => carried_turn_fields(row.bytes(), limits),
             w::TurnBytes::TooLarge(row) => {
                 c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge { bytes: row.bytes() } }
             }

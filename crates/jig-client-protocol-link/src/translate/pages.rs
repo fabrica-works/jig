@@ -350,6 +350,14 @@ pub(crate) fn turn_fields(value: &[u8], limits: &Limits) -> c::TurnRead {
     super::turn::decode(value, limits, bytes)
 }
 
+/// An archived turn its page carries, within the archive's bound (`turn::archive`).
+pub(crate) fn carried_turn_fields(value: &[u8], limits: &Limits) -> c::TurnRead {
+    let bytes = u32::try_from(limits.client.document_bytes)
+        .expect("validated document bytes")
+        .min(limits.wire.turn_carried_bytes);
+    super::turn::decode(value, limits, bytes)
+}
+
 pub(crate) fn task_page(value: w::TaskPage, limits: &Limits) -> Result<c::TaskPage, Undecodable> {
     if u64::from(value.measure()) > limits.client.document_bytes {
         return Err(Undecodable::TooLarge);
