@@ -514,10 +514,10 @@ fn a_program_grant_needs_no_table_entry() {
 
 #[test]
 fn program_names_share_the_wire_and_domain_bounds() {
-    use jig_protocol_worker_wire::v6;
+    use jig_protocol_worker_wire::v7;
     // Schema source names and grant names both admit exactly 32 bytes.
-    let bound = usize::try_from(v6::CEILINGS.program_value_name).expect("name bound fits usize");
-    assert_eq!(v6::CEILINGS.program_value_name, v6::CEILINGS.program_source_name);
+    let bound = usize::try_from(v7::CEILINGS.program_value_name).expect("name bound fits usize");
+    assert_eq!(v7::CEILINGS.program_value_name, v7::CEILINGS.program_source_name);
     let past = bound.checked_add(1).expect("small name bound");
     let name = [b'a'; 33]; // The schema's 32-byte name plus one byte.
     for (length, admitted) in [(bound, true), (past, false)] {
