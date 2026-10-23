@@ -315,3 +315,58 @@ fn the_restart_spares_kept_and_orphaned_carried_values() {
     restore_people(&mut store);
     assert_eq!(get(&mut store, SecretOwner::Application, carried), Some(Secret::new(Box::new([73; 32]))));
 }
+
+fn adopt_decoded(store: &mut Store, carried: u64, replaces: Option<[u8; 32]>) -> Box<[Event]> {
+    ask(
+        store,
+        Secrets::AdoptValue {
+            carried,
+            holds: skein_lib::sha256::digest(&[73; 32]),
+            owner: SecretOwner::Source,
+            number: 7,
+            value: record(81),
+            replaces,
+        },
+    )
+}
+#[test]
+fn adopt_value_keeps_the_decoded_record_and_erases_the_file_in_one_commit() {
+    let mut store = fixtures::opened();
+    let carried = carry_llm_key(&mut store);
+    let before = store.stores.secrets.last();
+    let [Event::Kept { owner: OWNER }] = &*adopt_decoded(&mut store, carried, None) else {
+        panic!("durable decoded record adoption")
+    };
+    assert_eq!(store.stores.secrets.last(), before + 1);
+    assert_eq!(get(&mut store, SecretOwner::Application, carried), None);
+    assert_eq!(get(&mut store, SecretOwner::Source, 7), Some(record(81)));
+}
+#[test]
+fn adopt_value_is_stale_when_the_carried_file_changed() {
+    let mut store = fixtures::opened();
+    let carried = carry_llm_key(&mut store);
+    ask(&mut store, Secrets::Keep { owner: SecretOwner::Application, number: carried, value: record(19) });
+    let before = store.stores.secrets.last();
+    let [Event::Stale { .. }] = &*adopt_decoded(&mut store, carried, None) else {
+        panic!("changed carried file is stale")
+    };
+    assert_eq!(store.stores.secrets.last(), before);
+    assert_eq!(get(&mut store, SecretOwner::Application, carried), Some(record(19)));
+    assert_eq!(get(&mut store, SecretOwner::Source, 7), None);
+}
+#[test]
+fn adopt_value_is_stale_when_the_destination_is_held() {
+    let mut store = fixtures::opened();
+    let carried = carry_llm_key(&mut store);
+    ask(&mut store, Secrets::Keep { owner: SecretOwner::Source, number: 7, value: record(19) });
+    let before = store.stores.secrets.last();
+    let [Event::Stale { .. }] = &*adopt_decoded(&mut store, carried, None) else { panic!("held destination is stale") };
+    assert_eq!(store.stores.secrets.last(), before);
+    assert_eq!(get(&mut store, SecretOwner::Application, carried), Some(Secret::new(Box::new([73; 32]))));
+    assert_eq!(get(&mut store, SecretOwner::Source, 7), Some(record(19)));
+    let [Event::Kept { .. }] =
+        &*adopt_decoded(&mut store, carried, Some(skein_lib::sha256::digest(record(19).expose())))
+    else {
+        panic!("matching destination digest permits adoption")
+    };
+}

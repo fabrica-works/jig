@@ -87,7 +87,7 @@ impl Host for Process {
         self.host().operations()
     }
 }
-fn issuer(story: Story) -> Process {
+pub(crate) fn issuer(story: Story) -> Process {
     let profile = fixtures::limits();
     let limits = fake::Limits {
         document: profile.client.document,

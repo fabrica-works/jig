@@ -349,7 +349,10 @@ fn while_moving_sign_out_removal_renewal_and_another_move_are_refused() {
         );
         assert_eq!(world.ended().last().expect("refused renewal").end, End::Refused { refusal: Refusal::Moving });
         let incoming = start_in(&mut world, ALICE);
-        assert_eq!(world.step(opened(incoming, 1, b"alice")), refused(2, Refusal::Moving));
+        assert_eq!(
+            world.step(opened(incoming, 1, b"alice")),
+            [vec![Request::Signing(Signing::Forget { source: incoming })], refused(2, Refusal::Moving)].concat()
+        );
     }
     moving_fact(&world, 6);
 }
@@ -414,7 +417,10 @@ fn a_move_in_renews_the_holders_account_of_its_subject() {
 fn a_move_in_is_refused_for_another_holders_subject_held() {
     let mut world = started(&rows(false));
     let source = start_in(&mut world, BOB);
-    assert_eq!(world.step(opened(source, 1, b"alice")), refused(2, Refusal::Held { provider: 1 }));
+    assert_eq!(
+        world.step(opened(source, 1, b"alice")),
+        [vec![Request::Signing(Signing::Forget { source })], refused(2, Refusal::Held { provider: 1 })].concat()
+    );
     assert_eq!(world.domain.accounts(), 1);
     assert!(world.step(Event::Adopted { source, kept: true }).is_empty());
 }
@@ -424,7 +430,10 @@ fn a_move_in_is_refused_for_the_deployment_where_sign_in_brings_a_plan() {
     for (holder, provider) in [(Holder::Deployment, 1), (ALICE, 2), (ALICE, 99)] {
         let mut world = started(&[]);
         let source = start_in(&mut world, holder);
-        assert_eq!(world.step(opened(source, provider, b"alice")), refused(2, Refusal::Provider { provider }));
+        assert_eq!(
+            world.step(opened(source, provider, b"alice")),
+            [vec![Request::Signing(Signing::Forget { source })], refused(2, Refusal::Provider { provider })].concat()
+        );
         assert_eq!(world.domain.accounts(), 0);
     }
 }

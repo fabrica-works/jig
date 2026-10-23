@@ -41,6 +41,7 @@ enum Waiting {
 struct Slot {
     /// The digest of what the store holds for this source, read or not.
     held: Option<[u8; 32]>,
+    generation: Option<u64>,
     waiting: Option<Waiting>,
     /// The store holds a record that could not be read (llm.md 5.4).
     unread: bool,
@@ -61,7 +62,9 @@ impl Records {
     /// Reserves a named LLM account source's record place.
     pub fn admit(&mut self, account: u32) -> Result<(), Unfit> {
         if !self.slots.contains_key(&account) {
-            self.slots.insert(account, Slot { held: None, waiting: None, unread: false }).or(Err(Unfit))?;
+            self.slots
+                .insert(account, Slot { held: None, generation: None, waiting: None, unread: false })
+                .or(Err(Unfit))?;
         }
         Ok(())
     }
@@ -74,6 +77,7 @@ impl Records {
     pub fn erased(&mut self, account: u32) {
         if let Some(slot) = self.slots.get_mut(&account) {
             slot.held = None;
+            slot.generation = None;
             slot.waiting = None;
             slot.unread = false;
         }
@@ -87,8 +91,14 @@ impl Records {
         let slot = self.slots.get_mut(&account)?;
         slot.held = Some(sha256::digest(value));
         let record = match oauth::decode_record(value, limits) {
-            Ok(record) if fits(&record, account, limits) => Some(record),
-            Ok(_) | Err(_) => None,
+            Ok(record) if fits(&record, account, limits) => {
+                slot.generation = Some(record.generation);
+                Some(record)
+            }
+            Ok(_) | Err(_) => {
+                slot.generation = None;
+                None
+            }
         };
         slot.unread = record.is_none();
         record
@@ -99,6 +109,7 @@ impl Records {
         self.admit(account).expect("restored source fits driver bound");
         let slot = self.slots.get_mut(&account).expect("admitted source");
         slot.held = None;
+        slot.generation = None;
         slot.unread = true;
     }
 
@@ -123,12 +134,13 @@ impl Records {
     /// The store kept `account`'s record: acknowledge the driver's candidate.
     pub fn kept(&mut self, account: u32) -> Option<driver::Request> {
         let slot = self.slots.get_mut(&account)?;
-        let (request, digest) = match slot.waiting.take()? {
+        let (request, digest, generation) = match slot.waiting.take()? {
             Waiting::Candidate { generation, digest } => {
-                (driver::Request::Kept { account, generation, keeping: driver::Keeping::Kept }, digest)
+                (driver::Request::Kept { account, generation, keeping: driver::Keeping::Kept }, digest, generation)
             }
         };
         slot.held = Some(digest);
+        slot.generation = Some(generation);
         slot.unread = false;
         Some(request)
     }
@@ -159,6 +171,12 @@ impl Records {
             });
         }
         translate::up(event, now, required)
+    }
+
+    /// The generation of the durable record, for the owner's keep-before-lend trace.
+    #[must_use]
+    pub fn generation(&self, account: u32) -> Option<u64> {
+        self.slots.get(&account)?.generation
     }
 
     /// Whether a write is on its way to the store.

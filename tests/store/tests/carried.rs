@@ -108,3 +108,61 @@ fn adopt_moves_a_carried_value_in_one_commit() {
         }
     }
 }
+
+fn adopt_value(world: &mut World, carried: u64, replaces: Option<[u8; 32]>) -> Vec<Event> {
+    world.secret(Secrets::AdoptValue {
+        carried,
+        holds: skein_lib::sha256::digest(value(7).expose()),
+        owner: SecretOwner::Source,
+        number: 7,
+        value: value(8),
+        replaces,
+    })
+}
+
+#[test]
+fn adopt_value_changes_both_rows_in_one_commit() {
+    let count = {
+        let mut world = opened(18);
+        let carried = carry(&mut world, 7).expect("carried file");
+        assert!(matches!(adopt_value(&mut world, carried, None).as_slice(), [Event::Kept { .. }]));
+        world.operation_count()
+    };
+    for cut in 0..=count {
+        let mut world = opened(u64::from(cut));
+        let carried = carry(&mut world, 7).expect("carried file");
+        world.cut_at(cut);
+        let kept = matches!(adopt_value(&mut world, carried, None).as_slice(), [Event::Kept { .. }]);
+        world.crash(u64::from(cut));
+        world.reopen();
+        let original = found(&mut world, carried);
+        let target = world.secret(Secrets::Get { owner: SecretOwner::Source, number: 7 });
+        let [Event::Secret { value: target, .. }] = target.as_slice() else { panic!("source record") };
+        assert!(
+            (original == Some(value(7)) && target.is_none()) || (original.is_none() && *target == Some(value(8))),
+            "one commit, cut {cut}"
+        );
+        if kept {
+            assert_eq!(*target, Some(value(8)), "answered once durable");
+        }
+    }
+}
+
+#[test]
+fn adopt_value_is_stale_when_either_digest_changed() {
+    for changed_carried in [true, false] {
+        let mut world = opened(19);
+        let carried = carry(&mut world, 7).expect("carried file");
+        let (owner, number) =
+            if changed_carried { (SecretOwner::Application, carried) } else { (SecretOwner::Source, 7) };
+        assert!(matches!(
+            world.secret(Secrets::Keep { owner, number, value: value(9) }).as_slice(),
+            [Event::Kept { .. }]
+        ));
+        assert!(matches!(adopt_value(&mut world, carried, None).as_slice(), [Event::Stale { .. }]));
+        assert_eq!(found(&mut world, carried), Some(value(if changed_carried { 9 } else { 7 })));
+        let target = world.secret(Secrets::Get { owner: SecretOwner::Source, number: 7 });
+        let [Event::Secret { value: target, .. }] = target.as_slice() else { panic!("source record") };
+        assert_eq!(*target, if changed_carried { None } else { Some(value(9)) });
+    }
+}

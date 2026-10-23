@@ -6,8 +6,9 @@ use crate::world::{Installation, Story};
 use jig_domain_accounts as child;
 use jig_domain_core as core;
 use jig_protocol_accounts::{
-    installation, party,
+    installation, moves, party,
     records::{self, Records},
+    restart,
     table::Table,
     translate::{self, Up},
 };
@@ -37,6 +38,11 @@ const OPEN: Token = Token::new(1);
 const LOAD: Token = Token::new(2);
 const GET: Token = Token::new(3);
 const SOURCE: u64 = 1 << 32;
+const MOVE_ADOPT: u64 = 1 << 33;
+const SWEEP: Token = Token::new(1 << 34);
+const MOVE_OUT: u64 = 1 << 35;
+const MOVE_BACK: u64 = 1 << 36;
+const MOVE_IN: u64 = 1 << 37;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Heard {
@@ -99,6 +105,18 @@ pub struct Owner {
     store_above: Queue<store::Event>,
     below: store::Below,
     records: Records,
+    moves: moves::Moves,
+    move_out: Queue<moves::Next>,
+    providers: Map<u32, driver::Account>,
+    source_providers: Map<u32, u32>,
+    inventory: restart::Inventory,
+    move_mode: Option<()>,
+    move_events: Queue<child::Event>,
+    /// Test client's output and preallocated input; the referee only copies bytes.
+    moved_file: Option<(u32, Secret)>,
+    move_input: Box<[u8]>,
+    move_input_len: Option<usize>,
+    carried_move: Option<u64>,
     lent: Vec<Lent>,
     last_kept: Option<Secret>,
     completions: Queue<kernel::Complete>,
@@ -185,6 +203,19 @@ impl Owner {
                 transcripts: Queue::with_capacity(skein_kv::MAX_OUT.below),
             },
             records: Records::new(limits.accounts),
+            moves: moves::Moves::new(bytes::copy_of(fixtures::MOVE_APPLICATION), limits.accounts),
+            move_out: Queue::with_capacity(ROOM),
+            providers: Map::with_capacity(1),
+            source_providers: Map::with_capacity(limits.accounts),
+            inventory: restart::Inventory::new(limits.accounts, store_limits.secrets.page.rows),
+            move_mode: None,
+            move_events: Queue::with_capacity(ROOM),
+            moved_file: None,
+            move_input: bytes::zeroed(
+                usize::try_from(jig_protocol_accounts::moved::bound(&limits.client.document)).expect("file bound"),
+            ),
+            move_input_len: None,
+            carried_move: None,
             lent: Vec::with_capacity(8),
             last_kept: None,
             limits,
@@ -248,6 +279,67 @@ impl Owner {
             assert!(matches!(kept, Some(store::Event::Kept { .. })), "the store keeps the record held before the run");
         }
         owner
+    }
+    pub(crate) fn new_move(held: bool, moving: bool) -> Self {
+        let mut owner = Self::new(Story::SignIn, None, crate::world::FIRST_START);
+        owner.move_mode = Some(());
+        if held {
+            for record in [
+                child::Stored::Account {
+                    number: 1000,
+                    provider: 1,
+                    holder: child::Holder::Party(7),
+                    place: 0,
+                    uses: None,
+                    subject: bytes::copy_of(b"subject"),
+                    display: bytes::copy_of(b"Moved"),
+                },
+                child::Stored::Source {
+                    account: 1000,
+                    number: 0,
+                    place: 0,
+                    kind: child::Kind::SignIn,
+                    name: Box::new([]),
+                    held: moving.then_some(child::Held::Moving),
+                },
+            ] {
+                owner.child_event(Time::ZERO, Wall::EPOCH, child::Event::Restore { record });
+            }
+            let mut record = fixtures::kept();
+            record.subject = Some(bytes::copy_of(b"subject"));
+            record.issued_client_id = Some(bytes::copy_of(b"client"));
+            record.granted_scopes = Some(bytes::copy_of(b"openid read"));
+            record.earliest_refresh_at = Some(Wall::from_nanos(skein_lib::Duration::from_secs(200).as_nanos()));
+            let value =
+                Secret::new(skein_oauth::encode_record(&record, &owner.limits.client.document).expect("move fixture"));
+            owner.secrets(Time::ZERO, Wall::EPOCH, source_token(0), replace(0, value, None));
+            assert!(matches!(owner.store_above.pop(), Some(store::Event::Kept { .. })));
+        }
+        owner
+    }
+    pub(crate) fn change(&mut self, request: u64, change: child::Change) {
+        self.move_events.push(child::Event::Change {
+            request: Token::new(request),
+            holder: child::Holder::Party(7),
+            change,
+        });
+    }
+    pub(crate) fn moved_file(&self, source: u32) -> Option<&Secret> {
+        self.moved_file.as_ref().filter(|(number, _)| *number == source).map(|(_, value)| value)
+    }
+    pub(crate) fn carry_move(&mut self, value: &Secret) {
+        self.move_input[..value.len()].copy_from_slice(value.expose());
+        self.move_input_len = Some(value.len());
+    }
+    pub(crate) fn carried_move(&self) -> Option<u64> {
+        self.carried_move
+    }
+    pub(crate) fn source_usable(&self) -> bool {
+        self.child.source_grant(self.account, self.now).is_some()
+    }
+    pub(crate) fn carried_value(&mut self, carried: u64) -> Option<Secret> {
+        let env = Env { now: self.now, wall: Wall::EPOCH, limits: self.limits };
+        self.secret_value(&env, GET, store::SecretOwner::Application, carried)
     }
     /// Opens the store, as this start drew `drawn`, and answers the
     /// installation's identifier it keeps. At an empty store the owner, as
@@ -379,7 +471,7 @@ impl Owner {
             && self.events.is_empty()
             && self.above.is_empty()
     }
-    fn child_event(&mut self, now: Time, wall: Wall, event: child::Event) {
+    pub(crate) fn child_event(&mut self, now: Time, wall: Wall, event: child::Event) {
         child::step(&mut self.child, &Env { now, wall, limits: self.child_limits }, event, &mut self.child_out);
         self.usable |= self.child.source_grant(self.account, now).is_some();
         while let Some(ended) = self.child.pop_ended() {
@@ -392,7 +484,7 @@ impl Owner {
     /// The driver starts from the store's records (llm.md 5.1).
     fn start(&mut self, env: &Env<driver::Limits>) {
         let mut configured = List::with_capacity(1);
-        if !fixtures::account_sign_in(self.story) {
+        if !fixtures::account_sign_in(self.story) && self.move_mode.is_none() {
             assert!(
                 configured
                     .push(driver::Account::SignIn {
@@ -437,7 +529,11 @@ impl Owner {
             self.component.as_mut().expect("started account driver").add(env, 999, restored, &mut self.above);
             assert!(self.above.is_empty());
         }
-        if fixtures::account_sign_in(self.story) {
+        let template = self.party_account();
+        assert!(self.providers.insert(1, template).is_ok());
+        if self.move_mode.is_some() {
+            self.child_event(env.now, env.wall, child::Event::Want);
+        } else if fixtures::account_sign_in(self.story) {
             self.child_event(env.now, env.wall, child::Event::Want);
             self.child_event(
                 env.now,
@@ -495,6 +591,157 @@ impl Owner {
     }
     /// Asks the store to keep a record in place of the one it holds, and
     /// passes its answer on.
+    fn party_account(&self) -> driver::Account {
+        let registration = fixtures::party_registration(self.story);
+        let endpoint =
+            driver::Endpoint { address: self.address.expect("issuer"), transport: driver::Transport::Plaintext };
+        let mut origins = List::with_capacity(1);
+        origins
+            .push(driver::Origin {
+                uri: registration.issuer.clone(),
+                endpoint: driver::Endpoint {
+                    address: self.address.expect("issuer"),
+                    transport: driver::Transport::Plaintext,
+                },
+            })
+            .expect("origin fits");
+        party::party_account(&registration, endpoint, origins, &self.installation)
+    }
+    fn ready(&mut self, env: &Env<driver::Limits>, source: u32, refresh: bool) {
+        if let Some(account) = self.moves.ready(source, refresh) {
+            self.component.as_mut().expect("started").add(env, source, account, &mut self.above);
+        }
+    }
+    fn restore_signed_in(&mut self, source: u32, provider: u32, value: Option<Secret>) {
+        assert_eq!(provider, 1);
+        let template = self.party_account();
+        let account = party::restore(template, source, value, &mut self.records, &self.limits.client.document);
+        if let Some(generation) = self.records.generation(source) {
+            self.trace.push(Trace::Loaded { account: source, generation });
+        }
+        self.source_providers.insert(source, provider).expect("source fits driver");
+        self.moves.stage(source, account);
+    }
+    fn secret_value(
+        &mut self,
+        env: &Env<driver::Limits>,
+        exchange: Token,
+        owner: store::SecretOwner,
+        number: u64,
+    ) -> Option<Secret> {
+        self.secrets(env.now, env.wall, exchange, store::Secrets::Get { owner, number });
+        let Some(store::Event::Secret { owner, value }) = self.store_above.pop() else {
+            panic!("immediate secret read")
+        };
+        assert_eq!(owner, exchange);
+        value
+    }
+    fn move_steps(&mut self, env: &Env<driver::Limits>) {
+        while let Some(next) = self.move_out.pop() {
+            match next {
+                moves::Next::Driver(request) => self.driver(env, request),
+                moves::Next::Child(event) => self.child_event(env.now, env.wall, event),
+                moves::Next::Store { source, request } => match request {
+                    moves::Store::ReadOut => {
+                        let value = self.secret_value(
+                            env,
+                            Token::new(MOVE_OUT | u64::from(source)),
+                            store::SecretOwner::Source,
+                            u64::from(source),
+                        );
+                        let provider = self.source_providers.get(&source).expect("withdrawn provider");
+                        let next = self.moves.read(
+                            source,
+                            value,
+                            self.providers.get(provider).expect("provider"),
+                            &self.limits.client.document,
+                        );
+                        self.move_out.push(next);
+                    }
+                    moves::Store::ReadBack => {
+                        let value = self.secret_value(
+                            env,
+                            Token::new(MOVE_BACK | u64::from(source)),
+                            store::SecretOwner::Source,
+                            u64::from(source),
+                        );
+                        self.restore_signed_in(
+                            source,
+                            *self.source_providers.get(&source).expect("return provider"),
+                            value,
+                        );
+                    }
+                    moves::Store::ReadIn { carried } => {
+                        let value = self.secret_value(
+                            env,
+                            Token::new(MOVE_IN | u64::from(source)),
+                            store::SecretOwner::Application,
+                            carried,
+                        );
+                        let next = self.moves.opened(source, value, &self.providers, &self.limits.client.document);
+                        self.move_out.push(next);
+                    }
+                    moves::Store::AdoptValue { carried, holds, value } => {
+                        let owner = Token::new(MOVE_ADOPT | u64::from(source));
+                        self.secrets(
+                            env.now,
+                            env.wall,
+                            owner,
+                            store::Secrets::AdoptValue {
+                                carried,
+                                holds,
+                                owner: store::SecretOwner::Source,
+                                number: u64::from(source),
+                                value,
+                                replaces: None,
+                            },
+                        );
+                        let kept = match self.store_above.pop() {
+                            Some(store::Event::Kept { .. }) => true,
+                            Some(store::Event::Stale { .. }) => false,
+                            other => panic!("adoption terminal: {other:?}"),
+                        };
+                        if let Some(adoption) = self.moves.adopted(source, kept) {
+                            self.account = source;
+                            self.inventory.name(source);
+                            self.restore_signed_in(source, adoption.provider, Some(adoption.value));
+                        }
+                        self.child_event(env.now, env.wall, child::Event::Adopted { source, kept });
+                    }
+                },
+            }
+        }
+    }
+    fn sweep(&mut self, env: &Env<driver::Limits>) {
+        if self.move_mode.is_none() {
+            return;
+        }
+        if let Some(step) = self.inventory.step() {
+            match step {
+                restart::Sweep::Load { after } => {
+                    self.secrets(
+                        env.now,
+                        env.wall,
+                        SWEEP,
+                        store::Secrets::Load { owner: store::SecretOwner::Source, after },
+                    );
+                    let Some(store::Event::SecretsLoaded { rows, next, .. }) = self.store_above.pop() else {
+                        panic!("inventory page")
+                    };
+                    for row in rows {
+                        self.inventory.row(row.number);
+                    }
+                    self.inventory.loaded(next);
+                }
+                restart::Sweep::Erase { number } => self.secrets(
+                    env.now,
+                    env.wall,
+                    SWEEP,
+                    store::Secrets::Erase { owner: store::SecretOwner::Source, number },
+                ),
+            }
+        }
+    }
     fn replace(&mut self, env: &Env<driver::Limits>, keep: records::Keep) {
         let records::Keep { account, value, replaces } = keep;
         self.secrets(env.now, env.wall, source_token(account), replace(account, value, replaces));
@@ -505,6 +752,15 @@ impl Owner {
     fn answers(&mut self, env: &Env<driver::Limits>) {
         while let Some(event) = self.store_above.pop() {
             let request = match event {
+                store::Event::Kept { owner } | store::Event::Stale { owner }
+                    if owner.raw() & MOVE_ADOPT == MOVE_ADOPT =>
+                {
+                    unreachable!("move adoption is answered in move_steps: {owner:?}");
+                }
+                store::Event::Erased { owner: SWEEP } => {
+                    self.inventory.erased();
+                    continue;
+                }
                 store::Event::Kept { owner } => {
                     let account = source(owner);
                     let Some(request) = self.records.kept(account) else { continue };
@@ -587,10 +843,85 @@ impl Owner {
             store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
         );
     }
+    fn signing(&mut self, env: &Env<driver::Limits>, signing: translate::Down) {
+        match signing {
+            translate::Down::Restore { source, provider, kind: child::Kind::SignIn } if self.move_mode.is_some() => {
+                let value = self.secret_value(env, GET, store::SecretOwner::Source, u64::from(source));
+                self.restore_signed_in(source, provider, value);
+                self.inventory.name(source);
+            }
+            translate::Down::Keep { .. } | translate::Down::Restore { .. } => (),
+            translate::Down::Restored => self.inventory.restored(),
+            translate::Down::Forget { source } => {
+                match self.moves.forget(source) {
+                    moves::Forget::Pending => return,
+                    moves::Forget::Withdrawn => (),
+                    moves::Forget::Source => {
+                        self.ready(env, source, false);
+                        self.driver(env, driver::Request::Remove { account: source });
+                    }
+                }
+                self.inventory.forget(source);
+                self.records.remove(source);
+                self.secrets(
+                    env.now,
+                    env.wall,
+                    source_token(source),
+                    store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
+                );
+            }
+            translate::Down::Withdraw { source, display } => {
+                self.ready(env, source, false);
+                let next = self.moves.withdraw(source, display);
+                self.move_out.push(next);
+            }
+            translate::Down::Return { source } => {
+                let next = self.moves.returning(source);
+                self.move_out.push(next);
+            }
+            translate::Down::Refresh { source } => {
+                self.ready(env, source, true);
+            }
+            translate::Down::Open { source, carried } => {
+                let next = self.moves.open(source, carried);
+                self.move_out.push(next);
+            }
+            translate::Down::Adopt { source, carried } => {
+                let next = self.moves.adopt(source, carried, &self.limits.client.document);
+                self.move_out.push(next);
+            }
+            translate::Down::SignIn { source, provider: 1 } => {
+                self.account = source;
+                let account = self.party_account();
+                let before = self.above.len();
+                self.component.as_mut().expect("started account driver").add(env, source, account, &mut self.above);
+                if self.above.len() == before {
+                    self.inventory.name(source);
+                    self.source_providers.insert(source, 1).expect("source provider");
+                    self.records.admit(source).expect("driver admitted account");
+                    self.driver(env, driver::Request::SignIn { account: source, subject: None });
+                }
+            }
+            translate::Down::SignIn { .. } => panic!("known account sign-in provider"),
+            translate::Down::CancelSignIn { source } => {
+                self.driver(env, driver::Request::Cancel { account: source });
+            }
+            translate::Down::SignOut { source } => {
+                self.ready(env, source, false);
+                self.driver(env, driver::Request::SignOut { account: source });
+            }
+        }
+    }
     fn child_requests(&mut self, env: &Env<driver::Limits>) {
         while let Some(request) = self.child_out.pop() {
             match request {
                 child::Request::Component(request) => {
+                    if let child::ToComponent::Want { account } = request {
+                        self.ready(env, account, false);
+                    }
+                    if request == child::ToComponent::Close {
+                        self.moves.close();
+                    }
                     self.trace.push(Trace::Requested(request));
                     self.component.as_mut().expect("started").down(
                         env,
@@ -601,74 +932,17 @@ impl Owner {
                     );
                 }
                 child::Request::Signing(signing) => {
-                    match signing {
-                        child::Signing::Keep { .. }
-                        | child::Signing::Forget { .. }
-                        | child::Signing::Restore { .. }
-                        | child::Signing::Restored => continue,
-                        child::Signing::Withdraw { .. }
-                        | child::Signing::Return { .. }
-                        | child::Signing::Refresh { .. }
-                        | child::Signing::Open { .. }
-                        | child::Signing::Adopt { .. }
-                        | child::Signing::CancelSignIn { .. }
-                        | child::Signing::SignIn { .. }
-                        | child::Signing::SignOut { .. }
-                        | child::Signing::Replaced { .. } => {}
-                    }
-                    match translate::down_signing(signing) {
-                        translate::Down::Keep { .. }
-                        | translate::Down::Forget { .. }
-                        | translate::Down::Restore { .. }
-                        | translate::Down::Restored => {
-                            unreachable!("LLM key tests use their component harness")
-                        }
-                        // The move's routing: T3 of accounts-move M1.
-                        translate::Down::Withdraw { .. }
-                        | translate::Down::Return { .. }
-                        | translate::Down::Refresh { .. }
-                        | translate::Down::Open { .. }
-                        | translate::Down::Adopt { .. } => {}
-                        translate::Down::SignIn { source, provider: 1 } => {
-                            self.account = source;
-                            let registration = fixtures::party_registration(self.story);
-                            let endpoint = driver::Endpoint {
-                                address: self.address.expect("issuer"),
-                                transport: driver::Transport::Plaintext,
-                            };
-                            let mut origins = List::with_capacity(1);
-                            origins
-                                .push(driver::Origin {
-                                    uri: registration.issuer.clone(),
-                                    endpoint: driver::Endpoint {
-                                        address: self.address.expect("issuer"),
-                                        transport: driver::Transport::Plaintext,
-                                    },
-                                })
-                                .expect("account sign-in origin fits");
-                            let account = party::party_account(&registration, endpoint, origins, &self.installation);
-                            let before = self.above.len();
-                            self.component.as_mut().expect("started account driver").add(
-                                env,
-                                source,
-                                account,
-                                &mut self.above,
-                            );
-                            if self.above.len() == before {
-                                self.records.admit(source).expect("driver admitted account");
-                                self.driver(env, driver::Request::SignIn { account: source, subject: None });
-                            }
-                        }
-                        translate::Down::SignIn { .. } => panic!("known account sign-in provider"),
-                        translate::Down::CancelSignIn { source } => {
-                            self.driver(env, driver::Request::Cancel { account: source });
-                        }
-                        translate::Down::SignOut { source } => {
-                            self.driver(env, driver::Request::SignOut { account: source });
-                        }
-                    }
+                    self.signing(env, translate::down_signing(signing));
+                    self.move_steps(env);
                 }
-                child::Request::Answer { answer, .. } => self.answers.push(answer),
+                child::Request::Answer { answer, .. } => {
+                    if let child::Answer::MovingOut { source, .. } = &answer {
+                        let file = self.moves.take(*source).expect("moving out carries the file");
+                        assert!(self.moves.take(*source).is_none(), "file goes out once");
+                        self.moved_file = Some((*source, file));
+                    }
+                    self.answers.push(answer);
+                }
                 child::Request::Programs { .. }
                 | child::Request::CheckProgram { .. }
                 | child::Request::SignOutProgram { .. }
@@ -723,6 +997,12 @@ impl Owner {
                     continue;
                 }
                 Up::Removed { source } => {
+                    if let Some(next) = self.moves.removed(source) {
+                        self.move_out.push(next);
+                        self.move_steps(env);
+                        continue;
+                    }
+                    self.inventory.forget(source);
                     self.erasing.remove(&source);
                     self.records.remove(source);
                     self.table.remove(source);
@@ -804,7 +1084,18 @@ impl Host for Owner {
             self.child_event(now, wall, child::Event::Unauthorized { account: self.account, generation: 1 });
         }
         self.answers(&env);
+        if let Some(len) = self.move_input_len.take() {
+            let value = Secret::new(bytes::copy_of(&self.move_input[..len]));
+            self.secrets(now, wall, GET, store::Secrets::Carry { value });
+            let Some(store::Event::Carried { number, .. }) = self.store_above.pop() else { panic!("carried move") };
+            self.carried_move = Some(number);
+            self.change(93, child::Change::MoveIn { carried: number });
+        }
+        while let Some(event) = self.move_events.pop() {
+            self.child_event(now, wall, event);
+        }
         self.child_requests(&env);
+        self.sweep(&env);
         for _ in 0..ROOM {
             if !self.io.is_ready() || self.events.room() < 3 || self.submissions.room() < 2 {
                 break;
@@ -839,6 +1130,7 @@ impl Host for Owner {
         self.table.expire(now);
         self.observe(&env);
         self.child_requests(&env);
+        self.answers(&env);
         for _ in 0..ROOM {
             if !self.io.takes() || self.submissions.room() < 2 {
                 break;
@@ -863,6 +1155,10 @@ impl Host for Owner {
             || !self.requests.is_empty()
             || !self.above.is_empty()
             || !self.store_above.is_empty()
+            || !self.move_events.is_empty()
+            || self.move_input_len.is_some()
+            || !self.move_out.is_empty()
+            || (self.move_mode.is_some() && self.inventory.work_pending())
             || !self.child_out.is_empty()
             || !self.completions.is_empty()
             || (self.component.is_none() && self.address.is_some())
@@ -905,6 +1201,9 @@ impl Host for Owner {
             + Queue::<store::Event>::worst_case(store::MAX_OUT_DOWN).expect("store answers bound")
             + 3 * Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below).expect("store files bound")
             + records::worst_case(self.limits.accounts, &self.limits.client.document).expect("records bound")
+            + moves::worst_case(self.limits.accounts, &self.limits.client.document).expect("moves bound")
+            + restart::worst_case(self.limits.accounts, self.store_limits.secrets.page.rows).expect("inventory bound")
+            + Queue::<moves::Next>::worst_case(ROOM).expect("move steps bound")
             + child::worst_case(&self.child_limits).expect("child bound")
             + jig_protocol_accounts::table::worst_case(self.limits.accounts, self.limits.client.document.token_bytes)
                 .expect("table bound")

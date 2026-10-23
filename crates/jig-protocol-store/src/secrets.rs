@@ -250,6 +250,9 @@ pub(crate) fn secrets(
         Secrets::Adopt { carried, owner: kind, number, replaces } => {
             adopt(store, env, owner, (kind, number), (carried, replaces), above, below);
         }
+        Secrets::AdoptValue { carried, holds, owner: kind, number, value, replaces } => {
+            adopt_value(store, env, owner, (kind, number), (carried, holds, replaces, value), above, below);
+        }
         Secrets::Carry { value } => carry(store, env, owner, value, above, below),
         Secrets::Erase { owner: kind, number } => {
             let Some(key) = key(kind, number, store.limits.secrets.key) else {
@@ -355,6 +358,48 @@ fn adopt(
     }
     let ops =
         Box::new([skein_kv::Op::Put { key: target.clone(), value }, skein_kv::Op::Erase { key: carried.clone() }]);
+    submit(store, env, ops, Pending::Adopt { owner, key: target, holds, carried }, above, below);
+}
+/// The carried digest pins the decoded identity the child accepted. Pending
+/// digests include both writes, so a racing adoption cannot consume it twice.
+fn adopt_value(
+    store: &mut Store,
+    env: &Env<Limits>,
+    owner: Token,
+    (kind, number): (SecretOwner, u64),
+    (carried, holds, replaces, value): (u64, [u8; 32], Option<[u8; 32]>, Secret),
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    if too_large(store, &value) {
+        store.phase = Phase::Stopped;
+        return;
+    }
+    let Some(target) = key(kind, number, store.limits.secrets.key) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    let Some(carried) = key(SecretOwner::Application, carried, store.limits.secrets.key) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    let Ok(target_digest) = held(store, env, &target, below) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    let Ok(carried_digest) = held(store, env, &carried, below) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    if target == carried || target_digest != replaces || carried_digest != Some(holds) {
+        above.push(Event::Stale { owner });
+        return;
+    }
+    let holds = sha256::digest(value.expose());
+    let ops = Box::new([
+        skein_kv::Op::Put { key: target.clone(), value: Box::from(value.expose()) },
+        skein_kv::Op::Erase { key: carried.clone() },
+    ]);
     submit(store, env, ops, Pending::Adopt { owner, key: target, holds, carried }, above, below);
 }
 fn too_large(store: &Store, value: &Secret) -> bool {

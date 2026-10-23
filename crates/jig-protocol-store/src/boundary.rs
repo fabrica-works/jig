@@ -136,6 +136,16 @@ pub enum Secrets {
         number: u64,
         replaces: Option<[u8; 32]>,
     },
+    /// Adopt a decoded value, conditional on both the carried file's digest
+    /// and the destination's digest. Both rows change in one commit (store.md 9).
+    AdoptValue {
+        carried: u64,
+        holds: [u8; 32],
+        owner: SecretOwner,
+        number: u64,
+        value: Secret,
+        replaces: Option<[u8; 32]>,
+    },
     /// Keep a value a client's request carried, under the next number of
     /// the application's carried range, from [`CARRIED`] up (store.md 9):
     /// `Carried` once durable, the next number moved in the same commit;

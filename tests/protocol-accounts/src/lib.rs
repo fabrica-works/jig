@@ -5,3 +5,5 @@ pub mod owner;
 pub mod referee;
 pub mod visitor;
 pub mod world;
+
+pub mod move_world;

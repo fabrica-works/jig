@@ -168,7 +168,7 @@ fn visit_answered(processes: &[Process]) -> bool {
 }
 /// Each granted generation's record was read from the store at start, or
 /// the store answered that it is durable, before the grant was heard.
-fn kept_before_lent(owner: &Owner) {
+pub(crate) fn kept_before_lent(owner: &Owner) {
     let trace = owner.trace();
     for (index, entry) in trace.iter().enumerate() {
         if let Trace::Heard(Heard::Granted { account, generation }) = entry {
@@ -181,7 +181,7 @@ fn kept_before_lent(owner: &Owner) {
     }
 }
 /// A source's generation names one value.
-fn one_value_per_name(owner: &Owner) {
+pub(crate) fn one_value_per_name(owner: &Owner) {
     let lent = owner.lent();
     for (index, first) in lent.iter().enumerate() {
         for second in &lent[index + 1..] {
@@ -193,7 +193,7 @@ fn one_value_per_name(owner: &Owner) {
 }
 /// What the owner holds outside the store, its trace and the child's facts,
 /// names no token; the driver files nothing (the owner's `iterate` checks).
-fn no_value_outside_the_store(owner: &Owner) {
+pub(crate) fn no_value_outside_the_store(owner: &Owner) {
     let facts = format!("{:?}", owner.facts());
     let trace = format!("{:?}", owner.trace());
     for value in fixtures::VALUES {

@@ -505,6 +505,7 @@ pub(crate) fn opened(
     assert!(within(&subject, crate::SUBJECT) && within(&display, DISPLAY), "the protocol bounds the file's parts");
     if let Err(refusal) = arriving_at(domain, &env.limits, arriving.holder, provider, &subject) {
         let arriving = domain.arriving.remove(&source).expect("an opened arrival");
+        out.push(Request::Signing(Signing::Forget { source }));
         return crate::changes::refuse(arriving.request, refusal, out);
     }
     let arriving = domain.arriving.get_mut(&source).expect("a checked arrival");

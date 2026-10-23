@@ -6,6 +6,7 @@ use skein_oauth as oauth;
 use skein_oauth_accounts as accounts;
 pub const ACCOUNT_CHAT: u32 = 0;
 pub const ROOM: u32 = 64;
+pub const MOVE_APPLICATION: &[u8] = b"jig-protocol-accounts-world";
 pub const TOKEN_FIRST: &[u8] = b"access-first";
 pub const TOKEN_SECOND: &[u8] = b"access-second";
 /// Every token the issuer gives and the record it starts from: the access

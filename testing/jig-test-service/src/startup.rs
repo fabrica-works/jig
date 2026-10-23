@@ -11,6 +11,8 @@ type ServerConfiguration = (skein_io::Addr, Option<Box<[u8]>>);
 
 type Initial = Box<[(connector::Path, u64)]>;
 
+const ACCOUNT_APPLICATION: &[u8] = b"jig-test";
+
 #[derive(Debug)]
 pub(super) struct Parsed {
     pub(super) engine: config::Engine,
@@ -430,6 +432,7 @@ pub(super) fn engine_startup(
     let max = root::max_out(&parsed.limits.root);
     let accounts = if parsed.accounts {
         Some(crate::accounts::Accounts::new(
+            ACCOUNT_APPLICATION.into(),
             &parsed.engine,
             seeds,
             runtime,

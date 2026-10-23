@@ -7,6 +7,7 @@ pub mod keys;
 pub mod moved;
 #[cfg(test)]
 mod moved_tests;
+pub mod moves;
 pub mod party;
 pub mod records;
 pub use records::Unfit;
