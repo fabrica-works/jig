@@ -267,8 +267,12 @@ impl Referee<Process> for Peers {
     }
 }
 
-pub fn run(directory: &Path) {
-    live_sign_in::configuration_at(directory, "127.0.0.1:34443", live_sign_in::Peers::Fake);
+/// Keep one issuer and LLM alive while a story kills and starts its application binaries.
+pub(super) fn with_peers(
+    plans: Vec<skein_fake_oauth::Plan>,
+    story: impl FnOnce(),
+    observe: impl FnOnce(&oauth::Peer, &llm::Peer) + Send,
+) {
     std::thread::scope(|scope| {
         let (stop, receiver) = mpsc::channel();
         let (ready, listening) = mpsc::channel();
@@ -280,24 +284,41 @@ pub fn run(directory: &Path) {
                 deadline: clock.now().now.saturating_add(PEER_WAIT),
                 wake: clock.now().now,
             });
-            let mut plans = fixtures::issuer_plans(Story::AccountSignInVaryingPort);
-            let mut first = plans.remove(0);
-            let skein_fake_oauth::Body::Token(token) = &mut first.body else { panic!("token plan") };
-            token.access_token = fixtures::TOKEN_FIRST.into();
-            // Sign-in leaves refresh token `next`; the independent issuer checks it on refresh.
-            plans.insert(0, fixtures::rotate());
-            plans.insert(0, first);
             world.spawn(|| Process::Issuer(Box::new(support::issuer_with_plans(plans))));
             world.spawn(|| Process::Peer(Box::new(live_sign_in::fake_peer(live_sign_in::Peers::Fake))));
             ready.send(()).expect("peer world ready");
             let outcome = world.run(&clock, PEER_WAIT);
             assert!(outcome.procs.iter().all(Host::is_empty), "independent peers' io settles");
             let Process::Issuer(issuer) = &outcome.procs[0] else { panic!("issuer") };
-            // Exactly two validated token POSTs: the code grant, then one refresh grant.
+            let Process::Peer(peer) = &outcome.procs[1] else { panic!("LLM") };
+            observe(issuer, peer);
+        });
+        listening.recv().expect("peers constructed");
+        story();
+        drop(stop);
+        peers.join().expect("peer world");
+    });
+}
+
+pub fn run(directory: &Path) {
+    live_sign_in::configuration_at(directory, "127.0.0.1:34443", live_sign_in::Peers::Fake);
+    let mut plans = fixtures::issuer_plans(Story::AccountSignInVaryingPort);
+    let mut first = plans.remove(0);
+    let skein_fake_oauth::Body::Token(token) = &mut first.body else { panic!("token plan") };
+    token.access_token = fixtures::TOKEN_FIRST.into();
+    // Sign-in leaves refresh token `next`; the independent issuer checks it on refresh.
+    plans.insert(0, fixtures::rotate());
+    plans.insert(0, first);
+    with_peers(
+        plans,
+        || {
+            let account = stage(directory, None);
+            stage(directory, Some(account));
+        },
+        |issuer, peer| {
             let posts = issuer.observations().iter().filter(|o| matches!(o, oauth::Observation::Post { .. })).count();
             let revokes =
                 issuer.observations().iter().filter(|o| matches!(o, oauth::Observation::Revoke { .. })).count();
-            let Process::Peer(peer) = &outcome.procs[1] else { panic!("LLM") };
             let credentials: Vec<_> = peer
                 .observations()
                 .iter()
@@ -305,18 +326,12 @@ pub fn run(directory: &Path) {
                 .collect();
             let answered =
                 peer.observations().iter().any(|o| matches!(o, llm::Observation::Answered { result: Ok(()), .. }));
-            (posts, revokes, credentials, answered)
-        });
-        listening.recv().expect("peers constructed");
-        let account = stage(directory, None);
-        stage(directory, Some(account));
-        drop(stop);
-        let (posts, revokes, credentials, answered) = peers.join().expect("peer world");
-        assert_eq!(posts, 2, "code grant and one validated refresh grant");
-        assert_eq!(revokes, 1, "issuer revoked the sign-in");
-        assert_eq!(credentials, vec![None, Some(0)], "first token refused, second accepted");
-        assert!(answered, "new grant answered");
-    });
+            assert_eq!(posts, 2, "code grant and one validated refresh grant");
+            assert_eq!(revokes, 1, "issuer revoked the sign-in");
+            assert_eq!(credentials, vec![None, Some(0)], "first token refused, second accepted");
+            assert!(answered, "new grant answered");
+        },
+    );
 }
 
 fn watch_accounts(native: &mut jig_client_protocol_world::native::NativeClient) {
