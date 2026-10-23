@@ -551,3 +551,6 @@ fn the_frame_shows_no_conversations_entry_without_a_chat_template() {
             .any(|node| node.role == Role::Link && node.name.as_deref() == Some(b"Conversations"))
     );
 }
+
+#[path = "stories/projects.rs"]
+mod projects;

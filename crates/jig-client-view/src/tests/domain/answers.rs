@@ -171,6 +171,7 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
             | Refusal::Ended { .. }
             | Refusal::Provider
             | Refusal::Unknown
+            | Refusal::NameTaken
             | Refusal::NotOffered
             | Refusal::NoEscalationHolder
             | Refusal::KeyConflict => {

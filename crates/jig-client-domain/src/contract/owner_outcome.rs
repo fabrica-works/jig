@@ -128,6 +128,14 @@ pub enum OwnerOutcome {
     PolicyChanged {
         project: u32,
     },
+    /// The project was renamed.
+    Renamed {
+        project: u32,
+    },
+    /// A project was made in the deployment.
+    ProjectMade {
+        project: u32,
+    },
     /// A person's project pool was opened or resized.
     PoolSet {
         project: u32,

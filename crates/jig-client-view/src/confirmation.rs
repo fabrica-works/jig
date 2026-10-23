@@ -319,6 +319,7 @@ fn action(
         ActKind::DeleteNote => words.text(b, JigPhrase::WillDeleteNote, &[]),
         ActKind::Seen
         | ActKind::Adopt
+        | ActKind::Rename
         | ActKind::ChangePolicy
         | ActKind::SetRoles
         | ActKind::MakeService

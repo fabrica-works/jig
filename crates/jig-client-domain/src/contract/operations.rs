@@ -21,6 +21,17 @@ pub enum Malformed {
     Cycle,
     ProposedAsAllowed,
     EndedBy,
+    Name(NameRule),
+}
+
+/// The project name shape rule that failed (domain/core.md, 6.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NameRule {
+    Empty,
+    Long,
+    Control,
+    Space,
+    Digits,
 }
 
 /// A dependency names a place in this batch or an existing task.

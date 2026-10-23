@@ -220,6 +220,8 @@ pub enum Refusal {
     },
     /// No visible object with that name.
     Unknown,
+    /// Another project holds this name.
+    NameTaken,
     /// The deployment does not offer this act.
     NotOffered,
     /// The key names another ask.

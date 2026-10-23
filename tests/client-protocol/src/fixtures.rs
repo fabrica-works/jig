@@ -57,7 +57,7 @@ pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
         heartbeat: Duration::from_millis(50),
         rows,
         served: jig_client_world::test::list([
-            Served { family: None, first: 15, last: 15 },
+            Served { family: None, first: 16, last: 16 },
             Served { family: Some(1), first: 2, last: 2 },
         ]),
         providers: List::with_capacity(0),
@@ -101,7 +101,7 @@ pub fn engine_limits() -> Limits {
         exchanges: 8,
         exchanges_per_client: 4,
         message_bytes: MESSAGE_BYTES,
-        wire: jig_client_protocol_wire::v15::CEILINGS,
+        wire: jig_client_protocol_wire::v16::CEILINGS,
         link_span: Duration::from_secs(300),
     }
 }

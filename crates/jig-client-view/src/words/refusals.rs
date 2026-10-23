@@ -1,7 +1,7 @@
 //! Durable engine categories and complete refusal facts; client/domain/contract.md, 4.
 use super::Words;
 use crate::phrases::jig::JigPhrase;
-use jig_client::contract::{AdmissionLimit, CurrentHold, HeldRole, Limit, Malformed, Moved, Refusal};
+use jig_client::contract::{AdmissionLimit, CurrentHold, HeldRole, Limit, Malformed, Moved, NameRule, Refusal};
 use jig_client::words::{RefusalWord, Word};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
@@ -34,18 +34,8 @@ impl Words {
                 }
             }
 
-            Refusal::Malformed { at, why } => self.text(
-                b,
-                match why {
-                    Malformed::ProjectMismatch => JigPhrase::MalformedProject,
-                    Malformed::TwoAsAllowed => JigPhrase::MalformedTwoAsAllowed,
-                    Malformed::EndedBy => JigPhrase::MalformedEndedBy,
-                    Malformed::ConversationNotAgent => JigPhrase::MalformedConversation,
-                    Malformed::Cycle => JigPhrase::MalformedCycle,
-                    Malformed::ProposedAsAllowed => JigPhrase::MalformedProposedAsAllowed,
-                },
-                &[Hole::Number(u64::from(*at))],
-            ),
+            Refusal::NameTaken => self.text(b, JigPhrase::NameTaken, &[]),
+            Refusal::Malformed { at, why } => self.malformed(b, *at, *why),
             Refusal::Role { held } => {
                 self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Role)), &[]);
                 self.held_role(b, *held);
@@ -98,6 +88,27 @@ impl Words {
             Refusal::Llm { model, .. } => {
                 self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Llm)), &[super::name(model.bytes())]);
             }
+        }
+    }
+    fn malformed(&self, b: &mut Builder, at: u32, why: Malformed) {
+        let position = [Hole::Number(u64::from(at))];
+        match why {
+            Malformed::Name(rule) => {
+                let phrase = match rule {
+                    NameRule::Empty => JigPhrase::NameEmpty,
+                    NameRule::Long => JigPhrase::NameLong,
+                    NameRule::Control => JigPhrase::NameControl,
+                    NameRule::Space => JigPhrase::NameSpace,
+                    NameRule::Digits => JigPhrase::NameDigits,
+                };
+                self.text(b, phrase, &[]);
+            }
+            Malformed::ProjectMismatch => self.text(b, JigPhrase::MalformedProject, &position),
+            Malformed::TwoAsAllowed => self.text(b, JigPhrase::MalformedTwoAsAllowed, &position),
+            Malformed::EndedBy => self.text(b, JigPhrase::MalformedEndedBy, &position),
+            Malformed::ConversationNotAgent => self.text(b, JigPhrase::MalformedConversation, &position),
+            Malformed::Cycle => self.text(b, JigPhrase::MalformedCycle, &position),
+            Malformed::ProposedAsAllowed => self.text(b, JigPhrase::MalformedProposedAsAllowed, &position),
         }
     }
     pub(crate) fn held_role(&self, b: &mut Builder, held: Option<HeldRole>) {
@@ -171,6 +182,7 @@ impl Words {
             AdmissionLimit::Accounts => JigPhrase::EngineLimitAccounts,
             AdmissionLimit::HolderAccounts => JigPhrase::EngineLimitHolderAccounts,
             AdmissionLimit::Sources => JigPhrase::EngineLimitSources,
+            AdmissionLimit::Projects => JigPhrase::EngineLimitProjects,
             AdmissionLimit::SignIns => JigPhrase::EngineLimitSignIns,
         };
         self.text(b, phrase, &[]);

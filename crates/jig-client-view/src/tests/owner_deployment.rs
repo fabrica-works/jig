@@ -299,7 +299,7 @@ fn deployment_view_opaque_history_keys_source_order_and_full_width_requester_pro
 }
 #[test]
 fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wrong_checked_shapes() {
-    const DEPLOYMENT_PHRASES: usize = 279; // 276 existing + three host rules.
+    const DEPLOYMENT_PHRASES: usize = 280; // Includes the deployment projects limit.
     let english = crate::phrases::english::language();
     let mut second = english.clone();
     for phrase in &mut second.phrases {

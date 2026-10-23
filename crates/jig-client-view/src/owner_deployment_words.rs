@@ -222,6 +222,7 @@ pub enum DeploymentPhrase {
     AdmissionHolderAccounts,
     AdmissionSources,
     AdmissionSignIns,
+    AdmissionProjects,
 
     Connectors,
     ConnectorsCut,
@@ -229,7 +230,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 279] = [
+pub const ALL: [DeploymentPhrase; 280] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -483,6 +484,7 @@ pub const ALL: [DeploymentPhrase; 279] = [
     DeploymentPhrase::AdmissionHolderAccounts,
     DeploymentPhrase::AdmissionSources,
     DeploymentPhrase::AdmissionSignIns,
+    DeploymentPhrase::AdmissionProjects,
     DeploymentPhrase::Connectors,
     DeploymentPhrase::ConnectorsCut,
     DeploymentPhrase::ConnectorsEmpty,
@@ -725,6 +727,7 @@ impl DeploymentPhrase {
                 Self::AdmissionHolderAccounts => 9426,
                 Self::AdmissionSources => 9427,
                 Self::AdmissionSignIns => 9428,
+                Self::AdmissionProjects => 9430,
 
                 Self::Connectors => 9396,
                 Self::ConnectorsCut => 9397,
@@ -899,6 +902,7 @@ impl DeploymentPhrase {
             | Self::AdmissionAccounts
             | Self::AdmissionHolderAccounts
             | Self::AdmissionSources
+            | Self::AdmissionProjects
             | Self::AdmissionSignIns
             | Self::AdmissionService
             | Self::Connectors
@@ -1159,6 +1163,7 @@ impl DeploymentPhrase {
             Self::AdmissionHolderAccounts => b"Structural limit: holder accounts",
             Self::AdmissionSources => b"Structural limit: sources",
             Self::AdmissionSignIns => b"Structural limit: account sign-ins",
+            Self::AdmissionProjects => b"The deployment has no room for another project",
 
             Self::Connectors => b"Configured connectors",
             Self::ConnectorsCut => b"Some configured connectors omitted",

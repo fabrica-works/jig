@@ -2,7 +2,7 @@
 use crate::translate::too_large;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v15 as w;
+use jig_client_protocol_wire::v16 as w;
 use skein_lib::{List, Writer, bytes};
 pub(crate) fn wire_revision(value: c::Revision, limits: &w::Limits) -> Result<w::Revision, w::Problem> {
     w::Revision::new(limits, w::RevisionParts { value: value.value })
@@ -677,6 +677,14 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
         c::Ask::SignOut { holder, source } => w::Ask::SignOut(w::AskSignOut::new(
             limits,
             w::AskSignOutParts { holder: account_holder(*holder), source: *source },
+        )?),
+        c::Ask::Rename { project, name } => w::Ask::Rename(w::Rename::new(
+            limits,
+            w::RenameParts { project: *project, name: bytes::copy_of(name.bytes()) },
+        )?),
+        c::Ask::MakeProject { name, policy } => w::Ask::MakeProject(w::MakeProject::new(
+            limits,
+            w::MakeProjectParts { name: bytes::copy_of(name.bytes()), policy: *policy },
         )?),
         c::Ask::SetPool { project, party, budget } => w::Ask::SetPool(w::SetPool::new(
             limits,

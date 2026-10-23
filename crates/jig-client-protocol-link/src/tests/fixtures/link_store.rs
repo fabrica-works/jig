@@ -38,6 +38,8 @@ fn policy() -> c::PolicyEdit {
 pub fn store_asks() -> List<c::Ask> {
     let revision = read_value_revision();
     list([
+        c::Ask::Rename { project: 7, name: store_text() },
+        c::Ask::MakeProject { name: store_text(), policy: 1 },
         message(),
         create_ask(),
         propose_amendment(revision),

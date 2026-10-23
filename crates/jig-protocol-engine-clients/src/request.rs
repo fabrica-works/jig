@@ -197,6 +197,8 @@ fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
         | w::Ask::ChangePolicy(_)
         | w::Ask::SetRoles(_)
         | w::Ask::MakeService(_)
+        | w::Ask::Rename(_)
+        | w::Ask::MakeProject(_)
         | w::Ask::SetPool(_)
         | w::Ask::Compound(_)
         | w::Ask::Create(_)

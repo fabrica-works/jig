@@ -222,6 +222,8 @@ pub fn named(ask: &Ask) -> Vec<(Object, Revision)> {
         | Ask::SignIn { .. }
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. } => Vec::new(),
     }
 }

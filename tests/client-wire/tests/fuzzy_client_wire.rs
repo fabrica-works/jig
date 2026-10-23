@@ -1,5 +1,5 @@
 //! Arbitrary and mutated client bytes (skein's codec.md, section 6).
-use jig_client_protocol_wire::v15::*;
+use jig_client_protocol_wire::v16::*;
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -324,6 +324,8 @@ fn records_7(bytes: &[u8]) {
     check!(ChangePolicy, bytes);
     check!(SetRoles, bytes);
     check!(MakeService, bytes);
+    check!(Rename, bytes);
+    check!(MakeProject, bytes);
     check!(SetPool, bytes);
     check!(TaskRefMember, bytes);
     check!(TaskRefTask, bytes);
@@ -377,6 +379,10 @@ fn records_8(bytes: &[u8]) {
     check!(OwnerOutcomePolicyChanged, bytes);
     check!(OwnerOutcomeAccountSignInStarted, bytes);
     check!(OwnerOutcomeAccountSignedOut, bytes);
+    check!(OwnerOutcomeRenamed, bytes);
+    check!(OwnerOutcomeProjectMade, bytes);
+    check!(NameRule, bytes);
+    check!(MalformedName, bytes);
     check!(OwnerOutcomePoolSet, bytes);
     check!(OwnerOutcomeEscalationDecided, bytes);
     check!(OwnerOutcome, bytes);
@@ -690,6 +696,18 @@ fn mutation_seed(path: &Path) -> bool {
             "record_owned_",
             "record_refused_",
             "enum_ask_",
+            "record_rename_",
+            "record_make_project_",
+            "record_owner_outcome_renamed_",
+            "record_owner_outcome_project_made_",
+            "record_malformed_name_",
+            "enum_owner_outcome_renamed_",
+            "enum_owner_outcome_project_made_",
+            "enum_refusal_name_taken_",
+            "enum_malformed_name_",
+            "enum_name_rule_",
+            "enum_admission_limit_projects_",
+            "enum_act_kind_rename_",
             "enum_final_",
             "enum_fact_",
             "record_hold_reason_",
@@ -722,7 +740,7 @@ fn mutation_seed(path: &Path) -> bool {
 }
 
 fn mutated(rng: &mut Rng) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-client-protocol-wire/golden/v15");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-client-protocol-wire/golden/v16");
     let mut paths: Vec<_> =
         fs::read_dir(root).expect("golden directory").map(|entry| entry.expect("golden entry").path()).collect();
     paths.sort();

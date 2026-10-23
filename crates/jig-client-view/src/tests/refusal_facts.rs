@@ -278,3 +278,21 @@ fn each_configured_bound_names_its_allowance_in_the_reference_view() {
         assert!(contains(&tree, expected), "{bound:?}");
     }
 }
+
+#[test]
+fn project_name_refusals_say_the_failed_rule_and_projects_limit() {
+    assert!(contains(&render(Refusal::NameTaken), b"Another project has that name"));
+    assert!(contains(
+        &render(Refusal::Limit { which: Limit::Admission { which: AdmissionLimit::Projects } }),
+        b"The deployment has no room for another project"
+    ));
+    for (rule, words) in [
+        (NameRule::Empty, b"The project name is empty".as_slice()),
+        (NameRule::Long, b"The project name is longer than 64 bytes"),
+        (NameRule::Control, b"The project name contains a control character"),
+        (NameRule::Space, b"The project name has white space at an end"),
+        (NameRule::Digits, b"The project name is digits alone"),
+    ] {
+        assert!(contains(&render(Refusal::Malformed { at: 0, why: Malformed::Name(rule) }), words));
+    }
+}

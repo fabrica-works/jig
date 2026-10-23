@@ -171,6 +171,7 @@ pub const fn dangerous(act: ActKind) -> bool {
         | ActKind::Seen
         | ActKind::EditNote
         | ActKind::Adopt
+        | ActKind::Rename
         | ActKind::ChangePolicy
         | ActKind::SetRoles
         | ActKind::MakeService

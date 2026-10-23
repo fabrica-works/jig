@@ -1,7 +1,7 @@
 //! Facts decoded independently at the byte boundary, before the root sees them.
 use crate::native::Received;
 use jig_client::{Message, Request as ClientRequest, contract as c};
-use jig_client_protocol_wire::v15 as w;
+use jig_client_protocol_wire::v16 as w;
 use jig_client_test_domain::{Event, Request};
 use jig_client_world::harness::{Receipt, Sent};
 use skein_lib::{Reader, RequestEnvelope, Token};
@@ -121,6 +121,8 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
                 | w::Ask::SignIn(_)
                 | w::Ask::AccountChange(_)
                 | w::Ask::SignOut(_)
+                | w::Ask::Rename(_)
+                | w::Ask::MakeProject(_)
                 | w::Ask::SetPool(_) => None,
             };
             if let Some((key, kind, revision)) = decided {

@@ -47,6 +47,7 @@ pub fn recovery(object: &Object) -> Recovery {
             | Refusal::Role { .. }
             | Refusal::Ended { .. }
             | Refusal::Unknown
+            | Refusal::NameTaken
             | Refusal::NotOffered
             | Refusal::NoEscalationHolder
             | Refusal::Provider

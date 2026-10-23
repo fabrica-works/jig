@@ -9,7 +9,7 @@ use jig_client::contract::{
 use skein_lib::{Wall, bytes::copy_of};
 
 fn phrase_limits() -> PhraseLimits {
-    PhraseLimits { languages: 2, phrases: 62, holes: 1, segments: 200, text_bytes: 8192, hole_bytes: 0 }
+    PhraseLimits { languages: 2, phrases: 64, holes: 1, segments: 200, text_bytes: 8192, hole_bytes: 0 }
 }
 fn words() -> Words {
     Words::new(Phrasebook::load(phrases::shapes(), Box::new([phrases::english()]), &phrase_limits()).unwrap(), 0, 0)
@@ -460,4 +460,11 @@ fn a_sign_out_outcome_shows_every_whole_host_name() {
     let tree = render(&OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts: rows }, &words());
     assert_eq!(tree.len(), view::required(&words()).unwrap().nodes);
     assert!(has(&tree, &[b'a'; 4096]));
+}
+
+#[test]
+fn project_outcomes_say_what_was_made_or_renamed_and_keep_the_number() {
+    let words = words();
+    expect_lines(&render(&OwnerOutcome::Renamed { project: 17 }, &words), &[b"Renamed the project", b"Project: 17"]);
+    expect_lines(&render(&OwnerOutcome::ProjectMade { project: 19 }, &words), &[b"Made project", b"Project: 19"]);
 }

@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 /// Client documents indexed by their identities, with parties and sign-ins.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Truth {
+    /// Configured policy numbers for `MakeProject`; `None` supplies the default `[1]`.
+    pub policies: Option<Vec<u32>>,
     pub frames: BTreeMap<u64, Me>,
     pub sign_ins: BTreeMap<u64, u64>,
     pub objects: BTreeMap<ObjectKey, ReadValue>,
@@ -42,6 +44,8 @@ pub enum Change {
     Forget { key: ObjectKey },
     /// Replace a project document.
     Project(Box<Project>),
+    /// Replace a whole owner project after its name changes.
+    OwnerProject(Box<jig_client_domain::contract::OwnerProject>),
     /// Replace a revisioned note.
     Note(Note),
     /// Delete a note.
@@ -74,6 +78,7 @@ impl Change {
                 payload::fits(value, bounds)
             }
             Self::Project(value) => payload::fits(value, bounds),
+            Self::OwnerProject(value) => payload::fits(value, bounds),
             Self::Note(value) => payload::fits(value, bounds),
             Self::Deployment(value) => payload::fits(value, bounds),
             Self::OwnerDeployment(value) => payload::fits(value, bounds),
@@ -180,6 +185,9 @@ impl Truth {
                 self.objects.remove(key);
                 self.object_projects.remove(key);
             }
+            Change::OwnerProject(project) => {
+                self.owner_projects.insert(project.number, (**project).clone());
+            }
             Change::Project(project) => {
                 self.projects.insert(project.number, (**project).clone());
             }
@@ -245,7 +253,7 @@ pub struct Script {
 impl Default for Script {
     fn default() -> Self {
         Self {
-            versions: jig_client_domain::contract::VersionRange { first: 15, last: 15 },
+            versions: jig_client_domain::contract::VersionRange { first: 16, last: 16 },
             truth: Truth::default(),
             bounds: Bounds::default(),
             rules: Vec::new(),

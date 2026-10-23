@@ -4,7 +4,7 @@ use super::piece_problem;
 use crate::Limits;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v15 as w;
+use jig_client_protocol_wire::v16 as w;
 use skein_lib::{List, Reader, bytes};
 fn copy(value: &[u8], room: &mut u64) -> Result<Box<[u8]>, w::Problem> {
     charge(room, u64::try_from(value.len()).ok())?;

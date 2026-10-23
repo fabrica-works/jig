@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v15 as w;
+use jig_client_protocol_wire::v16 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};
@@ -29,7 +29,7 @@ fn request() -> Box<[u8]> {
     ask.encode(&mut out).expect("ask bytes");
     let record = w::Keyed::new(
         &limits,
-        w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 15, request: out.finish(), value: None },
+        w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 16, request: out.finish(), value: None },
     )
     .expect("keyed request");
     let mut out = Writer::new(usize::try_from(record.measure()).expect("record size"));
@@ -66,7 +66,7 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
         panic!("final answer");
     };
     assert_eq!(answer.owner(), &w::Owner::Jig);
-    assert_eq!(answer.version(), 15);
+    assert_eq!(answer.version(), 16);
     let outcome = w::Outcome::Owner(
         w::OutcomeOwner::new(
             &limits,
@@ -143,7 +143,7 @@ fn keyed(key: [u8; 16], ask: &w::Ask) -> Box<[u8]> {
     ask.encode(&mut out).expect("ask bytes");
     let keyed = w::Keyed::new(
         &limits,
-        w::KeyedParts { key, owner: w::Owner::Jig, version: 15, request: out.finish(), value: None },
+        w::KeyedParts { key, owner: w::Owner::Jig, version: 16, request: out.finish(), value: None },
     )
     .expect("keyed");
     let mut out = Writer::new(usize::try_from(keyed.measure()).expect("keyed size"));
@@ -346,7 +346,7 @@ fn a_carried_value_is_kept_before_the_application_sees_its_request() {
     use jig_protocol_engine_clients::{Event, FromApplication, Served, ToApplication};
     let mut settings = fixtures::settings();
     settings.served = skein_lib::List::with_capacity(2);
-    settings.served.push(Served { family: None, first: 15, last: 15 }).expect("jig");
+    settings.served.push(Served { family: None, first: 16, last: 16 }).expect("jig");
     settings.served.push(Served { family: Some(1), first: 1, last: 1 }).expect("family");
     let mut peer = Peer::started(&settings);
     let bearer = fixtures::signed_in(&mut peer);

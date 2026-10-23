@@ -2,6 +2,7 @@
 //! Revision and decided-first checks precede scripted outcomes; contract.md, 3–4.
 mod creating;
 mod priorities;
+mod projects;
 use crate::{Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Up, payload};
 use jig_client_domain::contract::{
     ActKind, Actor, Admission, Answer, Ask, ChipPhase, CurrentHold, Decision, Ending, Moved, ObjectKey, Offered,
@@ -88,6 +89,9 @@ impl<A: crate::Application> Engine<A> {
         ask: &Ask,
         wall: Wall,
     ) -> core::result::Result<(Answer, Vec<crate::Change>), Invalid> {
+        if let Some(result) = self.project_request(party, ask) {
+            return result;
+        }
         if let Ask::Compound { project, operations } = ask
             && priorities::only(operations)
         {
@@ -296,6 +300,8 @@ impl<A: crate::Application> Engine<A> {
             | Ask::SignIn { .. }
             | Ask::AccountChange { .. }
             | Ask::SignOut { .. }
+            | Ask::Rename { .. }
+            | Ask::MakeProject { .. }
             | Ask::SetPool { .. } => None,
         };
         let offer = note_offers.or_else(|| {
@@ -350,6 +356,8 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::SetRoles { .. }
                 | Ask::MakeService { .. }
                 | Ask::Withdraw { .. }
+                | Ask::Rename { .. }
+                | Ask::MakeProject { .. }
                 | Ask::SetPool { .. } => Admission::Refused(Refusal::NotOffered),
             },
             Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => offer.clone(),
@@ -440,6 +448,8 @@ impl<A: crate::Application> Engine<A> {
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
+            | Ask::Rename { .. }
+            | Ask::MakeProject { .. }
             | Ask::SetPool { .. } => None,
         };
         if let (Some(key), Some(how)) = (object, how) {
@@ -624,7 +634,7 @@ fn decision_kind(decision: &Decision) -> ActKind {
 type Target = (Option<u32>, Option<ObjectKey>, ActKind, Option<(Revision, Moved)>);
 fn target(ask: &Ask) -> Option<Target> {
     Some(match ask {
-        Ask::SignIn { .. } | Ask::SignOut { .. } | Ask::AccountChange { .. } => return None,
+        Ask::MakeProject { .. } | Ask::SignIn { .. } | Ask::SignOut { .. } | Ask::AccountChange { .. } => return None,
         Ask::Compound { project, operations } => {
             compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Message, None))
         }
@@ -674,6 +684,7 @@ fn target(ask: &Ask) -> Option<Target> {
         Ask::ChangePolicy { project, .. } => (Some(*project), None, ActKind::ChangePolicy, None),
         Ask::SetRoles { project, .. } => (Some(*project), None, ActKind::SetRoles, None),
         Ask::MakeService { project, .. } => (Some(*project), None, ActKind::MakeService, None),
+        Ask::Rename { project, .. } => (Some(*project), None, ActKind::Rename, None),
         Ask::SetPool { project, .. } => (Some(*project), None, ActKind::SetPool, None),
     })
 }
