@@ -239,7 +239,7 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 | cancel a sign-in | cancel |
 | withdraw a source for a move | release, then remove: an exchange already sent finishes and keeps its record first (5.6) |
 | bring a moved source back, or adopt a moved record | add, with its record and the owner's store as keeper (5.6) |
-| refresh a source once before it is lent | rejected, of the generation its record holds, before any grant of it (5.6) |
+| refresh a source once before it is lent | nothing more: the record that add hands over has its access token disowned, so the driver's first grant refreshes it (5.6) |
 | close | cancel each sign-in under way, then close: a sign-in waiting on a person never holds the close |
 
 | The driver says | The accounts child hears |
@@ -389,12 +389,16 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
   and the child refuses the move "not signed in".
 - **Back.** A cancelled move's source is added to the driver again with
   the record read for it; one held moving at a restart is added as
-  every signed-in source is (5.1). It is then **refreshed once**: the
-  driver hears `rejected` of the generation the record holds, before
-  any grant of it, so that it lends nothing of that generation and
-  refreshes first (skein's `oauth.md`, 6.3; no refresh is asked before
-  the record's earliest refresh time). A refresh refused as sign in
-  again leaves the source needing sign-in.
+  every signed-in source is (5.1), except that the child asks it
+  **refreshed once**: the copy the driver is handed has its access
+  token disowned, its expiry past and no earliest refresh time, so the
+  driver refreshes before it lends anything (a grant asked for when the
+  token expires within the lead refreshes first, skein's `oauth.md`,
+  6.3), or answers that its exchanges are full, and the grant is asked
+  again later. Only the driver's copy is so marked, never the stored
+  row: the source keeps its moving hold until the first grant after the
+  refresh, so a restart before it refreshes again. A refresh refused as
+  sign in again leaves the source needing sign-in.
 - **In.** The carried value is read from the secrets' store and
   decoded. It is this application's when its name is the one the root
   gave, its issuer a configured LLM provider's registration's, and its
@@ -403,8 +407,8 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
   or "not ours". Accepted, the record, renamed to its new source's
   number, is adopted into the source's row in one secrets' commit that
   erases the carried value (`store.md`, section 9); the source is added
-  to the driver with it, refreshed once as above, and the child hears
-  it adopted.
+  to the driver with its access token disowned, refreshed once as
+  above, and the child hears it adopted.
 - **The file left behind is dead** once the receiving deployment's
   first refresh is kept: the issuer has rotated its refresh token
   (`../domain/providers.md`, 2.3), so a copy that refreshes is refused,

@@ -380,7 +380,8 @@ host's half reports it (`llm.md`, 5.5).
   task's chosen model is checked with its run's check
   (`../domain/authority.md`, 8.3).
 - **LLM accounts' bounds:** accounts in the deployment, accounts per
-  holder, sources per account, sign-ins at once, program sources per
+  holder, sources per account, sign-ins at once (moves out and in
+  count among them: `../domain/accounts.md`, 3.6), program sources per
   worker, and a credential's bytes, which bound a key (skein's
   `llm.md`, 2.6). Within them the accounts' table, skein's driver, the
   hub's grants, a worker's `sources` and `logins` and the secrets'

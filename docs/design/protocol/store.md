@@ -747,8 +747,9 @@ Removing a missing file is not a failure.
   key as its next generation (`llm.md`, 5.1). A later erase of the
   carried number is a no-op. A source's record or LLM key occupies one
   secret row under a fixed-size store key.
-- **A moved record adopted the same way,** in one secrets commit that
-  writes the source's row and erases the carried row: the row holds
+- **A moved record adopted the same way,** in one secrets commit
+  (`AdoptValue`, beside the key's `Adopt`) that writes the source's row
+  and erases the carried row: the row holds
   the record the carried file holds, in skein's form, not the file's
   bytes as they came (`llm.md`, 5.6), and the adoption states the
   carried value's digest, answering stale when it changed. The record

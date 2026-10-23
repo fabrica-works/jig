@@ -380,7 +380,10 @@ and program sources per worker are limits
 (`../protocol/configuration.md`, section 6), within which the accounts'
 records, skein's driver, the hub's grants, a worker's hello and the
 secrets' store are sized. A request that would pass one is refused,
-naming it. Client receiving counts for accounts, sources and sign-ins
+naming it. A move out or in holds one of the sign-ins at once from its
+ask to its end (section 6), as a sign-in and a key being kept do, so
+that the child's tables for them share that bound. Client receiving
+counts for accounts, sources and sign-ins
 are at least the engine's document lines, so every list cut there fits
 (`../client/domain/client.md`, section 14).
 
