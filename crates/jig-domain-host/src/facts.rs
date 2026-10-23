@@ -7,7 +7,8 @@
 //! no room in `out`, and when the queue is full they are dropped and counted.
 //! Nothing the host decides depends on whether a fact was kept. An assignment
 //! refused at the entrance tells nothing: no run was hosted. The agent's
-//! typed activity waits in its own bounded queue until the parent can send it.
+//! typed activity and live pieces share a bounded queue until the parent can
+//! send them. Pieces use at most its first half, leaving room for activity.
 
 use skein_lib::{Queue, Token};
 
@@ -41,6 +42,8 @@ pub(crate) struct Facts {
     queue: Queue<Fact>,
     activity: Queue<LinkUp>,
     activity_lost: u64,
+    pieces_lost: u64,
+    pieces_fenced: u64,
     lost: u64,
 }
 
@@ -51,6 +54,8 @@ impl Facts {
             activity: Queue::with_capacity(activity),
             lost: 0,
             activity_lost: 0,
+            pieces_lost: 0,
+            pieces_fenced: 0,
         }
     }
 
@@ -65,6 +70,30 @@ impl Facts {
         if self.activity.try_push(activity).is_err() {
             self.activity_lost = self.activity_lost.saturating_add(1);
         }
+    }
+
+    pub(crate) fn piece(&mut self, piece: LinkUp) {
+        if self.activity.len() >= self.activity.capacity() / 2 {
+            self.pieces_lost = self.pieces_lost.saturating_add(1);
+        } else {
+            self.activity.push(piece);
+        }
+    }
+
+    pub(crate) fn fence_piece(&mut self) {
+        self.pieces_fenced = self.pieces_fenced.saturating_add(1);
+    }
+
+    pub(crate) const fn pieces_lost(&self) -> u64 {
+        self.pieces_lost
+    }
+
+    pub(crate) const fn pieces_fenced(&self) -> u64 {
+        self.pieces_fenced
+    }
+
+    pub(crate) fn activity_len(&self) -> u32 {
+        self.activity.len()
     }
 
     pub(crate) fn phase(&mut self, run: Token, attempt: Token, previous: &mut Option<Phase>, phase: Phase) {
@@ -87,5 +116,37 @@ impl Facts {
 
     pub(crate) fn lost(&self) -> u64 {
         self.lost
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn piece_counters_saturate_and_tiny_queues_reserve_their_activity_room() {
+        for capacity in [0, 1] {
+            let mut facts = Facts::with_capacity(0, capacity);
+            assert_eq!((facts.pieces_fenced(), facts.pieces_lost()), (0, 0));
+            facts.pieces_fenced = u64::MAX - 1;
+            facts.pieces_lost = u64::MAX - 1;
+            for _ in 0..2_u32 {
+                facts.fence_piece();
+                facts.piece(LinkUp::Piece {
+                    run: Token::new(1),
+                    attempt: Token::new(2),
+                    piece: crate::Piece {
+                        turn: 1,
+                        retry: 1,
+                        kind: crate::LiveKind::Text,
+                        offset: 0,
+                        bytes: Box::new([]),
+                    },
+                });
+            }
+            assert_eq!((facts.pieces_fenced(), facts.pieces_lost()), (u64::MAX, u64::MAX));
+            assert_eq!(facts.pop_activity(), None);
+            assert_eq!(facts.activity_lost(), 0);
+        }
     }
 }

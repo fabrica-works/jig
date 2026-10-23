@@ -151,15 +151,29 @@ impl Domain {
         self.facts.lost()
     }
 
-    /// The oldest typed activity waiting for the engine.
+    /// The oldest activity or still-current live piece waiting for the engine.
+    /// Pieces whose attempts ended or whose turns were taken are fenced here.
     pub fn pop_activity(&mut self) -> Option<LinkUp> {
-        self.facts.pop_activity()
+        crate::live::pop_activity(self)
     }
 
     /// Activity dropped for lack of room.
     #[must_use]
     pub const fn activity_lost(&self) -> u64 {
         self.facts.activity_lost()
+    }
+
+    /// Live pieces dropped for lack of room in the activity queue.
+    #[must_use]
+    pub const fn pieces_lost(&self) -> u64 {
+        self.facts.pieces_lost()
+    }
+
+    /// Live pieces dropped at admission or drain for a failed attempt, ask,
+    /// size or turn fence.
+    #[must_use]
+    pub const fn pieces_fenced(&self) -> u64 {
+        self.facts.pieces_fenced()
     }
 
     /// Turns retained until the engine commits them.
@@ -237,8 +251,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Called { owner, call, ask } => hosted::called(domain, env, owner, call, ask, out),
         Event::Withdrawn { owner, call } => hosted::withdrawn(domain, owner, call, out),
         Event::Turn { owner, turn } => hosted::turned(domain, env, owner, turn, out),
-        // Transitional: live-text M1's task Tb forwards the piece, fenced and counted.
-        Event::Piece { .. } => {}
+        Event::Piece { owner, piece } => crate::live::reported(domain, env, owner, piece),
         Event::Activity { owner, activity } => crate::activity::reported(domain, owner, activity),
         Event::Unauthorized { owner, account, generation } => {
             crate::activity::unauthorized(domain, owner, account, generation, out);

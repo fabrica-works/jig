@@ -463,6 +463,7 @@ mod fixtures {
     }
 }
 
+mod pieces;
 mod progress;
 
 fn assigned_grants(h: &mut Harness, grants: Box<[crate::Grant]>) -> (Token, Box<crate::Start>) {

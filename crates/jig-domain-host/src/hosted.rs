@@ -56,6 +56,12 @@ struct Runtime {
     read: Option<Token>,
 }
 
+impl Hosted {
+    pub(crate) const fn taken_turns(&self) -> u32 {
+        self.runtime.turns
+    }
+}
+
 type CallName = Box<[u8]>;
 
 fn reply(agent: Token, call: CallName, reply: Reply, out: &mut Queue<Request>) {

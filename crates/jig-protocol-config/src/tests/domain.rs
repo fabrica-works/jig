@@ -324,6 +324,9 @@ fn memory_below_the_components_sum_is_refused() {
     const ENDING_AUTHORITY_GROWTH: u64 = 992;
     // The live ask grows the small profile's typed host carriers by 24 bytes.
     const LIVE_ASK_GROWTH: u64 = 24;
+    // Live pieces price all 64 hub activity slots at the piece bound plus
+    // Input's provider id and tool wire bounds (hosts.md, 6.5).
+    const LIVE_PIECE_GROWTH: u64 = 64 * (4096 + 256 + 64);
     // Finishing (domain/root.md, section 3; domain/people.md, section 3):
     // people's sign_in_worst_case adds Set<(Wall, u64)> at 8 sign-ins: 576 bytes.
     // Core's Reconciliation scratch replaces the views' Token snapshot:
@@ -470,6 +473,7 @@ fn memory_below_the_components_sum_is_refused() {
         + SIGN_IN_CANCEL_GROWTH
         + ENDING_AUTHORITY_GROWTH
         + LIVE_ASK_GROWTH
+        + LIVE_PIECE_GROWTH
         // Deployment role storage and project-role scratch: people.projects 2 -> 3.
         + 7_288;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });

@@ -508,3 +508,55 @@ fn source_replacement_at_capacity_stays_within_the_memory_bound() {
     assert!(matches!(out.pop(), Some(Request::Source { .. })));
     meter.check(measured, worst_case(&limits).expect("replacement bound"), &limits);
 }
+
+#[test]
+fn maximum_input_pieces_in_the_shared_queue_fit_the_hosts_bound() {
+    use jig_domain_host::{Activity, LiveAsk, LiveKind, Piece};
+    let limits = Limits { told: 64, ..LIMITS };
+    let mut host = Measured::new(limits);
+    let mut assignment = assignment(1, &limits);
+    assignment.live = LiveAsk { text: false, reasoning: false, input: true };
+    let [Asked::Prepare { owner }] = host.step(jig_host_world::fixtures::assign(assignment))[..] else {
+        panic!("prepare")
+    };
+    assert_eq!(host.step(Event::Prepared { owner, workspace: owner }), [Asked::Start]);
+    assert!(host.step(Event::Started { owner, agent: owner }).is_empty());
+    while host.domain.pop_activity().is_some() {}
+    let before = host.meter.held();
+    for offset in 0..limits.told / 2 {
+        let piece = Piece {
+            turn: 1,
+            retry: 1,
+            kind: LiveKind::Input { call: bytes(256), tool: bytes(64) },
+            offset: u64::from(offset),
+            bytes: bytes(u64::from(limits.piece_bytes)),
+        };
+        assert!(host.step(Event::Piece { owner, piece }).is_empty());
+    }
+    let payloads = u64::from(limits.told / 2) * (u64::from(limits.piece_bytes) + 256 + 64);
+    assert!(host.meter.held() >= before + payloads, "all maximum input payloads stay owned by the hub");
+    for _ in limits.told / 2..limits.told {
+        assert!(host.step(Event::Activity { owner, activity: Activity::LongDone }).is_empty());
+    }
+    let mut pieces = 0;
+    let mut activity = 0;
+    while let Some(record) = host.domain.pop_activity() {
+        match record {
+            LinkUp::Piece { piece, .. } => {
+                assert_eq!(piece.bytes.len(), usize::try_from(limits.piece_bytes).expect("small bound"));
+                pieces += 1;
+            }
+            LinkUp::Activity { .. } => activity += 1,
+            other @ (LinkUp::Logins { .. }
+            | LinkUp::SignedOut { .. }
+            | LinkUp::Unauthorized { .. }
+            | LinkUp::Limited { .. }
+            | LinkUp::AccountRefused { .. }
+            | LinkUp::Turn { .. }
+            | LinkUp::Call { .. }
+            | LinkUp::Answer { .. }) => panic!("unexpected queued record: {other:?}"),
+        }
+    }
+    assert_eq!((pieces, activity), (limits.told / 2, limits.told / 2));
+    assert_eq!((host.domain.pieces_fenced(), host.domain.pieces_lost(), host.domain.activity_lost()), (0, 0, 0));
+}
