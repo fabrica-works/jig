@@ -1,6 +1,6 @@
 //! Durable task values translated exhaustively (protocol/store.md, 5.1).
 use super::{proposals, value};
-use crate::tasks_v7 as wire;
+use crate::tasks_v8 as wire;
 use jig_domain_tasks as domain;
 use skein_lib::Wall;
 

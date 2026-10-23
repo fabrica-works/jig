@@ -3,8 +3,8 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 #[rustfmt::skip]
-#[path = "generated/v1.rs"]
-pub mod v1;
-pub const VERSION: u32 = 1;
+#[path = "generated/v2.rs"]
+pub mod v2;
+pub const VERSION: u32 = 2;
 
 pub mod codec;

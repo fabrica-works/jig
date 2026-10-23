@@ -273,6 +273,7 @@ pub(crate) fn hold_failure(b: &mut Builder, value: HoldFailure, words: &Words) {
 }
 pub(crate) fn reason(b: &mut Builder, value: HoldCategory, words: &Words) {
     match value {
+        HoldCategory::Exceeded(_) => words.hold_category(b, value),
         HoldCategory::Failures { class } => {
             text(b, words, P::Failures, &[]);
             hold_failure(b, class, words);

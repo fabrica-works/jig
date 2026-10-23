@@ -44,7 +44,7 @@ pub(super) fn ready() -> Domain {
         &mut root,
         Event::Client {
             event: jig_client::Event::Up {
-                up: jig_client::Up::FamilyServed { family: 1, versions: Some(VersionRange { first: 1, last: 1 }) },
+                up: jig_client::Up::FamilyServed { family: 1, versions: Some(VersionRange { first: 2, last: 2 }) },
             },
         },
     );

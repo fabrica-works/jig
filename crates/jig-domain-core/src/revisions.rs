@@ -114,6 +114,20 @@ pub(crate) fn moved_hold(revision: u64, why: tasks::Hold) -> people::Refusal {
 
 fn hold_reason(why: tasks::Hold) -> people::HoldReason {
     match why {
+        tasks::Hold::Exceeded(value) => people::HoldReason::Exceeded(people::Exceeded {
+            bound: match value.bound {
+                tasks::Bound::Reasoning => people::Bound::Reasoning,
+                tasks::Bound::Metadata => people::Bound::Metadata,
+                tasks::Bound::Items => people::Bound::Items,
+                tasks::Bound::Answer => people::Bound::Answer,
+                tasks::Bound::Tools => people::Bound::Tools,
+                tasks::Bound::HistoryItems => people::Bound::HistoryItems,
+                tasks::Bound::History => people::Bound::History,
+                tasks::Bound::Window => people::Bound::Window,
+                tasks::Bound::Output => people::Bound::Output,
+            },
+            value: value.value,
+        }),
         tasks::Hold::Failures(class) => people::HoldReason::Failures { class: failure_class(class) },
         tasks::Hold::Stalled => people::HoldReason::Stalled,
         tasks::Hold::Dependency(task) => people::HoldReason::Dependency { task },

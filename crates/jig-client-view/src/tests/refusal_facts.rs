@@ -181,6 +181,7 @@ fn sparse_current_hold_facts_keep_only_supplied_categories_and_numeric_identitie
         assert!(!contains(&tree, b"Attempt "));
         assert!(!contains(&tree, b"Reason: "));
         match reason {
+            HoldCategory::Exceeded(_) => unreachable!("bound phrases have their own table"),
             HoldCategory::Circle => assert!(contains(&tree, b"Held for a circle of waits")),
             HoldCategory::Dependency { .. }
             | HoldCategory::StoppedBy { .. }
@@ -244,5 +245,36 @@ fn the_account_sign_in_limits_name_each_refusal() {
     ] {
         let tree = render(Refusal::Limit { which: Limit::Admission { which } });
         assert!(contains(&tree, words));
+    }
+}
+
+#[test]
+fn each_configured_bound_names_its_allowance_in_the_reference_view() {
+    for (bound, expected) in [
+        (
+            Bound::Reasoning,
+            b"Held: the model's reasoning went past its configured allowance of 18446744073709551615 bytes".as_slice(),
+        ),
+        (
+            Bound::Metadata,
+            b"Held: the model's metadata went past its configured allowance of 18446744073709551615 bytes",
+        ),
+        (Bound::Items, b"Held: the model's answer went past its configured allowance of 18446744073709551615 items"),
+        (Bound::Answer, b"Held: the model's answer went past its configured allowance of 18446744073709551615 bytes"),
+        (Bound::Tools, b"Held: the run's tools went past their configured allowance of 18446744073709551615 tools"),
+        (
+            Bound::HistoryItems,
+            b"Held: the run's request went past its configured allowance of 18446744073709551615 messages and blocks",
+        ),
+        (Bound::History, b"Held: the run's history no longer fits its configured allowance, even compacted"),
+        (Bound::Window, b"Held: the run no longer fits the model's window of 18446744073709551615 tokens"),
+        (Bound::Output, b"Held: the request went past the model's output ceiling of 18446744073709551615 tokens"),
+    ] {
+        let reason = HoldCategory::Exceeded(Exceeded { bound, value: u64::MAX });
+        let tree = render(Refusal::Moved {
+            now: Revision { value: 23 },
+            what: Moved::Hold { reason: Some(CurrentHold::Reason(reason)) },
+        });
+        assert!(contains(&tree, expected), "{bound:?}");
     }
 }

@@ -25,7 +25,7 @@ pub(super) fn drive(root: &mut Domain, event: Event, limits: &jig_client_test_do
         Event::First(first::Event::Watch { watch, event: first::WatchEvent::Delivered(value) }) => {
             Up::FamilyDelivered {
                 watch,
-                record: jig_client::Family { family: 1, version: 1, bytes: family::wire::encode_document(&value) },
+                record: jig_client::Family { family: 1, version: 2, bytes: family::wire::encode_document(&value) },
             }
         }
         event => return step(root, event, limits),
@@ -56,7 +56,7 @@ fn step(root: &mut Domain, event: Event, limits: &jig_client_test_domain::Limits
     rows
 }
 fn subject(record: &jig_client::Family, read: bool) -> family::Subject {
-    use jig_client_test_protocol_wire::v1 as w;
+    use jig_client_test_protocol_wire::v2 as w;
     let mut reader = skein_lib::Reader::new(&record.bytes);
     let value = if read {
         w::Read::decode(&w::CEILINGS, &mut reader).unwrap().into_parts().value
@@ -118,7 +118,7 @@ pub(super) fn limits() -> jig_client_test_domain::Limits {
         second_parts: 8,
         client: jig_client::Limits {
             domain: jig_client::DomainLimits {
-                owners: &[jig_client::Spoken { family: 1, version: 1 }, jig_client::Spoken { family: 2, version: 1 }],
+                owners: &[jig_client::Spoken { family: 1, version: 2 }, jig_client::Spoken { family: 2, version: 2 }],
                 requests: RequestLimits {
                     requests: 4,
                     bytes: 65536,

@@ -415,7 +415,7 @@ fn historical_person_proposal_states_keep_the_independent_whole_decision_and_cre
             };
             assert_eq!(proposal.goal.numbers.reserved, 7);
             match &state {
-                tasks::PersonProposalState::Withdrawn { .. } => unreachable!("v12 has no withdrawn state"),
+                tasks::PersonProposalState::Withdrawn { .. } => unreachable!("v13 has no withdrawn state"),
                 tasks::PersonProposalState::Pending { since } => {
                     assert_eq!(proposal.state, client::OwnerPersonProposalState::Pending { since: *since });
                 }

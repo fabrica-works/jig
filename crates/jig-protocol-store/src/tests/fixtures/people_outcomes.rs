@@ -16,6 +16,15 @@ pub fn failure_class_values() -> Box<[domain::FailureClass]> {
 }
 pub fn hold_reason_values() -> Box<[domain::HoldReason]> {
     Box::new([
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::Reasoning, value: u64::MAX }),
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::Metadata, value: u64::MAX }),
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::Items, value: u64::MAX }),
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::Answer, value: u64::MAX }),
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::Tools, value: u64::MAX }),
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::HistoryItems, value: u64::MAX }),
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::History, value: u64::MAX }),
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::Window, value: u64::MAX }),
+        domain::HoldReason::Exceeded(domain::Exceeded { bound: domain::Bound::Output, value: u64::MAX }),
         domain::HoldReason::Failures { class: domain::FailureClass::Lost },
         domain::HoldReason::Stalled,
         domain::HoldReason::Dependency { task: 2 },

@@ -48,26 +48,26 @@ fn the_accounts_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_tasks_familys_code_and_goldens_have_no_drift() {
-    check("tasks", 7);
+    check("tasks", 8);
 }
 
 #[test]
 fn the_people_familys_code_and_goldens_have_no_drift() {
-    check("people", 7);
+    check("people", 8);
 }
 
 #[test]
 fn the_core_familys_code_and_goldens_have_no_drift() {
-    check("core", 4);
+    check("core", 5);
 }
 
 #[test]
 fn the_test_connectors_code_and_goldens_have_no_drift() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-store");
-    let source = fs::read_to_string(root.join("schema/test-connector-v1.schema")).expect("schema readable");
+    let source = fs::read_to_string(root.join("schema/test-connector-v2.schema")).expect("schema readable");
     let output = generate(&parse(&source).expect("schema valid"));
-    let code = root.join("src/generated/v1.rs");
-    let goldens = root.join("golden/v1");
+    let code = root.join("src/generated/v2.rs");
+    let goldens = root.join("golden/v2");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     if write {
         fs::write(code, &output.rust).expect("write code");

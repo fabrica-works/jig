@@ -1,6 +1,6 @@
 //! The English fallback for the public enum phrases.
 use super::{ALL, HoldWord, RefusalWord, StatusWord, WaitingWord, Word};
-use crate::contract::Phase;
+use crate::contract::{Bound, Phase};
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::phrases::HoleKind;
@@ -12,10 +12,23 @@ pub(super) fn language() -> Language {
             Word::Decision(value) => value.segments(),
             Word::Phase(_) | Word::Hold(_) | Word::Refusal(_) | Word::Waiting(_) | Word::Status(_) => {
                 let (_, label, holes) = word.data();
-                let mut segments = List::with_capacity(2);
+                let mut segments = List::with_capacity(3);
                 segments.push(Segment::Text(copy_of(label))).expect("word label fits");
                 for kind in holes {
                     segments.push(Segment::Hole { index: 0, kind: *kind }).expect("word hole fits");
+                }
+                if let Word::Hold(HoldWord::Exceeded(bound)) = word {
+                    let suffix: &[u8] = match bound {
+                        Bound::Reasoning | Bound::Metadata | Bound::Answer => b" bytes",
+                        Bound::Items => b" items",
+                        Bound::Tools => b" tools",
+                        Bound::HistoryItems => b" messages and blocks",
+                        Bound::History => b"",
+                        Bound::Window | Bound::Output => b" tokens",
+                    };
+                    if !suffix.is_empty() {
+                        segments.push(Segment::Text(copy_of(suffix))).expect("unit suffix fits");
+                    }
                 }
                 segments.into_boxed()
             }
@@ -55,6 +68,7 @@ impl Word {
             Self::Phase(Phase::Done) => (11, b"Completed", &[]),
             Self::Phase(Phase::Failed) => (12, b"Failed", &[]),
             Self::Phase(Phase::Cancelled) => (13, b"Cancelled", &[]),
+            Self::Hold(HoldWord::Exceeded(bound)) => exceeded(bound),
             Self::Hold(HoldWord::Failures) => (14, b"Held: out of tries", &[]),
             Self::Hold(HoldWord::Stalled) => (15, b"The executor stopped progressing", &[]),
             Self::Hold(HoldWord::Dependency) => (16, b"Dependency task ", &[HoleKind::Number]),
@@ -111,5 +125,27 @@ impl Word {
             Self::Status(StatusWord::Closing) => (57, b"Closing", &[]),
             Self::Status(StatusWord::Ended) => (58, b"Ended", &[]),
         }
+    }
+}
+
+const fn exceeded(bound: Bound) -> (u16, &'static [u8], &'static [HoleKind]) {
+    match bound {
+        Bound::Reasoning => {
+            (97, b"Held: the model's reasoning went past its configured allowance of ", &[HoleKind::Number])
+        }
+        Bound::Metadata => {
+            (98, b"Held: the model's metadata went past its configured allowance of ", &[HoleKind::Number])
+        }
+        Bound::Items => (99, b"Held: the model's answer went past its configured allowance of ", &[HoleKind::Number]),
+        Bound::Answer => (100, b"Held: the model's answer went past its configured allowance of ", &[HoleKind::Number]),
+        Bound::Tools => (101, b"Held: the run's tools went past their configured allowance of ", &[HoleKind::Number]),
+        Bound::HistoryItems => {
+            (102, b"Held: the run's request went past its configured allowance of ", &[HoleKind::Number])
+        }
+        Bound::History => {
+            (103, b"Held: the run's history no longer fits its configured allowance, even compacted", &[])
+        }
+        Bound::Window => (104, b"Held: the run no longer fits the model's window of ", &[HoleKind::Number]),
+        Bound::Output => (105, b"Held: the request went past the model's output ceiling of ", &[HoleKind::Number]),
     }
 }

@@ -158,14 +158,14 @@ fn a_store_of_another_deployment_refuses_to_open() {
 
 #[test]
 fn a_store_of_another_tasks_version_refuses_naming_tasks() {
-    let mut store = planted(&[version_put(6, 7, 4), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Tasks, found: 6, wanted: 7 });
+    let mut store = planted(&[version_put(6, 8, 5), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Tasks, found: 6, wanted: 8 });
 }
 
 #[test]
 fn a_store_of_another_people_version_refuses_naming_people() {
-    let mut store = planted(&[version_put(7, 6, 4), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::People, found: 6, wanted: 7 });
+    let mut store = planted(&[version_put(8, 6, 5), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::People, found: 6, wanted: 8 });
 }
 
 #[test]
@@ -197,8 +197,8 @@ fn a_format_row_without_its_header_refuses_as_numbers() {
 
 #[test]
 fn an_unknown_core_version_is_refused_before_decoding_its_header() {
-    let mut store = planted(&[version_put(7, 7, 5), corrupt_header()]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Core, found: 5, wanted: 4 });
+    let mut store = planted(&[version_put(8, 8, 6), corrupt_header()]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Core, found: 6, wanted: 5 });
 }
 
 #[test]

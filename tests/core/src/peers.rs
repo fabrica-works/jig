@@ -655,6 +655,20 @@ fn party_moved(value: people::Moved) -> parties::Moved {
 
 fn party_hold(value: people::HoldReason) -> parties::HoldReason {
     match value {
+        people::HoldReason::Exceeded(exceeded) => parties::HoldReason::Exceeded(parties::Exceeded {
+            bound: match exceeded.bound {
+                people::Bound::Reasoning => parties::Bound::Reasoning,
+                people::Bound::Metadata => parties::Bound::Metadata,
+                people::Bound::Items => parties::Bound::Items,
+                people::Bound::Answer => parties::Bound::Answer,
+                people::Bound::Tools => parties::Bound::Tools,
+                people::Bound::HistoryItems => parties::Bound::HistoryItems,
+                people::Bound::History => parties::Bound::History,
+                people::Bound::Window => parties::Bound::Window,
+                people::Bound::Output => parties::Bound::Output,
+            },
+            value: exceeded.value,
+        }),
         people::HoldReason::Failures { class } => parties::HoldReason::Failures { class: party_failure(class) },
         people::HoldReason::Stalled => parties::HoldReason::Stalled,
         people::HoldReason::Dependency { task } => parties::HoldReason::Dependency { task },

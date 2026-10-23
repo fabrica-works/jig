@@ -63,7 +63,7 @@ fn a_turn_frame_body_reads_back_with_its_version() {
 fn a_turn_frame_of_another_version_is_refused() {
     let limits = call_limits();
     let mut bytes = codec::turn(&fixtures::turn(), &limits).expect("turn within limits");
-    bytes[1] = 5;
+    bytes[1] = 4;
     assert_eq!(
         codec::read_turn(&bytes, &limits).expect_err("another core version").reason,
         skein_codec::Reason::Version
@@ -133,4 +133,23 @@ fn core_rows_read_back_as_written() {
         ("a_proposal_without_created_tasks_reads_back", a_proposal_without_created_tasks_reads_back),
         ("run_proofs_read_back_with_their_optional_fields", run_proofs_read_back_with_their_optional_fields),
     ]);
+}
+
+#[test]
+fn each_configured_bound_terminal_reads_back_with_its_value() {
+    for bound in [
+        tasks::Bound::Reasoning,
+        tasks::Bound::Metadata,
+        tasks::Bound::Items,
+        tasks::Bound::Answer,
+        tasks::Bound::Tools,
+        tasks::Bound::HistoryItems,
+        tasks::Bound::History,
+        tasks::Bound::Window,
+        tasks::Bound::Output,
+    ] {
+        let mut terminal = fixtures::terminal();
+        terminal.end = tasks::End::Exceeded(tasks::Exceeded { bound, value: u64::MAX });
+        core_round_trip(core::CoreRecord::Terminal(terminal));
+    }
 }

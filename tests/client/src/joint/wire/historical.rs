@@ -144,7 +144,7 @@ pub fn read(
     Ok(value)
 }
 
-// The v12 discriminator, archive scalars, optional-read tag and carried byte length.
+// The v13 discriminator, archive scalars, optional-read tag and carried byte length.
 const ARCHIVE_BYTES: u64 = 43;
 
 /// Preserve a single read's archive identity, complete document admission and decoder terminal.
@@ -191,9 +191,9 @@ fn person_proposal(
         number: value.number,
         proposer: value.proposer,
         project: value.project,
-        goal: historical_goal::goal(value.batch().first().expect("one v12 goal"), limits, models)?,
+        goal: historical_goal::goal(value.batch().first().expect("one v13 goal"), limits, models)?,
         state: match &value.state {
-            tasks::PersonProposalState::Withdrawn { .. } => unreachable!("no v12 withdrawal"),
+            tasks::PersonProposalState::Withdrawn { .. } => unreachable!("no v13 withdrawal"),
             tasks::PersonProposalState::Pending { since } => {
                 client::OwnerPersonProposalState::Pending { since: *since }
             }

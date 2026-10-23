@@ -1,5 +1,5 @@
 //! Total translations of the test connector records (protocol/store.md, 12).
-use crate::{Undecodable, v1 as w};
+use crate::{Undecodable, v2 as w};
 use alloc::boxed::Box;
 use jig_test_connector as d;
 use skein_lib::{List, Reader, Token, Wall, Writer};

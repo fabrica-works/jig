@@ -1642,6 +1642,7 @@ fn hydrate_result(
             }
             tasks::End::FinishedWithFollowups { followups: tasks::ResultFollowups::Delegates(_), .. }
             | tasks::End::Finished { .. }
+            | tasks::End::Exceeded(_)
             | tasks::End::Parked
             | tasks::End::Failed(_)
             | tasks::End::Refused

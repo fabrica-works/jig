@@ -18,7 +18,7 @@ fn a_commit_routes_connector_records_as_bytes() {
     match writes.as_ref() {
         [jig_protocol_store::Write::Put { key, value }] => {
             assert_eq!(key.as_ref(), &[0, 0, 0, 0, 0, 0, 0, 1, 8, 1, 1, 0, 0, 1, 1, 0, 0, 0]);
-            assert_eq!(value.as_ref(), &[0, 1, 9, 0, 0, 0, 2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1]);
+            assert_eq!(value.as_ref(), &[0, 2, 9, 0, 0, 0, 2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1]);
         }
         _ => unreachable!("one application's put"),
     }

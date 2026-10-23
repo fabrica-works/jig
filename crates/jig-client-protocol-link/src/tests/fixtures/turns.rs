@@ -166,7 +166,7 @@ pub fn reading_turn(limits: &Limits) -> (Harness, Token) {
     let exchange = harness.read(Readable::Jig(turn_read()));
     (harness, exchange)
 }
-// The existing v6 golden occupies 146 bytes; v9's Some(read) archive and tag add 51.
+// The existing v7 golden occupies 146 bytes; v9's Some(read) archive and tag add 51.
 pub const TURN_PAYLOAD_BYTES: u64 = 146;
 pub const TURN_DOCUMENT_BYTES: u64 = TURN_PAYLOAD_BYTES + 51;
 pub fn answered_turn(limits: &Limits, answer: &[u8]) -> Harness {

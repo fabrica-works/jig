@@ -335,6 +335,7 @@ pub(crate) fn activation(
     let lost_writer = match &end {
         End::Failed(Class::Lost) => true,
         End::Failed(_)
+        | End::Exceeded(_)
         | End::Parked
         | End::Refused
         | End::Recheck
@@ -358,14 +359,14 @@ pub(crate) fn activation(
     let end = if narrowed || discarded { End::Parked } else { end };
     let result_followups = match &end {
         End::FinishedWithFollowups { .. } => true,
-        End::Finished { .. } | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
+        End::Finished { .. } | End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
     };
     let invalid = match &end {
         End::Finished { result, .. } => invalid_result(&old.contract, result, &env.limits),
         End::FinishedWithFollowups { result, followups } => {
             invalid_followups(&old.contract, result, followups, &env.limits)
         }
-        End::Parked | End::Failed(_) | End::Refused | End::Recheck => None,
+        End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => None,
     };
     let end = match end {
         End::Finished { result, cancel_delegates } => {
@@ -382,14 +383,14 @@ pub(crate) fn activation(
                 End::Failed(Class::Invalid)
             }
         }
-        End::Parked | End::Failed(_) | End::Refused | End::Recheck => end,
+        End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => end,
     };
     let parked = kept.parks(&end);
     let end = if parked { End::Parked } else { end };
     let refuses_live = match &end {
         End::Finished { cancel_delegates, .. } => !cancel_delegates && !result_followups,
         End::FinishedWithFollowups { .. } => unreachable!("follow-ups normalized"),
-        End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
+        End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
     };
     if closing.is_none() && refuses_live && !old.delegates.is_empty() {
         return out
@@ -401,6 +402,7 @@ pub(crate) fn activation(
         match &end {
             End::Parked => crate::EndKind::Parked,
             End::Finished { .. } => crate::EndKind::Finished,
+            End::Exceeded(_) => crate::EndKind::Failed { class: Class::Run },
             End::Failed(class) => crate::EndKind::Failed { class: *class },
             End::Refused | End::Recheck => crate::EndKind::Refused,
             End::FinishedWithFollowups { .. } => unreachable!("follow-ups normalized"),
@@ -412,7 +414,7 @@ pub(crate) fn activation(
             Ending::Cancelled { result: partial, .. } => match end {
                 End::Finished { result, .. } => *partial = Some(result),
                 End::FinishedWithFollowups { .. } => unreachable!("follow-ups normalized"),
-                End::Parked | End::Failed(_) | End::Refused | End::Recheck => {}
+                End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => {}
             },
             Ending::Done(_) | Ending::Failed { .. } => {}
         }
@@ -432,6 +434,7 @@ pub(crate) fn activation(
                 task.record.refusals = 0;
                 if narrowed && !kept.blocks_claims() { Phase::Active(Active::Due) } else { Phase::Active(Active::Idle) }
             }
+            End::Exceeded(value) => exceeded(domain, number, value),
             End::Failed(class) => failure(domain, env, number, class),
             End::Refused => pause(domain, env, number),
             End::Recheck => {
@@ -625,4 +628,13 @@ pub(crate) fn apply_stop(domain: &mut Domain, env: &Env<Limits>, plan: StopPlan,
     task_mut(domain, number).expect("hold names live task").record.phase = next;
     publish(domain, env, number, out);
     fact(domain, Fact::Held { task: number, why });
+}
+
+fn exceeded(domain: &mut Domain, number: u64, exceeded: crate::Exceeded) -> Phase {
+    let task = task_mut(domain, number).expect("exceeded names live task");
+    task.record.refusals = 0;
+    task.record.retry_notice = None;
+    let why = Hold::Exceeded(exceeded);
+    fact(domain, Fact::Held { task: number, why });
+    Phase::Held { was: Was::Active(Active::Due), why, source: None }
 }

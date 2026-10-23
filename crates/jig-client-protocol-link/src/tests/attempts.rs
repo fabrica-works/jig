@@ -9,7 +9,7 @@ fn a_send_becomes_one_post_with_its_key() {
     let record = w::Keyed::decode(&fixtures::limits().wire, &mut Reader::new(&body)).unwrap();
     assert_eq!(record.key(), &fixtures::KEY);
     assert_eq!(record.owner(), &w::Owner::Jig);
-    assert_eq!(record.version(), 12);
+    assert_eq!(record.version(), 13);
 }
 #[test]
 fn done_is_handed_up_final_with_its_outcome() {

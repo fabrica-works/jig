@@ -526,7 +526,8 @@ fn hold_account(task: u64, reason: tasks::Hold, source: Option<&tasks::HoldSourc
             };
             Some(Part { connector, kind: PartKind::Hold, key: PartKey::Number(task) })
         }
-        tasks::Hold::Failures(_)
+        tasks::Hold::Exceeded(_)
+        | tasks::Hold::Failures(_)
         | tasks::Hold::Stalled
         | tasks::Hold::Dependency(_)
         | tasks::Hold::Stopped

@@ -78,6 +78,7 @@ pub(super) fn route_answer_payload(
         }
         tasks::End::Finished { .. }
         | tasks::End::FinishedWithFollowups { .. }
+        | tasks::End::Exceeded(_)
         | tasks::End::Parked
         | tasks::End::Failed(_)
         | tasks::End::Refused

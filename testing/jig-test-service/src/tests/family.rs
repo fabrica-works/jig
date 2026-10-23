@@ -12,7 +12,7 @@ fn request(record: Box<[u8]>) -> ToApplication {
         key: [23; 16],
         scope: jig_domain_people::ApplicationScope::Project(f::PROJECT),
         family: 1,
-        version: 1,
+        version: jig_client_test_protocol_wire::VERSION,
         record,
         digest: [29; 32],
         carried: None,

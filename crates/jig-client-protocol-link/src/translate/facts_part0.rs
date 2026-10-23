@@ -4,7 +4,7 @@ use crate::Limits;
 use crate::translate::{piece_problem, text_problem, too_large};
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use skein_lib::Map;
 use skein_lib::{List, Reader, Wall, bytes};
 pub(crate) fn document_text(value: &w::DocumentText, limits: &Limits) -> Result<c::DocumentText, w::Problem> {
@@ -101,6 +101,20 @@ pub(crate) fn hold_failure(value: &w::HoldFailure, _limits: &Limits) -> c::HoldF
 
 pub(crate) fn hold_category(value: &w::HoldCategory, limits: &Limits) -> c::HoldCategory {
     match value {
+        w::HoldCategory::Exceeded(value) => c::HoldCategory::Exceeded(c::Exceeded {
+            bound: match value.bound() {
+                w::Bound::Reasoning => c::Bound::Reasoning,
+                w::Bound::Metadata => c::Bound::Metadata,
+                w::Bound::Items => c::Bound::Items,
+                w::Bound::Answer => c::Bound::Answer,
+                w::Bound::Tools => c::Bound::Tools,
+                w::Bound::HistoryItems => c::Bound::HistoryItems,
+                w::Bound::History => c::Bound::History,
+                w::Bound::Window => c::Bound::Window,
+                w::Bound::Output => c::Bound::Output,
+            },
+            value: value.value(),
+        }),
         w::HoldCategory::Failures(row) => c::HoldCategory::Failures { class: hold_failure(row.class(), limits) },
         w::HoldCategory::Stalled => c::HoldCategory::Stalled,
         w::HoldCategory::Dependency(row) => c::HoldCategory::Dependency { task: row.task() },

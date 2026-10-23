@@ -174,7 +174,10 @@ pub(super) fn confirm(root: &mut Domain, watch: Token, party: u64) -> Vec<Reques
                 event: jig_client::Event::Up {
                     up: jig_client::Up::FamilyServed {
                         family,
-                        versions: Some(contract::VersionRange { first: 1, last: 1 }),
+                        versions: Some(contract::VersionRange {
+                            first: jig_client_test_protocol_wire::VERSION,
+                            last: jig_client_test_protocol_wire::VERSION,
+                        }),
                     },
                 },
             },

@@ -4,7 +4,7 @@ mod facts;
 pub use facts::decision;
 mod english;
 use crate::{
-    contract::{HoldCategory, Phase, Refusal, WaitsOn},
+    contract::{Bound, HoldCategory, Phase, Refusal, WaitsOn},
     facts::ChatStatus,
 };
 use alloc::boxed::Box;
@@ -12,7 +12,7 @@ pub use decision::DecisionWord;
 use skein_lib::List;
 use skein_ui::phrases::{HoleKind, HoleShape, Language, PhraseId, PhraseShape};
 /// Phrase count, for a caller composing a bounded phrasebook.
-pub const PHRASES: u32 = 96;
+pub const PHRASES: u32 = 105;
 /// Owner of jig's public enum vocabulary.
 pub const OWNER: skein_ui::Owner = skein_ui::Owner { number: 65_537 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,6 +26,7 @@ pub enum Word {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HoldWord {
+    Exceeded(Bound),
     Circle,
     Failures,
     Stalled,
@@ -100,6 +101,7 @@ impl Word {
     #[must_use]
     pub fn hold(value: &HoldCategory) -> Self {
         Self::Hold(match value {
+            HoldCategory::Exceeded(value) => HoldWord::Exceeded(value.bound),
             HoldCategory::Failures { .. } => HoldWord::Failures,
             HoldCategory::Stalled => HoldWord::Stalled,
             HoldCategory::Dependency { .. } => HoldWord::Dependency,
@@ -187,7 +189,16 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 96] = [
+pub const ALL: [Word; 105] = [
+    Word::Hold(HoldWord::Exceeded(Bound::Reasoning)),
+    Word::Hold(HoldWord::Exceeded(Bound::Metadata)),
+    Word::Hold(HoldWord::Exceeded(Bound::Items)),
+    Word::Hold(HoldWord::Exceeded(Bound::Answer)),
+    Word::Hold(HoldWord::Exceeded(Bound::Tools)),
+    Word::Hold(HoldWord::Exceeded(Bound::HistoryItems)),
+    Word::Hold(HoldWord::Exceeded(Bound::History)),
+    Word::Hold(HoldWord::Exceeded(Bound::Window)),
+    Word::Hold(HoldWord::Exceeded(Bound::Output)),
     Word::Status(StatusWord::HostRefused),
     Word::Hold(HoldWord::Circle),
     Word::Refusal(RefusalWord::Circle),
