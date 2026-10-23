@@ -199,6 +199,13 @@ inbox are the views child's (engine.md, section 11).
   and jig acts on no system as a party (section 12). An LLM provider's
   record is an LLM account's, kept by the protocol layer and lent only to
   pay for runs (accounts.md, 3.4; `../protocol/store.md`, section 9).
+- **Whose sign-in, for the OpenID provider.** The clients' component,
+  as the deployment's OpenID provider (`../protocol/client.md`, section
+  18), names a signed-in person to the deployment's other applications
+  by their identity. It asks people whose a sign-in is: `Whose`, with
+  the sign-in's number, answered with the signer, its party's identity
+  and kind, or with none for a sign-in unknown, ended or past either
+  clock. It is a read: nothing is written, and no limit is spent.
 - **No acting for.** A credential is one party's own. A bot relaying a
   person's decision holds that person's credential, obtained through the
   application's sign-in, and the decision is the person's request,
