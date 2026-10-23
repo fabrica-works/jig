@@ -2,7 +2,7 @@ use crate::{Request, tests::fixtures, translate};
 use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Queue, Reader, Time, Token};
-fn translated(kind: u16, bytes: &[u8], limits: &wire::v6::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
+fn translated(kind: u16, bytes: &[u8], limits: &wire::v7::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
     let mut parts = List::with_capacity(1);
     let mut values = Queue::with_capacity(4);
     let down =
@@ -84,7 +84,7 @@ fn activity_becomes_a_fact_record() {
     };
     let frame = translate::up(up, &[], &fixtures::codec()).expect("fact");
     let record = wire::Fact::decode(&fixtures::codec(), &mut body(&frame)).expect("fact");
-    let wire::Activity::Count(count) = record.activity() else { panic!("count") };
+    let wire::FactValue::Count(count) = record.value() else { panic!("count") };
     assert_eq!((count.kind(), count.value()), (&wire::CountKind::LlmFinished, 2));
 }
 #[test]
@@ -367,7 +367,7 @@ fn a_refused_later_program_grant_leaves_no_value_queued() {
 
 #[test]
 fn the_hosts_endpoint_cap_is_the_worker_wires_ceiling() {
-    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v6::CEILINGS.bounds_program_endpoints);
+    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v7::CEILINGS.bounds_program_endpoints);
 }
 
 fn hello_with_program_endpoints(count: u32) -> host::Hello {
@@ -393,5 +393,66 @@ fn the_hello_admits_the_endpoint_cap_and_refuses_past_it_or_a_duplicate() {
         (duplicate, false),
     ] {
         assert_eq!(translate::hello(hello, &limits).is_some(), admitted);
+    }
+}
+
+#[test]
+fn an_assignment_decodes_each_live_ask_without_changing_it() {
+    for ask in [
+        host::LiveAsk::NONE,
+        host::LiveAsk { text: true, reasoning: false, input: false },
+        host::LiveAsk { text: false, reasoning: true, input: false },
+        host::LiveAsk { text: false, reasoning: false, input: true },
+        host::LiveAsk { text: true, reasoning: true, input: true },
+    ] {
+        let limits = fixtures::codec();
+        let mut fields = fixtures::assignment_record(fixtures::window()).into_parts();
+        fields.live = wire::LiveAsk::new(
+            &limits,
+            wire::LiveAskParts { text: ask.text, reasoning: ask.reasoning, input: ask.input },
+        )
+        .unwrap();
+        let record = wire::Assignment::new(&limits, fields).unwrap();
+        let (down, _, _) = translated(0x0180, &fixtures::assignment_bytes(&record), &limits);
+        let host::LinkDown::Assign { assignment } = down else { panic!("assignment") };
+        assert_eq!(assignment.assignment.live, ask);
+    }
+}
+#[test]
+fn every_piece_kind_encodes_whole_including_offsets_past_u32() {
+    for kind in [
+        host::LiveKind::Text,
+        host::LiveKind::Reasoning,
+        host::LiveKind::Input { call: Box::from(&b"call-id"[..]), tool: Box::from(&b"tool"[..]) },
+    ] {
+        let piece = host::Piece {
+            turn: 17,
+            retry: 23,
+            kind: kind.clone(),
+            offset: u64::from(u32::MAX) + 19,
+            bytes: Box::from([0xff, 0, 0x80]),
+        };
+        let frame = translate::up(
+            host::LinkUp::Piece { run: Token::new(83), attempt: Token::new(97), piece },
+            &[],
+            &fixtures::codec(),
+        )
+        .unwrap();
+        assert_eq!(frame.kind(), wire::Kind::Fact.number());
+        let fact = wire::Fact::decode(&fixtures::codec(), &mut body(&frame)).unwrap();
+        assert_eq!((fact.task(), fact.attempt()), (83, 97));
+        let wire::FactValue::Piece(piece) = fact.value() else { panic!("piece") };
+        assert_eq!(
+            (piece.turn(), piece.retry(), piece.offset(), piece.bytes()),
+            (17, 23, u64::from(u32::MAX) + 19, [0xff, 0, 0x80].as_slice())
+        );
+        match (kind, piece.kind()) {
+            (host::LiveKind::Text, wire::LiveKind::Text) | (host::LiveKind::Reasoning, wire::LiveKind::Reasoning) => {}
+            (host::LiveKind::Input { call, tool }, wire::LiveKind::Input(input)) => {
+                assert_eq!(input.id(), call.as_ref());
+                assert_eq!(input.tool(), tool.as_ref());
+            }
+            other => panic!("kind changed: {other:?}"),
+        }
     }
 }

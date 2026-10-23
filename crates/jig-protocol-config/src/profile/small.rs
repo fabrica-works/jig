@@ -241,7 +241,7 @@ pub(super) const LINK: Link = Link {
     ceiling: Duration::from_secs(30),
     proved: Duration::from_secs(60),
     busy: Duration::from_secs(2),
-    facts: 64,
+    facts: 4470,
 };
 pub(super) const IO: skein_io::Limits = skein_io::Limits {
     sockets: 16,

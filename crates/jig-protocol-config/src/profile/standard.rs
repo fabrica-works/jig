@@ -132,7 +132,7 @@ pub(super) const CORE: core::Limits = core::Limits {
     ..small::CORE
 };
 pub(super) const HUB: host::Limits = host::Limits { slots: 4, accounts: 32, facts: 256, told: 256, ..small::HUB };
-pub(super) const LINK: Link = Link { names: 64, opening: 16, facts: 256, ..small::LINK };
+pub(super) const LINK: Link = Link { names: 64, opening: 16, facts: 4470, ..small::LINK };
 pub(super) const LIMITS: Limits = Limits {
     core: CORE,
     store: STORE,

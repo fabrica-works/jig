@@ -10,18 +10,18 @@ fn the_largest_turn_kept_body_is_twenty_bytes() {
 
 #[test]
 fn the_engine_cap_for_one_slot_is_the_hand_summed_bytes() {
-    // Assignment338, message64, relayed58, kept20, ack16, cancel16, grants2*73;
-    // eight frame headers add64:346+72+66+28+24+24+162=722.
+    // Assignment341, message64, relayed58, kept20, ack16, cancel16, grants2*73;
+    // eight frame headers add64:349+72+66+28+24+24+162=725.
     // Sources84 + two checks44 + two sign-outs44 add260 and five frames.
-    assert_eq!(engine_cap(&SIZES_ONE_SLOT), Some(Cap { bytes: 982, frames: 13 }));
+    assert_eq!(engine_cap(&SIZES_ONE_SLOT), Some(Cap { bytes: 985, frames: 13 }));
 }
 
 #[test]
 fn the_worker_cap_for_one_slot_is_the_hand_summed_bytes() {
     // Hello385 (125 + endpoint count 4 + 64 * 4) + turn71 + answer136 + call85 + unauthorized28 + limited29
-    // + account refused60; seven headers56 + fact reserve16 =606.
-    // Reserve16 fits no25-byte fact. Sources add Logins158 + two SignedOut66.
-    assert_eq!(worker_cap(&SIZES_ONE_SLOT), Some(WorkerCap { cap: Cap { bytes: 1156, frames: 10 }, facts: 16 }));
+    // + account refused60; seven headers56. Sources add Logins158 + two SignedOut66.
+    // Mandatory1140 + reserve390 =1530; reserve fits fifteen shortest facts25.
+    assert_eq!(worker_cap(&SIZES_ONE_SLOT), Some(WorkerCap { cap: Cap { bytes: 1530, frames: 25 }, facts: 390 }));
 }
 
 #[test]
@@ -42,10 +42,10 @@ fn the_largest_turn_body_matches_a_measured_fullest_turn() {
 #[test]
 fn the_largest_assignment_body_matches_a_measured_fullest_assignment() {
     let assignment = fixtures::fullest_assignment();
-    // Fixed32 + workspace29 + save1 + charter20 + transcript20 + calls66
-    // + messages52 + grants118 =338 (two full program names).
-    assert_eq!(assignment.measure(), 338);
-    assert_eq!(largest_body(&SIZES_ONE_SLOT, Kind::Assignment), Some(338));
+    // Fixed32 + workspace29 + save1 + live3 + charter20 + transcript20 + calls66
+    // + messages52 + grants118 =341 (two full program names).
+    assert_eq!(assignment.measure(), 341);
+    assert_eq!(largest_body(&SIZES_ONE_SLOT, Kind::Assignment), Some(341));
 }
 
 #[test]
@@ -66,6 +66,7 @@ fn sizes_past_a_ceiling_give_no_codec_limits() {
         ("program sources", Sizes { program_sources: 65_537, ..SIZES_ONE_SLOT }),
         ("charter", Sizes { charter: 67_108_865, ..SIZES_ONE_SLOT }),
         ("transcript", Sizes { transcript: 8_388_609, ..SIZES_ONE_SLOT }),
+        ("piece", Sizes { piece: 4097, ..SIZES_ONE_SLOT }),
         ("turn", Sizes { turn: 8_388_609, ..SIZES_ONE_SLOT }),
         ("message", Sizes { message: 1_048_577, ..SIZES_ONE_SLOT }),
         ("sender", Sizes { sender: 1025, ..SIZES_ONE_SLOT }),

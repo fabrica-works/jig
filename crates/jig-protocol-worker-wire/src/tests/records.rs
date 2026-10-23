@@ -5,7 +5,7 @@ use skein_channel::{Direction, Role, Term};
 use skein_lib::{Duration, List, Reader};
 
 // Existing hello 178 + list count 4 + the independent 64 endpoint identities.
-const HELLO_MAX: u32 = 178 + 4 + crate::v6::CEILINGS.bounds_program_endpoints * 4;
+const HELLO_MAX: u32 = 178 + 4 + crate::v7::CEILINGS.bounds_program_endpoints * 4;
 fn hello_schema() -> skein_channel::Schema {
     crate::schema(&fixtures::LIMITS).expect("small schema")
 }
@@ -19,7 +19,7 @@ fn hello_terms(largest: u32) -> List<Term> {
         (0x0101, 96),
         (0x0102, 101),
         (0x0103, 145),
-        (0x0104, 34),
+        (0x0104, 398),
         (0x0105, 28),
         (0x0106, 29),
         (0x0107, 60),
@@ -35,7 +35,7 @@ fn down_terms() -> List<Term> {
     let mut terms = List::with_capacity(11);
     // Independently summed from field widths and the fixture limits.
     for (kind, largest) in [
-        (0x0180, 562),
+        (0x0180, 565),
         (0x0181, 80),
         (0x0182, 74),
         (0x0183, 20),
@@ -168,8 +168,8 @@ fn a_hello_past_the_endpoint_ceiling_is_refused_at_its_bound() {
         (at_cap, Ok(ENDPOINT_CAP)),
         (
             past_cap,
-            Err(crate::v6::Problem {
-                path: crate::v6::Path::BoundsProgramEndpoints,
+            Err(crate::v7::Problem {
+                path: crate::v7::Path::BoundsProgramEndpoints,
                 reason: skein_codec::Reason::Bound,
             }),
         ),
@@ -207,7 +207,7 @@ fn a_reason_below_256_reads_as_none() {
 #[test]
 fn the_schema_lists_the_hello_from_the_initiator() {
     let schema = hello_schema();
-    let version = schema.version(6).expect("one version");
+    let version = schema.version(7).expect("one version");
     assert_eq!(schema.magic, *b"jigw");
     assert_eq!(version.kinds.len(), 21);
     assert_eq!(
@@ -345,7 +345,7 @@ fn through_bytes<T>(
     value: &T,
     measure: fn(&T) -> u32,
     encode: fn(&T, &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow>,
-    decode: fn(&crate::v6::Limits, &mut Reader<'_>) -> Result<T, crate::v6::Problem>,
+    decode: fn(&crate::v7::Limits, &mut Reader<'_>) -> Result<T, crate::v7::Problem>,
 ) -> T {
     let mut writer = skein_lib::Writer::new(usize::try_from(measure(value)).expect("small notice"));
     encode(value, &mut writer).expect("measured room");
@@ -417,13 +417,16 @@ fn an_account_refused_code_or_reason_past_its_bound_or_not_text_is_refused() {
 fn a_count_fact_carries_kind_time_and_count() {
     let fact = fixtures::fact_count();
     let decoded = fact_through_bytes(&fact);
-    match decoded.activity() {
-        crate::Activity::Count(count) => {
+    match decoded.value() {
+        crate::FactValue::Count(count) => {
             assert_eq!(count.kind(), &crate::CountKind::LlmRetried);
             assert_eq!(count.elapsed(), Duration::from_secs(2));
             assert_eq!(count.value(), 3);
         }
-        other @ (crate::Activity::Phase(_) | crate::Activity::Long(_) | crate::Activity::LongDone) => {
+        other @ (crate::FactValue::Phase(_)
+        | crate::FactValue::Long(_)
+        | crate::FactValue::LongDone
+        | crate::FactValue::Piece(_)) => {
             panic!("unexpected activity {other:?}")
         }
     }
@@ -434,12 +437,15 @@ fn a_count_fact_carries_kind_time_and_count() {
 fn a_long_operation_fact_keeps_its_span() {
     let fact = fixtures::fact_long();
     let decoded = fact_through_bytes(&fact);
-    match decoded.activity() {
-        crate::Activity::Long(long) => {
+    match decoded.value() {
+        crate::FactValue::Long(long) => {
             assert_eq!(long.operation(), &crate::Operation::Checks);
             assert_eq!(long.span(), Duration::from_secs(6));
         }
-        other @ (crate::Activity::Phase(_) | crate::Activity::Count(_) | crate::Activity::LongDone) => {
+        other @ (crate::FactValue::Phase(_)
+        | crate::FactValue::Count(_)
+        | crate::FactValue::LongDone
+        | crate::FactValue::Piece(_)) => {
             panic!("unexpected activity {other:?}")
         }
     }
@@ -571,7 +577,7 @@ fn an_assignment_past_its_grant_bound_is_refused() {
 #[test]
 fn the_schema_lists_every_down_kind_from_the_responder() {
     let schema = hello_schema();
-    let version = schema.version(6).expect("one version");
+    let version = schema.version(7).expect("one version");
     assert_eq!(version.kinds.len(), 21);
     for term in &down_terms() {
         assert_eq!(
