@@ -718,7 +718,7 @@ before any reaches the clients' component. What each stops is section
 
 | Guard | What the example does |
 |---|---|
-| a Host allow-list | any `Host` off the list the application gives when it mounts the mapping answered `421`, with nothing done; the reference's list is the address its printed link names on loopback, and its certificate's name between hosts |
+| a Host allow-list | any `Host` off the list answered `421`, with nothing done; the list is the listener's addresses, which the application gives once it listens, and the public name it gives when it mounts the mapping, if any (`client.md`, 17.3); the reference's is the address its printed link names on loopback, and gives no public name |
 | the required header, with no CORS | a request the cookie authenticates without `Jig-Client: browser` answered `403`, with nothing done; a POST whose `Content-Type` is not `application/octet-stream` answered `415`, with nothing done; no `OPTIONS` answered and no `Access-Control-` header sent |
 | the cookie's attributes | `client.md`, 17.3's |
 | a referrer policy on the printed link's route | `Referrer-Policy: no-referrer` added to the page the application answers at the link's route |
@@ -803,9 +803,11 @@ tested in skein, and in a browser on skein's UI example (skein's
   - the mapping's engine end, in `jig-protocol-engine-clients-http`'s
     step tests: each guard of 12.2 refusing with nothing reaching the
     component (a `Host` off the list, the header missing beside the
-    cookie, a POST of another content type, an `OPTIONS`); the cookie's
-    attributes on loopback and with TLS, set at a browser's sign-in and
-    cleared at its sign-out; a GET of the link's route left to the page
+    cookie, a POST of another content type, an `OPTIONS`); the public
+    name admitted beside the listener's address; the cookie's
+    attributes by the listener's address and by the public name, set at
+    a browser's sign-in, cleared at its sign-out, and set by the
+    application's function after a `Minted`; a GET of the link's route left to the page
     with the referrer policy, spending nothing;
   - the reference UI's codec: every place printed and parsed back, at
     the root, under a prefix, with other segment names; any bytes parsed
@@ -1035,9 +1037,9 @@ invariants, on which the client's "once" rests (the table's last row).
 
 | Held | Why | Instead |
 |---|---|---|
-| the `Host` allow-list (12.2) | DNS rebinding: a page of another site, its name rebound to the loopback address, would reach the engine as its own origin; answered `421`, it reaches nothing. | the list it gives at the mount: its listener, and between hosts its certificate's name |
+| the `Host` allow-list (12.2) | DNS rebinding: a page of another site, its name rebound to the loopback address, would reach the engine as its own origin; answered `421`, it reaches nothing. | the list it gives: its listener's addresses, and the public name of the TLS proxy in front of it |
 | the required header, the content type and no CORS (12.2) | Cross-origin requests: a page of another origin can neither set the header nor send a body of the mapping's type (either would need a preflight the mapping never answers, and no form can send that type) nor, from another site, send the cookie (same-site strict), so it can neither act as the person nor sign them in by the link. Same-site is not same-origin: on one person's machine, a local server on another port of the same host is the same site, which same-site strict lets send the cookie, and only the header stops it. | its own transport, holding what they held |
-| the cookie's attributes (`client.md`, 17.3) | HTTP-only keeps the credential from every script, the module's too; same-site strict, from requests another site starts; the `Path`, from every request but the mapping's; `Secure`, from plaintext, and left off on loopback, since not every browser keeps a secure cookie set over plaintext, loopback included. | its own sign-in, which sets the same cookie through the mapping's function |
+| the cookie's attributes (`client.md`, 17.3) | HTTP-only keeps the credential from every script, the module's too; same-site strict, from requests another site starts; the `Path`, from every request but the mapping's; `Secure`, from plaintext: set on an exchange that came by the public name, through a TLS proxy, and left off on one that came by the listener's own address, plaintext on loopback, since not every browser keeps a secure cookie set over plaintext, loopback included. | its own sign-in, which sets the same cookie through the mapping's function |
 | the referrer policy at the link's route (12.2) | The page opened at the link's route holds the sign-in's secret in its address until the sign-in part rewrites it; a policy sending a path to another origin would send the secret with a first request to an origin the page's policy names. | `strict-origin`, the origin alone |
 | the link's route safe to GET (section 11) | A GET is the one request any other site can make the person's browser send (a link, an image), with no header of its own and past every guard; one that signed in, or drew a fresh link on a refusal (`client.md`, section 8), would let any page the person visits spend the printed link or keep drawing new ones, until the link printed never works. | its own page at its own route, as safe |
 | the secret taken out of the address first (section 11) | Left in the address, the secret stays in the tab's history and in what the page shows or shares, after it is spent and before. Taken out first, it leaves the address bar and the tab's history; the browser's record of visited addresses keeps it, spent once signed in. | its own page at its own sign-in route |

@@ -1079,14 +1079,30 @@ prefix; jig's test application mounts it at `/jig`.
   application's server after a `Minted`, through the engine end's
   function that sets the same cookie: `jig-sign-in=<the credential in
   base64url>; Path=<the prefix>; HttpOnly; SameSite=Strict;
-  Max-Age=<the sign-in's remaining life>`, and `Secure` but on a
-  loopback listener (why each: `browser.md`, section 19). Its life is
+  Max-Age=<the sign-in's remaining life>`, and `Secure` on an exchange
+  that came by the public name (below), never on one that came by the
+  listener's own address (why each: `browser.md`, section 19). Its life is
   the sign-in's, from the sign-in's expiry, which a `Minted` carries
   (4.2); signing out clears it, with `Max-Age=0`. The engine end reads
   it as each exchange's credential, the link's sign-in's among them: a
   sign-in kept by the link answers with no credential, so it sets no
   cookie, and the browser's stays as it was (section 8); nor does a
   sign-in refused, not ready, busy or full.
+- **The public name,** for an application behind a TLS proxy: its
+  HTTPS origin's host, with its port where it is not 443, such as
+  `temper.example.com`, as a browser sends it in `Host`. The
+  application gives it the mapping when it mounts it, beside the
+  prefix, or gives none; it is no member of jig's configuration, as
+  the listener is not (`configuration.md`, section 3). The `Host`
+  allow-list holds it beside the listener's own addresses
+  (`browser.md`, 12.2), and each exchange is decided by its `Host`
+  alone: one that came by the public name came through the proxy, over
+  TLS, and its cookie is `Secure`; one that came by the listener's
+  address came in plaintext, and its cookie is not. Every answer that
+  sets or clears the cookie takes that decision: the engine end's at a
+  sign-in and a sign-out, and the application's after a `Minted`,
+  whose function takes the decision the engine end reads from the
+  application's own exchange.
 - **As `Authorization: Bearer`,** everywhere else: the credential in
   base64url, and a service's credential on its sign-in route the same
   way.
