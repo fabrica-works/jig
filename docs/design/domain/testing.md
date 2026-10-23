@@ -1,6 +1,6 @@
 # Testing the domain
 
-Provisional, 2026-10-07, revised 2026-10-22. How jig's domain is tested,
+Provisional, 2026-10-07, revised 2026-10-23. How jig's domain is tested,
 and how it tests an application's: the worlds of jig's own parts, the
 core's world, and the conformance world every application runs its
 domain on, with the referee that holds it to jig's promises. It applies
@@ -290,7 +290,9 @@ more than one world needs them (testing-strategy.md, section 4):
   conditions, late copies and uncertainty, requirements guarded and
   observed, judged on its facts, procedures that step, wait, delegate,
   amend, cancel with a grace, message and finish, topics with classified
-  news, some offered to agents, drift, and a fake system beneath it that
+  news, some offered to agents, drift, the deployment's acts a story
+  scripts, keyed in its records and sent again after a restart
+  (people.md, 5.3), and a fake system beneath it that
   reports what it saw. The core's world runs two of them, so that
   judges, resources and kinds cross connectors, with names and kinds
   generated from the seed;
