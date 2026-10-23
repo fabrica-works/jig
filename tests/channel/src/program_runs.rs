@@ -440,7 +440,7 @@ fn waiting_on(procs: &[Proc], attempt: u64) -> bool {
                 }
                 let fact = wire::Fact::decode(&wire::CEILINGS, &mut Reader::new(body)).expect("fact");
                 fact.attempt() == attempt
-                    && matches!(fact.activity(),wire::Activity::Phase(phase) if *phase.value()==wire::Phase::Waiting)
+                    && matches!(fact.value(),wire::FactValue::Phase(phase) if *phase.value()==wire::Phase::Waiting)
             })
         } else {
             false
