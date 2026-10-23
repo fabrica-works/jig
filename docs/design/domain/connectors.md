@@ -1,6 +1,6 @@
 # Connectors
 
-Provisional, 2026-10-07, revised 2026-10-21. The contract an external
+Provisional, 2026-10-07, revised 2026-10-23. The contract an external
 system meets to be driven by an application on jig: what a connector is,
 what crosses between it and the core through the application's root, and
 what every connector does: resources and holds, effects and the outbox,
@@ -86,6 +86,7 @@ application root            routes between the core and every connector
   | name what a run of this task needs prepared; hand it over | its workspace items, with their size, and the application's credentials they need; the items |
   | what a run of this task left on its resources | taken: facts updated, procedures stepped |
   | adopt this resource into this project | adopted, with what may be done there and the parties it knows; refused |
+  | an act's answer, under its key, once durable | an act in the deployment's name, under a key of its own: a person's conversation closed, the deployment's key added or account removed, one of its resources adopted, a project made (people.md, 5.3) |
   | restart: restore these records; read afresh; settle the outbox | done |
 
 - **Tasks are named by number.** The connector keeps the numbers of the
@@ -721,7 +722,10 @@ asks for each step:
 2. **a fresh read:** it reads afresh what its system owns of its live
    resources, within its budget, before any of its procedures steps;
 3. **its outbox to settle:** it looks for every entry not committed as
-   made, by its key or the state it leads to (4.3).
+   made, by its key or the state it leads to (4.3);
+4. **its acts to send again:** each act in the deployment's name it
+   keeps unanswered, sent again under its key once the core is ready,
+   answered from its saved answer when it was made (people.md, 5.3).
 
 Then, as decisions open, it steps each of its procedures once, on what
 it read. Nothing it held in memory before the restart is needed.

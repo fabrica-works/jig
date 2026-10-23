@@ -1,6 +1,6 @@
 # LLM accounts
 
-Provisional, 2026-10-19. How an application on jig pays for its runs'
+Provisional, 2026-10-19, revised 2026-10-23. How an application on jig pays for its runs'
 LLMs: who holds an account, the sources by which a run may use it, the
 states the accounts child keeps of each, whose work it pays for, which
 account each run gets, what people do with their accounts, and how an
@@ -147,7 +147,9 @@ Account
   and its place among their accounts, its uses, signing it out,
   removing it, and later moving it. For the deployment's accounts, its
   owners decide: the first owners its configuration names (people.md,
-  section 3; `../protocol/configuration.md`, section 3).
+  section 3; `../protocol/configuration.md`, section 3), and, in their
+  name, a connector the configuration grants the deployment's `AddKey`
+  or `RemoveAccount` (people.md, 5.3), where no client is there to ask.
 
 ### 3.3 Several accounts with one LLM provider
 
@@ -488,7 +490,9 @@ is a later decision for smith.
 ## 5. What people do
 
 Each is a party's request through the client (people.md, 5.1), checked
-against the account's holder (3.2) and decided by the accounts child;
+against the account's holder (3.2) and decided by the accounts child,
+or, for the deployment's key added and account removed, the
+deployment's act a connector makes in its owners' name (people.md, 5.3);
 each answer and each state is a fact the application's pages show
 (`../client/domain/contract.md`, section 5), which a party watches
 among their own (`../client/domain/contract.md`, 7.1).
@@ -497,11 +501,11 @@ among their own (`../client/domain/contract.md`, 7.1).
 |---|---|
 | sign in | starts an LLM provider's sign-in; the visit goes to the client that asked, and the redirect to a loopback listener the engine binds for this sign-in; makes an account, renews one of the same subject, or is refused for a subject another holder holds (3.3); refused before it starts for the deployment where the provider's sign-in brings a plan, since only a person holds one (3.2) |
 | sign out | revokes the record at the LLM provider, or has each worker sign a program's login out, and removes the source; when revocation is not confirmed, the answer says to disconnect the application in the provider's settings (providers.md, 2.3) |
-| add a key, replace it, remove it | adding names the account it joins, a new key's account by default; a person's, or the deployment's by its owners |
+| add a key, replace it, remove it | adding names the account it joins, a new key's account by default; a person's, or the deployment's by its owners, or added by the deployment's `AddKey` (people.md, 5.3) |
 | declare a program's login | makes the account, or adds the source to one, under the name its holder gives (3.4); each host then reports whether its login is usable, and the answer names the application's command to run there, which hands the terminal to the program's own sign-in (smith's `protocol/programs.md`, section 4) |
 | check a program's login | has each host's half check the source's login now (3.4) |
 | order, uses, resume | the holder's: an account's place among theirs and its sources' order, its uses, a limited source resumed |
-| remove an account | signs each of its sources out, as sign out does, and erases its keys; its number is never reused, and a task that kept it chooses again (4.3) |
+| remove an account | signs each of its sources out, as sign out does, and erases its keys; its number is never reused, and a task that kept it chooses again (4.3); the deployment's also by the deployment's `RemoveAccount` (people.md, 5.3) |
 | move out, move in | later (section 6) |
 
 - **A value is never committed.** A key, and later a moved record, is

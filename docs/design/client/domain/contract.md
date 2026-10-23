@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-22. jig's API: what crosses
+Provisional, 2026-10-09, revised 2026-10-23. jig's API: what crosses
 between a party's client and the engine, at the level of the two
 domains. It says who the party is; the plumbing operations a party asks,
 alone or several in one compound request, each keyed and answered once
@@ -318,7 +318,14 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   keeps the outcome under that token, durably, for the retention, and
   gives it again when the request is sent again, as the core asks a
   connector for any value it does not own (`../../domain/core.md`,
-  section 5; `../../domain/connectors.md`, 5.5).
+  section 5; `../../domain/connectors.md`, 5.5);
+- **never its own acts:** a connector acts on the core on a party's
+  behalf only within that party's request. What it asks of the core
+  with no request, where no client is there (a person's conversation
+  closed at an end no client saw, an act a restart left undone), is the
+  deployment's act (`../../domain/people.md`, 5.3): granted to it by
+  configuration, keyed in its own key space, and answered to it, never
+  to a client.
 
 ### 3.4 A compound request
 

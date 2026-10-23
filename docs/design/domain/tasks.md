@@ -1,6 +1,6 @@
 # Tasks
 
-Provisional, 2026-10-07, revised 2026-10-21. The core's tasks: what a
+Provisional, 2026-10-07, revised 2026-10-23. The core's tasks: what a
 task is, how tasks are made, how each moves from asked to ended, the
 resources it holds, what it hears and when it wakes, and how proposals
 and escalations travel the tree. It is the first primitive of core.md
@@ -898,7 +898,10 @@ circle, each for another of the set, so that none of them could end.
   in one decision, all or none: so a conversation is closed in one
   decision, each of its live delegates cancelled or moved to its party,
   then itself cancelled with a grace; a project's goals are reordered at
-  once; a held task is amended and released.
+  once; a held task is amended and released. The deployment's compound,
+  a connector's act in its name (people.md, 5.3), only cancels: an
+  operation of another kind, or on a task of another project, refuses
+  it whole.
 
 ## 8. Messages
 
@@ -911,7 +914,7 @@ circle, each for another of the set, so that none of them could end.
 | an answer | its requester | yes |
 | a decision on its own proposal | the holder that decided | yes |
 | an amendment; a cancel's grace, asking it to finish (section 7) | its requester, a task above it, or a party | yes |
-| a cancel | the same | always |
+| a cancel | the same; the deployment, closing a conversation (people.md, 5.3) | always |
 | words | a party; a task holding a reference to it | a party's, yes; a task's, by policy |
 | news: a connector's event, classified | its subscriptions (8.4) | by policy |
 | a notice: a task it references done or held; a proposal passing through; a hold it waits for | its subscriptions; the core | by policy |

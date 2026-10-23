@@ -1,6 +1,6 @@
 # The store
 
-Provisional, 2026-10-12, revised 2026-10-22. What lies beneath the
+Provisional, 2026-10-12, revised 2026-10-23. What lies beneath the
 engine's store vocabulary: skein's key-value store, embedded in the
 engine's process, holds every record jig's core and the application
 keep, transcripts are files beside it, and secrets are in a second
@@ -197,7 +197,7 @@ child puts live first.
 | core | turns (in transcripts' files, section 8), terminals, decisions on proposals and escalations | task, attempt, turn; task, attempt; proposer, proposal; task, revision | on demand |
 | tasks | live tasks, stubs naming ended results, the funders' live periods, writer slots, pools' slots, pending proposals | task; task; funder; slot; proposal | at start |
 | tasks | ended tasks, past periods, decided proposals, history, milestones, activity | task, then a position or revision; funder, period; proposal | on demand |
-| people | parties, sign-ins (no secret), roles, projects' names and whole policies (their ceilings, escalation roles and overrides of templates among them), seeded and made alike, read positions over results and over live conversations, answered keys within the retention, including program declarations and checks, their declared names, and sign-out/removal answers naming unconfirmed configured workers with their original failure reasons | as the people child keys them; a live conversation's position by party, then task | at start |
+| people | parties, sign-ins (no secret), roles, projects' names and whole policies (their ceilings, escalation roles and overrides of templates among them), seeded and made alike, read positions over results and over live conversations, answered keys within the retention, a party's or, for the deployment's acts, a connector's (`../domain/people.md`, 5.3), including program declarations and checks, their declared names, and sign-out/removal answers naming unconfirmed configured workers with their original failure reasons | as the people child keys them; a live conversation's position by party, then task | at start |
 | people | ended conversations' read positions (7.4) | task, then party | at start, by the census, every row (7.2); otherwise on demand |
 | accounts | issued program names, including retired ones, with their source number and original holder and desired sign-out (key tag 4, after the installation's reserved tag); the next number the accounts child gives, below which it gives none again; LLM accounts: each one's holder, LLM provider, subject and display name, and its uses; their sources, each at its place in its holder's order, with its kind, its name for a program's, and its hold: limited, with its reset as a wall time where it has one, or refused. The rest of a source's state is heard again at each start, and none is kept per host (`../domain/accounts.md`, 3.5) | source for an issued name; none: one row; account; account, source | at start, issued names before live account/source records |
 | notes | entries, and an index line per entry per scope | name; scope, name | when a scope is in use; entries on demand |

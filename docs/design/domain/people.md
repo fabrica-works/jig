@@ -39,6 +39,12 @@ is still open is listed in section 12.
 - **Proposing is explicit.** A request beyond the party's authority is
   refused, naming what it lacked and whether a proposal could be
   accepted; `Propose` asks.
+- **The deployment's acts** are what a connector asks of the core in
+  the deployment's name, where no client is there to ask: a person's
+  conversation closed, the deployment's key added or account removed,
+  a resource adopted, a project made. No party makes them: a connector
+  the configuration grants each kind, while it names a first owner,
+  keyed as a party's request and answered to it once durable (5.3).
 - **A party's inbox** holds what waits for them: questions, proposals,
   escalations, the tasks they carry out, results and the turns of their
   conversations. What is addressed to a role waits for every party in it
@@ -61,8 +67,9 @@ capability. It keeps:
   their sign-ins, each named by its number;
 - **roles:** each live project's roles and who holds them, loaded at
   start and changed by commits;
-- **requests in flight:** each party's pending requests, by their keys,
-  until answered, a compound request as one;
+- **requests in flight:** each party's pending requests, and each
+  connector's pending acts in the deployment's name (5.3), by their
+  keys, until answered, a compound request as one;
 - **inboxes:** for each party with something waiting, what waits, by
   reference to the task or proposal it is, and their read positions over
   results and over live conversations (section 6).
@@ -492,6 +499,70 @@ A crash keeps the project and its answer, or neither; a retry under the
 key then makes it once. Two makes naming one name: the first commit
 takes it, and the second is refused as *name taken*.
 
+### 5.3 The deployment's acts
+
+An application sometimes acts where no client is there to ask: at the
+end of what a person's conversations were about, at a start that a
+restart cut short. A connector then asks the core for one of a few
+acts in the deployment's name, as the deployment requests the tasks its
+configuration or a connector starts (tasks.md, section 3). An act has
+no party, no sign-in and no role: the configuration's grant and the
+act's own subject are its whole check.
+
+- **Who may:** a connector the configuration grants that kind of act
+  (`../protocol/configuration.md`, section 3), while the configuration
+  names a first owner (section 3): the deployment's acts are its owners'
+  decisions, made for them by a connector they configured. An act of a
+  kind the configuration does not grant its connector is refused *not
+  offered*; any act, while the configuration names no first owner, is
+  refused as lacking the role, none held. Neither refusal is saved, so
+  a later start's configuration decides again.
+- **What it may,** each act on its own subject alone:
+
+  | Act | Its subject | Becomes |
+  |---|---|---|
+  | `Close` | a live conversation of the named project (tasks.md, section 3) whose requester is a person; a grace within the tasks child's bound, or none; a reason within a cancel's | in one decision, the deployment's compound (tasks.md, section 7), section 7's close with every delegate cancelled: each live task the conversation requested cancelled, then the conversation cancelled with the grace, each with the reason; answered as a compound request (5.1) |
+  | `AddKey` | an LLM provider whose sources offer a key; the key, carried as a request carries one (accounts.md, section 5); one of the deployment's accounts to join, or a new one | the key added, the deployment's (accounts.md, 3.2 and section 5) |
+  | `RemoveAccount` | an account the deployment holds | the account removed (accounts.md, section 5) |
+  | `Adopt` | one of the acting connector's own resources, as an owner's adoption names one, into a live project | adopted as an owner's adoption is, the connector asked and answering as it does a party's (connectors.md, section 12), the project's roles seeded from the parties the connector knows there, and no party made its owner |
+  | `MakeProject` | as `MakeProject`'s (5.1), and an owner of the deployment, to be its maker | the project made (5.2), that owner its maker and only party |
+
+  A subject outside its act's is refused, naming it: a task that is not
+  a live conversation of a person, an account the deployment does not
+  hold, another connector's resource, a maker who is no owner of the
+  deployment.
+- **Keyed as a party's request** (5.1): the connector names a key, in
+  its own key space, apart from every party's and every other
+  connector's, and its answer is kept beside parties' answers
+  (`../protocol/store.md`, 4.4), with the same retention, room, joins
+  and conflicts. The same act under its key joins it while it is
+  pending, and once decided is answered from its saved answer, made
+  once; another act under the key is a key conflict. A saved answer is
+  given again whatever the configuration grants since, as a party's is
+  whatever their role is now, and a restart restores it whatever the
+  configuration names, until the retention ends it. Busy and not ready
+  are not saved, and the connector sends the act again.
+- **Answered to its connector once durable** (engine.md, 5.2), through
+  the root, with the outcome a party's request of its kind gets; each
+  send, a joined one among them, is answered once.
+- **Across a restart:** a connector keeps in its own records each act it
+  has still to hear answered, under its key, committed with the
+  decision that first asks for it, and sends each again at its start,
+  once the core is ready, until it hears the answer. An act made before
+  the restart is answered from its saved answer; an act the restart lost
+  is made then. So a restart between an act's keep and its answer makes
+  it once and answers it once. Past the retention it is judged afresh:
+  a conversation closed since is refused as ended, an account removed
+  since as unknown, which its connector takes as done.
+- **The deployment, not a party:** an act makes no party, sign-in,
+  inbox or role, and is in no `me`. A task it cancels is cancelled by
+  the deployment, with its reason. The value an `AddKey` carries is
+  kept by the application first, as a client's request's is
+  (`../protocol/client.md`, section 5), and one the act leaves unused
+  is said unused before its answer, for the application to erase. A
+  project it makes has a party as its owner, the deployment's owner the
+  act names.
+
 ## 6. A party's inbox
 
 What waits for a party, across every project they hold a role in, each
@@ -639,6 +710,12 @@ entry naming the task or proposal it is and its project:
   asks it to finish, as an amendment it is woken by, and cancels it if
   it has not ended when the grace ends (tasks.md, section 7). Any client
   may compose the same request itself; the engine knows no close.
+- **Closed by the deployment,** where no client is there: a connector
+  granted it makes the deployment's `Close` (5.3), the same close with
+  every delegate cancelled, none moved, since no party says which to
+  keep. The core composes it from the conversation's live delegates in
+  the decision that admits it, and the application gives the grace,
+  its template's: the engine still reads no template.
 
 ## 8. Person tasks
 
@@ -742,12 +819,25 @@ answered full, with its room and its earliest saved expiry, nothing
 written, while one holding their own live sign-in keeps it, and signs in
 once a sign-in ends; a sign-in finding the room full while one sign-in
 is past its wall expiry, its timer not yet run, ends that one and signs
-in; a new identity past the people table's room is answered busy.
+in; a new identity past the people table's room is answered busy; a
+connector granted the deployment's acts closes a person's conversation
+with two live delegates, both cancelled and the conversation cancelled
+with a grace it finishes within, removes one of the deployment's
+accounts, adds a key as the deployment's, and adopts one of its own
+resources; an act sent again under its key, after a restart between
+its commit and its answer, is answered from its saved answer with
+nothing made twice, and one the restart lost is made then; acts are
+refused, nothing made, while the configuration names no first owner,
+of a kind their connector is not granted, and on a subject outside
+their act's: a person's account, a task that is no conversation,
+another connector's resource.
 
 Its referee: every request is answered once, after its commit; a
 compound request is made whole or not at all; no request is acted on
 beyond the party's role, and none becomes a proposal unasked; no party
-becomes a root's requester while its escalations have no holder; what
+becomes a root's requester while its escalations have no holder; no
+act in the deployment's name is made but by a connector granted its
+kind, while a first owner is configured, on its act's subject; what
 waits for a role leaves every inbox once one party acts on it; a
 person's words reach their task, or the task ends; nothing read comes
 back unread, across a restart or a task's end.

@@ -1,6 +1,6 @@
 # The example application
 
-Provisional, 2026-10-06, revised 2026-10-18. This is jig's example
+Provisional, 2026-10-06, revised 2026-10-23. This is jig's example
 application, `ops`: a small system for running services in production,
 on two connectors, with its agents inside its engine. It exists to be
 tested and to be copied.
@@ -307,6 +307,14 @@ Q, a developer
   it finds the service healthy, and finishes without restarting it.
 - **An environment deleted by hand:** E's environment disappears. E is
   held and the client says why. Nothing is recreated without a decision.
+- **A chat closed with its environment:** once E's environment is torn
+  down, infrastructure closes C in the deployment's name, granted the
+  deployment's `close` by `ops`'s configuration (`domain/people.md`,
+  5.3): C is asked to finish within its template's grace, and cancelled
+  if it outlives it. Infrastructure keeps the act's key with E's record
+  until it hears the answer, so an engine restarted between the act's
+  commit and its answer sends it again and is answered once, C closed
+  once.
 - **A pool that shrinks:** staging's quota falls from five to two while
   four environments are held and a request waits. Nobody is evicted; the
   pool admits nobody until two are torn down; the waiting request goes
