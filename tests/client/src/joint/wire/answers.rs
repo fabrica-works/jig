@@ -34,6 +34,7 @@ pub fn reply(
         people::Reply::SignedIn { person, sign_in, expires } => Reply::SignedIn { person, sign_in, expires },
         people::Reply::SignedOut => Reply::SignedOut,
         people::Reply::Again(why) => Reply::Again(why),
+        people::Reply::Full { .. } => Reply::Again(people::Again::Busy),
         people::Reply::Refused(why) => {
             Reply::Final(client::Answer::Refused { refusal: refusal(why, models, limits)?, at: None })
         }

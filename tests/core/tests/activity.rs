@@ -52,7 +52,8 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
         .rev()
         .find_map(|reply| match reply {
             people::Reply::Outcome(people::Outcome::Said { message, .. }) => Some(*message),
-            people::Reply::SignedIn { .. }
+            people::Reply::Full { .. }
+            | people::Reply::SignedIn { .. }
             | people::Reply::SignedOut
             | people::Reply::Outcome(_)
             | people::Reply::Again(_)

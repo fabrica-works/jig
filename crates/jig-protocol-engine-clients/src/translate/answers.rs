@@ -1,7 +1,7 @@
 //! Durable keyed answers (protocol/client.md, section 5; contract.md, 4).
 use super::refusals;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn answer(
@@ -33,7 +33,7 @@ pub(crate) fn answer(
             let outcome = w::Outcome::Owner(w::OutcomeOwner::new(limits, w::OutcomeOwnerParts { value })?);
             w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?)
         }
-        p::Reply::SignedIn { .. } => return Err(problem()),
+        p::Reply::Full { .. } | p::Reply::SignedIn { .. } => return Err(problem()),
     };
     let mut out = Writer::new(usize::try_from(final_answer.measure()).expect("wire size fits"));
     final_answer.encode(&mut out).expect("measured final answer");

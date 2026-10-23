@@ -151,6 +151,8 @@ pub enum With {
 pub enum Signing {
     SignedIn { party: u64 },
     Again,
+    Busy,
+    Full { sign_ins: u32, earliest: skein_lib::Wall, link_until: skein_lib::Wall },
     Refused,
     Lost,
     SignedOut,

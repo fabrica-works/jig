@@ -1,4 +1,5 @@
 use super::*;
+use jig_client_protocol_wire::v14 as w;
 use skein_http::Method;
 use skein_lib::stream::{Down, Up};
 mod fixtures;
@@ -387,7 +388,7 @@ fn room_is_released_only_after_a_calls_end_is_handled() {
 
 #[test]
 fn a_browser_link_keeps_its_cookie_on_a_tokenless_sign_in() {
-    use jig_client_protocol_wire::v13 as w;
+    use jig_client_protocol_wire::v14 as w;
     let mut mount = fixtures::mount();
     let mut out = Queue::with_capacity(16);
     let call =
@@ -416,4 +417,31 @@ fn a_browser_link_keeps_its_cookie_on_a_tokenless_sign_in() {
     let answer = fixtures::signed_in(&body);
     assert_eq!(answer.token(), &None);
     assert_eq!((answer.party(), answer.expires()), (fixtures::PARTY, fixtures::IN_A_DAY));
+}
+
+#[test]
+fn busy_and_full_answer_200_without_setting_a_cookie() {
+    let full = w::SignInAnswer::Full(
+        w::SignInsFull::new(&w::CEILINGS, w::SignInsFullParts { sign_ins: 2, earliest: 400, link_until: 300 }).unwrap(),
+    );
+    for record in [w::SignInAnswer::Busy, full] {
+        for path in SIGN_IN_PATHS {
+            for browser in [false, true] {
+                let mut mount = fixtures::mount();
+                let mut out = Queue::with_capacity(16);
+                let browser_headers = fixtures::browser();
+                let headers: &[skein_http::Header] = if browser { &browser_headers } else { &[] };
+                let call = fixtures::call(&mut mount, &mut out, Method::Post, path, headers, b"");
+                fixtures::component(&mut out);
+                let mut bytes = skein_lib::Writer::new(usize::try_from(record.measure()).unwrap());
+                record.encode(&mut bytes).unwrap();
+                let bytes = bytes.finish();
+                fixtures::reply(&mut mount, &mut out, call, kit::Reply::Record(bytes.clone()));
+                let (status, body, headers) = fixtures::answered(&mut mount, &mut out, call);
+                assert_eq!(status, 200);
+                assert_eq!(body, bytes);
+                assert_eq!(fixtures::header(&headers, b"set-cookie"), None);
+            }
+        }
+    }
 }

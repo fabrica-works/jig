@@ -110,6 +110,7 @@ impl Component {
         self.phase = Phase::Aborting;
         self.end_streams(None);
         self.link = None;
+        self.spending = None;
         self.pending.exchanges = Map::with_capacity(self.pending.exchanges.capacity());
         self.pending.carried = Map::with_capacity(self.pending.carried.capacity());
     }
@@ -182,6 +183,7 @@ impl Component {
         if !self.aborting() {
             self.phase = Phase::Closing;
             self.link = None;
+            self.spending = None;
             self.stop(out);
         }
     }

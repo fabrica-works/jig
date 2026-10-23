@@ -56,3 +56,28 @@ fn a_mint_past_the_mints_in_flight_is_refused_busy() {
     assert_eq!((exchange, why), (NEXT, crate::MintRefusal::Busy));
     assert!(out.is_empty());
 }
+
+#[test]
+fn close_and_abort_drop_a_links_reservation_even_before_its_core_answer() {
+    for abort in [false, true] {
+        let env = fixtures::env();
+        let mut out = Queue::with_capacity(8);
+        let mut component = Component::new(fixtures::linked_settings(), &env, &mut out).unwrap();
+        out.pop().expect("printed link");
+        let link = component.link.take().expect("open link");
+        let exchange = Token::new(1);
+        component.spending = Some((exchange, link));
+        component.pending.exchanges.insert(exchange, Waiting::Core { held: None }).unwrap();
+        component.down(&env, if abort { Event::Abort } else { Event::Close }, &mut out);
+        assert!(component.link.is_none());
+        assert!(component.spending.is_none());
+        component.down(
+            &env,
+            Event::Reply { to: ReplyTo::new(exchange), reply: people::Reply::Again(people::Again::Busy) },
+            &mut out,
+        );
+        assert!(component.link.is_none(), "late retry answer cannot reopen a closing link");
+        assert!(component.spending.is_none());
+        assert!(out.is_empty(), "no new link, credential or core request");
+    }
+}

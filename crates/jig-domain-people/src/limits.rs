@@ -27,7 +27,7 @@ pub struct Limits {
     pub inbox_tasks: u32,
     /// Maximum recipient references in one task projection, independent of cached entries.
     pub inbox_recipients: u32,
-    /// Maximum live secret-free sign-ins and expiry alarms.
+    /// Positive maximum live secret-free sign-ins and expiry alarms.
     pub sign_ins: u32,
     /// Maximum retained project role sets.
     pub projects: u32,
@@ -64,7 +64,7 @@ pub struct Limits {
 /// Containers, retained bytes, pending copies and bounded bootstrap config. Checked heap bound
 /// under `limits` for retained containers/bytes, pending copies, bootstrap owners, restoration
 /// sign-in snapshot, role-update scratch and facts. Returns `None` for arithmetic overflow, zero
-/// waiters or zero sign-in lifetime; validates `max_out` additions. Caller separately counts
+/// waiters, zero sign-ins or zero sign-in lifetime; validates `max_out` additions. Caller separately counts
 /// incoming/outgoing payloads and Request queue storage.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
@@ -82,6 +82,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.program_host_name_bytes == 0
         || limits.program_host_name_bytes > 4096
         || limits.waiters == 0
+        || limits.sign_ins == 0
         || limits.sign_in_lifetime == Duration::ZERO
         || limits.request_retention == Duration::ZERO
     {

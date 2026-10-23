@@ -2,7 +2,7 @@
 use super::Received;
 use jig_client::{Event, Message, Request, Streamed};
 use jig_client_protocol_link::translate;
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 use skein_lib::{Reader, Secret, Token};
 use std::collections::BTreeMap;
 
@@ -177,7 +177,10 @@ impl Wire {
                             self.credential.clone_from(value.token());
                             vec![Received::SignedIn { person: value.party() }]
                         }
-                        w::SignInAnswer::Refused | w::SignInAnswer::NotReady => vec![],
+                        w::SignInAnswer::Refused
+                        | w::SignInAnswer::NotReady
+                        | w::SignInAnswer::Busy
+                        | w::SignInAnswer::Full(_) => vec![],
                     }
                 }
                 Some(Kind::SignOut) => {

@@ -157,7 +157,8 @@ pub(super) fn tag_people(
                 Request::Write(Write::Erase(Key::People(key)))
             }
             people::Request::Reply { to, reply } => match reply {
-                reply @ (people::Reply::Again(people::Again::Busy)
+                reply @ (people::Reply::Full { .. }
+                | people::Reply::Again(people::Again::Busy)
                 | people::Reply::Outcome(people::Outcome::Again(people::Again::Busy))) => {
                     core.touch_deployment();
                     Request::Held(Box::new(Held::PeopleReply { to, reply }))

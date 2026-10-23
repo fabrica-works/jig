@@ -834,7 +834,10 @@ fn expired_completed_key_is_erased_from_a_restore_page_and_frees_its_slot() {
 fn every_admission_point_refuses_without_partial_state() {
     let mut test = Test::new(Limits { people: 1, sign_ins: 1, projects: 1, holdings: 1, words: 1, ..LIMITS });
     test.member();
-    assert_eq!(reply(&test.signin(2, 11, identity(0, 2))), Reply::Again(Again::Busy));
+    assert_eq!(
+        reply(&test.signin(2, 11, identity(0, 2))),
+        Reply::Full { sign_ins: 1, earliest: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) }
+    );
     let reply_to = test.to();
     test.send(Event::SignOut { reply_to, sign_in: 10 });
     assert_eq!(reply(&test.signin(2, 11, identity(0, 2))), Reply::Again(Again::Busy));
@@ -1162,7 +1165,7 @@ fn first_owners_seed_their_roles_on_the_first_start_only() {
 fn signed_person(reply: Reply) -> Option<u64> {
     match reply {
         Reply::SignedIn { person, .. } => Some(person),
-        Reply::SignedOut | Reply::Again(_) | Reply::Outcome(_) | Reply::Refused(_) => None,
+        Reply::Full { .. } | Reply::SignedOut | Reply::Again(_) | Reply::Outcome(_) | Reply::Refused(_) => None,
     }
 }
 
@@ -2130,7 +2133,10 @@ fn a_live_held_sign_in_replies_alone_with_its_saved_expiry_even_at_capacity() {
         assert!(test.d.pop_fact().is_none());
         assert_eq!(test.d.sign_in_person(sign_in), None);
     }
-    assert_eq!(reply(&test.signin(2, 20, identity(0, 2))), Reply::Again(Again::Busy));
+    assert_eq!(
+        reply(&test.signin(2, 20, identity(0, 2))),
+        Reply::Full { sign_ins: 1, earliest: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) }
+    );
 }
 
 #[test]
@@ -2181,5 +2187,80 @@ fn an_absent_ended_or_expired_held_sign_in_signs_in_afresh() {
             }),
             "{case}"
         );
+    }
+}
+
+#[test]
+fn worst_case_refuses_zero_sign_ins() {
+    assert_eq!(worst_case(&Limits { sign_ins: 0, ..LIMITS }), None);
+}
+
+#[test]
+fn a_full_pool_answers_only_its_limit_and_first_saved_expiry_without_writes() {
+    let mut test = Test::new(Limits { sign_ins: 2, ..LIMITS });
+    test.signin(1, 10, identity(0, 1));
+    test.env.now = Time::from_nanos(1);
+    test.env.wall = Wall::from_nanos(1);
+    test.signin(1, 11, identity(0, 1));
+    while test.d.pop_fact().is_some() {}
+    let token = test.to().into_token();
+    let requests = test.send(Event::SignedIn {
+        reply_to: ReplyTo::new(token),
+        person: 2,
+        sign_in: 12,
+        identity: identity(0, 1),
+        kind: Kind::Person,
+        held: None,
+    });
+    assert_eq!(
+        requests,
+        [Request::Reply {
+            to: ReplyTo::new(token),
+            reply: Reply::Full { sign_ins: 2, earliest: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) }
+        }]
+    );
+    assert!(test.d.pop_fact().is_none());
+}
+
+#[test]
+fn a_new_identity_with_a_full_people_table_is_busy() {
+    let mut test = Test::new(Limits { people: 1, sign_ins: 2, ..LIMITS });
+    test.signin(1, 10, identity(0, 1));
+    let requests = test.signin(2, 11, identity(0, 2));
+    assert_eq!(requests.len(), 1);
+    assert_eq!(reply(&requests), Reply::Again(Again::Busy));
+}
+
+#[test]
+fn a_full_pool_ends_only_the_next_expired_sign_in_by_either_clock() {
+    for monotonic in [false, true] {
+        let mut test = Test::new(Limits { sign_ins: 2, ..LIMITS });
+        test.signin(1, 10, identity(0, 1));
+        test.signin(1, 11, identity(0, 1));
+        while test.d.pop_fact().is_some() {}
+        if monotonic {
+            test.env.now = Time::from_nanos(LIMITS.sign_in_lifetime.as_nanos());
+        } else {
+            test.env.wall = Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos());
+        }
+        let requests = test.signin(1, 12, identity(0, 1));
+        assert_eq!(requests.len(), 3, "erase, save, reply, within max_out");
+        assert_eq!(requests[0], Request::Erase { key: Key::SignIn(10) });
+        assert_eq!(
+            reply(&requests),
+            Reply::SignedIn {
+                person: 1,
+                sign_in: 12,
+                expires: Wall::from_nanos(
+                    test.env.wall.as_nanos().checked_add(LIMITS.sign_in_lifetime.as_nanos()).expect("test expiry fits")
+                ),
+            }
+        );
+        assert_eq!(test.d.sign_in_person(10), None);
+        assert_eq!(test.d.sign_in_person(11), Some(1), "only one expiration");
+        assert_eq!(test.d.sign_in_person(12), Some(1));
+        assert_eq!(test.d.pop_fact(), Some(Fact::SignedOut { sign_in: 10 }));
+        assert_eq!(test.d.pop_fact(), Some(Fact::SignedIn { person: 1, sign_in: 12 }));
+        assert!(test.d.pop_fact().is_none());
     }
 }

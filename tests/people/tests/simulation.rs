@@ -883,3 +883,69 @@ fn another_persons_live_held_sign_in_is_never_kept() {
     assert!(world.records().contains_key(&jig_domain_people::Key::SignIn(10)));
     world.assert_settled();
 }
+
+#[test]
+fn a_full_pool_answers_full_without_changing_its_durable_records() {
+    let mut settings = Settings::calm(903);
+    settings.limits.sign_ins = 2;
+    let mut world = World::new(settings);
+    let first = world.signin(10, 1);
+    world.commit_all();
+    let Some(Reply::SignedIn { expires: earliest, .. }) = world.reply(first) else { panic!("signed in") };
+    world.advance(Duration::from_nanos(1));
+    world.signin(11, 1);
+    world.commit_all();
+    let before = world.records().clone();
+    let call = world.signin(12, 1);
+    world.commit_all();
+    assert_eq!(world.reply(call), Some(Reply::Full { sign_ins: 2, earliest }));
+    assert_eq!(world.records(), &before);
+    world.signout(10);
+    world.commit_all();
+    let retry = world.signin(12, 1);
+    world.commit_all();
+    assert!(matches!(world.reply(retry), Some(Reply::SignedIn { sign_in: 12, .. })));
+    world.assert_settled();
+}
+
+#[test]
+fn a_new_identity_with_no_people_room_is_busy_instead_of_full() {
+    let mut settings = Settings::calm(904);
+    settings.limits.people = 1;
+    settings.limits.sign_ins = 2;
+    let mut world = World::new(settings);
+    world.signin(10, 1);
+    world.commit_all();
+    let before = world.records().clone();
+    let call = world.signin(11, 2);
+    world.commit_all();
+    assert_eq!(world.reply(call), Some(Reply::Again(Again::Busy)));
+    assert_eq!(world.records(), &before);
+    world.assert_settled();
+}
+
+#[test]
+fn a_full_pool_reuses_wall_expired_room_before_its_timer_runs_in_one_commit() {
+    use jig_domain_people::{Key, Stored};
+    let mut settings = Settings::calm(905);
+    settings.limits.sign_ins = 2;
+    let lifetime = settings.limits.sign_in_lifetime;
+    let mut world = World::new(settings);
+    world.signin(10, 1);
+    world.commit_all();
+    world.advance(Duration::from_nanos(1));
+    world.signin(11, 1);
+    world.commit_all();
+    let before = world.records().clone();
+    world.set_wall(skein_lib::Wall::from_nanos(lifetime.as_nanos()));
+    let call = world.signin(12, 1);
+    assert_eq!(world.reply(call), None, "the erase and new sign-in wait for the same commit");
+    assert_eq!(world.records(), &before);
+    world.commit_all();
+    assert!(matches!(world.reply(call), Some(Reply::SignedIn { sign_in: 12, .. })));
+    assert!(!world.records().contains_key(&Key::SignIn(10)));
+    assert_eq!(world.records().get(&Key::SignIn(11)), before.get(&Key::SignIn(11)));
+    assert!(matches!(world.records().get(&Key::SignIn(12)), Some(Stored::SignIn { number: 12, .. })));
+    assert_eq!(world.records().values().filter(|record| matches!(record, Stored::SignIn { .. })).count(), 2);
+    world.assert_settled();
+}

@@ -521,7 +521,12 @@ impl World {
             match request {
                 Request::Save { record } => changes.push(Change::Save(record)),
                 Request::Erase { key } => changes.push(Change::Erase(key)),
-                Request::Reply { to, reply } => replies.push((to.into_token().raw(), reply)),
+                Request::Reply { to, reply } => {
+                    if let Reply::Full { earliest, .. } = &reply {
+                        assert!(*earliest > self.env.wall, "Full names a future expiry at its answer's clocks");
+                    }
+                    replies.push((to.into_token().raw(), reply));
+                }
                 Request::Route { request, person, project, role, ask, models: _ } => {
                     assert!(
                         project == 1
@@ -1048,7 +1053,11 @@ impl World {
                 Reply::Refused(why) | Reply::Outcome(Outcome::Refused(why)) => {
                     self.observe(Seen::Refused { why: why.clone() });
                 }
-                Reply::SignedIn { .. } | Reply::SignedOut | Reply::Outcome(_) | Reply::Again(_) => {}
+                Reply::Full { .. }
+                | Reply::SignedIn { .. }
+                | Reply::SignedOut
+                | Reply::Outcome(_)
+                | Reply::Again(_) => {}
             }
             assert!(self.replies.insert(held.call, held.reply).is_none());
             self.stats.replies += 1;
@@ -1079,6 +1088,11 @@ impl World {
         self.send(Event::Restored);
         self.restore_ended();
         self.stats.restarts += 1;
+    }
+
+    /// Correct the wall clock before the next input, without firing its timer first.
+    pub fn set_wall(&mut self, wall: Wall) {
+        self.env.wall = wall;
     }
 
     pub fn advance(&mut self, duration: Duration) {

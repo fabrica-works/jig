@@ -430,9 +430,10 @@ impl Domain {
 }
 
 /// Bootstrap writes one roles record per configured owner match, alongside person/sign-in records
-/// and reply; completion answers every bounded waiter. Required free Request slots for one
-/// step/fire under validated `limits`: maximum of bootstrap owner matches plus three, waiters plus
-/// one and sign-ins plus one. `worst_case` validates those additions before use; caller counts
+/// and reply, plus one expired sign-in's erase; completion answers every bounded waiter.
+/// Required free Request slots for one step/fire under validated `limits`: maximum of bootstrap
+/// owner matches plus four, waiters plus two, and sign-ins, holdings or people plus one.
+/// `worst_case` validates those additions before use; caller counts
 /// output payload bytes separately.
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
@@ -901,7 +902,17 @@ fn signin(
         }
     }
     if domain.sign_ins.len() >= env.limits.sign_ins {
-        return again(to, Again::Busy, out);
+        if let Some(number) = domain.alarms.expire(env.now) {
+            end_signin(domain, number, out);
+        } else if let Some(&(expires, number)) = domain.expiries.first()
+            && expires <= env.wall
+        {
+            end_signin(domain, number, out);
+        } else {
+            let &(earliest, _) = domain.expiries.first().expect("positive full sign-in pool has an expiry");
+            assert!(earliest > env.wall, "full sign-ins are live by both clocks");
+            return out.push(Request::Reply { to, reply: Reply::Full { sign_ins: env.limits.sign_ins, earliest } });
+        }
     }
     if known.is_none() {
         if domain.people.len() >= env.limits.people {

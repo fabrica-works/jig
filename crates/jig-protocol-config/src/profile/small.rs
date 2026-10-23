@@ -296,7 +296,7 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_eng
     exchanges: 8,
     exchanges_per_client: 2,
     message_bytes: 65536,
-    wire: jig_client_protocol_wire::v13::CEILINGS,
+    wire: jig_client_protocol_wire::v14::CEILINGS,
     link_span: Duration::from_secs(300),
 };
 

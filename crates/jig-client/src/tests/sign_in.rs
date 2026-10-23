@@ -2,7 +2,7 @@ use super::{
     fixtures::{self, CREDENTIAL, Client, NEW_CREDENTIAL, SERVICE_CREDENTIAL, STOP, TASK},
     *,
 };
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 use skein_lib::{Duration, Time};
 const FIRST_BACKOFF: Duration = Duration::from_millis(10);
 const LEAST_BACKOFF: Duration = Duration::from_millis(5);
@@ -450,4 +450,67 @@ fn read_room_prices_the_composed_cancellation_buffers() {
     let composed_growth = worst_case(&full).unwrap().checked_sub(worst_case(&empty).unwrap()).unwrap();
     assert!(max_out(&full) > max_out(&empty));
     assert!(composed_growth > domain_growth);
+}
+
+fn link_attempt() -> With {
+    With::Link { secret: skein_lib::Secret::new(Box::new([3; 32])), held: None }
+}
+fn full_sign_in_answer() -> w::SignInAnswer {
+    w::SignInAnswer::Full(
+        w::SignInsFull::new(&w::CEILINGS, w::SignInsFullParts { sign_ins: 2, earliest: 400, link_until: 300 }).unwrap(),
+    )
+}
+fn assert_link_told(c: &Client) {
+    let mut told = false;
+    for request in c.requests() {
+        if let Request::Told { told: Told::Link { .. } } = request {
+            told = true;
+        }
+    }
+    assert!(told);
+}
+
+#[test]
+fn each_link_retry_answer_is_visible_and_told_until_the_next_sign_in() {
+    for (answer, why) in [
+        (w::SignInAnswer::NotReady, NotSignedIn::NotReady),
+        (w::SignInAnswer::Busy, NotSignedIn::Busy),
+        (
+            full_sign_in_answer(),
+            NotSignedIn::Full {
+                sign_ins: 2,
+                earliest: skein_lib::Wall::from_nanos(400),
+                link_until: skein_lib::Wall::from_nanos(300),
+            },
+        ),
+    ] {
+        let mut c = Client::new();
+        c.step(Event::SignIn { with: link_attempt() });
+        c.step(Event::Reply { exchange: c.exchange(), message: fixtures::sign_in_answer(&answer) });
+        assert_eq!(c.machine.link().not_signed_in, Some(why));
+        assert!(c.machine.link().credential.is_none());
+        assert_link_told(&c);
+        assert!(c.machine.next_deadline().is_none(), "link never retries itself");
+        c.step(Event::SignIn { with: link_attempt() });
+        assert_eq!(c.machine.link().not_signed_in, None);
+        assert_link_told(&c);
+        c.step(Event::Reply { exchange: c.exchange(), message: fixtures::signed_in(&NEW_CREDENTIAL) });
+        assert_eq!(c.machine.link().not_signed_in, None);
+        assert_eq!(c.machine.link().credential, Some(&fixtures::credential(&NEW_CREDENTIAL)));
+        assert_link_told(&c);
+    }
+}
+
+#[test]
+fn a_services_busy_or_full_ends_signing_without_a_retry() {
+    for answer in [w::SignInAnswer::Busy, full_sign_in_answer()] {
+        let mut c = Client::new();
+        c.step(Event::SignIn { with: With::Service(fixtures::credential(&SERVICE_CREDENTIAL)) });
+        c.step(Event::Reply { exchange: c.exchange(), message: fixtures::sign_in_answer(&answer) });
+        assert_eq!(c.machine.link().not_signed_in, None);
+        assert!(c.machine.link().credential.is_none());
+        assert!(c.machine.next_deadline().is_none());
+        c.fire(Time::from_nanos(u64::MAX));
+        assert!(c.requests().is_empty());
+    }
 }

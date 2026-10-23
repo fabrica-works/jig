@@ -6,7 +6,7 @@ use crate::{
     sign_in::{self, Link, Pending, Waiting},
 };
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use skein_lib::{CryptoRng, Env, Map, Queue, ReplyTo, Time, Token};
@@ -30,7 +30,7 @@ pub struct Component {
     settings: Settings,
     rng: CryptoRng,
     link: Option<Link>,
-    /// The link a sign-in spends while the core answers it, given back on not ready (client.md, 8).
+    /// The link a sign-in spends while the core answers it, given back on not ready, busy or full (client.md, 8).
     spending: Option<(Token, Link)>,
     connections: Map<Token, Exchange>,
     pending: Pending,
@@ -91,7 +91,7 @@ impl Component {
         token
     }
     fn fresh_link(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) {
-        if self.settings.link.is_none() || self.link.is_some() {
+        if self.settings.link.is_none() || self.link.is_some() || self.spending.is_some() {
             return;
         }
         let secret = sign_in::draw(&mut self.rng);
@@ -105,6 +105,11 @@ impl Component {
             Event::Reply { to, reply } => self.reply(env, to.into_token(), reply, out),
             Event::SignInRefused { to } => {
                 let exchange = to.into_token();
+                if let Some((reserved, _)) = &self.spending
+                    && *reserved == exchange
+                {
+                    self.spending = None;
+                }
                 let why = if self.stopping() { crate::MintRefusal::NotReady } else { crate::MintRefusal::Bound };
                 if !self.mint_refused(exchange, why, out) {
                     self.refused(env, exchange);
@@ -323,6 +328,15 @@ impl Component {
                     connection.respond(crate::Reply::NotARecord, &env.limits);
                     return;
                 };
+                if let Some((_, link)) = &self.spending {
+                    let answer = if sign_in::constant_time_eq(link.secret.expose(), record.secret()) {
+                        routes::sign_in_busy()
+                    } else {
+                        routes::refused(&env.limits.wire)
+                    };
+                    connection.respond(crate::Reply::Record(answer), &env.limits);
+                    return;
+                }
                 let live = match &self.link {
                     Some(link) => {
                         env.now < link.until && sign_in::constant_time_eq(link.secret.expose(), record.secret())
@@ -338,7 +352,7 @@ impl Component {
                     return;
                 }
                 if self.admitted() >= env.limits.exchanges {
-                    connection.respond(crate::Reply::Record(routes::refused(&env.limits.wire)), &env.limits);
+                    connection.respond(crate::Reply::Record(routes::sign_in_busy()), &env.limits);
                     return;
                 }
                 if let Some(link) = self.link.take() {
@@ -410,7 +424,8 @@ impl Component {
                 people::Reply::Again(people::Again::NotReady) => {
                     self.respond(env, exchange, routes::sign_out_not_ready());
                 }
-                people::Reply::SignedIn { .. }
+                people::Reply::Full { .. }
+                | people::Reply::SignedIn { .. }
                 | people::Reply::Outcome(_)
                 | people::Reply::Again(_)
                 | people::Reply::Refused(_) => {
@@ -460,7 +475,8 @@ impl Component {
             people::Reply::Outcome(people::Outcome::Applied { .. }) => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
             }
-            people::Reply::SignedIn { .. }
+            people::Reply::Full { .. }
+            | people::Reply::SignedIn { .. }
             | people::Reply::SignedOut
             | people::Reply::Outcome(_)
             | people::Reply::Again(_)

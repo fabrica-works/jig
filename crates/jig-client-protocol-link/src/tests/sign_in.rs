@@ -175,3 +175,47 @@ fn a_refused_not_ready_or_lost_link_installs_none_of_its_held_credential() {
         assert_eq!(h.link.credential(), None);
     }
 }
+
+#[test]
+fn busy_and_full_sign_in_answers_decode_and_trailing_bytes_are_lost() {
+    let full = w::SignInAnswer::Full(
+        w::SignInsFull::new(&w::CEILINGS, w::SignInsFullParts { sign_ins: 2, earliest: 400, link_until: 300 }).unwrap(),
+    );
+    for (record, expected) in [
+        (w::SignInAnswer::Busy, Signing::Busy),
+        (
+            full,
+            Signing::Full {
+                sign_ins: 2,
+                earliest: skein_lib::Wall::from_nanos(400),
+                link_until: skein_lib::Wall::from_nanos(300),
+            },
+        ),
+    ] {
+        for trailing in [false, true] {
+            let mut h = Harness::new(&limits());
+            let exchange = h
+                .sign_in(With::Link {
+                    secret: Secret::new(Box::new(LINK_SECRET)),
+                    held: Some(Secret::new(Box::new(CREDENTIAL))),
+                })
+                .unwrap();
+            let length = usize::try_from(record.measure()).unwrap().checked_add(usize::from(trailing)).unwrap();
+            let mut bytes = skein_lib::Writer::new(length);
+            record.encode(&mut bytes).unwrap();
+            if trailing {
+                bytes.put(&[0]).unwrap();
+            }
+            h.answer(exchange, &bytes.finish());
+            let mut told: u32 = 0;
+            for request in &h.out {
+                if let Request::Signing { signing } = request {
+                    assert_eq!(signing, if trailing { &Signing::Lost } else { &expected });
+                    told += 1;
+                }
+            }
+            assert_eq!(told, 1);
+            assert!(h.link.credential().is_none());
+        }
+    }
+}

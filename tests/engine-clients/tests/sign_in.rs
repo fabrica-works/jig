@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 use jig_engine_clients_world::fixtures::{self, Peer};
 use jig_protocol_engine_clients::{Event, MintRefusal};
 fn peer() -> Peer {
@@ -339,4 +339,157 @@ fn a_lost_links_credential_check_spends_the_link_like_a_lost_core_answer() {
     assert_eq!(peer.answered(exchange), None);
     assert_eq!(peer.digest_kept(), None);
     assert_ne!(fresh_link(&mut peer), link);
+}
+
+fn retry_answers() -> [jig_domain_people::Reply; 3] {
+    use jig_domain_people::{Again, Reply};
+    [
+        Reply::Again(Again::NotReady),
+        Reply::Again(Again::Busy),
+        Reply::Full { sign_ins: 2, earliest: skein_lib::Wall::from_nanos(900_000_000_000) },
+    ]
+}
+fn pending_reply(peer: &mut Peer) -> skein_lib::ReplyTo {
+    let Some(jig_domain_core::Event::SignIn { reply_to, .. }) = peer.take_core() else { panic!("sign-in") };
+    reply_to
+}
+fn decoded(peer: &Peer, exchange: skein_lib::Token) -> w::SignInAnswer {
+    let bytes = peer.answered(exchange).expect("answer");
+    let mut reader = skein_lib::Reader::new(bytes);
+    let answer = w::SignInAnswer::decode(&w::CEILINGS, &mut reader).expect("sign-in answer");
+    assert!(reader.is_empty());
+    answer
+}
+
+#[test]
+fn busy_and_full_return_the_same_printed_link_and_it_can_sign_in() {
+    for reply in retry_answers() {
+        let mut peer = peer();
+        let link = peer.printed_link();
+        let exchange = peer.post_link(&link);
+        let to = pending_reply(&mut peer);
+        peer.advance_time(skein_lib::Duration::from_secs(1));
+        let expected = match reply {
+            jig_domain_people::Reply::Again(jig_domain_people::Again::NotReady) => w::SignInAnswer::NotReady,
+            jig_domain_people::Reply::Again(jig_domain_people::Again::Busy) => w::SignInAnswer::Busy,
+            jig_domain_people::Reply::Full { sign_ins, earliest } => w::SignInAnswer::Full(
+                w::SignInsFull::new(
+                    &w::CEILINGS,
+                    w::SignInsFullParts { sign_ins, earliest: earliest.as_nanos(), link_until: 299_000_000_000 },
+                )
+                .expect("full answer within wire bounds"),
+            ),
+            jig_domain_people::Reply::SignedIn { .. }
+            | jig_domain_people::Reply::SignedOut
+            | jig_domain_people::Reply::Outcome(_)
+            | jig_domain_people::Reply::Refused(_) => {
+                unreachable!("retry fixtures contain only not ready, busy and full")
+            }
+        };
+        peer.answer_request(to, reply);
+        assert_eq!(decoded(&peer, exchange), expected);
+        assert_eq!(peer.printed_link(), link);
+        // One nanosecond before the original expiry remains usable.
+        peer.advance_time(skein_lib::Duration::from_nanos(299_000_000_000 - 1));
+        let exchange = peer.post_link(&link);
+        peer.answer_signed_in(fixtures::FIRST_SIGN_IN, fixtures::FIRST_PERSON);
+        peer.answer_kept(fixtures::FIRST_SIGN_IN);
+        assert_eq!(peer.sign_in_answer(exchange).party(), fixtures::FIRST_PERSON);
+        assert_eq!(peer.printed_link(), link);
+    }
+}
+
+#[test]
+fn a_returned_link_past_its_original_expiry_is_refused_and_replaced() {
+    for reply in retry_answers() {
+        let mut peer = peer();
+        let link = peer.printed_link();
+        peer.post_link(&link);
+        let to = pending_reply(&mut peer);
+        peer.advance_time(skein_lib::Duration::from_secs(1));
+        peer.answer_request(to, reply);
+        peer.advance_time(skein_lib::Duration::from_secs(299));
+        let exchange = peer.post_link(&link);
+        assert_eq!(decoded(&peer, exchange), w::SignInAnswer::Refused);
+        assert_ne!(peer.printed_link(), link);
+        assert!(peer.take_core().is_none());
+    }
+}
+
+#[test]
+fn a_reserved_link_answers_its_secret_busy_and_another_refused_without_drawing() {
+    let mut peer = peer();
+    let link = peer.printed_link();
+    let original = peer.post_link(&link);
+    let to = pending_reply(&mut peer);
+    let crossed = peer.post_link(&link);
+    assert_eq!(decoded(&peer, crossed), w::SignInAnswer::Busy);
+    let other = w::LinkSignIn::new(&w::CEILINGS, w::LinkSignInParts { secret: Box::new([0; 32]) })
+        .expect("real-length link secret");
+    let mut bytes = skein_lib::Writer::new(usize::try_from(other.measure()).expect("short link record"));
+    other.encode(&mut bytes).expect("measured link record");
+    let wrong = peer.post(b"/jig/v1/sign-in/link", bytes.finish(), None);
+    assert_eq!(decoded(&peer, wrong), w::SignInAnswer::Refused);
+    assert_eq!(peer.printed_link(), link);
+    assert!(peer.take_core().is_none());
+    peer.answer_request(to, jig_domain_people::Reply::Again(jig_domain_people::Again::Busy));
+    assert_eq!(decoded(&peer, original), w::SignInAnswer::Busy);
+    let exchange = peer.post_link(&link);
+    peer.answer_signed_in(fixtures::FIRST_SIGN_IN, fixtures::FIRST_PERSON);
+    peer.answer_kept(fixtures::FIRST_SIGN_IN);
+    assert_eq!(peer.sign_in_answer(exchange).party(), fixtures::FIRST_PERSON);
+}
+
+#[test]
+fn a_core_refusal_drops_the_reservation_and_the_next_attempt_prints_a_link() {
+    let mut peer = peer();
+    let link = peer.printed_link();
+    let exchange = peer.post_link(&link);
+    peer.refuse_sign_in();
+    assert_eq!(decoded(&peer, exchange), w::SignInAnswer::Refused);
+    assert_ne!(fresh_link(&mut peer), link);
+    complete_sign_in(&mut peer);
+}
+
+#[test]
+fn admission_full_answers_busy_and_leaves_the_link_open() {
+    let mut limits = fixtures::limits();
+    limits.exchanges = 1;
+    let mut peer = Peer::with_limits(&fixtures::settings(), limits);
+    let mint = peer.mint(fixtures::application_person());
+    let link = peer.printed_link();
+    let exchange = peer.post_link(&link);
+    assert_eq!(decoded(&peer, exchange), w::SignInAnswer::Busy);
+    assert_eq!(peer.printed_link(), link);
+    peer.answer_signed_in(fixtures::FIRST_SIGN_IN + 1, fixtures::FIRST_PERSON);
+    peer.answer_kept(fixtures::FIRST_SIGN_IN + 1);
+    assert!(peer.minted(mint).is_some());
+    complete_sign_in(&mut peer);
+    assert_eq!(peer.printed_link(), link);
+}
+
+#[test]
+fn a_mint_the_people_child_answers_full_is_refused_busy() {
+    let mut peer = peer();
+    let exchange = peer.mint(fixtures::application_person());
+    let to = pending_reply(&mut peer);
+    peer.answer_request(to, retry_answers()[2].clone());
+    assert_eq!(peer.mint_refusal(exchange), Some(MintRefusal::Busy));
+    assert_eq!(peer.digest_kept(), None);
+}
+
+#[test]
+fn a_services_sign_in_is_busy_for_busy_or_full() {
+    use jig_protocol_engine_clients::SecretOwner;
+    for reply in [retry_answers()[1].clone(), retry_answers()[2].clone()] {
+        let mut peer = peer();
+        let token = [7; 40];
+        let number = u64::from_be_bytes(token[..8].try_into().expect("eight-byte service number"));
+        peer.keep_digest(SecretOwner::Service(number), &token, fixtures::expires());
+        let exchange = peer.post(b"/jig/v1/sign-in/deployment", Box::new([0]), Some(&bearer(&token)));
+        let to = pending_reply(&mut peer);
+        peer.answer_request(to, reply);
+        assert_eq!(decoded(&peer, exchange), w::SignInAnswer::Busy);
+        assert_eq!(peer.digest_kept(), None);
+    }
 }

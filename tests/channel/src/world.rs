@@ -314,6 +314,7 @@ pub(crate) fn answer_parties(engine: &mut jig_test_service::Engine, party: &mut 
                     people::Reply::Outcome(people::Outcome::Said { task, message }) => {
                         parties::Reply::Said { task, message }
                     }
+                    people::Reply::Full { .. } => parties::Reply::Again(parties::Again::Busy),
                     people::Reply::Again(reason) => parties::Reply::Again(match reason {
                         people::Again::Busy => parties::Again::Busy,
                         people::Again::NotReady => parties::Again::NotReady,

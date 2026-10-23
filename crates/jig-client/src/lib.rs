@@ -10,7 +10,7 @@ pub mod shapes;
 mod store;
 pub mod thread;
 pub mod words;
-pub use client::{Client, Event, LinkView, Request};
+pub use client::{Client, Event, LinkView, NotSignedIn, Request};
 pub use jig_client_domain::Limits as DomainLimits;
 pub use jig_client_domain::{
     AccountCounts, Answered, Ask, Asker, Backoff, Document, Down, Family, Handle, Held, Key, Latest, Link, Outcome,

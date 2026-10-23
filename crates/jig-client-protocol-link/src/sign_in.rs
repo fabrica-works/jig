@@ -3,7 +3,7 @@ use crate::{
     Link, Message, Request, Signing, With,
     component::{Attempt, ExchangeKind},
 };
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 use skein_lib::{Queue, Reader, Secret, Time, Token, Writer};
 impl Link {
     #[must_use]
@@ -123,6 +123,12 @@ impl Link {
                         Signing::SignedIn { party: fields.party }
                     }
                     Ok(w::SignInAnswer::NotReady) if reader.remaining() == 0 => Signing::Again,
+                    Ok(w::SignInAnswer::Busy) if reader.remaining() == 0 => Signing::Busy,
+                    Ok(w::SignInAnswer::Full(value)) if reader.remaining() == 0 => Signing::Full {
+                        sign_ins: value.sign_ins(),
+                        earliest: skein_lib::Wall::from_nanos(value.earliest()),
+                        link_until: skein_lib::Wall::from_nanos(value.link_until()),
+                    },
                     Ok(w::SignInAnswer::Refused) if reader.remaining() == 0 => Signing::Refused,
                     Ok(_) | Err(_) => Signing::Lost,
                 },

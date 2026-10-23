@@ -480,6 +480,13 @@ pub enum Reply {
     Outcome(/** Terminal keyed result, or retryable root admission pressure for the current call. */ Outcome),
     /// Unsaved retry answer; no completed key is retained.
     Again(crate::Again),
+    /// Unsaved sign-in answer while every slot is live; no identity or sign-in is written.
+    Full {
+        /** Configured deployment capacity for sign-ins. */
+        sign_ins: u32,
+        /** Earliest saved expiry, strictly after the answer's wall clock. */
+        earliest: Wall,
+    },
     /// Entrance refused before making a new answered-key record.
     Refused(/** Direct entrance refusal with no newly saved answered-key record. */ Refusal),
 }

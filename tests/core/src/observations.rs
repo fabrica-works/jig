@@ -1027,10 +1027,11 @@ impl Observer {
                 );
             }
             root::Delivery::Core(core::Held::PeopleReply { to, reply }) => match reply {
-                people::Reply::SignedIn { sign_in, .. } => {
-                    requires.push(r::Receipt::SignIn(*sign_in));
-                }
-                people::Reply::Again(_) | people::Reply::SignedOut | people::Reply::Refused(_) => {
+                people::Reply::SignedIn { sign_in, .. } => requires.push(r::Receipt::SignIn(*sign_in)),
+                people::Reply::Full { .. }
+                | people::Reply::Again(_)
+                | people::Reply::SignedOut
+                | people::Reply::Refused(_) => {
                     let to = destination(to);
                     if self.requests.get(&to).is_some_and(|(_, _, seen)| seen.is_some()) {
                         self.requests.remove(&to);

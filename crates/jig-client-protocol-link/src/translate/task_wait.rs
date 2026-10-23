@@ -1,6 +1,6 @@
 //! Preserve the task's next-run wait and its unknown deadlines.
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 
 pub(super) fn waiting(value: Option<&w::TaskRunWait>, limits: &crate::Limits) -> Option<c::TaskRunWait> {
     Some(match value? {

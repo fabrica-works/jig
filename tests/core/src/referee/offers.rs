@@ -181,7 +181,10 @@ pub fn check(expected: &Admission, actual: &people::Reply) -> Result<(), &'stati
         people::Reply::Refused(why) => {
             return if *expected == Admission::Refused(why.clone()) { Ok(()) } else { Err("offered act was refused") };
         }
-        people::Reply::Again(_) | people::Reply::SignedOut | people::Reply::SignedIn { .. } => {
+        people::Reply::Full { .. }
+        | people::Reply::Again(_)
+        | people::Reply::SignedOut
+        | people::Reply::SignedIn { .. } => {
             return Err("offer received no semantic admission");
         }
     };

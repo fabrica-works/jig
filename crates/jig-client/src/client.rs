@@ -58,12 +58,20 @@ pub enum Request {
         credential: Secret,
     },
 }
+/// Why the last printed-link sign-in installed no credential (client/domain/client.md, 12).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NotSignedIn {
+    NotReady,
+    Busy,
+    Full { sign_ins: u32, earliest: Wall, link_until: Wall },
+}
 #[derive(Debug)]
 pub struct LinkView<'a> {
     pub state: Link,
     pub party: Option<u64>,
     pub not_served: &'a [u16],
     pub sign_out_lost: bool,
+    pub not_signed_in: Option<NotSignedIn>,
     pub credential: Option<&'a Secret>,
 }
 #[derive(Debug)]
@@ -75,6 +83,8 @@ pub struct Client {
     link_out: Queue<link::Request>,
     store: crate::store::Store,
     service: Option<Secret>,
+    signing_link: bool,
+    not_signed_in: Option<NotSignedIn>,
     signing_until: Option<Time>,
     signing_span: Option<Duration>,
     signing_out: bool,
@@ -112,6 +122,8 @@ impl Client {
             link_out: Queue::with_capacity(bound),
             store: crate::store::Store::new(limits.domain.requests.requests),
             service: None,
+            signing_link: false,
+            not_signed_in: None,
             signing_until: None,
             signing_span: None,
             signing_out: false,
@@ -146,6 +158,11 @@ impl Client {
                 self.domain_step(&env, domain::Event::Carry { key, name, request, value });
             }
             Event::SignIn { with } => {
+                self.signing_link = match &with {
+                    With::Link { .. } => true,
+                    With::Service(_) | With::Held(_) | With::Transport => false,
+                };
+                self.not_signed_in(None);
                 self.service = match &with {
                     With::Service(credential) if credential.len() == 40 => Some(credential.clone()),
                     With::Service(_) | With::Held(_) | With::Link { .. } | With::Transport => None,
@@ -237,6 +254,7 @@ impl Client {
             party: self.domain.party(),
             not_served: self.domain.not_served(),
             sign_out_lost: self.sign_out_lost,
+            not_signed_in: self.not_signed_in,
             credential: match &self.link {
                 Some(link) => link.credential(),
                 None => None,
@@ -294,8 +312,24 @@ impl Client {
         self.link.as_mut().expect("linked client").step(now, event, &mut self.link_out);
     }
     fn signing(&mut self, env: &Env<DomainLimits>, signing: link::Signing) {
+        if self.signing_link {
+            let why = match &signing {
+                link::Signing::Again => Some(NotSignedIn::NotReady),
+                link::Signing::Busy => Some(NotSignedIn::Busy),
+                link::Signing::Full { sign_ins, earliest, link_until } => {
+                    Some(NotSignedIn::Full { sign_ins: *sign_ins, earliest: *earliest, link_until: *link_until })
+                }
+                link::Signing::SignedIn { .. }
+                | link::Signing::SignedOut
+                | link::Signing::Lost
+                | link::Signing::Refused => None,
+            };
+            self.not_signed_in(why);
+        }
+        self.signing_link = false;
         match signing {
             link::Signing::SignedIn { .. } => {
+                self.not_signed_in(None);
                 self.service = None;
                 self.signing_until = None;
                 self.signing_out = false;
@@ -319,11 +353,21 @@ impl Client {
                 self.signing_until =
                     Some(env.now.saturating_add(Duration::from_nanos(self.rng.between(nanos.div_euclid(2), nanos))));
             }
-            link::Signing::Again | link::Signing::Lost | link::Signing::Refused => {
+            link::Signing::Busy
+            | link::Signing::Full { .. }
+            | link::Signing::Again
+            | link::Signing::Lost
+            | link::Signing::Refused => {
                 self.sign_out_failed();
                 self.service = None;
                 self.signing_until = None;
             }
+        }
+    }
+    fn not_signed_in(&mut self, why: Option<NotSignedIn>) {
+        if self.not_signed_in != why {
+            self.not_signed_in = why;
+            self.domain_out.push(domain::Request::Told { told: Told::Link { link: self.domain.link() } });
         }
     }
     fn sign_out_failed(&mut self) {

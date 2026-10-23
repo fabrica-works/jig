@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::{Event, FromApplication, Request, ToApplication, translate::watches};
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 use jig_domain_core as core;
 use skein_lib::{Reader, Token};
 const ENDED_WATCH: u64 = 17;

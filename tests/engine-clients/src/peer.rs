@@ -2,7 +2,7 @@
 use jig_protocol_engine_clients_http as mapping;
 mod closing;
 use crate::fixtures;
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_protocol_engine_clients::{
@@ -203,7 +203,11 @@ pub struct Peer {
 impl Peer {
     #[must_use]
     pub fn started(settings: &Settings) -> Self {
-        let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: fixtures::limits() };
+        Self::with_limits(settings, fixtures::limits())
+    }
+    #[must_use]
+    pub fn with_limits(settings: &Settings, limits: Limits) -> Self {
+        let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
         let mut out = Queue::with_capacity(64);
         let component = Component::new(settings.clone(), &env, &mut out).expect("component starts");
         let mut peer = Self {
@@ -523,7 +527,7 @@ impl Peer {
         subject.encode(&mut record).expect("subject");
         let subject = w::Owned::new(
             &self.env.limits.wire,
-            w::OwnedParts { owner: w::Owner::Jig, version: 13, record: record.finish() },
+            w::OwnedParts { owner: w::Owner::Jig, version: 14, record: record.finish() },
         )
         .expect("subject owner");
         let open = w::Open::new(&self.env.limits.wire, w::OpenParts { stream, watch: self.next_watch, subject })
@@ -762,6 +766,8 @@ impl Peer {
             w::SignInAnswer::SignedIn(answer) => answer,
             w::SignInAnswer::Refused => panic!("sign-in refused"),
             w::SignInAnswer::NotReady => panic!("sign-in not ready"),
+            w::SignInAnswer::Busy => panic!("sign-in busy"),
+            w::SignInAnswer::Full(_) => panic!("sign-ins full"),
         }
     }
     pub fn answer_request(&mut self, to: ReplyTo, reply: people::Reply) {

@@ -1,6 +1,6 @@
 //! Method and route dispatch (protocol/client.md, section 4).
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v13 as w;
+use jig_client_protocol_wire::v14 as w;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Route {
     Link,
@@ -103,6 +103,20 @@ pub(crate) fn not_ready() -> Box<[u8]> {
     out.finish()
 }
 
+pub(crate) fn sign_in_busy() -> Box<[u8]> {
+    sign_in_answer(w::SignInAnswer::Busy)
+}
+pub(crate) fn sign_in_full(limits: &w::Limits, sign_ins: u32, earliest: u64, link_until: u64) -> Box<[u8]> {
+    sign_in_answer(w::SignInAnswer::Full(
+        w::SignInsFull::new(limits, w::SignInsFullParts { sign_ins, earliest, link_until })
+            .expect("fixed sign-in capacity fits"),
+    ))
+}
+fn sign_in_answer(answer: w::SignInAnswer) -> Box<[u8]> {
+    let mut out = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut out).expect("measured sign-in answer");
+    out.finish()
+}
 pub(crate) fn sign_in_not_ready() -> Box<[u8]> {
     let mut out = skein_lib::Writer::new(1);
     w::SignInAnswer::NotReady.encode(&mut out).expect("not ready fits");

@@ -47,7 +47,8 @@ fn reply(world: &mut World, token: u64) -> (Option<u64>, people::Reply) {
     (
         match reply {
             people::Reply::SignedIn { sign_in, .. } => Some(sign_in),
-            people::Reply::SignedOut
+            people::Reply::Full { .. }
+            | people::Reply::SignedOut
             | people::Reply::Outcome(_)
             | people::Reply::Again(_)
             | people::Reply::Refused(_) => None,

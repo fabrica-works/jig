@@ -41,6 +41,12 @@ impl Component {
             false
         }
     }
+    fn return_link(&mut self, spent: Option<sign_in::Link>) {
+        if spent.is_some() && (self.phase == closing::Phase::Active || self.phase == closing::Phase::Stopped) {
+            assert!(self.link.is_none(), "a reserved link is not open");
+            self.link = spent;
+        }
+    }
     pub(super) fn sign_in_reply(
         &mut self,
         env: &Env<Limits>,
@@ -97,18 +103,27 @@ impl Component {
                     people::Again::Busy => MintRefusal::Busy,
                 };
                 if !self.mint_refused(exchange, refusal, out) {
-                    // Not ready spends no secret: the same link signs in when sent again.
-                    if refusal == MintRefusal::NotReady
-                        && self.link.is_none()
-                        && (self.phase == closing::Phase::Active || self.phase == closing::Phase::Stopped)
-                    {
-                        self.link = spent;
-                    }
+                    // Retry answers give the same secret back without extending its expiry.
+                    self.return_link(spent);
                     let answer = if refusal == MintRefusal::NotReady {
                         routes::sign_in_not_ready()
                     } else {
-                        routes::refused(&env.limits.wire)
+                        routes::sign_in_busy()
                     };
+                    self.respond(env, exchange, answer);
+                }
+            }
+            people::Reply::Full { sign_ins, earliest } => {
+                if !self.mint_refused(exchange, MintRefusal::Busy, out) {
+                    let answer = match &spent {
+                        Some(link) => {
+                            let left = link.until.as_nanos().saturating_sub(env.now.as_nanos());
+                            let link_until = env.wall.as_nanos().saturating_add(left);
+                            routes::sign_in_full(&env.limits.wire, sign_ins, earliest.as_nanos(), link_until)
+                        }
+                        None => routes::sign_in_busy(),
+                    };
+                    self.return_link(spent);
                     self.respond(env, exchange, answer);
                 }
             }
