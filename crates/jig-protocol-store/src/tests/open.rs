@@ -145,8 +145,8 @@ fn a_format_row_of_another_component_version_refuses_naming_it() {
 
 #[test]
 fn a_store_of_another_accounts_version_refuses_naming_accounts() {
-    let mut store = planted(&[accounts_put(2), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Accounts, found: 2, wanted: 1 });
+    let mut store = planted(&[accounts_put(1), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Accounts, found: 1, wanted: 2 });
 }
 
 #[test]

@@ -326,6 +326,7 @@ fn set_accounts(limits: &mut jig_domain_accounts::Limits, name: &[u8], value: u6
         backoff_base,
         backoff_max,
         retry,
+        move_deadline,
         spent_attention,
         facts,
     } = limits;
@@ -340,6 +341,7 @@ fn set_accounts(limits: &mut jig_domain_accounts::Limits, name: &[u8], value: u6
         b"backoff_base_ms" => *backoff_base = millis(value)?,
         b"backoff_max_ms" => *backoff_max = millis(value)?,
         b"retry_ms" => *retry = millis(value)?,
+        b"move_deadline_ms" => *move_deadline = millis(value)?,
         b"spent_attention_ms" => *spent_attention = millis(value)?,
         b"facts" => *facts = count(value)?,
         _ => return Err(What::Override),

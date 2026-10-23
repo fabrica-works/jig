@@ -176,6 +176,7 @@ fn profile() -> root::Limits {
                 backoff_base: Duration::from_secs(2),
                 backoff_max: Duration::from_secs(8),
                 retry: Duration::from_secs(30),
+                move_deadline: Duration::from_secs(60),
                 spent_attention: Duration::from_secs(1),
                 facts: 2,
             },

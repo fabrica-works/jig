@@ -15,6 +15,14 @@ pub enum SignIn {
 /// Why a sign-in or a new source is refused, naming what refuses it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// No signed-in source holding a record that reads (accounts.md, section 6).
+    NotSignedIn,
+    /// The carried file does not belong to this application.
+    NotOurs,
+    /// Written named no answered move of this holder's still under way.
+    Cancelled,
+    /// This source is withdrawn for a move.
+    Moving,
     NotLimited,
     Uses,
     NotKept {
@@ -83,6 +91,9 @@ impl Domain {
             }
             for (_, source) in &account.sources {
                 if self.sources.get(source).expect("an account's sources are kept").kind == Kind::SignIn {
+                    if self.moves.contains_key(source) {
+                        return Err(Refusal::Moving);
+                    }
                     return Ok(SignIn::Renew { account: *number });
                 }
             }

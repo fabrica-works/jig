@@ -1,5 +1,5 @@
 //! Arbitrary and mutated family bytes (protocol/store.md, sections 5.1 and 14).
-use jig_protocol_store::{accounts_v1, component_v2, notes_v1, people_v11};
+use jig_protocol_store::{accounts_v2, component_v2, notes_v1, people_v11};
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -28,12 +28,12 @@ fn component(bytes: &[u8]) {
     }
 }
 fn accounts(bytes: &[u8]) {
-    if let Ok(row) = accounts_v1::Installation::decode(&accounts_v1::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = accounts_v2::Installation::decode(&accounts_v2::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
     }
-    if let Ok(row) = accounts_v1::Row::decode(&accounts_v1::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = accounts_v2::Row::decode(&accounts_v2::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -55,7 +55,7 @@ fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
         "core" => "v6",
         "tasks" => "v9",
         "people" => "v11",
-        "component" => "v2",
+        "component" | "accounts" => "v2",
         _ => "v1",
     };
     let root =

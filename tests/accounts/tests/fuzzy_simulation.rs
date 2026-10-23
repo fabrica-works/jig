@@ -89,12 +89,13 @@ fn seeded_account_timers_and_faults_replay() {
 /// Every holder change, interleaved with component answers and source holds.
 fn changes(seed: u64) -> Vec<Request> {
     use jig_accounts_world::{provider, providers};
-    use jig_domain_accounts::{Answer, Change, Holder, Signing, Stored, Use};
+    use jig_domain_accounts::{Change, Holder, Stored, Use};
     use skein_lib::Token;
-    let mut world = World::with(providers(vec![provider(1, true, true)]), &[]);
-    world.step(Event::Want);
+    let mut offered = provider(1, true, true);
+    offered.offers.programs = Box::new([Box::from(b"fake-program".as_slice())]);
+    let mut world = World::with(providers(vec![offered]), &[]);
     let mut rng = Rng::new(seed);
-    let mut trace = Vec::new();
+    let mut trace = world.step(Event::Want);
     for request in 0..160_u64 {
         let views = world.views();
         let chosen = views.get(
@@ -102,7 +103,8 @@ fn changes(seed: u64) -> Vec<Request> {
         );
         let account = chosen.map_or(u32::MAX, |view| view.account);
         let source = chosen.map_or(u32::MAX, |view| view.source);
-        let change = match rng.below(8) {
+        let choice = rng.below(12);
+        let change = match choice {
             0 => Change::AddKey {
                 provider: 1,
                 join: if rng.chance(40) { Some(account) } else { None },
@@ -114,52 +116,21 @@ fn changes(seed: u64) -> Vec<Request> {
             4 => Change::Remove { account },
             5 => Change::MoveAccount { account, place: u32::try_from(rng.below(4)).expect("tiny place") },
             6 => Change::MoveSource { account, source, place: u32::try_from(rng.below(4)).expect("tiny place") },
-            _ => Change::SetUses { account, uses: if rng.chance(50) { Some(Box::new([Use::Party(7)])) } else { None } },
+            7 => Change::SetUses { account, uses: if rng.chance(50) { Some(Box::new([Use::Party(7)])) } else { None } },
+            8 => {
+                Change::DeclareProgram { provider: 1, join: None, name: format!("fake-{request}").into_bytes().into() }
+            }
+            _ => Change::CheckProgram { source },
         };
-        let outputs = world.step(Event::Change { request: Token::new(request), holder: Holder::Party(7), change });
+        let event = match choice {
+            10 => Event::SignIn { request: Token::new(request), holder: Holder::Party(7), by: 7, provider: 1 },
+            11 => Event::SignOut { request: Token::new(request), holder: Holder::Party(7), source },
+            _ => Event::Change { request: Token::new(request), holder: Holder::Party(7), change },
+        };
+        let outputs = world.step(event);
         let mut pending = std::collections::VecDeque::from(outputs);
         while let Some(output) = pending.pop_front() {
-            let event = match output {
-                Request::Signing(Signing::Keep { source, .. }) => {
-                    if rng.chance(25) {
-                        Some(Event::Component(FromComponent::KeepFailed {
-                            account: source,
-                            why: jig_domain_accounts::KeyFailure::NotStored,
-                        }))
-                    } else {
-                        let generation = world.domain.source(source).and_then(|s| s.generation).unwrap_or(0) + 1;
-                        Some(Event::Component(FromComponent::Granted {
-                            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Key),
-                            account: source,
-                            generation,
-                            valid: Duration::from_secs(100),
-                        }))
-                    }
-                }
-                Request::Signing(Signing::SignOut { source }) => {
-                    Some(Event::SignedOut { source, confirmed: rng.chance(70) })
-                }
-                Request::Signing(
-                    Signing::CancelSignIn { .. }
-                    | Signing::SignIn { .. }
-                    | Signing::Replaced { .. }
-                    | Signing::Forget { .. }
-                    | Signing::Restore { .. }
-                    | Signing::Restored,
-                )
-                | Request::Programs { .. }
-                | Request::CheckProgram { .. }
-                | Request::SignOutProgram { .. }
-                | Request::Component(_)
-                | Request::Granted { .. }
-                | Request::Save { .. }
-                | Request::Erase { .. }
-                | Request::Closed => None,
-                Request::Answer { ref answer, .. } => {
-                    assert!(!matches!(answer, Answer::Started { .. }));
-                    None
-                }
-            };
+            let event = change_response(&mut world, &mut rng, &output, &mut trace);
             trace.push(output);
             if let Some(event) = event {
                 pending.extend(world.step(event));
@@ -181,6 +152,68 @@ fn changes(seed: u64) -> Vec<Request> {
     assert_eq!(world.domain.accounts(), 0);
     trace
 }
+fn change_response(world: &mut World, rng: &mut Rng, output: &Request, trace: &mut Vec<Request>) -> Option<Event> {
+    use jig_domain_accounts::{Answer, Signing};
+    match *output {
+        Request::Signing(Signing::Keep { source, .. }) => {
+            if rng.chance(25) {
+                Some(Event::Component(FromComponent::KeepFailed {
+                    account: source,
+                    why: jig_domain_accounts::KeyFailure::NotStored,
+                }))
+            } else {
+                let generation = world.domain.source(source).and_then(|s| s.generation).unwrap_or(0) + 1;
+                Some(Event::Component(FromComponent::Granted {
+                    form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Key),
+                    account: source,
+                    generation,
+                    valid: Duration::from_secs(100),
+                }))
+            }
+        }
+        Request::Signing(Signing::SignIn { source, .. }) => {
+            trace.extend(
+                world.step(Event::Visited { source, address: Box::from(b"https://fake.test/visit".as_slice()) }),
+            );
+            Some(if rng.chance(25) {
+                Event::SignInFailed { source, failure: Failure::SignInAgain }
+            } else {
+                Event::SignedIn {
+                    source,
+                    subject: Box::from(if rng.chance(50) { b"subject-a".as_slice() } else { b"subject-b".as_slice() }),
+                    display: Box::new([]),
+                    declined: rng.chance(20),
+                }
+            })
+        }
+        Request::Signing(Signing::SignOut { source }) => Some(Event::SignedOut { source, confirmed: rng.chance(70) }),
+        Request::Signing(
+            Signing::Withdraw { .. }
+            | Signing::Return { .. }
+            | Signing::Refresh { .. }
+            | Signing::Open { .. }
+            | Signing::Adopt { .. }
+            | Signing::CancelSignIn { .. }
+            | Signing::Replaced { .. }
+            | Signing::Forget { .. }
+            | Signing::Restore { .. }
+            | Signing::Restored,
+        )
+        | Request::Programs { .. }
+        | Request::CheckProgram { .. }
+        | Request::SignOutProgram { .. }
+        | Request::Component(_)
+        | Request::Granted { .. }
+        | Request::Save { .. }
+        | Request::Erase { .. }
+        | Request::Closed => None,
+        Request::Answer { ref answer, .. } => {
+            assert!(!matches!(answer, Answer::MovingOut { .. } | Answer::MovedIn { .. }));
+            None
+        }
+    }
+}
+
 fn dense_and_bounded(world: &World) {
     let views = world.views();
     let mut places = Vec::new();
@@ -203,5 +236,42 @@ fn dense_and_bounded(world: &World) {
 fn seeded_account_changes_replay() {
     for seed in 0..64 {
         assert_eq!(changes(seed), changes(seed), "seed {seed}");
+    }
+}
+
+/// M1's core constructs changes only from people's `AccountChange`, which has no move.
+/// These whole traces cover the other half: without a move entrance the child emits none
+/// of the values the transitional M2 arms would translate.
+#[test]
+fn people_changes_never_emit_move_values() {
+    use jig_domain_accounts::{Answer, Held, Refusal, Signing, Stored};
+    for seed in 0..64 {
+        for trace in [run(seed), changes(seed)] {
+            for request in trace {
+                assert!(
+                    !matches!(
+                        request,
+                        Request::Answer {
+                            answer: Answer::MovingOut { .. }
+                                | Answer::MovedIn { .. }
+                                | Answer::Refused {
+                                    refusal: Refusal::NotSignedIn
+                                        | Refusal::NotOurs
+                                        | Refusal::Cancelled
+                                        | Refusal::Moving
+                                },
+                            ..
+                        } | Request::Signing(
+                            Signing::Withdraw { .. }
+                                | Signing::Return { .. }
+                                | Signing::Refresh { .. }
+                                | Signing::Open { .. }
+                                | Signing::Adopt { .. }
+                        ) | Request::Save { record: Stored::Source { held: Some(Held::Moving), .. } }
+                    ),
+                    "seed {seed}: {request:?}"
+                );
+            }
+        }
     }
 }

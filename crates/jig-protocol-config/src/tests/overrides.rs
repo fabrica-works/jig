@@ -225,6 +225,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"accounts.backoff_base_ms", 2_000),
     (b"accounts.backoff_max_ms", 60_000),
     (b"accounts.retry_ms", 30_000),
+    (b"accounts.move_deadline_ms", 60_000),
     (b"accounts.spent_attention_ms", 300_000),
     (b"accounts.facts", 32),
     (b"accounts.holder_accounts", 4),
@@ -427,4 +428,15 @@ fn document_segments_have_no_operator_override() {
     assert_eq!(overrides::apply(&mut small(), b"documents.grants", 8), Err(What::Override));
     assert_eq!(overrides::apply(&mut small(), b"documents.executors", 8), Err(What::Override));
     assert_eq!(overrides::apply(&mut small(), b"documents.implications", 8), Err(What::Override));
+}
+
+#[test]
+fn the_accounts_move_deadline_is_positive_and_overridden_in_milliseconds() {
+    for profile in [Profile::Small, Profile::Standard] {
+        assert_eq!(crate::profile(profile).core.accounts.move_deadline, skein_lib::Duration::from_secs(60));
+    }
+    let mut expected = small();
+    expected.core.accounts.move_deadline = skein_lib::Duration::from_millis(12_345);
+    assert_eq!(parse(br#"{"profile":"small","overrides":{"accounts.move_deadline_ms":12345}}"#), Ok(expected));
+    refused(br#"{"profile":"small","overrides":{"accounts.move_deadline_ms":0}}"#, b"accounts.move_deadline_ms");
 }

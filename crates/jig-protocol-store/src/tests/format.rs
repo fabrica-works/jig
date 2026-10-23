@@ -54,7 +54,7 @@ fn another_family_is_refused_naming_the_first_difference() {
         (Family::Core, codec::component::Format { core: 5, tasks: 4, ..wanted }),
         (Family::People, codec::component::Format { people: 10, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, accounts: 2, ..wanted }),
-        (Family::Accounts, codec::component::Format { accounts: 2, application: 2, ..wanted }),
+        (Family::Accounts, codec::component::Format { accounts: 1, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
     ] {
         assert_eq!(
@@ -65,14 +65,15 @@ fn another_family_is_refused_naming_the_first_difference() {
                     Family::Core => 5,
                     Family::People => 10,
                     Family::Component => 3,
-                    Family::Tasks | Family::Notes | Family::Accounts | Family::Application => 2,
+                    Family::Accounts => 1,
+                    Family::Tasks | Family::Notes | Family::Application => 2,
                 },
                 wanted: match family {
                     Family::Core => 6,
                     Family::Tasks => 9,
                     Family::People => 11,
-                    Family::Component => 2,
-                    Family::Notes | Family::Accounts | Family::Application => 1,
+                    Family::Component | Family::Accounts => 2,
+                    Family::Notes | Family::Application => 1,
                 }
             })
         );

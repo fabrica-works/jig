@@ -12,12 +12,13 @@ pub fn max_out(limits: &Limits) -> u32 {
     out_bound(limits).expect("account output bound")
 }
 pub(crate) const fn out_bound(limits: &Limits) -> Option<u32> {
-    let Some(per_account) = limits.sources.checked_mul(3) else { return None };
+    let Some(per_account) = limits.sources.checked_mul(4) else { return None };
     let Some(per_account) = per_account.checked_add(3) else { return None };
     let Some(all) = limits.accounts.checked_mul(per_account) else { return None };
     let Some(all) = all.checked_add(limits.sign_ins) else { return None };
     let Some(all) = all.checked_add(limits.sign_ins) else { return None };
-    all.checked_add(6)
+    let Some(all) = all.checked_add(limits.sign_ins) else { return None };
+    all.checked_add(10)
 }
 
 /// An account (accounts.md, 3.1): its provider, its holder, the subject a signed-in source gave
@@ -119,6 +120,7 @@ impl Source {
 pub(crate) enum Hold {
     Limited { until: Option<Deadline> },
     Refused,
+    Moving,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) struct Granted {
@@ -163,6 +165,9 @@ pub struct Domain {
     /// at the component until then, so they are within the sources' bound.
     pub(crate) signing_out: Map<u32, crate::changes::Leaving>,
     pub(crate) keeping: Map<u32, crate::keys::Keeping>,
+    pub(crate) moves: Map<u32, crate::signing::Move>,
+    pub(crate) move_alarms: Deadlines<u32>,
+    pub(crate) arriving: Map<u32, crate::signing::Arriving>,
     pub(crate) removing: Map<u32, crate::changes::Removing>,
     facts: Queue<Fact>,
     ended: Queue<Ended>,
@@ -191,6 +196,9 @@ impl Domain {
             signing: Map::with_capacity(limits.sign_ins),
             signing_out: Map::with_capacity(sources),
             keeping: Map::with_capacity(limits.sign_ins),
+            moves: Map::with_capacity(limits.sign_ins),
+            move_alarms: Deadlines::with_capacity(limits.sign_ins),
+            arriving: Map::with_capacity(limits.sign_ins),
             removing: Map::with_capacity(limits.accounts),
             facts: Queue::with_capacity(limits.facts),
             ended: Queue::with_capacity(limits.facts),
@@ -232,6 +240,14 @@ impl Domain {
     /// Started and not closing: the child takes a party's request.
     pub(crate) fn wanted(&self) -> bool {
         self.phase == Phase::Wanted
+    }
+    /// All operations sharing the sign-ins-at-once bound (accounts.md, 3.6).
+    pub(crate) fn sign_ins(&self) -> u32 {
+        self.signing
+            .len()
+            .saturating_add(self.keeping.len())
+            .saturating_add(self.moves.len())
+            .saturating_add(self.arriving.len())
     }
     pub(crate) fn end(&mut self, ended: Ended) {
         if self.ended.capacity() == 0 {
@@ -357,13 +373,14 @@ impl Domain {
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        match self.alarms.next() {
-            Some(a) => match self.credential_alarms.next() {
-                Some(b) => Some(a.min(b)),
-                None => Some(a),
-            },
-            None => self.credential_alarms.next(),
+        let mut next = None;
+        for at in [self.alarms.next(), self.credential_alarms.next(), self.move_alarms.next()].into_iter().flatten() {
+            next = Some(match next {
+                Some(old) => at.min(old),
+                None => at,
+            });
         }
+        next
     }
     #[must_use]
     pub fn is_due(&self, now: Time) -> bool {
@@ -454,6 +471,19 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::programs::signed_out(domain, source, host, result, out);
         }
         Event::Credential { number, generation, valid } => credential(domain, env, number, generation, valid, out),
+        Event::Withdrawn { source, readable } if domain.wanted() => {
+            crate::signing::withdrawn(domain, env, source, readable, out);
+        }
+        Event::Opened { source, provider, subject, display } if domain.wanted() => {
+            crate::signing::opened(domain, env, source, provider, subject, display, out);
+        }
+        Event::NotOurs { source } if domain.wanted() => {
+            crate::signing::not_ours(domain, source, out);
+        }
+        Event::Adopted { source, kept } if domain.wanted() => {
+            crate::signing::adopted(domain, env, source, kept, out);
+        }
+        Event::Withdrawn { .. } | Event::Opened { .. } | Event::NotOurs { .. } | Event::Adopted { .. } => {}
         Event::Close => close(domain, env, out),
         Event::Component(FromComponent::Closed) => {
             if domain.phase != Phase::Closing {
@@ -561,6 +591,9 @@ fn want(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     }
     for (number, source) in &domain.sources {
         if source.kind == Kind::SignIn || source.kind == Kind::Key {
+            if source.hold == Some(Hold::Moving) {
+                out.push(Request::Signing(Signing::Refresh { source: *number }));
+            }
             out.push(Request::Component(ToComponent::Want { account: *number }));
         }
     }
@@ -654,6 +687,9 @@ fn none_accounts(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request
 /// The first unauthorized of a signed-in source's generation asks the component to renew it;
 /// a second fails it. A key refused so is refused; a program's login is its host's to check.
 fn unauthorized(domain: &mut Domain, env: &Env<Limits>, source: u32, generation: u64, out: &mut Queue<Request>) {
+    if domain.moves.contains_key(&source) {
+        return;
+    }
     let kind = match domain.sources.get(&source) {
         Some(entry) => entry.kind,
         None => return,
@@ -696,7 +732,7 @@ fn limited(domain: &mut Domain, env: &Env<Limits>, source: u32, reset: Option<Ti
     let Some(entry) = domain.sources.get_mut(&source) else { return };
     let before = entry.hold;
     let until = match entry.hold {
-        Some(Hold::Refused) => return,
+        Some(Hold::Refused | Hold::Moving) => return,
         Some(Hold::Limited { until: None }) => None,
         Some(Hold::Limited { until: Some(old) }) => match reset {
             Some(new) if new > old.at => Some(deadline(env, new)),
@@ -717,6 +753,9 @@ fn limited(domain: &mut Domain, env: &Env<Limits>, source: u32, reset: Option<Ti
 }
 fn refused(domain: &mut Domain, env: &Env<Limits>, source: u32, out: &mut Queue<Request>) {
     let Some(entry) = domain.sources.get_mut(&source) else { return };
+    if entry.hold == Some(Hold::Moving) {
+        return;
+    }
     let before = entry.hold;
     entry.hold = Some(Hold::Refused);
     entry.hold_attention = true;
@@ -729,6 +768,7 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     }
     crate::signing::close(domain, out);
     crate::keys::close(domain, out);
+    crate::signing::close_moves(domain, out);
     for (_, pending) in &domain.programs {
         match pending.leaving {
             crate::changes::Leaving::Source(request) => crate::changes::refuse(request, crate::Refusal::Closing, out),
@@ -774,6 +814,16 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 }
 /// The component serves signed-in sources; it names each by its number.
 fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: &mut Queue<Request>) {
+    let source = match event {
+        FromComponent::Granted { account, .. }
+        | FromComponent::Expiring { account, .. }
+        | FromComponent::Failed { account, .. }
+        | FromComponent::KeepFailed { account, .. } => account,
+        FromComponent::Closed => return,
+    };
+    if domain.moves.contains_key(&source) {
+        return;
+    }
     let kept = match event {
         FromComponent::Granted { account, form, .. } => {
             match form {
@@ -804,6 +854,9 @@ fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: 
             let valid = if entry.kind == Kind::Key { crate::KEY_VALID } else { valid };
             entry.grant = Some(Granted { generation, expires: env.now.saturating_add(valid), form });
             entry.state = State::Granted;
+            if entry.hold == Some(Hold::Moving) {
+                entry.hold = None;
+            }
             entry.retry = None;
             entry.expiring = false;
             entry.backoff = env.limits.backoff_base;
@@ -843,6 +896,9 @@ fn failed(entry: &mut Source, env: &Env<Limits>, failure: Failure) {
             State::Later { until: deadline(env, until) }
         }
         Failure::SignInAgain | Failure::MissingScope { .. } => {
+            if entry.hold == Some(Hold::Moving) {
+                entry.hold = None;
+            }
             entry.grant = None;
             entry.expiring = false;
             entry.retry = Some(env.now.saturating_add(env.limits.retry));
@@ -873,6 +929,10 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         domain.credentials.remove(&number).expect("credential alarm names a grant");
         return;
     }
+    if let Some(source) = domain.move_alarms.expire(env.now) {
+        crate::signing::cancel_move(domain, env, source, out);
+        return;
+    }
     let Some(source) = domain.alarms.expire(env.now) else { return };
     let entry = domain.sources.get_mut(&source).expect("alarm names a kept source");
     let before = entry.hold;
@@ -891,17 +951,23 @@ fn fact(number: u32, entry: &Source) -> Fact {
     let held = match entry.hold {
         Some(Hold::Limited { until }) => State::Limited { until },
         Some(Hold::Refused) => State::Refused,
+        // M2 carries the moving state through the client; M1 exposes Asking.
+        Some(Hold::Moving) => State::Asking,
         None => entry.state,
     };
-    let state = match entry.state {
-        State::Asking | State::Granted | State::Later { .. } => held,
-        State::Limited { .. }
-        | State::Refused
-        | State::NeedsSignIn
-        | State::Misconfigured
-        | State::Unloaded { .. }
-        | State::Cancelled
-        | State::Closing => entry.state,
+    let state = if entry.hold == Some(Hold::Moving) {
+        State::Asking
+    } else {
+        match entry.state {
+            State::Asking | State::Granted | State::Later { .. } => held,
+            State::Limited { .. }
+            | State::Refused
+            | State::NeedsSignIn
+            | State::Misconfigured
+            | State::Unloaded { .. }
+            | State::Cancelled
+            | State::Closing => entry.state,
+        }
     };
     let attention = match state {
         State::NeedsSignIn | State::Misconfigured | State::Unloaded { .. } => true,
@@ -926,7 +992,7 @@ fn fact(number: u32, entry: &Source) -> Fact {
         expiring: entry.expiring,
         spent_until: match entry.hold {
             Some(Hold::Limited { until }) => until,
-            Some(Hold::Refused) | None => None,
+            Some(Hold::Refused | Hold::Moving) | None => None,
         },
         attention: attention || entry.expiring || entry.hold_attention,
     }
@@ -965,6 +1031,7 @@ pub(crate) fn stored(domain: &Domain, _env: &Env<Limits>, number: u32) -> Stored
         Some(Hold::Limited { until: Some(until) }) => Some(Held::Limited { reset: Some(until.wall) }),
         Some(Hold::Limited { until: None }) => Some(Held::Limited { reset: None }),
         Some(Hold::Refused) => Some(Held::Refused),
+        Some(Hold::Moving) => Some(Held::Moving),
         None => None,
     };
     Stored::Source {
@@ -1008,7 +1075,7 @@ pub(crate) fn settle(domain: &mut Domain, env: &Env<Limits>, source: u32) -> Fac
     };
     let reset = match entry.hold {
         Some(Hold::Limited { until: Some(until) }) => Some(until.at),
-        Some(Hold::Limited { until: None } | Hold::Refused) | None => None,
+        Some(Hold::Limited { until: None } | Hold::Refused | Hold::Moving) | None => None,
     };
     for at in [expiry, reset].into_iter().flatten() {
         if at > env.now {
@@ -1043,7 +1110,7 @@ pub(crate) fn program_grant(domain: &mut Domain, source: u32, out: &mut Queue<Re
     }
     match entry.hold {
         Some(Hold::Limited { until: Some(until) }) if until.at <= domain.now => {}
-        Some(Hold::Limited { .. } | Hold::Refused) => return,
+        Some(Hold::Limited { .. } | Hold::Refused | Hold::Moving) => return,
         None => {}
     }
     let generation = u64::from(domain.next);
@@ -1061,4 +1128,18 @@ pub(crate) fn withdraw_program(domain: &mut Domain, source: u32) {
         entry.usable = false;
         entry.state = State::Asking;
     }
+}
+
+/// A move releases every trace of the generation before its record is withdrawn.
+pub(crate) fn moving(domain: &mut Domain, env: &Env<Limits>, source: u32, out: &mut Queue<Request>) {
+    let entry = domain.sources.get_mut(&source).expect("a move's checked source");
+    let before = entry.hold;
+    entry.hold = Some(Hold::Moving);
+    entry.grant = None;
+    entry.expiring = false;
+    entry.retry = None;
+    entry.unauthorized = None;
+    entry.hold_attention = false;
+    entry.state = State::Asking;
+    changed(domain, env, source, before, out);
 }

@@ -495,7 +495,10 @@ fn memory_below_the_components_sum_is_refused() {
         // template overrides at the small profile.
         + 190_256
         // First-start seed policy heap, names and their retained table.
-        + 187_504;
+        + 187_504
+        // Account moves add bounded move/arrival tables, payloads and deadlines,
+        // and enlarge the accounts output bound and the core's routed envelopes.
+        + 14_560_734;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

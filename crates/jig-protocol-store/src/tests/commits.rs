@@ -87,7 +87,7 @@ fn a_first_commit_puts_the_format_row_and_the_installation_with_its_header() {
             tasks: 9,
             people: 11,
             notes: 1,
-            accounts: 1,
+            accounts: 2,
             application: 1,
             deployment: fixtures::DEPLOYMENT,
         },

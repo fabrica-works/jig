@@ -69,6 +69,18 @@ pub(crate) fn change(
             }
             return;
         }
+        Change::MoveOut { account } => {
+            crate::signing::move_out(domain, env, request, holder, account, out);
+            return;
+        }
+        Change::Written { number } => {
+            crate::signing::written(domain, env, request, holder, number, out);
+            return;
+        }
+        Change::MoveIn { carried } => {
+            crate::signing::move_in(domain, env, request, holder, carried, out);
+            return;
+        }
         Change::CheckProgram { source } => crate::programs::check(domain, holder, source, out),
         Change::AddKey { provider, join, carried } => {
             crate::keys::add(domain, env, request, holder, provider, join, carried, out);
@@ -128,7 +140,7 @@ fn resume(
             entry.hold = None;
             entry.hold_attention = false;
         }
-        Some(crate::domain::Hold::Refused) | None => return Err(Refusal::NotLimited),
+        Some(crate::domain::Hold::Refused | crate::domain::Hold::Moving) | None => return Err(Refusal::NotLimited),
     }
     crate::domain::changed(domain, env, number, before, out);
     Ok(())
@@ -167,6 +179,12 @@ pub(crate) fn detach(domain: &mut Domain, env: &Env<Limits>, account: u32, numbe
 
 fn removable(domain: &Domain, holder: Holder, number: u32) -> Result<u32, Refusal> {
     account(domain, holder, number)?;
+    let entry = domain.accounts.get(&number).expect("checked account");
+    for (_, source) in &entry.sources {
+        if domain.moves.contains_key(source) {
+            return Err(Refusal::Moving);
+        }
+    }
     if domain.removing.len() == domain.removing.capacity() {
         return Err(Refusal::Limit { bound: Bound::Accounts });
     }
@@ -175,7 +193,6 @@ fn removable(domain: &Domain, holder: Holder, number: u32) -> Result<u32, Refusa
             return Err(Refusal::Limit { bound: Bound::SignIns });
         }
     }
-    let entry = domain.accounts.get(&number).expect("checked account");
     let mut leaving: u32 = 0;
     let mut programs: u32 = 0;
     for (_, source) in &entry.sources {

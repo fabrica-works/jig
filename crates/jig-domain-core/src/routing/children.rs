@@ -549,7 +549,11 @@ fn account_party(core: &Core, event: &accounts::Event) -> Option<u64> {
             }
             None
         }
-        accounts::Event::ProgramTargets { .. }
+        accounts::Event::Withdrawn { .. }
+        | accounts::Event::Opened { .. }
+        | accounts::Event::NotOurs { .. }
+        | accounts::Event::Adopted { .. }
+        | accounts::Event::ProgramTargets { .. }
         | accounts::Event::ProgramSignedOut { .. }
         | accounts::Event::SignedIn { .. }
         | accounts::Event::SignOut { .. }

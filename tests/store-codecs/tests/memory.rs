@@ -1,5 +1,5 @@
 //! Full golden rows decode within their heap worst cases (skein's codec.md, 6).
-use jig_protocol_store::{accounts_v1, component_v2, core_v6, notes_v1, people_v11, tasks_v9};
+use jig_protocol_store::{accounts_v2, component_v2, core_v6, notes_v1, people_v11, tasks_v9};
 use skein_heap::{Counting, Meter};
 use skein_lib::Reader;
 
@@ -11,7 +11,7 @@ fn check<T>(family: &str, record: &str, bound: u64, decode: impl FnOnce(&[u8]) -
         "core" => 6,
         "tasks" => 9,
         "people" => 11,
-        "component" => 2,
+        "component" | "accounts" => 2,
         _ => 1,
     };
     let golden = std::fs::read(
@@ -84,33 +84,33 @@ fn each_full_component_row_decodes_within_its_heap_worst_case() {
 }
 #[test]
 fn a_full_installation_row_decodes_within_its_heap_worst_case() {
-    let bound = accounts_v1::Installation::worst_case_heap(&accounts_v1::CEILINGS).expect("installation bound");
+    let bound = accounts_v2::Installation::worst_case_heap(&accounts_v2::CEILINGS).expect("installation bound");
     check("accounts", "installation", bound, |golden| {
-        accounts_v1::Installation::decode(&accounts_v1::CEILINGS, &mut Reader::new(golden)).expect("full installation")
+        accounts_v2::Installation::decode(&accounts_v2::CEILINGS, &mut Reader::new(golden)).expect("full installation")
     });
 }
 #[test]
 fn a_full_accounts_row_decodes_within_its_heap_worst_case() {
-    let bound = accounts_v1::Row::worst_case_heap(&accounts_v1::CEILINGS).expect("accounts heap bound");
+    let bound = accounts_v2::Row::worst_case_heap(&accounts_v2::CEILINGS).expect("accounts heap bound");
     check("accounts", "row", bound, |golden| {
-        accounts_v1::Row::decode(&accounts_v1::CEILINGS, &mut Reader::new(golden)).expect("full row")
+        accounts_v2::Row::decode(&accounts_v2::CEILINGS, &mut Reader::new(golden)).expect("full row")
     });
 }
 #[test]
 fn the_longest_accounts_rows_decode_within_the_rows_heap_worst_case() {
-    let ceilings = accounts_v1::CEILINGS;
-    let bound = accounts_v1::Row::worst_case_heap(&ceilings).expect("accounts heap bound");
+    let ceilings = accounts_v2::CEILINGS;
+    let bound = accounts_v2::Row::worst_case_heap(&ceilings).expect("accounts heap bound");
     let bytes = |length: u32| vec![0xa5; usize::try_from(length).expect("ceiling fits")].into_boxed_slice();
-    let party = accounts_v1::Party::new(&ceilings, accounts_v1::PartyParts { party: u64::MAX }).expect("a party");
-    let account = accounts_v1::Account::new(
+    let party = accounts_v2::Party::new(&ceilings, accounts_v2::PartyParts { party: u64::MAX }).expect("a party");
+    let account = accounts_v2::Account::new(
         &ceilings,
-        accounts_v1::AccountParts {
+        accounts_v2::AccountParts {
             place: u32::MAX,
             uses: Some({
                 let mut uses = skein_lib::List::with_capacity(ceilings.account_uses_some);
                 for n in 0..ceilings.account_uses_some {
-                    uses.push(accounts_v1::Use::Party(
-                        accounts_v1::Party::new(&ceilings, accounts_v1::PartyParts { party: u64::from(n) })
+                    uses.push(accounts_v2::Use::Party(
+                        accounts_v2::Party::new(&ceilings, accounts_v2::PartyParts { party: u64::from(n) })
                             .expect("party"),
                     ))
                     .expect("uses fit");
@@ -119,34 +119,34 @@ fn the_longest_accounts_rows_decode_within_the_rows_heap_worst_case() {
             }),
             number: u32::MAX,
             provider: u32::MAX,
-            holder: accounts_v1::Holder::Party(party),
+            holder: accounts_v2::Holder::Party(party),
             subject: bytes(ceilings.account_subject),
             display: bytes(ceilings.account_display),
         },
     )
     .expect("an account at its ceilings");
     let limited =
-        accounts_v1::Limited::new(&ceilings, accounts_v1::LimitedParts { reset: Some(u64::MAX) }).expect("a limit");
-    let source = accounts_v1::Source::new(
+        accounts_v2::Limited::new(&ceilings, accounts_v2::LimitedParts { reset: Some(u64::MAX) }).expect("a limit");
+    let source = accounts_v2::Source::new(
         &ceilings,
-        accounts_v1::SourceParts {
+        accounts_v2::SourceParts {
             account: u32::MAX,
             number: u32::MAX,
             place: u32::MAX,
-            kind: accounts_v1::Kind::Program,
+            kind: accounts_v2::Kind::Program,
             name: bytes(ceilings.source_name),
-            held: Some(accounts_v1::Held::Limited(limited)),
+            held: Some(accounts_v2::Held::Limited(limited)),
         },
     )
     .expect("a source at its ceiling");
-    for value in [accounts_v1::Value::Account(account), accounts_v1::Value::Source(source)] {
-        let row = accounts_v1::Row::new(&ceilings, accounts_v1::RowParts { value }).expect("a row");
+    for value in [accounts_v2::Value::Account(account), accounts_v2::Value::Source(source)] {
+        let row = accounts_v2::Row::new(&ceilings, accounts_v2::RowParts { value }).expect("a row");
         let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         let encoded = writer.finish();
         let meter = Meter::new();
         meter.start();
-        let decoded = accounts_v1::Row::decode(&ceilings, &mut Reader::new(&encoded)).expect("the longest row");
+        let decoded = accounts_v2::Row::decode(&ceilings, &mut Reader::new(&encoded)).expect("the longest row");
         let measured = meter.end();
         assert!(measured.peak() <= bound, "the longest accounts row decodes within the generated bound");
         assert_eq!(decoded, row);

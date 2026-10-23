@@ -151,6 +151,7 @@ fn hold(entry: &mut Source, env: &Env<Limits>, kept: Option<Held>) {
     let (hold, attention) = match kept {
         None => return,
         Some(Held::Refused) => (Hold::Refused, true),
+        Some(Held::Moving) => (Hold::Moving, false),
         Some(Held::Limited { reset: None }) => (Hold::Limited { until: None }, true),
         Some(Held::Limited { reset: Some(reset) }) => {
             let Some(left) = left(env.wall, reset) else { return };

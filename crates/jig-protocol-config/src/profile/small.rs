@@ -5,7 +5,7 @@
 //! **fleet**: `needs_bytes=65536, grants=8, workers=2, engine_slots=0, slots=2, workstreams=8, attempts=8, calls=32, call_name_bytes=64, progress_bytes=1024, turns=32, grace=Duration::from_secs(120), facts=32, history=8`.
 //! **authority**: `projects=2, roles=4, requirements=4, facts=16, grants=4, executors=4, segments=4, segment_bytes=256, implications=8, batch=2, accounts=4, writes=4`.
 //! **brief**: `briefs=4, sections=4, read_bytes=8192, brief_bytes=16384`.
-//! **accounts**: `credentials=3, accounts=4, holder_accounts=4, sources=3, sign_ins=2, backoff_base=Duration::from_secs(2), backoff_max=Duration::from_secs(60), retry=Duration::from_secs(30), spent_attention=Duration::from_secs(300), facts=32`.
+//! **accounts**: `credentials=3, accounts=4, holder_accounts=4, sources=3, sign_ins=2, backoff_base=Duration::from_secs(2), backoff_max=Duration::from_secs(60), retry=Duration::from_secs(30), move_deadline=Duration::from_secs(60), spent_attention=Duration::from_secs(300), facts=32`.
 //! **views**: `runs=4, watchers=4, watchers_per_party=4, subjects_per_change=32, text_bytes=65536, facts=32`.
 //! **notes**: `scopes=8, entries_per_scope=16, pattern_bytes=256, description_bytes=256, body_bytes=4096, references=8, load_rows=4, lines=4, recalled=4`.
 //! **documents**: `segments=4, rows=4, text_bytes=4096, chips=4, lines=4, versions=core::documents::Versions { minimum: 1, maximum: 1 }`.
@@ -144,6 +144,7 @@ pub(super) const ACCOUNTS: accounts::Limits = accounts::Limits {
     backoff_base: Duration::from_secs(2),
     backoff_max: Duration::from_secs(60),
     retry: Duration::from_secs(30),
+    move_deadline: Duration::from_secs(60),
     spent_attention: Duration::from_secs(300),
     facts: 32,
 };
@@ -259,9 +260,10 @@ pub(super) const IO: skein_io::Limits = skein_io::Limits {
 // The root adds 18 positions to core's 18,572. Joined direct/holder terminals
 // raise fleet max_out 21 -> 25 and core room by 8 * 4 = 32 positions.
 // Close cancels each of Small's two pending sign-ins (protocol/llm.md, 5.2).
-// Held room covers three decisions: 3 * 18,590 = 55,770.
+// Account moves add 18 core route positions (accounts::max_out: 58 -> 76).
+// Held room covers three decisions: 3 * 18,608 = 55,824.
 pub(super) const JOURNAL: skein_lib::JournalLimits =
-    skein_lib::JournalLimits { commits: 3, writes: 18_590, held: 55_770, now: 256, release: 256 };
+    skein_lib::JournalLimits { commits: 3, writes: 18_608, held: 55_824, now: 256, release: 256 };
 pub(super) const LIMITS: Limits = Limits {
     core: CORE,
     store: STORE,
@@ -367,16 +369,16 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
     value: 1_567_829,
-    // Two operations per journal write plus three metadata operations: 2 * 18,590 + 3.
-    ops: 37_183,
-    // 256 MiB values + 37,183 operations * (2,079 key + 9 framing) + 26 frame bytes.
-    commit: 346_073_586,
+    // Two operations per journal write plus three metadata operations: 2 * 18,608 + 3.
+    ops: 37_219,
+    // 256 MiB values + 37,219 operations * (2,079 key + 9 framing) + 26 frame bytes.
+    commit: 346_148_754,
     queued: 3,
     // Three queued commits; segment holds two, snapshot follows one.
-    queued_bytes: 1_038_220_758,
+    queued_bytes: 1_038_446_262,
     budget: 268_435_456,
-    segment: 692_147_172,
-    snapshot_after: 346_073_586,
+    segment: 692_297_508,
+    snapshot_after: 346_148_754,
     chunk: 1_569_928,
     page: skein_kv::Page { rows: 2, bytes: 1_569_908 },
     deadline: Duration::from_secs(30),

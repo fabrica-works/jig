@@ -53,6 +53,16 @@ impl World {
     /// provider's sign-in answers with [`SIGNED_IN`]'s subject, and each revocation is confirmed.
     pub(super) fn account_signing(&mut self, signing: accounts::Signing) {
         let event = match signing {
+            // M2 (the account's move through the client) replaces this arm.
+            // Proven unreachable in M1 by accounts' people_changes_never_emit_move_values.
+            moving @ (accounts::Signing::Withdraw { .. }
+            | accounts::Signing::Return { .. }
+            | accounts::Signing::Refresh { .. }
+            | accounts::Signing::Open { .. }
+            | accounts::Signing::Adopt { .. }) => {
+                drop(moving);
+                return;
+            }
             accounts::Signing::SignIn { source, .. } => {
                 let visit = accounts::Event::Visited {
                     source,

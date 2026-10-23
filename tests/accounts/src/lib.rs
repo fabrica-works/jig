@@ -16,12 +16,14 @@ pub const LIMITS: Limits = Limits {
     backoff_base: Duration::from_secs(2),
     backoff_max: Duration::from_secs(8),
     retry: Duration::from_secs(30),
+    move_deadline: Duration::from_secs(60),
     spent_attention: Duration::from_secs(30),
     facts: 16,
 };
 #[derive(Debug)]
 pub struct World {
     pub domain: Domain,
+    pub limits: Limits,
     pub now: Time,
     /// The wall clock the child sees, for what the store keeps (engine.md, 5.4).
     pub wall: Wall,
@@ -48,7 +50,11 @@ impl World {
     }
     #[must_use]
     pub fn with(providers: Providers, records: &[Stored]) -> World {
-        let mut world = World { domain: Domain::new(&LIMITS, providers), now: Time::ZERO, wall: Wall::EPOCH };
+        Self::with_limits(LIMITS, providers, records)
+    }
+    #[must_use]
+    pub fn with_limits(limits: Limits, providers: Providers, records: &[Stored]) -> World {
+        let mut world = World { domain: Domain::new(&limits, providers), limits, now: Time::ZERO, wall: Wall::EPOCH };
         world.restore(records.to_vec());
         world
     }
@@ -69,8 +75,8 @@ impl World {
         self.domain.account_views().as_slice().to_vec()
     }
     pub fn step(&mut self, event: Event) -> Vec<Request> {
-        let mut out = Queue::with_capacity(accounts::max_out(&LIMITS));
-        accounts::step(&mut self.domain, &Env { now: self.now, wall: self.wall, limits: LIMITS }, event, &mut out);
+        let mut out = Queue::with_capacity(accounts::max_out(&self.limits));
+        accounts::step(&mut self.domain, &Env { now: self.now, wall: self.wall, limits: self.limits }, event, &mut out);
         drain(&mut out)
     }
     /// Fires at a time, the wall clock moving with the monotonic one.
@@ -78,8 +84,8 @@ impl World {
         let now = Time::ZERO.saturating_add(Duration::from_secs(seconds));
         self.wall = Wall::from_nanos(self.wall.as_nanos().saturating_add(now.saturating_since(self.now).as_nanos()));
         self.now = now;
-        let mut out = Queue::with_capacity(accounts::max_out(&LIMITS));
-        accounts::fire(&mut self.domain, &Env { now: self.now, wall: self.wall, limits: LIMITS }, &mut out);
+        let mut out = Queue::with_capacity(accounts::max_out(&self.limits));
+        accounts::fire(&mut self.domain, &Env { now: self.now, wall: self.wall, limits: self.limits }, &mut out);
         drain(&mut out)
     }
     /// Every fact queued since the last call.

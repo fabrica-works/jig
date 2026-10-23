@@ -43,6 +43,7 @@ pub enum Kind {
 pub enum Held {
     Limited { reset: Option<Wall> },
     Refused,
+    Moving,
 }
 
 /// A record of the accounts' family: the counter's one row, an account, or one of its sources.

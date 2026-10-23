@@ -54,7 +54,7 @@ fn the_installation_reads_back_and_another_version_does_not() {
     let mut bytes = row.encode();
     assert_eq!(bytes.len(), 18);
     assert_eq!(accounts::Installation::decode(&bytes), Ok(row));
-    *bytes.get_mut(1).expect("version prefix") = 2;
+    *bytes.get_mut(1).expect("version prefix") = 1;
     accounts::Installation::decode(&bytes).expect_err("another accounts version");
 }
 fn accounts_records() -> Box<[jig_domain_accounts::Stored]> {
@@ -96,6 +96,7 @@ fn accounts_records() -> Box<[jig_domain_accounts::Stored]> {
             display: Box::new([0x5a; 64]),
         },
         source(Kind::SignIn, Box::new([]), None),
+        source(Kind::SignIn, Box::new([]), Some(Held::Moving)),
         source(Kind::Key, Box::new([]), Some(Held::Refused)),
         source(
             Kind::Program,
@@ -113,7 +114,7 @@ fn each_accounts_record_reads_back_at_its_bounds() {
 }
 fn the_accounts_ceilings_are_the_childs_bounds() {
     use jig_domain_accounts::{DISPLAY, NAME, SUBJECT};
-    let ceilings = crate::accounts_v1::CEILINGS;
+    let ceilings = crate::accounts_v2::CEILINGS;
     assert_eq!((ceilings.account_subject, ceilings.account_display, ceilings.source_name), (SUBJECT, DISPLAY, NAME));
     assert_eq!((SUBJECT, DISPLAY, NAME), (255, 64, 32), "the lengths the records at their bounds take");
     let subject = Box::new([0; 256]);
@@ -130,7 +131,7 @@ fn the_accounts_ceilings_are_the_childs_bounds() {
 }
 fn an_accounts_record_of_another_version_or_the_installation_does_not_decode() {
     let mut bytes = accounts::encode(&jig_domain_accounts::Stored::Next { number: 9 }).expect("a counter");
-    *bytes.get_mut(1).expect("version prefix") = 2;
+    *bytes.get_mut(1).expect("version prefix") = 1;
     accounts::decode(&bytes).expect_err("another accounts version");
     accounts::decode(&accounts::Installation { id: [9; 16] }.encode()).expect_err("the installation is no record");
 }
