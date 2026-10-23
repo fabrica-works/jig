@@ -42,6 +42,8 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         | Ask::SignIn { .. }
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::DeleteNote { .. } => return false,
     };
     if project != doc.number || !complete {
@@ -207,6 +209,8 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
         | Ask::SignIn { .. }
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::DeleteNote { .. } => None,
     }
 }
@@ -253,6 +257,8 @@ pub(crate) fn review(domain: &mut Ui, ask: Box<Ask>) {
             | Ask::SignIn { .. }
             | Ask::AccountChange { .. }
             | Ask::SignOut { .. }
+            | Ask::Rename { .. }
+            | Ask::MakeProject { .. }
             | Ask::DeleteNote { .. } => None,
         };
         domain.project_page.settings.before = match baseline(doc, &ask) {
@@ -305,6 +311,8 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>) {
         | Ask::SignIn { .. }
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::DeleteNote { .. } => false,
     };
     if changed_period

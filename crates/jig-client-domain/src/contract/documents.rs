@@ -224,6 +224,8 @@ pub enum ActKind {
     Adopt,
     /// Change policy.
     ChangePolicy,
+    /// Rename a project.
+    Rename,
     /// Change roles.
     SetRoles,
     /// Make a service.

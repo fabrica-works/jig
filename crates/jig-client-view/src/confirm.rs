@@ -478,6 +478,7 @@ fn draft_admission(domain: &Ui, object: &Object, open: &Confirmation) -> Admissi
         | ActKind::EditNote
         | ActKind::DeleteNote
         | ActKind::Adopt
+        | ActKind::Rename
         | ActKind::ChangePolicy
         | ActKind::SetRoles
         | ActKind::MakeService
@@ -590,6 +591,7 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
         }
         ActKind::Seen
         | ActKind::Adopt
+        | ActKind::Rename
         | ActKind::ChangePolicy
         | ActKind::SetRoles
         | ActKind::MakeService

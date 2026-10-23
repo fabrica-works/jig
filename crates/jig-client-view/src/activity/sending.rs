@@ -45,6 +45,8 @@ fn message(ask: &Ask, task: u64) -> Option<(&Text, u32)> {
         | Ask::SignIn { .. }
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }

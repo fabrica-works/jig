@@ -103,6 +103,8 @@ pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> 
         | Ask::SignIn { .. }
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. } => (None, None, None),
     };
     Sent { attempt, key: request_key, card, revision, words }
@@ -539,6 +541,7 @@ mod tests {
     fn ordinary_requests_without_cards_keep_their_observations() {
         use crate::test::list;
         let reason = c::Text::new(b"because".as_slice().into(), 32).expect("fixture text");
+        let name = c::Text::new(b"Tally".as_slice().into(), 32).expect("fixture name");
         let asks = [
             c::Ask::Create { project: PROJECT, tasks: list([]) },
             c::Ask::Take { project: PROJECT, task: TASK },
@@ -555,6 +558,8 @@ mod tests {
                 name: c::Text::new(b"service".as_slice().into(), 32).expect("fixture text"),
                 role: c::HeldRole::Member,
             },
+            c::Ask::Rename { project: PROJECT, name: name.clone() },
+            c::Ask::MakeProject { name, policy: 1 },
             c::Ask::SetPool { project: PROJECT, party: 1, budget: 10 },
             c::Ask::SignIn { holder: c::AccountHolder::Own, provider: 1 },
             c::Ask::AccountChange {

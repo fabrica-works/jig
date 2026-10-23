@@ -222,6 +222,8 @@ impl Payload for Ask {
             Self::MakeService { project, name, role } => {
                 sum(&[project.heap(bounds), name.heap(bounds), role.heap(bounds)])
             }
+            Self::Rename { project, name } => sum(&[project.heap(bounds), name.heap(bounds)]),
+            Self::MakeProject { name, policy } => sum(&[name.heap(bounds), policy.heap(bounds)]),
             Self::SetPool { project, party, budget } => {
                 sum(&[project.heap(bounds), party.heap(bounds), budget.heap(bounds)])
             }
@@ -527,6 +529,7 @@ impl Payload for ActKind {
             | Self::ChangePolicy
             | Self::SetRoles
             | Self::MakeService
+            | Self::Rename
             | Self::SetPool
             | Self::Withdraw => Some(0),
         }
@@ -1078,6 +1081,7 @@ impl Payload for Refusal {
             | Self::Unknown
             | Self::Provider
             | Self::NoEscalationHolder
+            | Self::NameTaken
             | Self::NotOffered
             | Self::KeyConflict
             | Self::Dependency { .. }
@@ -1238,6 +1242,7 @@ impl Payload for AdmissionLimit {
             | Self::Accounts
             | Self::HolderAccounts
             | Self::Sources
+            | Self::Projects
             | Self::SignIns
             | Self::Service => Some(0),
         }

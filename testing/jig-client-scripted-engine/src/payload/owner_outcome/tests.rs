@@ -6,7 +6,7 @@ use jig_client_domain::contract::{
 use skein_lib::Wall;
 use std::mem::size_of;
 
-fn maximum_outcomes() -> [OwnerOutcome; 24] {
+fn maximum_outcomes() -> [OwnerOutcome; 26] {
     [
         OwnerOutcome::MarkedSeen { seen: SeenThrough::Results { through: u64::MAX } },
         OwnerOutcome::MarkedSeen { seen: SeenThrough::Conversation { task: u64::MAX, through: u64::MAX } },
@@ -33,6 +33,8 @@ fn maximum_outcomes() -> [OwnerOutcome; 24] {
         OwnerOutcome::Withdrawn { proposal: u64::MAX },
         OwnerOutcome::RolesSet { project: u32::MAX },
         OwnerOutcome::PolicyChanged { project: u32::MAX },
+        OwnerOutcome::Renamed { project: u32::MAX },
+        OwnerOutcome::ProjectMade { project: u32::MAX },
         OwnerOutcome::PoolSet { project: u32::MAX, person: u64::MAX },
         OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts: Box::new([]) },
         OwnerOutcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) },

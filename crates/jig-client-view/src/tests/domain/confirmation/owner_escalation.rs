@@ -180,6 +180,7 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
             | ActKind::EditNote
             | ActKind::DeleteNote
             | ActKind::Adopt
+            | ActKind::Rename
             | ActKind::ChangePolicy
             | ActKind::SetRoles
             | ActKind::MakeService

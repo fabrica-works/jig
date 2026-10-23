@@ -3,7 +3,7 @@ use crate::Limits;
 use crate::translate::text_problem;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v15 as w;
+use jig_client_protocol_wire::v16 as w;
 use skein_lib::{List, Reader, Wall, bytes};
 pub(crate) fn seen(value: &w::SeenThrough, _limits: &Limits) -> c::SeenThrough {
     match value {
@@ -86,6 +86,8 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> Result<
         w::OwnerOutcome::Proposed(row) => c::OwnerOutcome::Proposed { proposal: row.proposal() },
         w::OwnerOutcome::Withdrawn(row) => c::OwnerOutcome::Withdrawn { proposal: row.proposal() },
         w::OwnerOutcome::RolesSet(row) => c::OwnerOutcome::RolesSet { project: row.project() },
+        w::OwnerOutcome::Renamed(row) => c::OwnerOutcome::Renamed { project: row.project() },
+        w::OwnerOutcome::ProjectMade(row) => c::OwnerOutcome::ProjectMade { project: row.project() },
         w::OwnerOutcome::PolicyChanged(row) => c::OwnerOutcome::PolicyChanged { project: row.project() },
         w::OwnerOutcome::AccountSignInStarted(row) => {
             c::OwnerOutcome::AccountSignInStarted { source: row.source(), address: bytes::copy_of(row.address()) }
@@ -356,6 +358,7 @@ pub(crate) fn admission_limit(value: &w::AdmissionLimit, _limits: &Limits) -> c:
         w::AdmissionLimit::HolderAccounts => c::AdmissionLimit::HolderAccounts,
         w::AdmissionLimit::Sources => c::AdmissionLimit::Sources,
         w::AdmissionLimit::SignIns => c::AdmissionLimit::SignIns,
+        w::AdmissionLimit::Projects => c::AdmissionLimit::Projects,
     }
 }
 
@@ -493,6 +496,13 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
                 w::Malformed::TwoAsAllowed => c::Malformed::TwoAsAllowed,
                 w::Malformed::ConversationNotAgent => c::Malformed::ConversationNotAgent,
 
+                w::Malformed::Name(value) => c::Malformed::Name(match value.rule() {
+                    w::NameRule::Empty => c::NameRule::Empty,
+                    w::NameRule::Long => c::NameRule::Long,
+                    w::NameRule::Control => c::NameRule::Control,
+                    w::NameRule::Space => c::NameRule::Space,
+                    w::NameRule::Digits => c::NameRule::Digits,
+                }),
                 w::Malformed::EndedBy => c::Malformed::EndedBy,
                 w::Malformed::Cycle => c::Malformed::Cycle,
                 w::Malformed::ProposedAsAllowed => c::Malformed::ProposedAsAllowed,
@@ -512,6 +522,7 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
         w::Refusal::Unknown => c::Refusal::Unknown,
         w::Refusal::NoEscalationHolder => c::Refusal::NoEscalationHolder,
         w::Refusal::Llm(row) => super::llm::refusal(row, limits)?,
+        w::Refusal::NameTaken => c::Refusal::NameTaken,
         w::Refusal::NotOffered => c::Refusal::NotOffered,
         w::Refusal::KeyConflict => c::Refusal::KeyConflict,
     })

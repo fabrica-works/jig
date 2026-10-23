@@ -2321,3 +2321,4 @@ fn named_authority_models_price_their_full_allocated_list_and_bytes() {
     value.authority.models = Some(AuthorityModels::Named(over));
     assert_eq!(crate::owner_authority::document_bytes(&value, &bounds), None);
 }
+mod projects;

@@ -163,6 +163,10 @@ pub enum Ask {
     SetRoles { project: u32, holdings: List<Holding> },
     /// Make a service with a project role.
     MakeService { project: u32, name: Text, role: HeldRole },
+    /// Rename a project as its owner (contract.md, 3.2).
+    Rename { project: u32, name: Text },
+    /// Make a project in the deployment scope (contract.md, 7.5).
+    MakeProject { name: Text, policy: u32 },
     /// Set a party pool preserving spend and reservations.
     SetPool { project: u32, party: u64, budget: u64 },
     /// Start an LLM account sign-in.

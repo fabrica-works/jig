@@ -96,6 +96,7 @@ impl Word {
             Self::Refusal(RefusalWord::Moved) => (39, b"The object changed", &[]),
             Self::Refusal(RefusalWord::Ended) => (40, b"The object ended", &[]),
             Self::Refusal(RefusalWord::Unknown) => (41, b"No visible object with that name", &[]),
+            Self::Refusal(RefusalWord::NameTaken) => (106, b"Another project has that name", &[]),
             Self::Refusal(RefusalWord::NotOffered) => (42, b"This act is not offered", &[]),
             Self::Refusal(RefusalWord::KeyConflict) => (43, b"The request key names another act", &[]),
             Self::Refusal(RefusalWord::Provider) => (86, b"The provider does not permit these account uses", &[]),

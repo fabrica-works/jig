@@ -156,6 +156,8 @@ impl Offers {
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
+            | Ask::Rename { .. }
+            | Ask::MakeProject { .. }
             | Ask::SetPool { .. } => return None,
         };
         if let Some(creating) = self.shown.get(&(client, project)) {

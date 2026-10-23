@@ -57,9 +57,11 @@ impl Payload for OwnerOutcome {
             Self::MarkedSeen { seen } => seen.heap(bounds),
             Self::NoteEdited { name } => name.heap(bounds),
             Self::ServiceMade { person } => person.heap(bounds),
-            Self::Adopted { project } | Self::RolesSet { project } | Self::PolicyChanged { project } => {
-                project.heap(bounds)
-            }
+            Self::Renamed { project }
+            | Self::ProjectMade { project }
+            | Self::Adopted { project }
+            | Self::RolesSet { project }
+            | Self::PolicyChanged { project } => project.heap(bounds),
             Self::Stopped { task }
             | Self::Cancelled { task }
             | Self::Released { task }

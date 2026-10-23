@@ -6,6 +6,15 @@ use skein_ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    ActRename,
+    NameTaken,
+    NameEmpty,
+    NameLong,
+    NameControl,
+    NameSpace,
+    NameDigits,
+    EngineLimitProjects,
+
     OpenProgramModel,
     OpenProgramUnavailable,
     OpenProgramChooseModel,
@@ -1033,6 +1042,15 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::ActRename => 7837,
+            Self::NameTaken => 7830,
+            Self::NameEmpty => 7831,
+            Self::NameLong => 7832,
+            Self::NameControl => 7833,
+            Self::NameSpace => 7834,
+            Self::NameDigits => 7835,
+            Self::EngineLimitProjects => 7836,
+
             Self::OpenProgramModel => 7816,
             Self::OpenProgramUnavailable => 7817,
             Self::OpenProgramChooseModel => 7818,
@@ -1767,6 +1785,14 @@ impl JigPhrase {
             | Self::EngineLimitAccounts
             | Self::EngineLimitHolderAccounts
             | Self::EngineLimitSources
+            | Self::ActRename
+            | Self::NameTaken
+            | Self::NameEmpty
+            | Self::NameLong
+            | Self::NameControl
+            | Self::NameSpace
+            | Self::NameDigits
+            | Self::EngineLimitProjects
             | Self::EngineLimitSignIns
             | Self::EngineLimitService
             | Self::FailedBare
@@ -2308,7 +2334,15 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 610] = [
+pub const ALL: [JigPhrase; 618] = [
+    JigPhrase::ActRename,
+    JigPhrase::NameTaken,
+    JigPhrase::NameEmpty,
+    JigPhrase::NameLong,
+    JigPhrase::NameControl,
+    JigPhrase::NameSpace,
+    JigPhrase::NameDigits,
+    JigPhrase::EngineLimitProjects,
     JigPhrase::OpenProgramModel,
     JigPhrase::OpenProgramUnavailable,
     JigPhrase::OpenProgramChooseModel,

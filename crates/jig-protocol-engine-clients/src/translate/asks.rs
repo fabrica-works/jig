@@ -1,7 +1,7 @@
 //! Wire asks into the people vocabulary (client/domain/contract.md, 3).
 use super::Untranslatable;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v15 as w;
+use jig_client_protocol_wire::v16 as w;
 use jig_domain_people as p;
 use skein_lib::{List, Reader, Wall};
 #[derive(Debug)]
@@ -113,6 +113,10 @@ fn decode(
         w::Ask::SignOut(value) => {
             p::Ask::AccountSignOut { holder: account_holder(value.holder()), source: value.source() }
         }
+        // T4: translated to people's Rename / MakeProject.
+        w::Ask::Rename(_) => return Err(Untranslatable { path: w::Path::RenameProject }),
+        // T4: translated to people's Rename / MakeProject.
+        w::Ask::MakeProject(_) => return Err(Untranslatable { path: w::Path::MakeProjectPolicy }),
         w::Ask::SetPool(value) => {
             let v = value.into_parts();
             p::Ask::SetPool { project: v.project, person: v.party, budget: v.budget }

@@ -539,6 +539,8 @@ fn decisions(ask: &Ask) -> Vec<(ObjectKey, ActKind)> {
         | Ask::SignIn { .. }
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. } => Vec::new(),
     }
 }

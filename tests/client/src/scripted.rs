@@ -160,7 +160,7 @@ impl Scripted {
                 (
                     client,
                     crate::test::up(jig_client::Up::Served {
-                        served: self.engine.versions().contains(15),
+                        served: self.engine.versions().contains(16),
                         versions: None,
                     }),
                 )
@@ -621,6 +621,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
         | engine::Change::Me(_)
         | engine::Change::SignIn { .. }
         | engine::Change::SignedOut { .. }
+        | engine::Change::OwnerProject(_)
         | engine::Change::Project(_)
         | engine::Change::Note(_)
         | engine::Change::DeleteNote { .. }

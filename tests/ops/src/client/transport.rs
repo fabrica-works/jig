@@ -301,7 +301,7 @@ impl Front<Ops> for Scripted {
                     client,
                     Event::Client {
                         event: jig_client::Event::Up {
-                            up: jig_client::Up::Served { served: self.engine.versions().contains(15), versions: None },
+                            up: jig_client::Up::Served { served: self.engine.versions().contains(16), versions: None },
                         },
                     },
                 )
@@ -600,6 +600,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
         | engine::Change::Me(_)
         | engine::Change::SignIn { .. }
         | engine::Change::SignedOut { .. }
+        | engine::Change::OwnerProject(_)
         | engine::Change::Project(_)
         | engine::Change::Note(_)
         | engine::Change::DeleteNote { .. }

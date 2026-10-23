@@ -37,6 +37,18 @@ pub fn language() -> Language {
                 Segment::Text(copy_of(b"An engine host was refused at ")),
                 Segment::Hole { index: 0, kind: HoleKind::Wall },
             ]),
+            JigPhrase::ActRename => Box::new([Segment::Text(copy_of(b"Rename"))]),
+            JigPhrase::NameTaken => Box::new([Segment::Text(copy_of(b"Another project has that name"))]),
+            JigPhrase::NameEmpty => Box::new([Segment::Text(copy_of(b"The project name is empty"))]),
+            JigPhrase::NameLong => Box::new([Segment::Text(copy_of(b"The project name is longer than 64 bytes"))]),
+            JigPhrase::NameControl => {
+                Box::new([Segment::Text(copy_of(b"The project name contains a control character"))])
+            }
+            JigPhrase::NameSpace => Box::new([Segment::Text(copy_of(b"The project name has white space at an end"))]),
+            JigPhrase::NameDigits => Box::new([Segment::Text(copy_of(b"The project name is digits alone"))]),
+            JigPhrase::EngineLimitProjects => {
+                Box::new([Segment::Text(copy_of(b"The deployment has no room for another project"))])
+            }
             JigPhrase::MalformedEndedBy => Box::new([
                 Segment::Text(copy_of(b"Requester-ended task is not an agent conversation at ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
