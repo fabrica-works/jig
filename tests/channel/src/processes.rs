@@ -452,7 +452,7 @@ impl Wire {
                     &mut skein_lib::Reader::new(&stream[8..end]),
                 )
                 .expect("activity fact");
-                if let jig_protocol_worker_wire::Activity::Phase(value) = fact.activity() {
+                if let jig_protocol_worker_wire::FactValue::Phase(value) = fact.value() {
                     self.waited |= matches!(value.value(), jig_protocol_worker_wire::Phase::Waiting);
                 }
             }
