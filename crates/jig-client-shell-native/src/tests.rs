@@ -1,3 +1,4 @@
+mod client_store;
 use super::*;
 use jig_client_protocol_http::Unlinked;
 const EXCHANGE: u64 = 42;
@@ -9,6 +10,8 @@ use skein_lib::{
 };
 use skein_world::stream::Wire;
 const TOKEN: [u8; 40] = [7; 40];
+const MIXED_BATCHES: u32 = 2; // One Save and one Erase.
+const TOTAL_BATCHES: u32 = 3; // One active Save, then the two mixed batches.
 fn limits() -> Limits {
     Limits {
         exchanges: 2,
@@ -138,6 +141,10 @@ enum FileCase {
     KeepToken,
     ReloadToken,
     Store,
+    SaveAndErase,
+    DuringWrite,
+    RefusedDuringWrite,
+    ClientTurn,
 }
 struct Disk {
     shell: Shell,
@@ -148,17 +155,38 @@ struct Disk {
     failures: u32,
     sockets: u32,
     token: Option<Vec<u8>>,
+    write_acks: Vec<u32>,
+    answers: Vec<bool>,
+    client: Option<client::Client>,
+    keyed: u32,
 }
 impl Disk {
     fn new(root: skein_io::kernel::Fd, case: FileCase) -> Self {
+        let mut bounds = limits();
+        if matches!(case, FileCase::ClientTurn) {
+            bounds.body_bytes = client_store::STORE_BYTES;
+        }
         let mut shell = Shell::new(Settings {
             engine: skein_io::Addr::Ip((std::net::Ipv4Addr::LOCALHOST, 8080).into()),
             directory: b"private".as_slice().into(),
-            limits: limits(),
+            limits: bounds,
             io: file_io_limits(),
         });
         shell.adopt(root, 1000, 7);
-        Self { shell, case, started: false, closing: false, writes: 0, failures: 0, sockets: 0, token: None }
+        Self {
+            shell,
+            case,
+            started: false,
+            closing: false,
+            writes: 0,
+            failures: 0,
+            sockets: 0,
+            token: None,
+            write_acks: Vec::new(),
+            answers: Vec::new(),
+            client: None,
+            keyed: 0,
+        }
     }
     fn start(&mut self) {
         self.started = true;
@@ -166,15 +194,21 @@ impl Disk {
             FileCase::KeepToken => {
                 self.shell.keep(Some(Secret::new(Box::new(TOKEN))));
             }
+            FileCase::ClientTurn => {
+                let (client, mut out) = client_store::mixed_turn();
+                self.client = Some(client);
+                while let Some(request) = out.pop() {
+                    self.shell.down(request);
+                }
+            }
             FileCase::ReloadToken => {
                 self.closing = true;
             }
-            FileCase::Store => {
-                let mut records = skein_lib::List::with_capacity(1);
-                records
-                    .push(client::Record { key: b"key".as_slice().into(), bytes: b"pending".as_slice().into() })
-                    .expect("one record fits");
-                self.shell.down(client::Request::Save { records });
+            FileCase::Store | FileCase::SaveAndErase | FileCase::DuringWrite | FileCase::RefusedDuringWrite => {
+                self.shell.down(save(b"key", b"pending"));
+                if matches!(self.case, FileCase::SaveAndErase) {
+                    self.shell.down(erase(b"absent"));
+                }
                 self.shell.down(client::Request::Exchange {
                     exchange: Token::new(EXCHANGE),
                     credential: Some(Secret::new(Box::new(TOKEN))),
@@ -198,9 +232,25 @@ impl skein_shell::Host for Disk {
         }
         while let Some(event) = self.shell.events().pop() {
             match event {
-                client::Event::Stored => self.writes += 1,
+                client::Event::Stored => {
+                    self.writes += 1;
+                    self.answers.push(true);
+                    if let Some(client) = &mut self.client {
+                        // The fixture uses the same output bound as the client.
+                        let mut out = Queue::with_capacity(client::max_out(&client_store::bounds()));
+                        client.step(now, wall, client::Event::Stored, &mut out);
+                        while let Some(request) = out.pop() {
+                            if matches!(request, client::Request::Exchange { message: client::Message::Request(_), .. })
+                            {
+                                self.keyed += 1;
+                            }
+                            self.shell.down(request);
+                        }
+                    }
+                }
                 client::Event::NotStored => {
                     self.failures += 1;
+                    self.answers.push(false);
                     self.closing = true;
                 }
                 client::Event::Lost { .. } => self.closing = true,
@@ -218,6 +268,21 @@ impl skein_shell::Host for Disk {
                 | client::Event::Up { .. }
                 | client::Event::Streamed { .. }
                 | client::Event::StreamGone) => panic!("file fixture event {other:?}"),
+            }
+        }
+        let writing =
+            self.shell.submissions().iter().any(|submit| matches!(submit.kind, skein_io::kernel::Op::Write { .. }));
+        if writing {
+            self.write_acks.push(self.writes);
+            if matches!(self.case, FileCase::DuringWrite | FileCase::RefusedDuringWrite) && self.write_acks.len() == 1 {
+                // A record as large as the whole store cannot fit its framing.
+                let bytes = if matches!(self.case, FileCase::RefusedDuringWrite) {
+                    vec![0; usize::try_from(limits().body_bytes).expect("store bound")]
+                } else {
+                    b"later".to_vec()
+                };
+                self.shell.down(save(b"next", &bytes));
+                self.shell.down(erase(b"key"));
             }
         }
         for submit in self.shell.submissions().iter() {
@@ -312,6 +377,59 @@ fn fresh_disk(case: FileCase, fail: bool) -> skein_world::Outcome<Disk, DiskMach
     let mut machine = skein_fake_machine::Machine::for_user(1000);
     let root = machine.lay(&[]);
     disk_world(machine, root, case, fail)
+}
+fn save(key: &[u8], bytes: &[u8]) -> client::Request {
+    let mut records = skein_lib::List::with_capacity(1);
+    records.push(client::Record { key: key.into(), bytes: bytes.into() }).expect("one record fits");
+    client::Request::Save { records }
+}
+fn erase(key: &[u8]) -> client::Request {
+    let mut records = skein_lib::List::with_capacity(1);
+    records.push(key.into()).expect("one key fits");
+    client::Request::Erase { records }
+}
+#[test]
+fn a_mixed_turn_releases_the_clients_next_request() {
+    let outcome = fresh_disk(FileCase::ClientTurn, false);
+    let disk = &outcome.procs[0];
+    assert_eq!(disk.keyed, 1, "the client's storage barrier releases its next request");
+    assert_eq!(disk.writes, MIXED_BATCHES, "the terminal erase and next save each receive Stored");
+    assert_eq!(disk.write_acks, [0], "both batches share one write");
+    assert_eq!(disk.sockets, 1);
+}
+#[test]
+fn save_and_erase_each_receive_stored_before_the_exchange() {
+    let outcome = fresh_disk(FileCase::SaveAndErase, false);
+    let disk = &outcome.procs[0];
+    assert_eq!(disk.writes, MIXED_BATCHES, "one acknowledgement per batch");
+    assert_eq!(disk.write_acks, [0], "both batches share one write");
+    assert_eq!(disk.sockets, 1, "the exchange is no longer held");
+    assert_eq!(disk.failures, 0);
+}
+#[test]
+fn batches_during_a_write_are_answered_by_the_next_write() {
+    let outcome = fresh_disk(FileCase::DuringWrite, false);
+    let disk = &outcome.procs[0];
+    assert_eq!(disk.write_acks, [0, 1], "later batches are not acknowledged by the first write");
+    assert_eq!(disk.writes, TOTAL_BATCHES, "one first batch and two later batches");
+    assert_eq!(disk.sockets, 1);
+    assert_eq!(disk.failures, 0);
+}
+#[test]
+fn a_queued_refusal_follows_the_active_writes_acknowledgement() {
+    let outcome = fresh_disk(FileCase::RefusedDuringWrite, false);
+    let disk = &outcome.procs[0];
+    assert_eq!(disk.answers, [true, false, false], "the first batch is stored before the two refused batches");
+    assert_eq!(disk.write_acks, [0], "refused batches never start another write");
+    assert_eq!(disk.sockets, 0, "the refused batches withhold the exchange");
+}
+#[test]
+fn save_and_erase_each_receive_not_stored_on_failure() {
+    let outcome = fresh_disk(FileCase::SaveAndErase, true);
+    let disk = &outcome.procs[0];
+    assert_eq!(disk.failures, MIXED_BATCHES, "one failure per batch");
+    assert_eq!(disk.writes, 0);
+    assert_eq!(disk.sockets, 0, "failed storage withholds the exchange");
 }
 #[test]
 fn the_token_is_kept_and_read_back_at_start() {

@@ -15,6 +15,7 @@ jig-client-protocol-http.workspace = true
 jig-client-protocol-wire.workspace = true
 
 [dev-dependencies]
+jig-client-test-records = { path = "../../testing/jig-client-test-records" }
 skein-sim.workspace = true
 skein-shell.workspace = true
 skein-fake-machine.workspace = true

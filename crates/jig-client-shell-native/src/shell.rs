@@ -114,11 +114,13 @@ impl Shell {
     pub fn down(&mut self, request: client::Request) {
         match request {
             client::Request::Save { records } => {
+                self.files.batch();
                 for record in records.into_boxed() {
                     self.files.edit(record.key, Some(record.bytes));
                 }
             }
             client::Request::Erase { records } => {
+                self.files.batch();
                 for key in records.into_boxed() {
                     self.files.edit(key, None);
                 }
@@ -301,8 +303,10 @@ impl Shell {
             self.transport.event(now, event);
         }
         self.files.progress(now);
-        if let Some(ok) = self.files.written.take() {
-            self.events.push(if ok { client::Event::Stored } else { client::Event::NotStored });
+        if let Some((ok, batches)) = self.files.written.take() {
+            for _ in 0..batches {
+                self.events.push(if ok { client::Event::Stored } else { client::Event::NotStored });
+            }
             if !ok {
                 while let Some(request) = self.held.pop_front() {
                     if let client::Request::Exchange { exchange, .. } = request {

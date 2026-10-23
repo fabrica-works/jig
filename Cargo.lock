@@ -492,6 +492,7 @@ dependencies = [
  "jig-client",
  "jig-client-protocol-http",
  "jig-client-protocol-wire",
+ "jig-client-test-records",
  "skein-fake-machine",
  "skein-http",
  "skein-io",

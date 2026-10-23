@@ -1,4 +1,5 @@
 //! Private token and whole small-store files (protocol/client.md, 8 and 10).
+//! Each batch is answered in order (client/domain/client.md, 16).
 use skein_io::{
     file::{self, Expect},
     file_layer::{self, FileIo},
@@ -29,7 +30,9 @@ pub(crate) struct Files {
     stage: Stage,
     records: BTreeMap<Box<[u8]>, Box<[u8]>>,
     max: u32,
-    dirty: bool,
+    batches: u32,
+    writing: u32,
+    refused: bool,
     failure: Option<()>,
     closing: bool,
     token: Option<Secret>,
@@ -37,7 +40,7 @@ pub(crate) struct Files {
     loaded: Option<()>,
     pub(crate) events: Queue<file::Event>,
     pub(crate) submissions: Queue<Submit>,
-    pub(crate) written: Option<bool>,
+    pub(crate) written: Option<(bool, u32)>,
     pub(crate) credential_written: Option<bool>,
 }
 impl Files {
@@ -50,7 +53,9 @@ impl Files {
             stage: Stage::Unopened,
             records: BTreeMap::new(),
             max,
-            dirty: false,
+            batches: 0,
+            writing: 0,
+            refused: false,
             failure: None,
             closing: false,
             token: None,
@@ -69,7 +74,7 @@ impl Files {
         self.root = Some(self.io.adopt_root(fd).expect("root room"));
     }
     pub(crate) fn ready(&self) -> bool {
-        self.stage == Stage::Ready && self.failure.is_none() && !self.dirty && self.credential.is_none()
+        self.stage == Stage::Ready && self.failure.is_none() && self.batches == 0 && self.credential.is_none()
     }
     pub(crate) fn token(&mut self) -> Option<Secret> {
         self.token.take()
@@ -83,6 +88,9 @@ impl Files {
                 .collect(),
         )
     }
+    pub(crate) fn batch(&mut self) {
+        self.batches = self.batches.checked_add(1).expect("bounded storage batches");
+    }
     pub(crate) fn edit(&mut self, key: Box<[u8]>, record: Option<Box<[u8]>>) {
         match record {
             Some(record) => {
@@ -93,8 +101,7 @@ impl Files {
                     .map(|(key, value)| key.len() + value.len() + 8)
                     .sum();
                 if bytes + key.len() + record.len() + 12 > usize::try_from(self.max).expect("file bound") {
-                    self.written = Some(false);
-                    self.dirty = false;
+                    self.refused = true;
                     return;
                 }
                 self.records.insert(key, record);
@@ -103,7 +110,6 @@ impl Files {
                 self.records.remove(&key);
             }
         }
-        self.dirty = true;
     }
     pub(crate) fn credential(&mut self, bytes: Box<[u8]>) {
         self.credential = Some(bytes);
@@ -117,7 +123,7 @@ impl Files {
     pub(crate) fn pending(&self) -> bool {
         (self.stage == Stage::Unopened && self.root.is_some())
             || !self.events.is_empty()
-            || (self.stage == Stage::Ready && (self.dirty || self.credential.is_some() || self.closing))
+            || (self.stage == Stage::Ready && (self.batches != 0 || self.credential.is_some() || self.closing))
     }
     pub(crate) fn deadline(&self) -> Option<Time> {
         self.io.next_deadline()
@@ -154,7 +160,8 @@ impl Files {
         while let Some(event) = self.events.pop() {
             self.answer(event);
         }
-        if !self.io.takes() {
+        // Deliver the preceding write before a queued refusal can answer.
+        if !self.io.takes() || self.written.is_some() {
             return;
         }
         let root = self.root.unwrap_or(OWNER);
@@ -186,13 +193,18 @@ impl Files {
                 let bytes = self.credential.take().expect("credential");
                 self.request(now, Stage::Credential, self.store(b"token", bytes));
             }
-            Stage::Ready if self.dirty => {
-                self.dirty = false;
+            Stage::Ready if self.batches != 0 => {
+                let batches = core::mem::take(&mut self.batches);
+                if core::mem::take(&mut self.refused) {
+                    self.written = Some((false, batches));
+                    return;
+                }
                 if let Some(bytes) = self.encode() {
+                    self.writing = batches;
                     self.request(now, Stage::Writing, self.store(b"store", bytes));
                 } else {
                     self.failure = Some(());
-                    self.written = Some(false);
+                    self.written = Some((false, batches));
                 }
             }
             Stage::Ready if self.closing => {
@@ -261,7 +273,7 @@ impl Files {
             Stage::Writing | Stage::Credential => {
                 let ok = matches!(event, file::Event::Stored { .. });
                 if self.stage == Stage::Writing {
-                    self.written = Some(ok);
+                    self.written = Some((ok, core::mem::take(&mut self.writing)));
                 } else {
                     self.credential_written = Some(ok);
                 }
