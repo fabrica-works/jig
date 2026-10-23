@@ -190,6 +190,35 @@ fn a_live_credential_keeps_the_sign_in_without_minting_and_spends_the_link() {
 }
 
 #[test]
+fn a_held_credential_answered_with_another_sign_in_draws_a_token() {
+    const NEW_SIGN_IN: u64 = fixtures::FIRST_SIGN_IN + 1;
+    // A credential carries an eight-byte sign-in number and 32 drawn bytes (client.md, 8).
+    const TOKEN_BYTES: usize = 40;
+    let mut peer = peer();
+    let bearer = fixtures::signed_in(&mut peer);
+    let link = fresh_link(&mut peer);
+    let exchange = peer.post(b"/jig/v1/sign-in/link", peer.link_body(&link), Some(&bearer));
+    let Some(jig_domain_core::Event::SignIn { reply_to, held, .. }) = peer.take_core() else { panic!("sign-in") };
+    assert_eq!(held, Some(fixtures::FIRST_SIGN_IN));
+    peer.answer_request(
+        reply_to,
+        jig_domain_people::Reply::SignedIn {
+            person: fixtures::FIRST_PERSON,
+            sign_in: NEW_SIGN_IN,
+            expires: fixtures::expires(),
+        },
+    );
+    assert_eq!(peer.digest_kept(), Some(NEW_SIGN_IN));
+    assert_eq!(peer.answered(exchange), None, "waits for digest durability");
+    peer.answer_kept(NEW_SIGN_IN);
+    let answer = peer.sign_in_answer(exchange);
+    assert_eq!(answer.party(), fixtures::FIRST_PERSON);
+    let token = answer.token().as_ref().expect("fresh token").expose();
+    assert_eq!(token.len(), TOKEN_BYTES);
+    assert_eq!(u64::from_be_bytes(token[..8].try_into().expect("sign-in number")), NEW_SIGN_IN);
+}
+
+#[test]
 fn a_links_unaccepted_credential_always_signs_in_afresh() {
     use jig_protocol_engine_clients::SecretOwner;
     for case in ["wrong digest", "expired", "ended while checking", "service", "unknown", "malformed", "none"] {
