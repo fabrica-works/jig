@@ -125,3 +125,18 @@ fn a_person_s_sign_in_outlives_a_restart_is_refreshed_at_the_issuer_and_signs_ou
         std::panic::resume_unwind(failure);
     }
 }
+
+#[path = "support/account_move.rs"]
+mod account_move;
+
+#[test]
+fn an_account_moves_between_two_binaries_and_the_first_holds_nothing() {
+    let directory = support::scratch();
+    let result = std::panic::catch_unwind(|| account_move::run(directory.path()));
+    if let Err(failure) = result {
+        for deployment in ["a", "b"] {
+            eprintln!("{deployment}: {}", support::trace::failures(&directory.path().join(deployment)));
+        }
+        std::panic::resume_unwind(failure);
+    }
+}
