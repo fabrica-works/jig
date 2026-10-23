@@ -1110,6 +1110,7 @@ fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
         tasks::Party::Task(_) | tasks::Party::Deployment { .. } => panic!("person's chat"),
     };
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(6100)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },

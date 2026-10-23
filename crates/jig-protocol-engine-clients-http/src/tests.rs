@@ -384,3 +384,36 @@ fn room_is_released_only_after_a_calls_end_is_handled() {
     fixtures::pump(&mut mount, &mut out);
     assert_eq!(mount.room(), 1);
 }
+
+#[test]
+fn a_browser_link_keeps_its_cookie_on_a_tokenless_sign_in() {
+    use jig_client_protocol_wire::v13 as w;
+    let mut mount = fixtures::mount();
+    let mut out = Queue::with_capacity(16);
+    let call =
+        fixtures::call(&mut mount, &mut out, Method::Post, b"/jig/v1/sign-in/link", &fixtures::browser(), b"link");
+    assert_eq!(
+        *fixtures::component(&mut out),
+        [kit::FromTransport::Exchange {
+            exchange: fixtures::EXCHANGE,
+            credential: Some(fixtures::credential()),
+            message: kit::Message::SignInLink(Box::from(b"link".as_slice())),
+        }]
+    );
+    let answer = w::SignInAnswer::SignedIn(
+        w::SignedIn::new(
+            &w::CEILINGS,
+            w::SignedInParts { token: None, party: fixtures::PARTY, expires: fixtures::IN_A_DAY },
+        )
+        .expect("kept sign-in"),
+    );
+    let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer size"));
+    answer.encode(&mut bytes).expect("answer");
+    fixtures::reply(&mut mount, &mut out, call, kit::Reply::Record(bytes.finish()));
+    let (status, body, headers) = fixtures::answered(&mut mount, &mut out, call);
+    assert_eq!(status, 200);
+    assert_eq!(fixtures::header(&headers, b"set-cookie"), None);
+    let answer = fixtures::signed_in(&body);
+    assert_eq!(answer.token(), &None);
+    assert_eq!((answer.party(), answer.expires()), (fixtures::PARTY, fixtures::IN_A_DAY));
+}

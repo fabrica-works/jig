@@ -11,7 +11,8 @@ fn held() -> With {
 #[test]
 fn a_sign_in_answer_puts_its_credential_on_each_exchange() {
     let mut h = Harness::new(&limits());
-    let exchange = h.sign_in(With::Link(Secret::new(Box::new(LINK_SECRET)))).expect("sign-in exchange");
+    let exchange =
+        h.sign_in(With::Link { secret: Secret::new(Box::new(LINK_SECRET)), held: None }).expect("sign-in exchange");
     assert!(h.link.credential().is_none());
     h.answer(exchange, &signed_in(PARTY, &CREDENTIAL));
     assert!(h.has(&Request::Signing { signing: Signing::SignedIn { party: PARTY } }));
@@ -29,7 +30,7 @@ fn a_held_credential_is_carried_without_an_exchange() {
 #[test]
 fn a_not_ready_sign_in_is_again_and_holds_nothing() {
     let mut h = Harness::new(&limits());
-    let exchange = h.sign_in(With::Link(Secret::new(Box::new(LINK_SECRET)))).unwrap();
+    let exchange = h.sign_in(With::Link { secret: Secret::new(Box::new(LINK_SECRET)), held: None }).unwrap();
     h.answer(exchange, &[2]);
     assert!(h.has(&Request::Signing { signing: Signing::Again }));
     assert!(h.link.credential().is_none());
@@ -37,7 +38,7 @@ fn a_not_ready_sign_in_is_again_and_holds_nothing() {
 #[test]
 fn a_refused_secret_is_refused_and_holds_nothing() {
     let mut h = Harness::new(&limits());
-    let exchange = h.sign_in(With::Link(Secret::new(Box::new(LINK_SECRET)))).unwrap();
+    let exchange = h.sign_in(With::Link { secret: Secret::new(Box::new(LINK_SECRET)), held: None }).unwrap();
     let record = w::SignInAnswer::Refused;
     let mut writer = skein_lib::Writer::new(1);
     record.encode(&mut writer).unwrap();
@@ -103,7 +104,8 @@ fn a_sign_in_answer_with_no_token_leaves_none_held() {
     let mut h = Harness::new(&limits());
     assert_eq!(h.sign_in(held()), None);
     let generation = h.link.generation;
-    let exchange = h.sign_in(With::Link(Secret::new(Box::new(LINK_SECRET)))).expect("sign-in exchange");
+    let exchange =
+        h.sign_in(With::Link { secret: Secret::new(Box::new(LINK_SECRET)), held: None }).expect("sign-in exchange");
     let answer = w::SignInAnswer::SignedIn(
         w::SignedIn::new(&limits().wire, w::SignedInParts { token: None, party: PARTY, expires: 10 })
             .expect("transport credential"),
@@ -114,4 +116,62 @@ fn a_sign_in_answer_with_no_token_leaves_none_held() {
     assert!(h.link.credential().is_none());
     assert_eq!(h.link.generation, generation.checked_add(1).expect("next generation"));
     assert!(h.has(&Request::Signing { signing: Signing::SignedIn { party: PARTY } }));
+}
+
+#[test]
+fn a_link_carries_the_attempts_held_credential_and_keeps_it_on_a_tokenless_answer() {
+    let mut h = Harness::new(&limits());
+    h.sign_in(With::Held(Secret::new(Box::new(NEW_CREDENTIAL))));
+    let exchange = h
+        .sign_in(With::Link {
+            secret: Secret::new(Box::new(LINK_SECRET)),
+            held: Some(Secret::new(Box::new(CREDENTIAL))),
+        })
+        .expect("link exchange");
+    assert_eq!(h.credentials().as_slice().last(), Some(&Some(Secret::new(Box::new(CREDENTIAL)))));
+    let answer = w::SignInAnswer::SignedIn(
+        w::SignedIn::new(&limits().wire, w::SignedInParts { token: None, party: PARTY, expires: 10 })
+            .expect("kept sign-in"),
+    );
+    let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer size"));
+    answer.encode(&mut bytes).expect("answer");
+    h.answer(exchange, &bytes.finish());
+    assert_eq!(h.link.credential(), Some(&Secret::new(Box::new(CREDENTIAL))));
+    assert!(h.has(&Request::Signing { signing: Signing::SignedIn { party: PARTY } }));
+    h.send(ATTEMPT, KEY, message());
+    assert_eq!(h.credentials().as_slice().last(), Some(&Some(Secret::new(Box::new(CREDENTIAL)))));
+}
+
+#[test]
+fn a_link_answer_with_a_new_token_replaces_the_attempts_held_credential() {
+    let mut h = Harness::new(&limits());
+    let exchange = h
+        .sign_in(With::Link {
+            secret: Secret::new(Box::new(LINK_SECRET)),
+            held: Some(Secret::new(Box::new(CREDENTIAL))),
+        })
+        .expect("link exchange");
+    h.answer(exchange, &signed_in(PARTY, &NEW_CREDENTIAL));
+    assert_eq!(h.link.credential(), Some(&Secret::new(Box::new(NEW_CREDENTIAL))));
+}
+
+#[test]
+fn a_refused_not_ready_or_lost_link_installs_none_of_its_held_credential() {
+    for (body, expected) in
+        [(Some(&[1][..]), Signing::Refused), (Some(&[2][..]), Signing::Again), (None, Signing::Lost)]
+    {
+        let mut h = Harness::new(&limits());
+        let exchange = h
+            .sign_in(With::Link {
+                secret: Secret::new(Box::new(LINK_SECRET)),
+                held: Some(Secret::new(Box::new(CREDENTIAL))),
+            })
+            .expect("link exchange");
+        match body {
+            Some(body) => h.answer(exchange, body),
+            None => h.link.step(Time::ZERO, Event::Lost { exchange }, &mut h.out),
+        }
+        assert!(h.has(&Request::Signing { signing: expected }));
+        assert_eq!(h.link.credential(), None);
+    }
 }

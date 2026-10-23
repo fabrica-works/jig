@@ -106,6 +106,7 @@ fn application_replay_after_a_durable_restart_does_not_repeat_a_decision() {
 
     let task = world.assigned.as_ref().expect("first person's task").task;
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(901)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: Box::from([8]) },

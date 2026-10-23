@@ -351,6 +351,7 @@ pub fn second_party(world: &mut crate::effects::World, subject: &[u8], role: jig
         value => panic!("project roles: {value:?}"),
     };
     world.send(jig_test_domain::Event::Core(jig_domain_core::Event::SignIn {
+        held: None,
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(FIXTURE_SIGN_IN_REQUEST)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: subject.into() },

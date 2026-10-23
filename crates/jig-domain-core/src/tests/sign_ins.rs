@@ -13,8 +13,11 @@ fn newcomer() -> people::Identity {
 #[test]
 fn a_sign_in_reply_names_the_sign_in_its_decision_saved() {
     let (mut core, env) = timer_core(false);
-    let Requests::Out(mut out) =
-        step(&mut core, &env, Event::SignIn { reply_to: ReplyTo::new(Token::new(60)), identity: newcomer() });
+    let Requests::Out(mut out) = step(
+        &mut core,
+        &env,
+        Event::SignIn { held: None, reply_to: ReplyTo::new(Token::new(60)), identity: newcomer() },
+    );
     let mut saved = None;
     let mut named = None;
     for _ in 0..out.len() {
@@ -35,7 +38,11 @@ fn a_sign_in_reply_names_the_sign_in_its_decision_saved() {
 #[test]
 fn the_core_is_quiescent_once_a_sign_in_reply_has_left() {
     let (mut core, env) = timer_core(false);
-    drop(step(&mut core, &env, Event::SignIn { reply_to: ReplyTo::new(Token::new(61)), identity: newcomer() }));
+    drop(step(
+        &mut core,
+        &env,
+        Event::SignIn { held: None, reply_to: ReplyTo::new(Token::new(61)), identity: newcomer() },
+    ));
     let _committed = core.counters.next_commit();
     assert!(core.quiescent(true));
 }
@@ -52,6 +59,7 @@ fn a_replayed_live_sign_in_names_the_same_sign_in() {
         &mut core,
         &env,
         Event::People(people::Event::SignedIn {
+            held: None,
             reply_to: ReplyTo::new(Token::new(62)),
             person: 1,
             sign_in: 10,
@@ -68,4 +76,36 @@ fn a_replayed_live_sign_in_names_the_same_sign_in() {
         }
     }
     assert_eq!(replayed, Some(10));
+}
+
+#[test]
+fn the_held_sign_in_reaches_people_untouched() {
+    let (mut core, env) = timer_core(false);
+    let identity = people::Identity {
+        key: people::IdentityKey { provider: 0, subject: Box::new([1]) },
+        login: Box::from(&b"owner"[..]),
+        name: Box::from(&b"A Person"[..]),
+    };
+    let Requests::Out(mut out) =
+        step(&mut core, &env, Event::SignIn { reply_to: ReplyTo::new(Token::new(63)), identity, held: Some(10) });
+    let mut answer = None;
+    for _ in 0..out.len() {
+        let request = out.pop().expect("output count");
+        if let Request::Write(Write::Save(Record::People(people::Stored::SignIn { .. }))) = &request {
+            panic!("reuse writes no sign-in");
+        }
+        if let Request::Held(held) = request
+            && let Held::PeopleReply { reply, .. } = *held
+        {
+            answer = Some(reply);
+        }
+    }
+    assert_eq!(
+        answer,
+        Some(people::Reply::SignedIn {
+            person: 1,
+            sign_in: 10,
+            expires: Wall::from_nanos(env.limits.people.sign_in_lifetime.as_nanos()),
+        })
+    );
 }

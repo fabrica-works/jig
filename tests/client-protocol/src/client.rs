@@ -320,11 +320,11 @@ impl Story {
     pub fn sign_in(&mut self) {
         let printed = self.engine.link.clone();
         let secret = self.front.connections.printed(&printed).expect("engine's printed link");
-        self.event(Event::SignIn { with: client::With::Link(secret) });
+        self.event(Event::SignIn { with: client::With::Link { secret, held: None } });
         self.advance();
         if self.client.link().state == Link::SignedOut && self.engine.link != printed {
             let secret = self.front.connections.printed(&self.engine.link).expect("fresh printed link");
-            self.event(Event::SignIn { with: client::With::Link(secret) });
+            self.event(Event::SignIn { with: client::With::Link { secret, held: None } });
         }
     }
     pub fn watch(&mut self, handle: Handle, subject: Watchable) {
@@ -459,14 +459,14 @@ impl Story {
         let printed = self.engine.link.clone();
         let secret = second.connections.printed(&printed).expect("engine's printed link");
         second.event(self.now, Event::Start { kept: List::with_capacity(0) });
-        second.event(self.now, Event::SignIn { with: client::With::Link(secret) });
+        second.event(self.now, Event::SignIn { with: client::With::Link { secret, held: None } });
         self.second = Some(second);
         self.advance();
         // A consumed printed link is refused and the engine prints its replacement.
         if self.second().client.link().state == Link::SignedOut && self.engine.link != printed {
             let second = self.second.as_mut().expect("second client attached");
             let secret = second.connections.printed(&self.engine.link).expect("fresh printed link");
-            second.event(self.now, Event::SignIn { with: client::With::Link(secret) });
+            second.event(self.now, Event::SignIn { with: client::With::Link { secret, held: None } });
         }
         assert!(self.run_until(|s| s.second().client.link().state == Link::Live, Duration::from_secs(1)));
     }

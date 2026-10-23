@@ -29,8 +29,8 @@ impl Component {
         }
         let name = self.name();
         self.pending.mints.insert(name, exchange).expect("admitted mint");
-        self.pending.exchanges.insert(name, Waiting::Core).expect("admitted exchange");
-        out.push(Request::Core(Box::new(core::Event::SignIn { reply_to: ReplyTo::new(name), identity })));
+        self.pending.exchanges.insert(name, Waiting::Core { held: None }).expect("admitted exchange");
+        out.push(Request::Core(Box::new(core::Event::SignIn { held: None, reply_to: ReplyTo::new(name), identity })));
     }
     pub(super) fn mint_refused(&mut self, name: Token, why: MintRefusal, out: &mut Queue<Request>) -> bool {
         if let Some(exchange) = self.pending.mints.remove(&name) {
@@ -46,6 +46,7 @@ impl Component {
         env: &Env<Limits>,
         exchange: Token,
         reply: people::Reply,
+        held: Option<u64>,
         out: &mut Queue<Request>,
     ) {
         if self.stopping() && self.mint_refused(exchange, MintRefusal::NotReady, out) {
@@ -60,6 +61,15 @@ impl Component {
         };
         match reply {
             people::Reply::SignedIn { person, sign_in, expires } => {
+                if held == Some(sign_in) {
+                    let value = w::SignedIn::new(
+                        &env.limits.wire,
+                        w::SignedInParts { token: None, party: person, expires: expires.as_nanos() },
+                    )
+                    .expect("token-less sign-in admitted");
+                    self.respond(env, exchange, routes::signed_in(&env.limits.wire, value));
+                    return;
+                }
                 let token = sign_in::token(&mut self.rng, sign_in);
                 let digest = sign_in::digest(token.expose());
                 let answer = if self.pending.mints.contains_key(&exchange) {

@@ -20,7 +20,7 @@ fn identity() -> people::Identity {
 
 fn signin(core: &mut Core, env: &Env<Limits>, token: u64) {
     let Requests::Out(mut out) =
-        step(core, env, Event::SignIn { reply_to: ReplyTo::new(Token::new(token)), identity: identity() });
+        step(core, env, Event::SignIn { held: None, reply_to: ReplyTo::new(Token::new(token)), identity: identity() });
     assert_eq!(out.len(), 2, "one answer and the completed decision, with no write");
     let Some(Request::Held(reply)) = out.pop() else { panic!("held sign-in answer") };
     let Held::PeopleReply { to, reply } = *reply else { panic!("original people reply") };
@@ -449,6 +449,7 @@ fn the_census_restores_unread_ended_replies_beside_the_result() {
         &mut core.people,
         &Env { now: env.now, wall: env.wall, limits: env.limits.people },
         people::Event::SignedIn {
+            held: None,
             reply_to: ReplyTo::new(Token::new(SIGN_IN)),
             person: PARTY,
             sign_in: SIGN_IN,

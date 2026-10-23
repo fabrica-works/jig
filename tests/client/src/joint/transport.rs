@@ -232,7 +232,7 @@ impl Transport {
     pub fn start_sign_in(&mut self, client: ClientId) -> Event {
         let identity = self.clients.get(&client).expect("bound client").identity.clone();
         let reply_to = self.reply_to(Reply::SignIn { client });
-        Event::SignIn { reply_to, identity }
+        Event::SignIn { held: None, reply_to, identity }
     }
 
     pub fn open(&mut self, client: ClientId, native: Token, subject: Watched) -> Token {
@@ -608,7 +608,7 @@ mod tests {
         front.bind(ClientId(0), u64::MAX, supplied.clone());
         assert_eq!(front.hello(), jig_client::Up::Served { served: false, versions: None });
         assert_eq!(front.sign_in(ClientId(0)), None);
-        let Event::SignIn { reply_to, identity: actual } = front.start_sign_in(ClientId(0)) else {
+        let Event::SignIn { held: None, reply_to, identity: actual } = front.start_sign_in(ClientId(0)) else {
             panic!("authentic sign-in input")
         };
         assert_eq!(actual, supplied);

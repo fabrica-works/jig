@@ -657,6 +657,8 @@ pub enum Event {
         identity: Identity,
         /// The protocol-authenticated party kind; a service must already exist.
         kind: Kind,
+        /// Authenticated sign-in to keep if it is live and belongs to this identity.
+        held: Option<u64>,
     },
     /// End one sign-in after restoration, emitting erase if present and one reply.
     SignOut {

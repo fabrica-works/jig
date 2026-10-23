@@ -718,6 +718,7 @@ impl Application for Ops {
         if ready && !peers.asked_sign_in {
             peers.asked_sign_in = true;
             events.push(Input::Event(root::Event::Core(core::Event::SignIn {
+                held: None,
                 reply_to: ReplyTo::new(Token::new(100)),
                 identity: people::Identity {
                     key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },

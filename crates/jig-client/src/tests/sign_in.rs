@@ -307,7 +307,7 @@ fn held_and_transport_installation_end_reads_even_before_first_sign_in() {
             let expected_credential = match &with {
                 With::Held(credential) => Some(credential.clone()),
                 With::Transport => None,
-                With::Link(_) | With::Service(_) => unreachable!("immediate installation"),
+                With::Link { .. } | With::Service(_) => unreachable!("immediate installation"),
             };
             c.step(Event::SignIn { with });
             assert_eq!(fixtures::pages(c.requests()).as_slice(), &[(TASK, signed_out_page()), (ME, signed_out_page())]);
@@ -318,7 +318,10 @@ fn held_and_transport_installation_end_reads_even_before_first_sign_in() {
 }
 
 fn exchanging_sign_ins() -> [With; 2] {
-    [With::Link(fixtures::credential(&CREDENTIAL)), With::Service(fixtures::credential(&SERVICE_CREDENTIAL))]
+    [
+        With::Link { secret: fixtures::credential(&CREDENTIAL), held: None },
+        With::Service(fixtures::credential(&SERVICE_CREDENTIAL)),
+    ]
 }
 fn reads_across_sign_in_exchange(with: With) -> (Client, skein_lib::Token, [skein_lib::Token; 2]) {
     let mut c = Client::signed_in();
@@ -367,7 +370,7 @@ fn sign_in_without_installation_leaves_old_reads_eligible() {
             None,
         ] {
             let (mut c, signing, reads) = reads_across_sign_in_exchange(match &with {
-                With::Link(secret) => With::Link(secret.clone()),
+                With::Link { secret, held } => With::Link { secret: secret.clone(), held: held.clone() },
                 With::Service(credential) => With::Service(credential.clone()),
                 With::Held(_) | With::Transport => unreachable!("exchange sign-in"),
             });

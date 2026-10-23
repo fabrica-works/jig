@@ -13,7 +13,7 @@ fn sign_in(core: &mut Core, limits: &Limits, party: u8) -> (u64, Box<[Record]>) 
     let out = watch_outputs(
         core,
         limits,
-        Event::SignIn { reply_to: ReplyTo::new(Token::new(90)), identity: identity(party) },
+        Event::SignIn { held: None, reply_to: ReplyTo::new(Token::new(90)), identity: identity(party) },
     );
     let mut sign_in = None;
     let mut records = List::with_capacity(u32::try_from(out.len()).expect("bounded sign-in outputs"));

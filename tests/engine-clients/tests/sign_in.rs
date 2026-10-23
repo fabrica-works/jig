@@ -100,7 +100,7 @@ fn no_core_event_holds_a_token_or_digest() {
     peer.post_link(&link);
     assert_eq!(
         peer.core_record(),
-        "SignIn { reply_to: ReplyTo(Token(1)), identity: Identity { key: IdentityKey { provider: 0, subject: [111, 119, 110, 101, 114] }, login: [111, 119, 110, 101, 114], name: [79, 119, 110, 101, 114] } }"
+        "SignIn { reply_to: ReplyTo(Token(1)), identity: Identity { key: IdentityKey { provider: 0, subject: [111, 119, 110, 101, 114] }, login: [111, 119, 110, 101, 114], name: [79, 119, 110, 101, 114] }, held: None }"
     );
 }
 
@@ -146,4 +146,168 @@ fn a_mint_the_people_child_answers_busy_is_refused_busy() {
     peer.event(Event::Reply { to: reply_to, reply: jig_domain_people::Reply::Again(jig_domain_people::Again::Busy) });
     assert_eq!(peer.mint_refusal(exchange), Some(MintRefusal::Busy));
     assert_eq!(peer.digest_kept(), None);
+}
+
+fn bearer(token: &[u8]) -> Box<[u8]> {
+    let mut bytes = skein_lib::Writer::new(7 + (token.len() * 8).div_ceil(6));
+    bytes.put(b"Bearer ").expect("prefix");
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, token, &mut bytes).expect("40-byte credential");
+    bytes.finish()
+}
+fn fresh_link(peer: &mut Peer) -> Box<[u8]> {
+    let spent = peer.printed_link();
+    let exchange = peer.post_link(&spent);
+    assert_eq!(peer.answered(exchange), Some(b"\x01".as_slice()));
+    let fresh = peer.printed_link();
+    assert_ne!(fresh, spent);
+    fresh
+}
+
+#[test]
+fn a_live_credential_keeps_the_sign_in_without_minting_and_spends_the_link() {
+    let mut peer = peer();
+    let first = complete_sign_in(&mut peer);
+    let bearer = bearer(first.token().as_ref().expect("credential").expose());
+    let link = fresh_link(&mut peer);
+    let exchange = peer.post(b"/jig/v1/sign-in/link", peer.link_body(&link), Some(&bearer));
+    let Some(jig_domain_core::Event::SignIn { reply_to, identity, held }) = peer.take_core() else { panic!("sign-in") };
+    assert_eq!(held, Some(fixtures::FIRST_SIGN_IN));
+    assert_eq!(identity, fixtures::first_owner());
+    peer.answer_request(
+        reply_to,
+        jig_domain_people::Reply::SignedIn {
+            person: fixtures::FIRST_PERSON,
+            sign_in: fixtures::FIRST_SIGN_IN,
+            expires: fixtures::expires(),
+        },
+    );
+    let answer = peer.sign_in_answer(exchange);
+    assert_eq!(answer.token(), &None);
+    assert_eq!((answer.party(), answer.expires()), (first.party(), first.expires()));
+    assert_eq!(peer.digest_kept(), None);
+    assert!(peer.has_digest(fixtures::FIRST_SIGN_IN));
+    assert_ne!(fresh_link(&mut peer), link);
+}
+
+#[test]
+fn a_links_unaccepted_credential_always_signs_in_afresh() {
+    use jig_protocol_engine_clients::SecretOwner;
+    for case in ["wrong digest", "expired", "ended while checking", "service", "unknown", "malformed", "none"] {
+        let mut peer = peer();
+        let first = complete_sign_in(&mut peer);
+        let original = first.token().as_ref().expect("40-byte credential").expose();
+        let mut token = original.to_vec();
+        match case {
+            "wrong digest" => token[39] ^= 1,
+            "expired" => {
+                peer.keep_digest(SecretOwner::SignIn(fixtures::FIRST_SIGN_IN), original, skein_lib::Wall::EPOCH);
+            }
+            "ended while checking" => peer.hold_gets(),
+            "service" => {
+                token[..8].copy_from_slice(&99_u64.to_be_bytes());
+                peer.keep_digest(SecretOwner::Service(99), &token, fixtures::expires());
+            }
+            "unknown" => token[..8].copy_from_slice(&98_u64.to_be_bytes()),
+            "malformed" => token.truncate(39),
+            "none" => {}
+            _ => unreachable!(),
+        }
+        let link = fresh_link(&mut peer);
+        let bearer = bearer(&token);
+        let exchange = peer.post(
+            b"/jig/v1/sign-in/link",
+            peer.link_body(&link),
+            if case == "none" { None } else { Some(&bearer) },
+        );
+        if case == "ended while checking" {
+            assert!(peer.take_core().is_none(), "Get is pending");
+            peer.event(Event::SignInEnded { sign_in: fixtures::FIRST_SIGN_IN });
+            peer.answer_get(); // Even the stale, accepted Get cannot resurrect the ended sign-in.
+        }
+        assert_eq!(peer.answered(exchange), None, "{case}: waits for people");
+        peer.answer_signed_in(42, fixtures::FIRST_PERSON); // Also asserts core held: None.
+        assert_eq!(peer.digest_kept(), Some(42), "{case}: new digest");
+        assert_eq!(peer.answered(exchange), None, "{case}: waits for durability");
+        peer.answer_kept(42);
+        let answer = peer.sign_in_answer(exchange);
+        assert_eq!(answer.party(), fixtures::FIRST_PERSON, "{case}");
+        assert_eq!(answer.token().as_ref().expect("fresh token").len(), 40, "{case}");
+        assert_ne!(answer.token(), first.token(), "{case}");
+    }
+}
+
+#[test]
+fn a_links_pending_credential_check_survives_stop_and_drain_as_an_admitted_sign_in() {
+    for drain in [false, true] {
+        let mut peer = peer();
+        let first = complete_sign_in(&mut peer);
+        let bearer = bearer(first.token().as_ref().expect("credential").expose());
+        let link = fresh_link(&mut peer);
+        peer.hold_gets();
+        let exchange = peer.post(b"/jig/v1/sign-in/link", peer.link_body(&link), Some(&bearer));
+        assert!(peer.take_core().is_none());
+        peer.event(if drain { Event::Close } else { Event::Stop });
+        assert_eq!(peer.answered(exchange), None);
+        assert_eq!(peer.closed(), 0);
+        peer.answer_get();
+        let Some(jig_domain_core::Event::SignIn { reply_to, held: Some(fixtures::FIRST_SIGN_IN), .. }) =
+            peer.take_core()
+        else {
+            panic!("admitted sign-in completes after stop");
+        };
+        peer.answer_request(
+            reply_to,
+            jig_domain_people::Reply::SignedIn {
+                person: fixtures::FIRST_PERSON,
+                sign_in: fixtures::FIRST_SIGN_IN,
+                expires: fixtures::expires(),
+            },
+        );
+        assert_eq!(peer.sign_in_answer(exchange).token(), &None);
+        assert_eq!(peer.digest_kept(), None);
+        assert_eq!(peer.closed(), usize::from(drain));
+    }
+}
+
+#[test]
+fn aborting_a_links_pending_credential_check_releases_no_sign_in_or_token() {
+    let mut peer = peer();
+    let first = complete_sign_in(&mut peer);
+    let bearer = bearer(first.token().as_ref().expect("credential").expose());
+    let link = fresh_link(&mut peer);
+    peer.hold_gets();
+    let exchange = peer.post(b"/jig/v1/sign-in/link", peer.link_body(&link), Some(&bearer));
+    assert!(peer.take_core().is_none());
+    peer.event(Event::Abort);
+    assert!(peer.take_core().is_none());
+    assert_eq!(peer.answered(exchange), None);
+    assert_eq!(peer.digest_kept(), None);
+    assert_eq!(peer.closed(), 1);
+}
+
+#[test]
+fn a_lost_links_credential_check_spends_the_link_like_a_lost_core_answer() {
+    let mut peer = peer();
+    let first = complete_sign_in(&mut peer);
+    let bearer = bearer(first.token().as_ref().expect("credential").expose());
+    let link = fresh_link(&mut peer);
+    peer.hold_gets();
+    let exchange = peer.post(b"/jig/v1/sign-in/link", peer.link_body(&link), Some(&bearer));
+    peer.cut_exchange(exchange);
+    peer.answer_get();
+    let Some(jig_domain_core::Event::SignIn { reply_to, held: Some(fixtures::FIRST_SIGN_IN), .. }) = peer.take_core()
+    else {
+        panic!("the admitted lost exchange still spends its link");
+    };
+    peer.answer_request(
+        reply_to,
+        jig_domain_people::Reply::SignedIn {
+            person: fixtures::FIRST_PERSON,
+            sign_in: fixtures::FIRST_SIGN_IN,
+            expires: fixtures::expires(),
+        },
+    );
+    assert_eq!(peer.answered(exchange), None);
+    assert_eq!(peer.digest_kept(), None);
+    assert_ne!(fresh_link(&mut peer), link);
 }

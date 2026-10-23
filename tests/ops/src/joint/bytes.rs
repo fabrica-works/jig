@@ -230,7 +230,10 @@ impl Bytes {
         let side = self.sides.get_mut(&client).expect("bound byte client");
         let with = match side.wire.credential() {
             Some(credential) => jig_client::With::Held(credential),
-            None => jig_client::With::Link(side.connections.printed(&self.link).expect("printed Ops link")),
+            None => jig_client::With::Link {
+                secret: side.connections.printed(&self.link).expect("printed Ops link"),
+                held: None,
+            },
         };
         vec![d::Event::Client { event: Event::SignIn { with } }]
     }

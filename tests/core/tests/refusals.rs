@@ -28,6 +28,7 @@ fn hold_revision(world: &World, task: u64) -> u64 {
 
 fn second_person(world: &mut World, role: bool) -> u64 {
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(8090)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: Box::new([2]) },

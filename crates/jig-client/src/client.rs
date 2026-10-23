@@ -148,7 +148,7 @@ impl Client {
             Event::SignIn { with } => {
                 self.service = match &with {
                     With::Service(credential) if credential.len() == 40 => Some(credential.clone()),
-                    With::Service(_) | With::Held(_) | With::Link(_) | With::Transport => None,
+                    With::Service(_) | With::Held(_) | With::Link { .. } | With::Transport => None,
                 };
                 self.signing_until = None;
                 self.signing_span = None;
@@ -156,7 +156,7 @@ impl Client {
                 self.sign_out_lost = false;
                 let held = match &with {
                     With::Held(_) | With::Transport => true,
-                    With::Link(_) | With::Service(_) => false,
+                    With::Link { .. } | With::Service(_) => false,
                 };
                 self.link_step(now, link::Event::SignIn { with });
                 if held {

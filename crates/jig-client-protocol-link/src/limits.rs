@@ -197,7 +197,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     let map = Map::<skein_lib::Token, Attempt>::worst_case(limits.exchanges)?;
-    map.checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.exchanges)?)?
+    map.checked_add(u64::from(limits.exchanges).checked_mul(40)?)?
+        .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.exchanges)?)?
         .checked_add(crate::watches::worst_case(limits)?)?
         .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.client.watches)?)?
         .checked_add(crate::store::worst_case(limits)?)?

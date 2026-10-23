@@ -86,6 +86,7 @@ impl Peers {
             parties::Up::SignIn { to, provider, subject } => {
                 assert!(self.party_flights.insert(to, index).is_none());
                 root::Event::Core(core::Event::SignIn {
+                    held: None,
                     reply_to: ReplyTo::new(Token::new(to)),
                     identity: people::Identity {
                         key: people::IdentityKey { provider, subject },

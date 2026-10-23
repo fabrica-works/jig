@@ -89,6 +89,7 @@ pub(super) fn sign_in(
     work: &mut Queue<Event>,
     reply_to: ReplyTo,
     identity: people::Identity,
+    held: Option<u64>,
 ) -> Requests {
     let mut out = Queue::with_capacity(2);
     if !core.people.ready() {
@@ -109,7 +110,7 @@ pub(super) fn sign_in(
         } else {
             people::Kind::Person
         };
-        work.push(Event::People(people::Event::SignedIn { reply_to, person, sign_in, identity, kind }));
+        work.push(Event::People(people::Event::SignedIn { reply_to, person, sign_in, identity, kind, held }));
     }
     out.push(Request::Decided);
     Requests::Out(out)

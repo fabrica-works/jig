@@ -164,6 +164,7 @@ fn members_dependency_world(seed: u64) -> (World, u64, u64, u64, u64, u64) {
     let member_sign_in = world.sign_in.expect("requester signed in");
     let tasks::Party::Person(person) = live_row(&world, parent.0).requester else { panic!("person's tree") };
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(6100)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },

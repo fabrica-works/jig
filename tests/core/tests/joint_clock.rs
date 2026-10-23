@@ -6,6 +6,7 @@ use skein_lib::{ReplyTo, Time, Token, Wall};
 
 fn sign_in(world: &mut World, number: u64) {
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(number)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: number.to_be_bytes().into() },

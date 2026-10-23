@@ -144,7 +144,7 @@ pub enum Fact {
 pub enum With {
     Service(Secret),
     Transport,
-    Link(Secret),
+    Link { secret: Secret, held: Option<Secret> },
     Held(Secret),
 }
 #[derive(Debug, PartialEq, Eq)]

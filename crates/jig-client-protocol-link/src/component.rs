@@ -11,6 +11,7 @@ pub(crate) struct Attempt {
     pub(super) owner: w::Owner,
     pub(super) version: u32,
     pub(super) kind: ExchangeKind,
+    pub(super) held: Option<Secret>,
 }
 impl Attempt {
     pub(super) fn carrying(&self) -> bool {
@@ -148,6 +149,7 @@ impl Link {
         let exchange = Token::new(self.next);
         self.next = next;
         let state = Attempt {
+            held: None,
             token: attempt,
             owner: record.owner().clone(),
             version: record.version(),
@@ -185,7 +187,8 @@ impl Link {
         };
         let exchange = Token::new(self.next);
         self.next = next;
-        let state = Attempt { token: read, owner, version: record.version(), kind: ExchangeKind::Read { turn } };
+        let state =
+            Attempt { held: None, token: read, owner, version: record.version(), kind: ExchangeKind::Read { turn } };
         self.attempts.insert(exchange, state).expect("checked exchange capacity");
         let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
         record.encode(&mut writer).expect("measured read envelope");
@@ -195,7 +198,7 @@ impl Link {
         let Some(attempt) = self.attempts.remove(&exchange) else { return };
         match attempt.kind {
             ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
-                self.signing_answer(attempt.kind, body, out);
+                self.signing_answer(attempt.kind, attempt.held, body, out);
                 return;
             }
             ExchangeKind::Attempt { .. } => {}
@@ -469,6 +472,7 @@ impl Link {
         let record = w::Open::new(&self.limits.wire, w::OpenParts { stream, watch: opening.name, subject })
             .expect("checked owned subject");
         let attempt = Attempt {
+            held: None,
             token: watch,
             owner: opening.owner.clone(),
             version: opening.version,
@@ -500,6 +504,7 @@ impl Link {
         let opening = self.watches.0.get_mut(&watch).expect("closing watch");
         opening.closing = true;
         let attempt = Attempt {
+            held: None,
             token: watch,
             owner: opening.owner.clone(),
             version: opening.version,

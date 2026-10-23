@@ -17,6 +17,7 @@ fn a_person_task_is_readdressed_after_durability_and_the_previous_taker_cannot_a
     assert_eq!(before.person_revision, Some(0));
     assert_eq!(before.taken_by, Some(first));
     w.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(80_002)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },

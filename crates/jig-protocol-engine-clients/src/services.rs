@@ -43,8 +43,9 @@ impl Component {
                     for (exchange, waiting) in &self.pending.exchanges {
                         let wanted = match waiting {
                             Waiting::Get { owner, .. } => Some(*owner),
+                            Waiting::LinkGet { sign_in, .. } => Some(SecretOwner::SignIn(*sign_in)),
                             Waiting::Made { party, .. } => Some(SecretOwner::Service(*party)),
-                            Waiting::Core
+                            Waiting::Core { .. }
                             | Waiting::SignOut { .. }
                             | Waiting::Watch { .. }
                             | Waiting::Keep { .. }
@@ -61,6 +62,11 @@ impl Component {
                     }
                     let Some(exchange) = found else { break };
                     match self.pending.exchanges.remove(&exchange).expect("found get") {
+                        Waiting::LinkGet { sign_in, digest } => {
+                            let held =
+                                if sign_in::accepted(value.as_ref(), &digest, env.wall) { Some(sign_in) } else { None };
+                            self.link_sign_in(exchange, held, out);
+                        }
                         Waiting::Get { digest, body, route, .. } => {
                             if sign_in::accepted(value.as_ref(), &digest, env.wall) {
                                 match owner {
@@ -86,7 +92,7 @@ impl Component {
                         Waiting::Made { sign_in, party } => {
                             self.made(env, exchange, sign_in, party, value.as_ref(), out);
                         }
-                        Waiting::Core
+                        Waiting::Core { .. }
                         | Waiting::SignOut { .. }
                         | Waiting::Watch { .. }
                         | Waiting::Keep { .. }
@@ -174,8 +180,12 @@ impl Component {
             login: Box::new([]),
             name: Box::new([]),
         };
-        self.pending.exchanges.insert(exchange, Waiting::Core).expect("same get slot");
-        out.push(Request::Core(Box::new(core::Event::SignIn { reply_to: ReplyTo::new(exchange), identity })));
+        self.pending.exchanges.insert(exchange, Waiting::Core { held: None }).expect("same get slot");
+        out.push(Request::Core(Box::new(core::Event::SignIn {
+            held: None,
+            reply_to: ReplyTo::new(exchange),
+            identity,
+        })));
     }
     fn made(
         &mut self,

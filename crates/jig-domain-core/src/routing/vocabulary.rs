@@ -430,7 +430,7 @@ pub enum Event {
     /// Release effect answers whose absolute answer deadline has passed.
     EffectDeadline,
     /// Allocate the person and session named by a new party sign-in.
-    SignIn { reply_to: ReplyTo, identity: people::Identity },
+    SignIn { reply_to: ReplyTo, identity: people::Identity, held: Option<u64> },
     /// Admit a visible subject on a live sign-in, without a request key.
     Watch { watcher: Token, sign_in: u64, subject: crate::documents::Watched, window: crate::documents::Window },
     /// Follow a task's live run from the client's acknowledged turn and offset.

@@ -36,6 +36,7 @@ impl Component {
                     | Waiting::Watch { sign_in: number, .. }
                     | Waiting::Keep { sign_in: number, .. }
                     | Waiting::Get { owner: SecretOwner::SignIn(number), .. }
+                    | Waiting::LinkGet { sign_in: number, .. }
                     | Waiting::Made { sign_in: number, .. }
                     | Waiting::Checked { sign_in: number, .. }
                     | Waiting::Read { sign_in: number, .. }
@@ -47,7 +48,8 @@ impl Component {
                         found = Some(*exchange);
                         break;
                     }
-                    Waiting::Core
+                    Waiting::Core { .. }
+                    | Waiting::LinkGet { .. }
                     | Waiting::SignOut { .. }
                     | Waiting::Watch { .. }
                     | Waiting::Keep { .. }
@@ -64,6 +66,7 @@ impl Component {
                 break;
             };
             match self.pending.exchanges.remove(&exchange).expect("ended exchange") {
+                Waiting::LinkGet { .. } => self.link_sign_in(exchange, None, out),
                 Waiting::Keep { .. } | Waiting::Made { .. } => {
                     if !self.mint_refused(exchange, crate::MintRefusal::Bound, out) {
                         self.respond(env, exchange, routes::refused(&env.limits.wire));
@@ -95,7 +98,7 @@ impl Component {
                         .insert(exchange, Waiting::SignOut { sign_in, committed: true })
                         .expect("same sign-out slot");
                 }
-                Waiting::Core => {}
+                Waiting::Core { .. } => {}
             }
         }
         self.end_streams(Some(sign_in));
@@ -151,7 +154,8 @@ impl Component {
                         found = Some(*exchange);
                         break;
                     }
-                    Waiting::Core
+                    Waiting::Core { .. }
+                    | Waiting::LinkGet { .. }
                     | Waiting::SignOut { .. }
                     | Waiting::Watch { .. }
                     | Waiting::Keep { .. }

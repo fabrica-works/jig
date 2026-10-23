@@ -475,8 +475,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         Event::Restore { record } => restore(domain, env, record, out),
         Event::Restored => restored(domain, env, out),
-        Event::SignedIn { reply_to, person, sign_in, identity, kind } => {
-            signin(domain, env, reply_to, person, sign_in, identity, kind, out);
+        Event::SignedIn { reply_to, person, sign_in, identity, kind, held } => {
+            signin(domain, env, reply_to, person, sign_in, identity, kind, held, out);
         }
         Event::SignOut { reply_to, sign_in } => {
             if !domain.ready() {
@@ -842,7 +842,8 @@ fn seeds(owners: &[InitialOwner], seeding: bool) -> &[InitialOwner] {
 
 #[expect(
     clippy::too_many_arguments,
-    reason = "the authenticated sign-in has its identity, kind and root-issued numbers"
+    clippy::too_many_lines,
+    reason = "one sign-in decision checks replay and held ownership before capacity and writes"
 )]
 fn signin(
     domain: &mut Domain,
@@ -852,6 +853,7 @@ fn signin(
     number: u64,
     identity: Identity,
     kind: Kind,
+    held: Option<u64>,
     out: &mut Queue<Request>,
 ) {
     if !domain.ready() {
@@ -883,6 +885,20 @@ fn signin(
         }
         return out
             .push(Request::Reply { to, reply: Reply::SignedIn { person, sign_in: number, expires: old.expires } });
+    }
+    if let Some(held) = held
+        && let Some(row) = domain.sign_ins.get(&held)
+    {
+        // A held sign-in is kept only for the same person as the identity.
+        #[expect(clippy::collapsible_if, reason = "held ownership is an explicit comparison (people.md, 3)")]
+        if row.person == person {
+            if row.expires > env.wall && row.due > env.now {
+                return out.push(Request::Reply {
+                    to,
+                    reply: Reply::SignedIn { person, sign_in: held, expires: row.expires },
+                });
+            }
+        }
     }
     if domain.sign_ins.len() >= env.limits.sign_ins {
         return again(to, Again::Busy, out);

@@ -307,6 +307,7 @@ fn an_earlier_compound_amendment_sets_the_next_spec_revision() {
 fn another_requester(world: &mut jig_core_world::effects::World) -> u64 {
     let first = world.sign_in.expect("first requester signed in");
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(MOVE_SIGN_IN)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },

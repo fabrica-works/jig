@@ -13,6 +13,7 @@ use skein_lib::{Duration, ReplyTo, Time, Token, Wall};
 
 fn sign_in(number: u8) -> root::Event {
     root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(7000 + u64::from(number))),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: Box::from([number, 255]) },

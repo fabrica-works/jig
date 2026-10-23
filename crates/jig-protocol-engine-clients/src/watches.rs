@@ -244,7 +244,8 @@ impl Component {
                 | Waiting::Carry { sign_in, .. }
                 | Waiting::Read { sign_in, .. }
                 | Waiting::ApplicationRead { sign_in, .. } => Some(*sign_in),
-                Waiting::Core
+                Waiting::Core { .. }
+                | Waiting::LinkGet { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Get { .. }

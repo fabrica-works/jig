@@ -66,7 +66,10 @@ impl Host {
             kept,
             offset: jig_client_view::boundary::Offset { minutes: offset },
         });
-        let with = secret.map_or(jig_client::With::Transport, |bytes| jig_client::With::Link(Secret::new(bytes)));
+        let with = secret.map_or(jig_client::With::Transport, |bytes| jig_client::With::Link {
+            secret: Secret::new(bytes),
+            held: None,
+        });
         self.client(jig_client::Event::SignIn { with });
     }
     pub fn clocks(&mut self, now: Time, wall: Wall) {

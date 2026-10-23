@@ -64,7 +64,7 @@ impl Exchange {
         assert_eq!(who, SecretOwner::Service(SERVICE));
         self.service_got(Some(service_kept()));
         let Some(Request::Core(event)) = self.out.pop() else { panic!("core sign-in") };
-        let core::Event::SignIn { reply_to, identity } = *event else { panic!("sign-in") };
+        let core::Event::SignIn { held: None, reply_to, identity } = *event else { panic!("sign-in") };
         assert_eq!(identity.key.provider, 2);
         assert_eq!(identity.key.subject.as_ref(), &SERVICE.to_be_bytes());
         assert!(identity.login.is_empty() && identity.name.is_empty());

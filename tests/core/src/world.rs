@@ -505,6 +505,7 @@ impl World {
         })));
         events.push_back(root::Event::Core(core::Event::Period { project: 1, period: 1, budget: 1000, next: None }));
         events.push_back(root::Event::Core(core::Event::SignIn {
+            held: None,
             reply_to: ReplyTo::new(Token::new(101)),
             identity: people::Identity {
                 key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },

@@ -433,6 +433,7 @@ fn owner_makes_a_service_which_can_request_work() {
 
     let unknown_to = test.to();
     let unknown = test.send(Event::SignedIn {
+        held: None,
         reply_to: unknown_to,
         person: 3,
         sign_in: 20,
@@ -442,6 +443,7 @@ fn owner_makes_a_service_which_can_request_work() {
     assert_eq!(reply(&unknown), Reply::SignedOut);
     let service_to = test.to();
     let service = test.send(Event::SignedIn {
+        held: None,
         reply_to: service_to,
         person: 4,
         sign_in: 21,
@@ -518,7 +520,7 @@ impl Test {
 
     fn signin_bounded(&mut self, person: u64, sign_in: u64, identity: Identity) -> List<Request> {
         let reply_to = self.to();
-        self.send_bounded(Event::SignedIn { reply_to, person, sign_in, identity, kind: Kind::Person })
+        self.send_bounded(Event::SignedIn { held: None, reply_to, person, sign_in, identity, kind: Kind::Person })
     }
 
     fn request_bounded(&mut self, sign_in: u64, key: u8, ask: Ask) -> List<Request> {
@@ -528,7 +530,7 @@ impl Test {
 
     fn signin(&mut self, person: u64, sign_in: u64, identity: Identity) -> Vec<Request> {
         let reply_to = self.to();
-        self.send(Event::SignedIn { reply_to, person, sign_in, identity, kind: Kind::Person })
+        self.send(Event::SignedIn { held: None, reply_to, person, sign_in, identity, kind: Kind::Person })
     }
 
     fn request(&mut self, sign_in: u64, key: u8, ask: Ask) -> Vec<Request> {
@@ -2105,4 +2107,79 @@ fn restored_expiries_and_removing_the_earliest_keep_both_indexes_exact() {
 fn assert_signin_erased(out: &mut Queue<Request>, expected: u64) {
     let Some(Request::Erase { key: Key::SignIn(number) }) = out.pop() else { panic!("one sign-in erased") };
     assert_eq!(number, expected);
+}
+
+#[test]
+fn a_live_held_sign_in_replies_alone_with_its_saved_expiry_even_at_capacity() {
+    let mut test = Test::new(Limits { sign_ins: 1, ..LIMITS });
+    let original = reply(&test.signin(1, 10, identity(0, 1)));
+    while test.d.pop_fact().is_some() {}
+    test.env.now = Time::from_nanos(1);
+    test.env.wall = Wall::from_nanos(1);
+    for sign_in in 11..20 {
+        let reply = test.to().into_token();
+        let requests = test.send(Event::SignedIn {
+            reply_to: ReplyTo::new(reply),
+            person: sign_in,
+            sign_in,
+            identity: identity(0, 1),
+            kind: Kind::Person,
+            held: Some(10),
+        });
+        assert_eq!(requests, [Request::Reply { to: ReplyTo::new(reply), reply: original.clone() }]);
+        assert!(test.d.pop_fact().is_none());
+        assert_eq!(test.d.sign_in_person(sign_in), None);
+    }
+    assert_eq!(reply(&test.signin(2, 20, identity(0, 2))), Reply::Again(Again::Busy));
+}
+
+#[test]
+fn an_absent_ended_or_expired_held_sign_in_signs_in_afresh() {
+    for case in ["none", "unknown", "other person", "ended", "wall expiry", "monotonic expiry"] {
+        let mut test = Test::new(LIMITS);
+        test.signin(1, 10, identity(0, 1));
+        let mut held = Some(10);
+        let mut user = 1;
+        match case {
+            "none" => held = None,
+            "unknown" => held = Some(99),
+            "other person" => user = 2,
+            "ended" => {
+                let reply_to = test.to();
+                test.send(Event::SignOut { reply_to, sign_in: 10 });
+            }
+            "wall expiry" => test.env.wall = Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()),
+            "monotonic expiry" => test.env.now = Time::from_nanos(LIMITS.sign_in_lifetime.as_nanos()),
+            _ => unreachable!(),
+        }
+        let reply_to = test.to();
+        let requests = test.send(Event::SignedIn {
+            reply_to,
+            person: 2,
+            sign_in: 11,
+            identity: identity(0, user),
+            kind: Kind::Person,
+            held,
+        });
+        let expected_person = if user == 1 { 1 } else { 2 };
+        assert_eq!(
+            reply(&requests),
+            Reply::SignedIn {
+                person: expected_person,
+                sign_in: 11,
+                expires: Wall::from_nanos(test.env.wall.as_nanos() + LIMITS.sign_in_lifetime.as_nanos()),
+            },
+            "{case}"
+        );
+        assert!(
+            requests.iter().any(|request| {
+                if let Request::Save { record: Stored::SignIn { number: 11, person, .. } } = request {
+                    *person == expected_person
+                } else {
+                    false
+                }
+            }),
+            "{case}"
+        );
+    }
 }

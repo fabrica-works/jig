@@ -18,7 +18,11 @@ fn identity() -> people::Identity {
 }
 
 fn sign_in(token: u64) -> root::Event {
-    root::Event::Core(core::Event::SignIn { reply_to: ReplyTo::new(Token::new(token)), identity: identity() })
+    root::Event::Core(core::Event::SignIn {
+        held: None,
+        reply_to: ReplyTo::new(Token::new(token)),
+        identity: identity(),
+    })
 }
 
 fn ask(world: &World, sign_in: u64, token: u64) -> root::Event {

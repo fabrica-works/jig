@@ -226,6 +226,7 @@ impl Driven {
         driven.party(core::Event::Period { project: 1, period: 1, budget: 100, next: None });
         driven.commit_all();
         driven.party(core::Event::SignIn {
+            held: None,
             reply_to: ReplyTo::new(Token::new(10)),
             identity: people::Identity {
                 key: people::IdentityKey { provider: 1, subject: b"owner-a".as_slice().into() },

@@ -174,6 +174,8 @@ pub struct Peer {
     application: VecDeque<jig_protocol_engine_clients::ToApplication>,
     keep: Option<(SecretOwner, Kept)>,
     digests: BTreeMap<SecretOwner, Kept>,
+    hold_gets: bool,
+    gets: VecDeque<(SecretOwner, Option<Kept>)>,
     sign_ins: BTreeMap<u64, u64>,
     watch_sign_ins: BTreeMap<Token, u64>,
 
@@ -220,6 +222,8 @@ impl Peer {
             application: VecDeque::new(),
             keep: None,
             digests: BTreeMap::new(),
+            hold_gets: false,
+            gets: VecDeque::new(),
             sign_ins: BTreeMap::new(),
             watch_sign_ins: BTreeMap::new(),
 
@@ -379,11 +383,16 @@ impl Peer {
                     }
                     Request::Secrets(SecretsRequest::Keep { owner, value }) => self.keep = Some((owner, value)),
                     Request::Secrets(SecretsRequest::Get { owner }) => {
-                        self.component.down(
-                            &self.env,
-                            Event::Secrets(SecretsAnswer::Got { owner, value: self.digests.get(&owner).cloned() }),
-                            &mut self.out,
-                        );
+                        let value = self.digests.get(&owner).cloned();
+                        if self.hold_gets {
+                            self.gets.push_back((owner, value));
+                        } else {
+                            self.component.down(
+                                &self.env,
+                                Event::Secrets(SecretsAnswer::Got { owner, value }),
+                                &mut self.out,
+                            );
+                        }
                     }
                     Request::Secrets(SecretsRequest::Carry { exchange, value }) => {
                         self.carries.push_back((exchange, value));
@@ -651,12 +660,16 @@ impl Peer {
         self.links.last().expect("printed link").clone()
     }
     pub fn post_link(&mut self, link: &[u8]) -> Token {
+        self.post(b"/jig/v1/sign-in/link", self.link_body(link), None)
+    }
+    #[must_use]
+    pub fn link_body(&self, link: &[u8]) -> Box<[u8]> {
         let secret = link.split(|byte| *byte == b'=').next_back().expect("link query");
         let secret = base64::decode(Alphabet::Url, secret, 32).expect("link secret");
         let record = w::LinkSignIn::new(&self.env.limits.wire, w::LinkSignInParts { secret }).expect("bounded secret");
         let mut out = Writer::new(usize::try_from(record.measure()).expect("record size"));
         record.encode(&mut out).expect("encoded link");
-        self.post(b"/jig/v1/sign-in/link", out.finish(), None)
+        out.finish()
     }
     pub fn post(&mut self, target: &[u8], body: Box<[u8]>, bearer: Option<&[u8]>) -> Token {
         let socket = Token::new(self.next_socket);
@@ -669,11 +682,34 @@ impl Peer {
         self.pump();
         socket
     }
+    pub fn cut_exchange(&mut self, socket: Token) {
+        let exchange = self.sockets.get_mut(&socket).expect("exchange");
+        exchange.state = ExchangeState::Cut;
+        let owner = exchange.owner.expect("bound exchange");
+        self.server.up(
+            skein_io::Event::Stream { owner, up: Up::Failed(skein_lib::stream::Fault::Other) },
+            &mut self.server_out,
+        );
+        self.pump();
+    }
+    pub fn hold_gets(&mut self) {
+        self.hold_gets = true;
+    }
+    pub fn answer_get(&mut self) {
+        let (owner, value) = self.gets.pop_front().expect("pending Get");
+        self.event(Event::Secrets(SecretsAnswer::Got { owner, value }));
+    }
+    pub fn keep_digest(&mut self, owner: SecretOwner, token: &[u8], expires: Wall) {
+        self.digests.insert(
+            owner,
+            Kept { digest: skein_lib::Secret::new(Box::new(skein_lib::sha256::digest(token))), expires },
+        );
+    }
     fn take_sign_in(&mut self) -> ReplyTo {
         let event = self.core.pop_front().expect("core sign-in");
         // The assertion first checks the variant; destructuring reads its public vocabulary.
         assert!(matches!(event, core::Event::SignIn { .. }));
-        if let core::Event::SignIn { reply_to, identity } = event {
+        if let core::Event::SignIn { held: None, reply_to, identity } = event {
             assert_eq!(identity, self.mint_identity.take().unwrap_or_else(fixtures::first_owner));
             reply_to
         } else {

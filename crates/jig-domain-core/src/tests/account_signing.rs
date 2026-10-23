@@ -46,7 +46,7 @@ fn signed_in(core: &mut Core, env: &Env<Limits>) {
     people::step(
         &mut core.people,
         &env,
-        people::Event::SignedIn { reply_to, person: 1, sign_in: SIGN_IN, identity, kind },
+        people::Event::SignedIn { held: None, reply_to, person: 1, sign_in: SIGN_IN, identity, kind },
         &mut out,
     );
     assert_eq!(core.people.person(SIGN_IN, env.now, env.wall), Some(1));

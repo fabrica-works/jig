@@ -843,3 +843,43 @@ fn a_retained_create_distinguishes_its_account_preference() {
     assert_eq!(world.reply(conflict), Some(Reply::Refused(Refusal::KeyConflict)));
     world.assert_settled();
 }
+
+#[test]
+fn fresh_links_keep_the_same_persons_sign_in_without_filling_the_pool() {
+    let mut settings = Settings::calm(901);
+    settings.limits.sign_ins = 1;
+    let mut world = World::new(settings);
+    let first = world.signin(10, 1);
+    world.commit_all();
+    let original = world.reply(first).expect("signed in");
+    let records = world.records().clone();
+    for number in 11..20 {
+        let call = world.signin_held(number, 1, Some(10));
+        world.commit_all();
+        assert_eq!(world.reply(call), Some(original.clone()));
+        assert_eq!(world.records(), &records, "no person, sign-in or expiry changed");
+    }
+    assert_eq!(
+        world.records().values().filter(|row| matches!(row, jig_domain_people::Stored::SignIn { .. })).count(),
+        1
+    );
+    world.assert_settled();
+}
+
+#[test]
+fn another_persons_live_held_sign_in_is_never_kept() {
+    let mut world = World::new(Settings::calm(902));
+    let first = world.signin(10, 1);
+    let second = world.signin(20, 2);
+    world.commit_all();
+    let Some(Reply::SignedIn { person: first_person, .. }) = world.reply(first) else { panic!("first person") };
+    let Some(Reply::SignedIn { person: second_person, .. }) = world.reply(second) else { panic!("second person") };
+    assert_ne!(first_person, second_person);
+    let call = world.signin_held(30, 2, Some(10));
+    world.commit_all();
+    assert!(matches!(world.reply(call), Some(Reply::SignedIn { person, sign_in: 30, .. }) if person == second_person));
+    assert!(matches!(world.records().get(&jig_domain_people::Key::SignIn(30)),
+        Some(jig_domain_people::Stored::SignIn { person, .. }) if *person == second_person));
+    assert!(world.records().contains_key(&jig_domain_people::Key::SignIn(10)));
+    world.assert_settled();
+}

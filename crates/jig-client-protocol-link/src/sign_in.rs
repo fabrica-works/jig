@@ -26,9 +26,9 @@ impl Link {
                     out.push(Request::Signing { signing: Signing::Refused });
                     return;
                 }
-                self.signing_exchange(ExchangeKind::SignIn, Message::SignInService, Some(credential), out);
+                self.signing_exchange(ExchangeKind::SignIn, Message::SignInService, Some(credential), None, out);
             }
-            With::Link(secret) => {
+            With::Link { secret, held } => {
                 let Ok(record) = w::LinkSignIn::new(
                     &self.limits.wire,
                     w::LinkSignInParts { secret: skein_lib::bytes::copy_of(secret.expose()) },
@@ -41,7 +41,8 @@ impl Link {
                 self.signing_exchange(
                     ExchangeKind::SignIn,
                     Message::SignInLink(writer.finish()),
-                    self.credential.clone(),
+                    held.clone(),
+                    held,
                     out,
                 );
             }
@@ -52,6 +53,7 @@ impl Link {
             ExchangeKind::SignOut { generation: self.generation },
             Message::SignOut,
             self.credential.clone(),
+            None,
             out,
         );
     }
@@ -60,6 +62,7 @@ impl Link {
         kind: ExchangeKind,
         message: Message,
         credential: Option<Secret>,
+        held: Option<Secret>,
         out: &mut Queue<Request>,
     ) {
         let Some(next) = self.next.checked_add(1) else {
@@ -75,12 +78,24 @@ impl Link {
         self.attempts
             .insert(
                 exchange,
-                Attempt { token: exchange, owner: w::Owner::Jig, version: jig_client_protocol_wire::VERSION, kind },
+                Attempt {
+                    held,
+                    token: exchange,
+                    owner: w::Owner::Jig,
+                    version: jig_client_protocol_wire::VERSION,
+                    kind,
+                },
             )
             .expect("checked exchange capacity");
         out.push(Request::Exchange { exchange, credential, message });
     }
-    pub(super) fn signing_answer(&mut self, kind: ExchangeKind, body: &[u8], out: &mut Queue<Request>) {
+    pub(super) fn signing_answer(
+        &mut self,
+        kind: ExchangeKind,
+        held: Option<Secret>,
+        body: &[u8],
+        out: &mut Queue<Request>,
+    ) {
         match kind {
             ExchangeKind::SignOut { generation } if generation != self.generation => return,
             ExchangeKind::SignOut { .. }
@@ -103,7 +118,7 @@ impl Link {
                     {
                         let fields = value.into_parts();
                         self.end_sign_in(out);
-                        self.credential = fields.token;
+                        self.credential = fields.token.or(held);
                         self.generation = self.generation.saturating_add(1);
                         Signing::SignedIn { party: fields.party }
                     }

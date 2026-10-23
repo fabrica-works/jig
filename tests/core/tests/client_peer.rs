@@ -19,6 +19,7 @@ fn client_world() -> (World, u64) {
     );
     world.client_peer = Some(ClientPeer::default());
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(45_100)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: Box::from(&b"client-peer"[..]) },

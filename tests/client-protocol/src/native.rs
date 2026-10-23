@@ -205,7 +205,7 @@ impl NativeClient {
     pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_protocol_http::Unlinked> {
         let secret = self.shell.sign_in(printed)?;
         self.callback(client::Event::Client {
-            event: jig_client::Event::SignIn { with: jig_client::With::Link(secret) },
+            event: jig_client::Event::SignIn { with: jig_client::With::Link { secret, held: None } },
         });
         Ok(())
     }

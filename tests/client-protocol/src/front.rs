@@ -167,7 +167,11 @@ impl Protocol {
                         let secret = side.connections.printed(&self.engine.link).expect("new printed link");
                         self.callbacks.push((
                             *client,
-                            Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Link(secret) } },
+                            Event::Client {
+                                event: jig_client::Event::SignIn {
+                                    with: jig_client::With::Link { secret, held: None },
+                                },
+                            },
                         ));
                     }
                     let additional = side.wire.additional_receipts(&event);
@@ -329,7 +333,7 @@ impl Front<Test> for Protocol {
         let secret = side.connections.printed(&self.engine.link).expect("engine's printed link");
         self.callbacks.push((
             client,
-            Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Link(secret) } },
+            Event::Client { event: jig_client::Event::SignIn { with: jig_client::With::Link { secret, held: None } } },
         ));
     }
     fn sign_out(&mut self, client: ClientId, _now: Time, _wall: Wall) {

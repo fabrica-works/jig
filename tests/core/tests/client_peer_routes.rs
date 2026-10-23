@@ -36,6 +36,7 @@ fn world(peer: ClientPeer) -> World {
 
 fn sign_in(token: Token) -> root::Event {
     root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(token),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: SUBJECT.into() },

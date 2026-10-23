@@ -104,6 +104,7 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
                 name: Box::new([]),
             };
             test.event(Event::SignedIn {
+                held: None,
                 reply_to,
                 person: number,
                 sign_in: number,
@@ -289,6 +290,7 @@ fn retained_account_sign_in_answers_hold_their_longest_addresses_within_the_wors
     test.event(Event::Restored);
     let reply_to = test.to();
     test.event(Event::SignedIn {
+        held: None,
         reply_to,
         person: 1,
         sign_in: 1,
@@ -336,6 +338,7 @@ fn retained_program_outcomes_fit_the_people_bound() {
     test.event(Event::Restored);
     let reply_to = test.to();
     test.event(Event::SignedIn {
+        held: None,
         reply_to,
         person: 1,
         sign_in: 1,

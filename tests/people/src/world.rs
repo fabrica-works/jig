@@ -285,9 +285,20 @@ impl World {
     }
 
     pub fn signin(&mut self, sign_in: u64, user: u64) -> u64 {
+        self.signin_held(sign_in, user, None)
+    }
+
+    pub fn signin_held(&mut self, sign_in: u64, user: u64, held: Option<u64>) -> u64 {
         let (call, reply_to) = self.call();
         let person = self.name();
-        self.send(Event::SignedIn { reply_to, person, sign_in, identity: identity(user), kind: people::Kind::Person });
+        self.send(Event::SignedIn {
+            reply_to,
+            person,
+            sign_in,
+            identity: identity(user),
+            kind: people::Kind::Person,
+            held,
+        });
         call
     }
 
@@ -295,6 +306,7 @@ impl World {
         let (call, reply_to) = self.call();
         let candidate = self.name();
         self.send(Event::SignedIn {
+            held: None,
             reply_to,
             person: candidate,
             sign_in,

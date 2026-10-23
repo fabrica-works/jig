@@ -198,6 +198,7 @@ fn inbox_across_projects_stories() {
     open(&mut world, 4, Watched::Inbox);
     let first_sign_in = world.sign_in.expect("first party");
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: skein_lib::ReplyTo::new(Token::new(6090)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },

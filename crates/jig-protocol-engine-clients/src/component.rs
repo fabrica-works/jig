@@ -189,7 +189,8 @@ impl Component {
                     ready = Some(*exchange);
                     break;
                 }
-                Waiting::Core
+                Waiting::Core { .. }
+                | Waiting::LinkGet { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Watch { .. }
                 | Waiting::Get { .. }
@@ -212,7 +213,8 @@ impl Component {
                     Route::SignOut => self.sign_out(env, exchange, sign_in, &body, out),
                     Route::Link | Route::Service => {}
                 },
-                Waiting::Core
+                Waiting::Core { .. }
+                | Waiting::LinkGet { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Watch { .. }
                 | Waiting::Get { .. }
@@ -342,11 +344,15 @@ impl Component {
                 if let Some(link) = self.link.take() {
                     self.spending = Some((exchange, link));
                 }
-                self.pending.exchanges.insert(exchange, Waiting::Core).expect("admitted exchange");
-                out.push(Request::Core(Box::new(core::Event::SignIn {
-                    reply_to: ReplyTo::new(exchange),
-                    identity: self.settings.link.as_ref().expect("link enabled").clone(),
-                })));
+                if let Some((sign_in, digest)) = sign_in::credential(credential.as_ref()) {
+                    self.pending
+                        .exchanges
+                        .insert(exchange, Waiting::LinkGet { sign_in, digest })
+                        .expect("admitted exchange");
+                    out.push(Request::Secrets(SecretsRequest::Get { owner: SecretOwner::SignIn(sign_in) }));
+                } else {
+                    self.link_sign_in(exchange, None, out);
+                }
             }
             Route::Service
             | Route::SignOut
@@ -374,6 +380,14 @@ impl Component {
                 out.push(Request::Secrets(SecretsRequest::Get { owner }));
             }
         }
+    }
+    pub(super) fn link_sign_in(&mut self, exchange: Token, held: Option<u64>, out: &mut Queue<Request>) {
+        self.pending.exchanges.insert(exchange, Waiting::Core { held }).expect("admitted link slot");
+        out.push(Request::Core(Box::new(core::Event::SignIn {
+            reply_to: ReplyTo::new(exchange),
+            identity: self.settings.link.as_ref().expect("link enabled").clone(),
+            held,
+        })));
     }
     fn reply(&mut self, env: &Env<Limits>, exchange: Token, reply: people::Reply, out: &mut Queue<Request>) {
         // The core names a value it leaves unused before its answer; one
@@ -405,9 +419,10 @@ impl Component {
                     }
                 }
             },
-            Waiting::Core => self.sign_in_reply(env, exchange, reply, out),
+            Waiting::Core { held } => self.sign_in_reply(env, exchange, reply, held, out),
             Waiting::Ask { .. } => self.ask_reply(env, exchange, reply, out, waiting),
-            Waiting::Watch { .. }
+            Waiting::LinkGet { .. }
+            | Waiting::Watch { .. }
             | Waiting::Read { .. }
             | Waiting::ApplicationRead { .. }
             | Waiting::Keep { .. }
@@ -498,7 +513,8 @@ impl Component {
                 };
                 self.answer(env, exchange, answer, out);
             }
-            Waiting::Core
+            Waiting::Core { .. }
+            | Waiting::LinkGet { .. }
             | Waiting::SignOut { .. }
             | Waiting::Watch { .. }
             | Waiting::Keep { .. }
@@ -545,7 +561,8 @@ impl Component {
         let mut count = 0_u32;
         for (_, waiting) in &self.pending.exchanges {
             match waiting {
-                Waiting::Core
+                Waiting::Core { .. }
+                | Waiting::LinkGet { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Watch { .. }
                 | Waiting::Keep { .. }

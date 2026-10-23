@@ -54,6 +54,7 @@ fn member_world() -> (World, u64, u64) {
     let mut world = World::configured(172, false, configuration, limits);
     let owner = world.sign_in.expect("signed-in owner");
     world.send(root::Event::Core(core::Event::SignIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(SIGN_IN)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: b"member".as_slice().into() },

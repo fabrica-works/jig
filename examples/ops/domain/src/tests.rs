@@ -337,6 +337,7 @@ fn restore_chat_account(domain: &mut Domain, env: &Env<Limits>) {
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "the held sign-in field extends the existing complete chat fixture")]
 fn started_chat() -> (Domain, Env<Limits>, Token) {
     use jig_domain_fleet as fleet;
     use jig_domain_people as people;
@@ -364,6 +365,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
         &mut domain,
         &env,
         Event::Core(core::Event::SignIn {
+            held: None,
             reply_to: skein_lib::ReplyTo::new(Token::new(101)),
             identity: people::Identity {
                 key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },

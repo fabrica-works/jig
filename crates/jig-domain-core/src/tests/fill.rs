@@ -13,6 +13,7 @@ fn signed_in(core: &mut Core, env: &Env<Limits>) {
         core,
         env,
         Event::People(people::Event::SignedIn {
+            held: None,
             reply_to: ReplyTo::new(Token::new(7200)),
             person: 1,
             sign_in: 10,
@@ -67,7 +68,7 @@ fn a_sign_in_at_the_fill_mark_is_refused() {
         name: b"B Person".as_slice().into(),
     };
     let Requests::Out(mut out) =
-        step(&mut core, &env, Event::SignIn { reply_to: ReplyTo::new(Token::new(7201)), identity });
+        step(&mut core, &env, Event::SignIn { held: None, reply_to: ReplyTo::new(Token::new(7201)), identity });
     let Some(Request::Now(now)) = out.pop() else { panic!("one refusal, first") };
     let Now::SignInRefused { to } = *now else { panic!("the sign-in's refusal") };
     assert_eq!(to.into_token(), Token::new(7201));
