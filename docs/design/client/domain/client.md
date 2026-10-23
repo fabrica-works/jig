@@ -1012,17 +1012,16 @@ the client's protocol designs (`../../protocol/client.md`):
 alone, as an application holds it, with the engine scripted (testing.md,
 section 4), and joins the engine's domain in the joint world
 (testing.md, section 5). Its stories: signing in by the printed link and
-starting a chat by `shapes::chat`; signing in by a fresh link with a
-credential held, kept when the answer carries none; a held chat amended
-and released in one compound request; a proposal accepted while two
-handles watch it; two clients deciding one thing; a restart with
-requests pending, the kept work told and sent; the engine restarting
-under a pending request; the stream dropped, every handle behind, then
-live; a handle given another subject while a delivery for the old one is
-in flight; a store write that fails; another party signing in on a
-client with kept work; a family's request, read and watch as bytes; a
-version not served; a sign-out lost, then sent again; a one-shot client
-that sends, waits for the durable answer and stops.
+starting a chat by `shapes::chat`; a held chat amended and released in
+one compound request; a proposal accepted while two handles watch it;
+two clients deciding one thing; a restart with requests pending, the
+kept work told and sent; the engine restarting under a pending request;
+the stream dropped, every handle behind, then live; a handle given
+another subject while a delivery for the old one is in flight; a store
+write that fails; another party signing in on a client with kept work; a
+family's request, read and watch as bytes; a version not served; a
+sign-out lost, then sent again; a one-shot client that sends, waits for
+the durable answer and stops.
 
 Its referee is testing.md's, 6.1 and 6.2; the reference UI's stories,
 with a person in front of a tree, are view.md's, 18.10.
