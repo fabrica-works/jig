@@ -843,6 +843,37 @@ settled fields remain available.
   reference UI keeps jig's confirmation (view.md, 18.5); jig's check of
   it is testing.md's, 6.2.
 
+### 5.5 Configured-bound holds
+
+- **A typed category.** `HoldCategory::Exceeded(Exceeded)` carries the
+  client's own `Exceeded { bound: Bound, value: u64 }` and the nine
+  `Bound` tags of `../../domain/hosts.md`, 6.3. The payload is `Copy` and
+  inline. `value` is the configured allowance in the bound's unit,
+  never a measured size. `History` does not identify the ceiling's unit;
+  its value is still carried and stored. People's `HoldReason::Exceeded(Exceeded)`
+  carries the same cause in revision refusals, with people's own types.
+  Translations between the domains' copies are exhaustive, without a
+  wildcard.
+- **Words name the allowance.** Jig's hold phrases, including the
+  reference view's, take `N` as a Number parameter except for `History`,
+  whose phrase takes no number because its unit is not known:
+
+| Bound | Phrase |
+|---|---|
+| `Reasoning` | Held: the model's reasoning went past its configured allowance of N bytes |
+| `Metadata` | Held: the model's metadata went past its configured allowance of N bytes |
+| `Items` | Held: the model's answer went past its configured allowance of N items |
+| `Answer` | Held: the model's answer went past its configured allowance of N bytes |
+| `Tools` | Held: the run's tools went past their configured allowance of N tools |
+| `HistoryItems` | Held: the run's request went past its configured allowance of N messages and blocks |
+| `History` | Held: the run's history no longer fits its configured allowance, even compacted |
+| `Window` | Held: the run no longer fits the model's window of N tokens |
+| `Output` | Held: the request went past the model's output ceiling of N tokens |
+
+- **Release keeps its authority.** The hold is lifted by an authorized
+  `Release`, not by words. The task's immediate hold and release rules
+  are `../../domain/tasks.md`, 5.5 and 6.
+
 ## 6. Reads
 
 A read asks for one document, or one page of a list, and is answered

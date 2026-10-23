@@ -473,6 +473,29 @@ Typed, so the engine can act on them without reading prose:
 
 Each carries bounded detail for operators; none of it is shown to an LLM.
 
+**A configured bound** is `RunFailure::Exceeded(Exceeded)`, where
+`Exceeded { bound: Bound, value: u64 }` names the bound and its configured
+value in that bound's unit, never a measured size. The payload is `Copy`
+and inline. For `History`, the value is the ceiling met, whose unit the
+tag does not identify. Its bounds are:
+
+| Bound | What is bounded | Unit |
+|---|---|---|
+| `Reasoning` | the model's reasoning, per item or in all | bytes |
+| `Metadata` | the model's other replay metadata | bytes |
+| `Items` | the items of the model's answer | count |
+| `Answer` | the model's answer | bytes |
+| `Tools` | the tools offered to the model | count |
+| `HistoryItems` | the messages and blocks one request carries | count of both |
+| `History` | retained history that compaction could not bring under a configured ceiling | messages, blocks or bytes; the tag does not identify which |
+| `Window` | the model's window | tokens |
+| `Output` | the model's declared output ceiling | tokens |
+
+The tasks child holds this failure at once (tasks.md, 5.5). It is not an
+account wait and is not rewritten to an account Recheck. The host, tasks,
+people and client domains each own their `Exceeded` and `Bound`; every
+translation between them is exhaustive, without a wildcard.
+
 ### 6.4 Turns
 
 - **A turn** is the bytes of one turn of the run's conversation, in

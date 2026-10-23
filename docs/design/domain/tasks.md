@@ -407,9 +407,9 @@ them (5.7).
 
 ### 5.5 Failures and holds
 
-- **Tries, within a task.** A run or a step that fails is tried again
-  after a jittered backoff, within a number of tries per class of
-  failure:
+- **Tries, within a task.** Except for `Exceeded` below, a run or a step
+  that fails is tried again after a jittered backoff, within a number
+  of tries per class of failure:
   - *transient:* a peer unavailable, the engine's own reads missing, a
     transcript the agent could not use (engine.md, 7.2);
   - *permanent until something on a system changes:* a resource missing,
@@ -428,6 +428,18 @@ them (5.7).
   its account and committed conversation. Stale asynchronous preparation also
   returns to due without a timer. Every attempt, a failed one included, takes a new
   attempt number.
+- **A configured bound holds at once.** `End::Exceeded(Exceeded)` becomes
+  `Hold::Exceeded(Exceeded)`, with prior lifecycle `Active(Due)` and no
+  source. The tasks child's own `Exceeded { bound: Bound, value: u64 }`
+  and nine `Bound` tags have the meaning and units of hosts.md, 6.3.
+  They are `Copy` and inline. No try is counted and no backoff is set.
+  Refusals reset to zero and `retry_notice` is cleared to `None`, so an
+  earlier retry notice cannot stand as the current cause. The child
+  emits `Fact::Held` and publishes as for any hold.
+  Terminal admission still checks the attempt, price, saved resources
+  and read fences. Charged spend, `last_answer`, `RunEnded` and committed
+  replies are kept. This end bypasses the account Recheck rewrite. A
+  requester-ended conversation keeps its requester ending (5.8).
 - **Past its tries, a task is held.** So it is when its executor stalls
   past its bound, a dependency fails or is cancelled, drift breaks a
   resource it relies on (connectors.md, section 11), an effect it asked
@@ -570,8 +582,16 @@ The kept rule of 5.7 holds both facts, the dependency and this one,
 apart: a task that is held from active keeps its requester's ending,
 and one that is held from closing does not. A failure that is not a
 finish, the run's own, keeps its retry policy whoever ends the task.
+`End::Exceeded` is such a failure, not a finish: it holds at once by
+5.5, retaining the requester ending through the hold.
 
 ## 6. Holds
+
+**A configured-bound hold** stops the task under 5.5; the resource holds
+below stay with it as for any held task. An authorized
+`Release` lifts `Hold::Exceeded`, returning it to Due with tries reset.
+If the same bound is reported again, its first report holds the task
+again. Words alone do not release it (people.md, 5.1).
 
 ### 6.1 What a task holds
 
