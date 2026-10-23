@@ -811,14 +811,14 @@ for any presentation of a chat or of any agent task's activity.
     and full leave the link's secret usable until its expiry
     (`../../protocol/client.md`, section 8), and the link's view says
     which, as `not_signed_in`: not ready, busy, or full with the
-    deployment's room for sign-ins and the earliest saved expiry among
-    them, for the application's words. The client keeps no secret and
+    deployment's room for sign-ins, the earliest saved expiry among
+    them and the link's own expiry, for the application's words. The client keeps no secret and
     signs in again by itself never: the person's retry is the
     application's, the same `Link { secret, held }` given again, as a
     native shell does, or the printed link opened again, as a browser
     does. The next `SignIn`, and signed in, clear `not_signed_in`;
-  - *a service's busy or full* ends its signing as a refusal does: a
-    service waits for no room;
+  - *a service's busy* ends its signing as a refusal does: a service
+    waits for no room, and is never answered full;
   - *`Service(credential)`:* a service's credential, sent the same way,
     and answered with a sign-in's credential, held the same way;
   - *`Held(credential)`:* a credential the application obtained by its own

@@ -604,11 +604,14 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
     exchange; a spent secret is the link's no more, and the next sign-in
     by any other draws a fresh one.
   - *Full* (`../domain/people.md`, section 3) carries the deployment's
-    room for sign-ins and the earliest saved expiry among them, its wall
-    time, for the person to read when the next room comes. A `Mint` is
-    answered busy for it, and a service's sign-in is answered full as the
-    link's is. On the wire, a sign-in's answer is signed in, refused, not
-    ready, busy, or full with those two.
+    room for sign-ins, the earliest saved expiry among them, and the
+    link's own expiry, both wall times: the person reads when the next
+    room comes, and until when this link serves, past which a fresh one
+    is drawn when it is tried. The link's expiry is kept on the
+    monotonic clock, and full says it at the answer's clocks. Full is the
+    printed link's answer alone: a `Mint` and a service's sign-in are
+    answered busy for it. On the wire, a sign-in's answer is signed in,
+    refused, not ready, busy, or full with those three.
   - *A sign-in held is kept* (`../domain/people.md`, section 3). The
     link's exchange carries a credential as every exchange may, a
     browser's cookie or a native client's bearer (17.3). Once the secret
@@ -909,8 +912,9 @@ section 2).
   once there is room, or refused past that expiry; the same secret sent
   again while reserved answered busy, another refused with no fresh link
   drawn; the reservation dropped by the core's refusal, a close and an
-  abort; the exchanges' admission full answered busy; a `Mint` answered
-  busy for full; a
+  abort; the exchanges' admission full answered busy; full carrying the
+  link's expiry as drawn; a `Mint` and a service's sign-in answered busy
+  for full; a
   service signing in, a key added, sent again under its key with the
   same value and with another. Its referee: one reply per exchange; one
   streamed message in flight per stream; no credential reaches a
