@@ -520,3 +520,35 @@ fn direct_resume_observes_wall_expiry_without_firing_or_reordering_the_people_ti
 fn the_hosts_endpoint_cap_is_the_fleets() {
     assert_eq!(host::PROGRAM_ENDPOINTS, fleet::PROGRAM_ENDPOINTS);
 }
+
+#[test]
+fn a_bound_failure_reaches_the_core_with_its_configured_value() {
+    for (bound, expected) in [
+        (host::Bound::Reasoning, tasks::Bound::Reasoning),
+        (host::Bound::Metadata, tasks::Bound::Metadata),
+        (host::Bound::Items, tasks::Bound::Items),
+        (host::Bound::Answer, tasks::Bound::Answer),
+        (host::Bound::Tools, tasks::Bound::Tools),
+        (host::Bound::HistoryItems, tasks::Bound::HistoryItems),
+        (host::Bound::History, tasks::Bound::History),
+        (host::Bound::Window, tasks::Bound::Window),
+        (host::Bound::Output, tasks::Bound::Output),
+    ] {
+        let mut domain = fixtures::domain();
+        let host::LinkUp::Answer { run, attempt, mut answer } = fixtures::start_refusal() else {
+            panic!("answer fixture")
+        };
+        answer.ending = host::Ending::Failed {
+            failure: host::Failure::Run(host::RunFailure::Exceeded(host::Exceeded { bound, value: u64::MAX })),
+            detail: Box::new([]),
+            work: host::Work { left: None, saved: None },
+        };
+        let (run, attempt, payload, _) = received_answer(&mut domain, host::LinkUp::Answer { run, attempt, answer });
+        let mut work = fixtures::work();
+        link::answer(&mut domain, run, attempt, payload, &mut work);
+        let Some(crate::Work::Core(core::Event::AnswerPayload { end, .. })) = work.pop() else {
+            panic!("bound terminal")
+        };
+        assert_eq!(end, tasks::End::Exceeded(tasks::Exceeded { bound: expected, value: u64::MAX }));
+    }
+}
