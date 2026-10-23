@@ -52,6 +52,7 @@ enum Role {
     Incident,
     Lead,
     Environment,
+    EnvironmentClose,
     Uncued,
 }
 
@@ -71,6 +72,7 @@ struct Agent {
     turns: u32,
     spent: u64,
     acted: bool,
+    tearing_down: bool,
     result: bool,
     /// The result of the last resumed turn's finish, accepted again first.
     refinish: Option<Box<[u8]>>,
@@ -134,6 +136,7 @@ impl Agents {
                     turns: 0,
                     spent: 0,
                     acted: false,
+                    tearing_down: false,
                     result: false,
                     refinish: None,
                     unread: messages.into_vec().into_iter().map(|message| (message.name, message.words)).collect(),
@@ -266,9 +269,7 @@ impl Agents {
                 }));
                 match step {
                     Step::Call { tool, input } => {
-                        if tool == "delegate" || (tool == "propose" && matches!(role, Role::Lead | Role::Environment)) {
-                            agent.acted = true;
-                        }
+                        agent.called(tool.as_bytes());
                         let call = name(agent.activation, agent.turns);
                         agent.pending = Some(call.clone());
                         out.push(root::Event::Agent(host::FromAgent::Called {
@@ -322,6 +323,8 @@ impl Agents {
         ];
         if self.environment_chat {
             cues.push((b"@environment_chat".as_slice(), Role::Environment));
+            cues.push((b"@environment_close".as_slice(), Role::EnvironmentClose));
+            cues.push((b"@keep_delegate".as_slice(), Role::Uncued));
         }
         cues.into_iter()
             .filter_map(|(cue, role)| find(charter, cue).map(|at| (at, role)))
@@ -337,7 +340,13 @@ impl Agents {
         if role == Role::Lead && agent.result {
             return finish("checkout recovered after the accepted restart");
         }
-        if matches!(role, Role::Watch | Role::Lead | Role::Environment) && agent.acted {
+        if role == Role::EnvironmentClose && agent.result && !agent.tearing_down {
+            return call(
+                "propose",
+                format!(r#"{{"action":"batch","reason":"tear down the environment","batch":[{}]}}"#, tear_down()),
+            );
+        }
+        if matches!(role, Role::Watch | Role::Lead | Role::Environment | Role::EnvironmentClose) && agent.acted {
             return Step::Yield;
         }
         let steps: Vec<Step> = match role {
@@ -371,6 +380,14 @@ impl Agents {
                     provision()
                 ),
             )],
+            Role::EnvironmentClose => vec![call(
+                "propose",
+                format!(
+                    r#"{{"action":"batch","reason":"an environment and a live delegate","batch":[{},{}]}}"#,
+                    provision(),
+                    delegate("@keep_delegate", r#"{"kind":"agent","charter":1}"#, 2, 0, 0, false, "", ""),
+                ),
+            )],
             Role::Uncued => Vec::new(),
         };
         steps.into_iter().nth(usize::try_from(index).expect("small index")).unwrap_or(Step::Yield)
@@ -378,6 +395,18 @@ impl Agents {
 }
 
 impl Agent {
+    /// Note a call: whether it acted, and whether it tore the environment down.
+    fn called(&mut self, tool: &[u8]) {
+        if self.role == Role::EnvironmentClose && self.result && tool == b"propose" {
+            self.tearing_down = true;
+        }
+        if tool == b"delegate"
+            || (tool == b"propose" && matches!(self.role, Role::Lead | Role::Environment | Role::EnvironmentClose))
+        {
+            self.acted = true;
+        }
+    }
+
     /// What a resumed turn says: whether the run delegated, or read a result.
     fn remember(&mut self, body: &[u8]) {
         self.refinish = None;
@@ -391,11 +420,7 @@ impl Agent {
                         if call.name() == b"finish" {
                             self.refinish = Some(Box::from(call.input()));
                         }
-                        if call.name() == b"delegate"
-                            || (call.name() == b"propose" && matches!(self.role, Role::Lead | Role::Environment))
-                        {
-                            self.acted = true;
-                        }
+                        self.called(call.name());
                     }
                     transcript::Block::Text(text) => {
                         if contains(text.text(), b"Result from task ") {
@@ -611,6 +636,17 @@ fn provision() -> String {
     format!(
         r#"{{"executor":{{"kind":"procedure","connector":2,"code":{}}},"spec":{{"words":"staging for payments, a week","parameters":[{{"name":1,"kind":"bytes","value":"staging"}},{{"name":2,"kind":"bytes","value":"payments"}},{{"name":3,"kind":"number","value":604800}},{{"name":4,"kind":"number","value":40}},{{"name":5,"kind":"number","value":7200}}]}},"contract":{{"kind":"report","words":128}},"authority":{{"tools":1023,"grants":[{{"connector":2,"kind":4,"segments":["pool"],"terminal":"exact","last":"staging"}},{{"connector":2,"kind":4,"segments":["pool","staging","environment"],"terminal":"open","last":""}}],"delegation":{{"kinds":[],"tasks":0,"depth":0}},"budget":{{"spend":40}},"notes":0}}}}"#,
         jig_ops_domain_infrastructure::PROVISION_CODE,
+    )
+}
+
+// E is the first delegate in this story. Its creation's purpose is its end.
+const ENVIRONMENT_TASK: u64 = 2;
+const ENVIRONMENT_END: u64 = 604_800;
+
+fn tear_down() -> String {
+    format!(
+        r#"{{"executor":{{"kind":"procedure","connector":2,"code":{}}},"spec":{{"words":"tear down staging/payments","parameters":[{{"name":1,"kind":"bytes","value":"staging"}},{{"name":2,"kind":"bytes","value":"payments"}},{{"name":3,"kind":"number","value":{ENVIRONMENT_TASK}}},{{"name":4,"kind":"number","value":{ENVIRONMENT_END}}},{{"name":5,"kind":"number","value":7200}}]}},"contract":{{"kind":"report","words":128}},"authority":{{"tools":1023,"grants":[{{"connector":2,"kind":5,"segments":["pool","staging","environment"],"terminal":"open","last":""}}],"delegation":{{"kinds":[],"tasks":0,"depth":0}},"budget":{{"spend":0}},"notes":0}}}}"#,
+        jig_ops_domain_infrastructure::TEAR_DOWN_CODE,
     )
 }
 

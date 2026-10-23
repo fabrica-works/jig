@@ -467,11 +467,15 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                 }
             }
             crate::MessageKind::EffectNotMade { .. }
-            | crate::MessageKind::FinishRequested { .. }
             | crate::MessageKind::Amendment { .. }
             | crate::MessageKind::Met { .. } => match word.from {
                 Party::Task(_) | Party::Person(_) => true,
                 Party::Deployment { .. } => false,
+            },
+            // The deployment's close asks its own project's conversation to finish (people.md, 5.3).
+            crate::MessageKind::FinishRequested { .. } => match word.from {
+                Party::Task(_) | Party::Person(_) => true,
+                Party::Deployment { project } => project == task.project,
             },
             crate::MessageKind::Result(_) => match word.from {
                 Party::Task(_) => true,
@@ -1115,7 +1119,7 @@ fn valid_grace(task: &TaskRecord, limits: &Limits) -> bool {
     match grace.by {
         Party::Person(person) => person != 0,
         Party::Task(task) => task != 0,
-        Party::Deployment { .. } => false,
+        Party::Deployment { project } => project == task.project,
     }
 }
 

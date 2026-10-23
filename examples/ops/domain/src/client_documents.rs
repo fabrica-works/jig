@@ -228,6 +228,7 @@ pub(crate) fn read(
                     | infrastructure::Request::Marked { .. }
                     | infrastructure::Request::ApplicationDone { .. }
                     | infrastructure::Request::ApplicationBusy { .. }
+                    | infrastructure::Request::Close { .. }
                     | infrastructure::Request::Closed { .. }
                     | infrastructure::Request::Released { .. }
                     | infrastructure::Request::Restarted { .. }

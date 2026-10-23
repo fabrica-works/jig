@@ -24,7 +24,7 @@ pub struct Limits {
     pub proposals: u32,
     /// Unsettled outbox entries.
     pub effects: u32,
-    /// Environments owned by this deployment.
+    /// Creations, including their outstanding effects and unanswered closes.
     pub made: u32,
     /// Maximum resources one task names.
     pub resources_per_task: u32,
@@ -68,6 +68,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<u64>::worst_case(limits.procedures)?)?
         .checked_add(Map::<skein_lib::Token, Effect>::worst_case(limits.staged)?)?
         .checked_add(Map::<u64, (u64, Effect)>::worst_case(limits.proposals)?)?
+        .checked_add(Map::<[u8; 16], (u32, u64)>::worst_case(limits.made)?)?
         .checked_add(Map::<Key, Entry>::worst_case(limits.effects)?)?
         .checked_add(Map::<Environment, (Key, Option<u32>)>::worst_case(limits.made)?)?
         .checked_add(u64::from(limits.services).checked_mul(name.checked_mul(3)?)?)?

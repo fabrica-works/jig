@@ -73,6 +73,7 @@ pub(crate) fn route(
             },
             core::RestartStep::Open => {
                 let _request = domain.core.restart_done(step);
+                work.push(Work::Infrastructure(infrastructure::Event::SendCloses));
             }
         },
     }
@@ -221,7 +222,8 @@ fn restore_roles(domain: &mut Domain, env: &Env<Limits>, record: &infrastructure
                 );
             }
         }
-        infrastructure::Record::Drift(_)
+        infrastructure::Record::Closing { .. }
+        | infrastructure::Record::Drift(_)
         | infrastructure::Record::Procedure(_)
         | infrastructure::Record::Proposal { .. }
         | infrastructure::Record::Outbox(_)

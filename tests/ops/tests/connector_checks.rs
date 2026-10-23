@@ -164,6 +164,7 @@ fn a_hand_reaching_a_conditional_target_is_ambiguous() {
 fn infrastructure_procedure_repeats_a_wait_but_never_repeats_an_effect_decision() {
     let mut world = InfrastructureWorld::new(0, infra::Backend::OperationIds);
     world.event(infra::Event::StartProcedure {
+        chat: None,
         pending: Box::new([]),
         added: Box::new([]),
         project: 1,

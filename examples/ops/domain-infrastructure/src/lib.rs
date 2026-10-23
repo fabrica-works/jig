@@ -43,10 +43,10 @@ mod domain;
 mod limits;
 
 pub use boundary::{
-    Added, ApplyResult, Backend, Description, Effect, Entry, Environment, EnvironmentFact, Event, Form, Hold, Key,
-    Looked, Named, Outcome, PROVISION_CODE, Party, Phase, Pool, Procedure, ProcedurePhase, ProcedureSignal,
+    Added, ApplyResult, Backend, CloseOutcome, Description, Effect, Entry, Environment, EnvironmentFact, Event, Form,
+    Hold, Key, Looked, Named, Outcome, PROVISION_CODE, Party, Phase, Pool, Procedure, ProcedurePhase, ProcedureSignal,
     ProcedureState, Purpose, Record, RecordKey, Recovery, Request, Resource, ResourceRole, RestartStage, Service,
-    ServiceFact, StepDecision, SystemEvent, SystemRequest,
+    ServiceFact, StepDecision, SystemEvent, SystemRequest, TEAR_DOWN_CODE,
 };
 pub use domain::{Domain, MAX_OUT, fire, next_deadline, step};
 pub use limits::{Limits, worst_case};

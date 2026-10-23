@@ -58,7 +58,20 @@ pub fn parts(effect: &infra::Effect) -> (u16, Vec<r::Name>, Option<u64>, u64) {
             None,
             *until,
         ),
-        infra::Effect::Rollback { .. } | infra::Effect::TearDown { .. } => {
+        infra::Effect::TearDown { environment, .. } => (
+            5,
+            vec![r::Name {
+                connector: 2,
+                path: infra::Resource::Environment(environment.clone())
+                    .segments()
+                    .iter()
+                    .map(|part| part.to_vec())
+                    .collect(),
+            }],
+            Some(1),
+            0,
+        ),
+        infra::Effect::Rollback { .. } => {
             panic!("the two stories use restart and scale")
         }
     }
@@ -103,6 +116,7 @@ pub fn policy(seed: u64, environment_chat: bool) -> r::Policy {
     };
     if environment_chat {
         policy.kinds.insert((2, 4), r::Kind { recovery: r::Recovery::Keyed, price: 40 });
+        policy.kinds.insert((2, 5), r::Kind { recovery: r::Recovery::Conditional, price: 0 });
         policy.owned.push((2, r::Pattern { base: vec![b"pool".to_vec()], terminal: Vec::new(), open: true }));
     }
     for kind in [1, 2] {

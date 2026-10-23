@@ -185,12 +185,19 @@ fn spec_environment(spec: &tasks::Spec) -> Option<infrastructure::Environment> {
     }
     Some(infrastructure::Environment::new(pool?, name?))
 }
-pub(crate) fn procedure(code: u32, spec: &tasks::Spec) -> Option<infrastructure::Procedure> {
+pub(crate) fn procedure(code: u32, spec: &tasks::Spec, deployment: [u8; 16]) -> Option<infrastructure::Procedure> {
     if code == infrastructure::PROVISION_CODE {
         return Some(infrastructure::Procedure::Provision {
             environment: spec_environment(spec)?,
             until: spec_number(spec, 3)?,
             price: spec_number(spec, 4)?,
+            deadline: spec_number(spec, 5)?,
+        });
+    }
+    if code == infrastructure::TEAR_DOWN_CODE {
+        return Some(infrastructure::Procedure::TearDown {
+            environment: spec_environment(spec)?,
+            created_by: infrastructure::Key::procedure(deployment, spec_number(spec, 3)?, spec_number(spec, 4)?),
             deadline: spec_number(spec, 5)?,
         });
     }
@@ -217,6 +224,15 @@ pub(crate) fn holdings(number: u16, executor: tasks::Executor, spec: &tasks::Spe
     match executor {
         tasks::Executor::Procedure { connector, code } => match jig_ops_domain_connectors::connector(connector) {
             Some(jig_ops_domain_connectors::Connector::Infrastructure) => {
+                if code == infrastructure::TEAR_DOWN_CODE {
+                    return Some(Box::new([tasks::Holding::Write {
+                        resource: tasks::Name {
+                            connector: number,
+                            path: infrastructure::Resource::Environment(spec_environment(spec)?).segments(),
+                        },
+                        kind: 2,
+                    }]));
+                }
                 if code == infrastructure::PROVISION_CODE {
                     let environment = spec_environment(spec)?;
                     return Some(Box::from([

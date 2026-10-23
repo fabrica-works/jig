@@ -21,7 +21,8 @@ pub(super) fn poll(peers: &mut Peers, store: &Store) -> Vec<Input<root::Event, r
             Some(false)
         }
         root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Live(task)))
-            if task.spec.words.starts_with(b"@environment_chat") =>
+            if task.spec.words.starts_with(b"@environment_chat")
+                || task.spec.words.starts_with(b"@environment_close") =>
         {
             Some(true)
         }

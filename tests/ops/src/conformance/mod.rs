@@ -41,6 +41,7 @@ pub struct Config {
     limits: root::Limits,
     documents: bool,
     client_backed: bool,
+    close_grant: bool,
 }
 
 impl Config {
@@ -53,7 +54,15 @@ impl Config {
             limits: config::root_for(seed, story == Story::Environment).1,
             documents: false,
             client_backed: false,
+            close_grant: true,
         }
+    }
+
+    /// Omit the deployment close grant while preserving the same story.
+    #[must_use]
+    pub fn without_close_grant(mut self) -> Self {
+        self.close_grant = false;
+        self
     }
 
     /// Replace only the on-call person with clients; retain scripted hosts and systems.
@@ -119,6 +128,7 @@ pub struct Peers {
     pub accepted: Vec<u64>,
     pub replies: u64,
     pub application_answers: Vec<infra::ApplicationOutcome>,
+    pub close_answers: Vec<people::Outcome>,
     pub documents: Vec<(u64, root::ClientDocument)>,
     pub ended_documents: Vec<u64>,
     pub lead_commits: Vec<(u64, obs::Incident, obs::Delegation)>,
@@ -163,7 +173,10 @@ impl Application for Ops {
         jig_fake_store::Store::new()
     }
     fn build(config: &Config) -> root::Domain {
-        let configuration = config::root_for(config.seed, config.story == Story::Environment).0;
+        let mut configuration = config::root_for(config.seed, config.story == Story::Environment).0;
+        if !config.close_grant {
+            configuration.core.grants = Box::new([]);
+        }
         root::Domain::new(configuration, &config.limits).expect("fixture core configuration")
     }
     fn systems(_: &Config, _: u64) -> Systems {
@@ -194,6 +207,7 @@ impl Application for Ops {
             accepted: Vec::new(),
             replies: 0,
             application_answers: Vec::new(),
+            close_answers: Vec::new(),
             documents: Vec::new(),
             ended_documents: Vec::new(),
             document_story: config.documents,
@@ -208,7 +222,7 @@ impl Application for Ops {
                     .clone();
                 scripts::Agents::new(
                     config.client_backed,
-                    config.client_backed && config.story == Story::Environment,
+                    config.story == Story::Environment,
                     run.waiting,
                     run.call_timeout,
                 )
@@ -227,7 +241,7 @@ impl Application for Ops {
     fn recovery(_: &Config, connector: u16, kind: u16) -> r::Recovery {
         match (connector, kind) {
             (2, 1 | 4) => r::Recovery::Keyed,
-            (2, 2) => r::Recovery::Conditional,
+            (2, 2 | 5) => r::Recovery::Conditional,
             _ => panic!("declared story kinds"),
         }
     }
@@ -528,17 +542,28 @@ impl Application for Ops {
                                 }),
                             }]
                         }
-                        infra::Effect::Rollback { .. } | infra::Effect::TearDown { .. } => panic!("two story effects"),
+                        infra::Effect::TearDown { environment, .. } => {
+                            let name = production::EnvironmentName::new(
+                                std::str::from_utf8(&environment.pool).expect("fixture pool"),
+                                std::str::from_utf8(&environment.name).expect("fixture environment"),
+                            );
+                            vec![jig_test_system::ValueObserved {
+                                state: systems.production.read_environment(&name).map(|_| 1),
+                                owner: None,
+                            }]
+                        }
+                        infra::Effect::Rollback { .. } => panic!("unused story effect"),
                     };
                     let previous = systems.production.observed().len();
                     let event = systems.infrastructure(call);
                     let applied = match &systems.production.observed()[previous] {
                         production::ObservedEffect::Restart { applied, .. }
                         | production::ObservedEffect::Scale { applied, .. }
-                        | production::ObservedEffect::Create { applied, .. } => *applied,
-                        production::ObservedEffect::Silence { .. }
-                        | production::ObservedEffect::Rollback { .. }
-                        | production::ObservedEffect::TearDown { .. } => panic!("two story effects"),
+                        | production::ObservedEffect::Create { applied, .. }
+                        | production::ObservedEffect::TearDown { applied, .. } => *applied,
+                        production::ObservedEffect::Silence { .. } | production::ObservedEffect::Rollback { .. } => {
+                            panic!("unused story effect")
+                        }
                     };
                     peers.observed.push(r::Observed::Effect {
                         connector: 2,
@@ -670,6 +695,10 @@ impl Application for Ops {
                 core::Held::ApplicationWatchEnded { watcher, .. } | core::Held::WatchEnded { watcher, .. },
             ) => {
                 peers.ended_documents.push(watcher.raw());
+                Vec::new()
+            }
+            root::Output::Core(core::Held::Acted { outcome, .. }) => {
+                peers.close_answers.push(outcome);
                 Vec::new()
             }
             root::Output::IncidentAssociationRefused { .. } => panic!("owner association refused in conformance story"),

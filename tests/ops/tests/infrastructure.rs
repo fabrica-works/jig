@@ -83,9 +83,14 @@ fn a_hand_change_reports_drift_to_a_reliant_task() {
 
 #[test]
 fn provision_waits_for_readiness_and_tears_down_on_release() {
+    provision_released();
+}
+
+fn provision_released() -> InfrastructureWorld {
     let mut world = InfrastructureWorld::new(0, infra::Backend::OperationIds);
     let environment = infra_environment();
     world.event(infra::Event::StartProcedure {
+        chat: None,
         pending: Box::new([]),
         added: Box::new([]),
         project: 1,
@@ -132,6 +137,7 @@ fn provision_waits_for_readiness_and_tears_down_on_release() {
     let deleted = make(&mut world, infra::Effect::TearDown { environment, created_by: key() });
     assert!(deleted.contains(&infra::Request::Outcome { entry: 3, key: key(), outcome: infra::Outcome::Made }));
     assert_eq!(world.production.used_slots("staging"), 0);
+    world
 }
 
 #[test]
@@ -183,6 +189,7 @@ fn scale_reads_replicas_afresh_and_finishes_at_the_requested_count() {
         replicas: 4,
     });
     world.event(infra::Event::StartProcedure {
+        chat: None,
         pending: Box::new([]),
         added: Box::new([]),
         project: 1,
@@ -221,6 +228,7 @@ fn scale_waiting_for_authority_rereads_before_asking_again() {
     let service = infra::Service::new(Box::from(*b"staging"), Box::from(*b"checkout"));
     world.production.add_service(production::ServiceName::new("staging", "checkout"), "v2", 3);
     world.event(infra::Event::StartProcedure {
+        chat: None,
         pending: Box::new([]),
         added: Box::new([]),
         project: 1,
@@ -263,4 +271,95 @@ fn dropping_a_proposal_erases_its_payload_across_restart() {
         vec![infra::Request::Refused { token }]
     );
     assert!(world.production.observed().is_empty());
+}
+
+fn torn_down(chat: Option<u64>) -> InfrastructureWorld {
+    const TEARDOWN_TASK: u64 = 8;
+    let mut world = InfrastructureWorld::new(0, infra::Backend::OperationIds);
+    let environment = infra_environment();
+    make(&mut world, infra::Effect::CreateEnvironment { environment: environment.clone(), until: 100, price: 40 });
+    world.event(infra::Event::StartProcedure {
+        task: TEARDOWN_TASK,
+        project: 1,
+        chat,
+        pending: Box::new([]),
+        added: Box::new([]),
+        procedure: infra::Procedure::TearDown { environment: environment.clone(), created_by: key(), deadline: 90 },
+    });
+    let read = world.event(infra::Event::Procedure { task: TEARDOWN_TASK, signal: infra::ProcedureSignal::Step });
+    world.release(&read);
+    let effect = world.event(infra::Event::Procedure { task: TEARDOWN_TASK, signal: infra::ProcedureSignal::Step });
+    let described = world.event(infra::Event::Describe {
+        token: Token::new(2),
+        effect: infra::Effect::TearDown { environment, created_by: key() },
+    });
+    let _ = (effect, described);
+    let kept = world.event(infra::Event::Keep {
+        project: Some(1),
+        entry: 4,
+        token: Token::new(2),
+        key: infra::Key::procedure([1; 16], TEARDOWN_TASK, 0),
+    });
+    world.release(&kept);
+    world
+}
+
+/// The close a teardown asked for: its key, project and chat.
+fn asked_close(world: &InfrastructureWorld) -> ([u8; 16], u32, u64) {
+    world
+        .seen
+        .iter()
+        .find_map(|request| {
+            let infra::Request::Close { key, project, chat } = request else { return None };
+            Some((*key, *project, *chat))
+        })
+        .expect("teardown asks to close its chat")
+}
+
+#[test]
+fn a_torn_down_environment_keeps_a_close_for_its_chat_until_answered() {
+    let mut world = torn_down(Some(5));
+    let (key, project, chat) = asked_close(&world);
+    let record = infra::Record::Closing { key, project, chat };
+    assert_eq!((project, chat), (1, 5));
+    assert!(world.seen.contains(&infra::Request::Save { record: record.clone() }));
+    assert!(world.restart().contains(&infra::Request::Close { key, project, chat }));
+    assert!(
+        world
+            .event(infra::Event::Closed { key, outcome: infra::CloseOutcome::Closed })
+            .contains(&infra::Request::Erase { key: record.key() })
+    );
+    assert!(!world.restart().iter().any(|request| matches!(request, infra::Request::Close { .. })));
+}
+
+#[test]
+fn a_procedure_with_no_chat_closes_nothing() {
+    let mut world = torn_down(None);
+    assert!(!world.seen.iter().any(|request| matches!(request, infra::Request::Close { .. })));
+    assert!(!world.restart().iter().any(|request| matches!(request, infra::Request::Close { .. })));
+}
+
+#[test]
+fn unsaved_close_answers_survive_until_the_next_start() {
+    for outcome in [infra::CloseOutcome::NotOffered, infra::CloseOutcome::NoOwner, infra::CloseOutcome::Again] {
+        let mut world = torn_down(Some(5));
+        let (key, _, _) = asked_close(&world);
+        assert!(world.event(infra::Event::Closed { key, outcome }).is_empty());
+        assert!(!world.fire().iter().any(|request| matches!(request, infra::Request::Close { .. })));
+        assert!(world.restart().contains(&infra::Request::Close { key, project: 1, chat: 5 }));
+    }
+}
+
+#[test]
+fn saved_refusals_finish_the_close_including_an_already_ended_chat() {
+    for outcome in [infra::CloseOutcome::Ended, infra::CloseOutcome::Refused] {
+        let mut world = torn_down(Some(5));
+        let (key, _, _) = asked_close(&world);
+        assert!(
+            world
+                .event(infra::Event::Closed { key, outcome })
+                .contains(&infra::Request::Erase { key: infra::RecordKey::Closing(key) })
+        );
+        assert!(!world.restart().iter().any(|request| matches!(request, infra::Request::Close { .. })));
+    }
 }

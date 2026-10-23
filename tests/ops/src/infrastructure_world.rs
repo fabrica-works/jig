@@ -143,6 +143,7 @@ impl InfrastructureWorld {
                 infra::Request::Closed { .. }
                 | infra::Request::Released { .. }
                 | infra::Request::Restarted { .. }
+                | infra::Request::Close { .. }
                 | infra::Request::Named { .. }
                 | infra::Request::Slots { .. }
                 | infra::Request::Wake { .. }
@@ -187,6 +188,7 @@ impl InfrastructureWorld {
                 }
                 infra::Request::Save { .. }
                 | infra::Request::Erase { .. }
+                | infra::Request::Close { .. }
                 | infra::Request::Named { .. }
                 | infra::Request::Slots { .. }
                 | infra::Request::Wake { .. }
@@ -352,7 +354,7 @@ impl InfrastructureWorld {
         let mut live = BTreeSet::new();
         for record in records {
             match record {
-                infra::Record::ApplicationAnswer { .. } | infra::Record::Drift(_) => {}
+                infra::Record::Closing { .. } | infra::Record::ApplicationAnswer { .. } | infra::Record::Drift(_) => {}
                 infra::Record::Rely { resources, .. } => {
                     live.extend(resources.into_iter().map(|named| named.resource));
                 }
@@ -393,7 +395,9 @@ impl InfrastructureWorld {
             self.event(infra::Event::System(answer));
         }
         let requests = self.event(infra::Event::Restart);
-        self.release(&requests)
+        let mut requests = self.release(&requests);
+        requests.extend(self.event(infra::Event::SendCloses));
+        requests
     }
 
     /// Recheck uncertain effects when their saved absolute deadlines pass.

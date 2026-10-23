@@ -74,6 +74,7 @@ pub struct Domain {
     pub(crate) judges: Map<Token, (Token, authority::Judge, [u8; 32])>,
     pub(crate) procedures: Map<u64, (u64, u16, u32)>,
     pub(crate) effect_procedures: Map<Token, u64>,
+    pub(crate) close_replies: Map<Token, [u8; 16]>,
     pub(crate) host_calls: Map<Box<[u8]>, HostCall>,
     pub(crate) turn_backoffs: skein_lib::Deadlines<(Token, Token, u32)>,
     pub(crate) turn_rng: skein_lib::Rng,
@@ -172,6 +173,7 @@ impl Domain {
             judges: Map::with_capacity(limits.core.authority.facts),
             procedures: Map::with_capacity(limits.core.tasks.tasks),
             effect_procedures: Map::with_capacity(limits.core.tasks.tasks),
+            close_replies: Map::with_capacity(limits.infrastructure.made),
             host_calls: Map::with_capacity(host_calls),
             turn_backoffs: skein_lib::Deadlines::with_capacity(
                 limits.host.slots.checked_mul(limits.host.turns).expect("hub retained turns"),

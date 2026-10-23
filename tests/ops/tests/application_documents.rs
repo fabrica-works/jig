@@ -117,6 +117,7 @@ fn infrastructure_parts_retain_scope_prices_and_attributed_drift_without_making_
     });
     world.release(&named);
     world.event(infra::Event::StartProcedure {
+        chat: None,
         pending: Box::new([]),
         added: Box::new([]),
         task: 7,

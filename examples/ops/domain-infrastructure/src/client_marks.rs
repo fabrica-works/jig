@@ -27,6 +27,7 @@ pub(crate) fn collect(domain: &Domain, env: &Env<Limits>, out: &mut Queue<Reques
             | Request::Make { .. }
             | Request::Outcome { .. }
             | Request::Step { .. }
+            | Request::Close { .. }
             | Request::System(_) => false,
         };
         out.push(request);

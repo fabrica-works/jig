@@ -713,7 +713,7 @@ fn provision_preserves_opaque_environment_parameters_and_distinct_pool_hold() {
     let environment =
         infrastructure::Environment::new(Box::from(b"staging".as_slice()), Box::from(b"payments".as_slice()));
     assert_eq!(
-        crate::translate::procedure(infrastructure::PROVISION_CODE, &spec),
+        crate::translate::procedure(infrastructure::PROVISION_CODE, &spec, [1; 16]),
         Some(infrastructure::Procedure::Provision {
             environment: environment.clone(),
             until: 604_800,
@@ -753,7 +753,7 @@ fn provision_preserves_opaque_environment_parameters_and_distinct_pool_hold() {
     );
     spec.parameters = spec.parameters[..4].into();
     assert_eq!(
-        crate::translate::procedure(infrastructure::PROVISION_CODE, &spec),
+        crate::translate::procedure(infrastructure::PROVISION_CODE, &spec, [1; 16]),
         None,
         "a missing deadline is not manufactured"
     );
@@ -776,11 +776,11 @@ fn adding_provision_preserves_scale_and_remediate_codes_and_service_hold() {
     spec.parameters = spec.parameters[..4].into();
     let service = infrastructure::Service::new(Box::from(b"staging".as_slice()), Box::from(b"payments".as_slice()));
     assert_eq!(
-        crate::translate::procedure(1, &spec),
+        crate::translate::procedure(1, &spec, [1; 16]),
         Some(infrastructure::Procedure::Scale { service: service.clone(), replicas: 604_800, deadline: 40 })
     );
     assert_eq!(
-        crate::translate::procedure(2, &spec),
+        crate::translate::procedure(2, &spec, [1; 16]),
         Some(infrastructure::Procedure::Remediate { service: service.clone(), operation: 604_800, deadline: 40 })
     );
     for code in [1, 2] {
@@ -792,7 +792,7 @@ fn adding_provision_preserves_scale_and_remediate_codes_and_service_hold() {
             },]))
         );
     }
-    assert_eq!(crate::translate::procedure(99, &spec), None);
+    assert_eq!(crate::translate::procedure(99, &spec, [1; 16]), None);
 }
 
 fn chat_request(limits: &core::Limits, words: &[u8]) -> jig_domain_people::Ask {

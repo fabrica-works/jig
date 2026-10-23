@@ -313,6 +313,11 @@ pub struct EnvironmentFact {
 /// parameters 3 (lease end), 4 (maximum price), 5 (readiness deadline).
 pub const PROVISION_CODE: u32 = 3;
 
+/// Tear down a provision's environment: byte parameters 1 (pool), 2 (name),
+/// number parameters 3 (creation task), 4 (creation purpose), 5 (deadline).
+/// The root supplies its deployment identity when translating the creation key.
+pub const TEAR_DOWN_CODE: u32 = 4;
+
 /// Procedure parameters kept under a task's number.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Procedure {
@@ -350,6 +355,8 @@ pub enum ProcedurePhase {
 /// One procedure task's durable parameters and progress.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ProcedureState {
+    /// The person-requested conversation served by this procedure, if any.
+    pub chat: Option<u64>,
     /// Task executing it.
     pub task: u64,
     /// Its parameters.
@@ -391,6 +398,8 @@ pub enum StepDecision {
 /// Stable key for a connector record.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum RecordKey {
+    /// An unanswered deployment close, independent of task release.
+    Closing([u8; 16]),
     /// Retained observed drift for one resource.
     Drift(Resource),
     /// Connector-owned end and revision.
@@ -412,6 +421,8 @@ pub enum RecordKey {
 /// State committed by the root with a decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Record {
+    /// A deployment close retained until a terminal answer.
+    Closing { key: [u8; 16], project: u32, chat: u64 },
     /// The owner's observed drift, including known or unknown actor.
     Drift(crate::DriftAccount),
     /// Current desired end and revision.
@@ -435,6 +446,7 @@ impl Record {
     #[must_use]
     pub fn key(&self) -> RecordKey {
         match self {
+            Record::Closing { key, .. } => RecordKey::Closing(*key),
             Record::EnvironmentEnd { environment, .. } => RecordKey::EnvironmentEnd(environment.clone()),
             Record::ApplicationAnswer { token, .. } => RecordKey::ApplicationAnswer(*token),
             Record::Rely { task, .. } => RecordKey::Rely(*task),
@@ -450,6 +462,10 @@ impl Record {
 /// Root-to-connector events.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    /// The root translated the deployment act's answer.
+    Closed { key: [u8; 16], outcome: CloseOutcome },
+    /// The core is ready; resend every retained close once.
+    SendCloses,
     /// The core names the delegate made by this owner procedure step.
     ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
     /// Retain this root-minted name in the application's own vocabulary.
@@ -483,7 +499,14 @@ pub enum Event {
     /// A task no longer relies on its named resources.
     Unnamed { task: u64 },
     /// Start a procedure with parameters.
-    StartProcedure { task: u64, project: u32, procedure: Procedure, pending: Box<[u64]>, added: Box<[Added]> },
+    StartProcedure {
+        task: u64,
+        project: u32,
+        chat: Option<u64>,
+        procedure: Procedure,
+        pending: Box<[u64]>,
+        added: Box<[Added]>,
+    },
     /// Step a procedure on current facts.
     Procedure { task: u64, signal: ProcedureSignal },
     /// Stage an effect for the core's authority check.
@@ -551,6 +574,8 @@ pub enum SystemEvent {
 /// Requests to the root and its journal.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// Ask for the deployment's close under this retained key.
+    Close { key: [u8; 16], project: u32, chat: u64 },
     /// Complete a due delivery from this owner's current state.
     Document { watcher: Token, subject: Token, document: Result<crate::ClientDocument, crate::DocumentMissing> },
     /// One client read answer; the root holds it until durable.
@@ -618,4 +643,22 @@ pub struct Added {
     pub task: u64,
     pub at: skein_lib::Wall,
     pub by: Party,
+}
+
+/// Infrastructure's translation of people.md 5.3's close answers.
+/// The root preserves the full saved refusal as a report fact.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum CloseOutcome {
+    /// The deployment's compound was made.
+    Closed,
+    /// The conversation already ended.
+    Ended,
+    /// This start's configuration grants no close.
+    NotOffered,
+    /// This start's configuration names no first owner.
+    NoOwner,
+    /// Admission asked the sender to try again.
+    Again,
+    /// A saved refusal; report it and finish this request.
+    Refused,
 }

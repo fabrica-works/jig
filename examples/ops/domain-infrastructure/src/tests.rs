@@ -176,7 +176,14 @@ fn a_procedure_waits_for_current_facts_and_never_asks_for_two_effects() {
     event(
         &mut domain,
         1,
-        Event::StartProcedure { pending: Box::new([]), added: Box::new([]), task: 7, project: 1, procedure },
+        Event::StartProcedure {
+            chat: None,
+            pending: Box::new([]),
+            added: Box::new([]),
+            task: 7,
+            project: 1,
+            procedure,
+        },
     );
     let mut first = event(&mut domain, 1, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
     assert_eq!(first.pop(), Some(Request::System(SystemRequest::Service { service: service() })));
@@ -196,6 +203,7 @@ fn pending_restart() -> Domain {
         &mut domain,
         1,
         Event::StartProcedure {
+            chat: None,
             pending: Box::new([]),
             added: Box::new([]),
             task: 7,
@@ -271,6 +279,7 @@ fn an_unmade_pending_restart_reads_healthy_without_suppressing_other_drift() {
             | Request::Slots { .. }
             | Request::Wake { .. }
             | Request::Described { .. }
+            | Request::Close { .. }
             | Request::Refused { .. }
             | Request::Make { .. }
             | Request::Outcome { .. }
@@ -467,6 +476,7 @@ fn provision_wakes_at_supplied_readiness_and_keeps_deadline_and_holding_behavior
             &mut domain,
             0,
             Event::StartProcedure {
+                chat: None,
                 pending: Box::new([]),
                 added: Box::new([]),
                 task: 7,
@@ -610,6 +620,7 @@ fn restored_resource_reports_keep_owner_roles_holds_and_task_scopes_during_read_
             | Request::Wake { .. }
             | Request::Changed { .. }
             | Request::Described { .. }
+            | Request::Close { .. }
             | Request::Refused { .. }
             | Request::Make { .. }
             | Request::Outcome { .. }

@@ -17,6 +17,7 @@ pub struct Domain {
     pub(crate) application: crate::application::State,
     restart: Option<crate::RestartStage>,
     closing: Map<u64, bool>,
+    closes: Map<[u8; 16], (u32, u64)>,
     refresh: Map<Resource, bool>,
     pub(crate) backend: Backend,
     pub(crate) services: Map<Service, ServiceFact>,
@@ -37,13 +38,18 @@ impl Domain {
     pub fn new(backend: Backend, limits: &Limits) -> Self {
         assert!(crate::worst_case(limits).is_some(), "connector limits fit");
         assert!(
-            limits.tasks <= 16 && limits.effects <= 16 && limits.procedures <= 16 && limits.resources_per_task <= 16,
+            limits.tasks <= 16
+                && limits.effects <= 16
+                && limits.procedures <= 16
+                && limits.made <= 16
+                && limits.resources_per_task <= 16,
             "MAX_OUT covers one step"
         );
         Self {
             client_subjects: Map::with_capacity(limits.proposals),
             application: crate::application::State::new(limits),
             restart: None,
+            closes: Map::with_capacity(limits.made),
             closing: Map::with_capacity(
                 limits
                     .tasks
@@ -354,6 +360,9 @@ fn fresh_pool(domain: &mut Domain, env: &Env<Limits>, pool: Pool, quota: u32, us
 
 fn restore(domain: &mut Domain, record: Record) {
     match record {
+        Record::Closing { key, project, chat } => {
+            domain.closes.insert(key, (project, chat)).expect("retained close fits creation bound");
+        }
         Record::EnvironmentEnd { environment, created_by, now } => {
             domain.application.restore_end(environment, created_by, now);
         }
@@ -398,6 +407,7 @@ fn settled(domain: &mut Domain, key: Key, outcome: Outcome, out: &mut Queue<Requ
         return;
     };
     out.push(Request::Erase { key: RecordKey::Outbox(key) });
+    let mut close = None;
     if outcome == Outcome::Made {
         match entry.effect {
             Effect::CreateEnvironment { environment, .. } => {
@@ -411,7 +421,22 @@ fn settled(domain: &mut Domain, key: Key, outcome: Outcome, out: &mut Queue<Requ
                 domain.made.insert(environment.clone(), (key, project)).expect("made capacity reserved");
                 out.push(Request::Save { record: Record::Made { environment, key, project } });
             }
-            Effect::TearDown { environment, .. } => {
+            Effect::TearDown { environment, created_by } => {
+                if let Some(state) = domain.procedures.get(&key.task)
+                    && let Some(chat) = state.chat
+                    && let Some(project) = entry.project
+                {
+                    // A provision has one stable creation purpose per task in
+                    // this deployment. Acts have their own connector key space.
+                    let mut key = [0; 16];
+                    let bytes = created_by.task.to_be_bytes().into_iter().chain(created_by.purpose.to_be_bytes());
+                    for (slot, byte) in key.iter_mut().zip(bytes) {
+                        *slot = byte;
+                    }
+                    domain.closes.insert(key, (project, chat)).expect("creation reserved close room");
+                    out.push(Request::Save { record: Record::Closing { key, project, chat } });
+                    close = Some(Request::Close { key, project, chat });
+                }
                 domain.made.remove(&environment);
                 out.push(Request::Erase { key: RecordKey::Made(environment) });
             }
@@ -419,6 +444,9 @@ fn settled(domain: &mut Domain, key: Key, outcome: Outcome, out: &mut Queue<Requ
         }
     }
     out.push(Request::Outcome { entry: entry.number, key, outcome });
+    if let Some(close) = close {
+        out.push(close);
+    }
 }
 
 fn applied(domain: &mut Domain, key: Key, attempt: u32, result: ApplyResult, out: &mut Queue<Request>) {
@@ -491,6 +519,7 @@ fn start_procedure(
     task: u64,
     project: u32,
     procedure: Procedure,
+    chat: Option<u64>,
     out: &mut Queue<Request>,
 ) {
     if domain.procedures.contains_key(&task) || domain.procedures.len() >= env.limits.procedures {
@@ -513,7 +542,7 @@ fn start_procedure(
         Some((owner, _)) if *owner == project => {}
         Some(_) | None => return,
     }
-    let state = ProcedureState { task, procedure, phase: ProcedurePhase::Active };
+    let state = ProcedureState { task, chat, procedure, phase: ProcedurePhase::Active };
     domain.procedures.insert(task, state.clone()).expect("procedure capacity checked");
     out.push(Request::Save { record: Record::Procedure(state) });
 }
@@ -798,6 +827,19 @@ fn stage(domain: &mut Domain, env: &Env<Limits>, token: Token, effect: Effect, o
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "the root reserves MAX_OUT slots");
     match event {
+        Event::Closed { key, outcome } => match outcome {
+            crate::CloseOutcome::NotOffered | crate::CloseOutcome::NoOwner | crate::CloseOutcome::Again => {}
+            crate::CloseOutcome::Closed | crate::CloseOutcome::Ended | crate::CloseOutcome::Refused => {
+                if domain.closes.remove(&key).is_some() {
+                    out.push(Request::Erase { key: RecordKey::Closing(key) });
+                }
+            }
+        },
+        Event::SendCloses => {
+            for (key, (project, chat)) in &domain.closes {
+                out.push(Request::Close { key: *key, project: *project, chat: *chat });
+            }
+        }
         Event::DocumentPrepare { token, subject } => {
             crate::client_documents::prepare(domain, &env.limits, token, subject);
         }
@@ -835,8 +877,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 out.push(Request::Erase { key: RecordKey::Rely(task) });
             }
         }
-        Event::StartProcedure { task, project, procedure, pending: _, added: _ } => {
-            start_procedure(domain, env, task, project, procedure, out);
+        Event::StartProcedure { task, project, chat, procedure, pending: _, added: _ } => {
+            start_procedure(domain, env, task, project, procedure, chat, out);
         }
         Event::ProcedureDelegateOutcome { .. } => {}
         Event::Procedure { task, signal } => procedure(domain, env, task, signal, out),
@@ -861,9 +903,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Keep { token, entry: number, key, project } => {
             if let Some(effect) = domain.staged.remove(&token) {
                 let owner_room = match &effect {
-                    Effect::CreateEnvironment { environment, .. } => {
-                        domain.made.len() < env.limits.made || domain.made.contains_key(environment)
-                    }
+                    Effect::CreateEnvironment { environment, .. } => creation_room(domain, &env.limits, environment),
                     Effect::Restart { .. }
                     | Effect::Scale { .. }
                     | Effect::Rollback { .. }
@@ -1128,4 +1168,19 @@ fn closing_complete(domain: &mut Domain, out: &mut Queue<Request>) {
     for task in &ready {
         domain.closing.remove(task);
     }
+}
+
+// A creation reserves the place its unanswered close may occupy after teardown.
+fn creation_room(domain: &Domain, limits: &Limits, environment: &Environment) -> bool {
+    if domain.made.contains_key(environment) {
+        return true;
+    }
+    let mut reserved = domain.made.len().saturating_add(domain.closes.len());
+    for (_, entry) in &domain.effects {
+        match &entry.effect {
+            Effect::CreateEnvironment { .. } => reserved = reserved.saturating_add(1),
+            Effect::Restart { .. } | Effect::Scale { .. } | Effect::Rollback { .. } | Effect::TearDown { .. } => {}
+        }
+    }
+    reserved < limits.made
 }

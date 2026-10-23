@@ -26,7 +26,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     core_limits.tasks.executor_kinds = 3;
     if environment_chat {
         core_limits.tasks.parameters = 5;
-        core_limits.tasks.executor_kinds = 4;
+        core_limits.tasks.executor_kinds = 5;
     }
     core_limits.tasks.funders = 16;
     core_limits.tasks.inbox_messages = 16;
@@ -38,12 +38,14 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     core_limits.people.words = 512;
     core_limits.people.amendment_bytes = 2048;
     core_limits.people.requests = 16;
+    // A close cancels the chat and up to its three live delegates.
+    core_limits.people.operations = 4;
     core_limits.people.inbox_entries = 16;
     core_limits.people.sign_in_lifetime = Duration::from_secs(7200);
     core_limits.authority.grants = 8;
     core_limits.notes.scopes = 11;
     core_limits.authority.segments = 4;
-    core_limits.authority.executors = if environment_chat { 4 } else { 3 };
+    core_limits.authority.executors = if environment_chat { 5 } else { 3 };
     core_limits.authority.batch = 2;
     core_limits.authority.requirements = 2;
     core_limits.fleet.attempts = 8;
@@ -108,6 +110,8 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     limits.observability.answer_bytes = 2048;
     limits.infrastructure.tasks = 8;
     limits.infrastructure.procedures = 8;
+    config.core.grants =
+        Box::new([jig_domain_people::ActGrant { connector: 2, may: Box::new([jig_domain_people::ActKind::Close]) }]);
     let (domain, policy) = policy_domain(&limits.core.authority, environment_chat);
     config.core.authority = domain;
     config.core.seed_projects[0].policy.policy = policy;
@@ -121,6 +125,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
         for template in &mut config.core.settings.templates {
             if template.flags.conversation {
                 template.contract = jig_domain_tasks::Contract::Report { words: limits.core.tasks.result_bytes };
+                template.grace = Some(Duration::from_secs(1));
             }
         }
     }
@@ -215,6 +220,7 @@ pub fn environment_authority(spend: u64, person: bool) -> authority::Authority {
     value.grants = grants.into();
     let mut kinds = value.delegation.kinds.into_vec();
     kinds.push(authority::Executor::Procedure(infrastructure::PROVISION_CODE));
+    kinds.push(authority::Executor::Procedure(infrastructure::TEAR_DOWN_CODE));
     value.delegation.kinds = kinds.into();
     value
 }

@@ -264,6 +264,59 @@ fn core_held(
                 .expect("kept people token has its retained connector outcome");
             held(decision, Output::Application { to, outcome });
         }
+        core::Held::Acted { to, outcome } => {
+            let token = to.into_token();
+            let key = domain.close_replies.remove(&token).expect("infrastructure act reply");
+            let translated = match &outcome {
+                jig_domain_people::Outcome::Compound { .. } => infrastructure::CloseOutcome::Closed,
+                jig_domain_people::Outcome::Again(_) => infrastructure::CloseOutcome::Again,
+                jig_domain_people::Outcome::Refused(jig_domain_people::Refusal::NotOffered) => {
+                    infrastructure::CloseOutcome::NotOffered
+                }
+                jig_domain_people::Outcome::Refused(jig_domain_people::Refusal::Role { held: None }) => {
+                    infrastructure::CloseOutcome::NoOwner
+                }
+                jig_domain_people::Outcome::Refused(jig_domain_people::Refusal::Ended { .. }) => {
+                    infrastructure::CloseOutcome::Ended
+                }
+                jig_domain_people::Outcome::CompoundRefused { .. }
+                | jig_domain_people::Outcome::Created { .. }
+                | jig_domain_people::Outcome::MarkedSeen { .. }
+                | jig_domain_people::Outcome::Applied { .. }
+                | jig_domain_people::Outcome::SignedOut
+                | jig_domain_people::Outcome::NoteEdited { .. }
+                | jig_domain_people::Outcome::ServiceMade { .. }
+                | jig_domain_people::Outcome::Adopted { .. }
+                | jig_domain_people::Outcome::Proposed { .. }
+                | jig_domain_people::Outcome::Withdrawn { .. }
+                | jig_domain_people::Outcome::Stopped { .. }
+                | jig_domain_people::Outcome::Cancelled { .. }
+                | jig_domain_people::Outcome::Released { .. }
+                | jig_domain_people::Outcome::PersonTaken { .. }
+                | jig_domain_people::Outcome::PersonHandedBack { .. }
+                | jig_domain_people::Outcome::PersonAnswered { .. }
+                | jig_domain_people::Outcome::Moved { .. }
+                | jig_domain_people::Outcome::ProposalDecided { .. }
+                | jig_domain_people::Outcome::Said { .. }
+                | jig_domain_people::Outcome::QuestionAnswered { .. }
+                | jig_domain_people::Outcome::Amended { .. }
+                | jig_domain_people::Outcome::RolesSet { .. }
+                | jig_domain_people::Outcome::PolicyChanged { .. }
+                | jig_domain_people::Outcome::PoolSet { .. }
+                | jig_domain_people::Outcome::EscalationDecided { .. }
+                | jig_domain_people::Outcome::AccountSignInStarted { .. }
+                | jig_domain_people::Outcome::AccountSignedOut { .. }
+                | jig_domain_people::Outcome::AccountKeyKept { .. }
+                | jig_domain_people::Outcome::AccountProgramDeclared { .. }
+                | jig_domain_people::Outcome::AccountChanged
+                | jig_domain_people::Outcome::AccountRemoved { .. }
+                | jig_domain_people::Outcome::Refused(_) => infrastructure::CloseOutcome::Refused,
+            };
+            // Keep the complete answer as a report fact, including saved
+            // refusals; the connector owns retention and retry decisions.
+            held(decision, Output::Core(core::Held::Acted { to: ReplyTo::new(token), outcome }));
+            child(decision, Released::Infrastructure(infrastructure::Event::Closed { key, outcome: translated }));
+        }
         core::Held::MakeEffect { connector, entry } => match jig_ops_domain_connectors::connector(connector) {
             Some(Connector::Infrastructure) => {
                 child(decision, Released::Infrastructure(infrastructure::Event::MakeEntry { entry }));
@@ -375,7 +428,6 @@ fn core_held(
         | core::Held::TurnBusy { .. }
         | core::Held::NotesLoad { .. }
         | core::Held::NotesWritten { .. }
-        | core::Held::Acted { .. }
         | core::Held::NotesDeleted { .. }) => held(decision, Output::Core(other)),
     }
 }
@@ -475,11 +527,12 @@ fn core_ask(
             domain.procedures.insert(task, (step, number, code)).expect("core-selected procedure continuation");
             match jig_ops_domain_connectors::connector(number) {
                 Some(Connector::Infrastructure) => {
-                    match translate::procedure(code, &context.spec) {
+                    match translate::procedure(code, &context.spec, domain.core.counters.deployment().id) {
                         Some(procedure) => {
                             work.push(Work::Infrastructure(infrastructure::Event::StartProcedure {
                                 task,
                                 project: context.project,
+                                chat: served_chat(domain, task),
                                 pending: context.pending,
                                 added: translate::infrastructure_added(context.added),
                                 procedure,
@@ -1018,6 +1071,29 @@ pub(crate) fn infrastructure_out(
                         hold,
                     })));
                 }
+            }
+            infrastructure::Request::Close { key, project, chat } => {
+                let token = domain.token();
+                domain.close_replies.insert(token, key).expect("bounded infrastructure close replies");
+                let mut grace = None;
+                for template in &domain.core.settings.templates {
+                    if template.flags.conversation {
+                        grace = template.grace;
+                        break;
+                    }
+                }
+                work.push(Work::Core(core::Event::Act {
+                    reply_to: ReplyTo::new(token),
+                    connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
+                    key,
+                    act: Box::new(jig_domain_people::Act::Close {
+                        project,
+                        task: chat,
+                        grace,
+                        reason: b"environment torn down".as_slice().into(),
+                    }),
+                    carried: None,
+                }));
             }
             infrastructure::Request::Restarted { stage } => {
                 let step = match stage {
@@ -1627,5 +1703,20 @@ fn agent_content(
             );
             core_out(domain, env, decision, requests, work);
         }
+    }
+}
+
+// Translate the procedure's requester context; authority and closing stay below
+// the root, in the connector and core respectively (examples.md, 7.2–7.3).
+fn served_chat(domain: &Domain, task: u64) -> Option<u64> {
+    let row = domain.core.tasks.task(task)?;
+    let chat = match row.requester {
+        tasks::Party::Task(chat) => chat,
+        tasks::Party::Person(_) | tasks::Party::Deployment { .. } => return None,
+    };
+    let row = domain.core.tasks.task(chat)?;
+    match row.requester {
+        tasks::Party::Person(_) if row.flags.conversation => Some(chat),
+        tasks::Party::Person(_) | tasks::Party::Task(_) | tasks::Party::Deployment { .. } => None,
     }
 }

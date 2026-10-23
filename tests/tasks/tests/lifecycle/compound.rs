@@ -78,6 +78,24 @@ fn the_deployments_compound_cancels_its_projects_tasks() {
     }
 }
 #[test]
+fn the_deployments_grace_and_its_ask_to_finish_survive_a_restart() {
+    let mut world = World::new(206, LIMITS);
+    world.make(Party::Person(REQUESTER), vec![task(ROOT, &[])]);
+    let close = Operation::Cancel {
+        task: ROOT,
+        reason: b"closed".as_slice().into(),
+        grace: Some(Duration::from_secs(5)),
+        message: Some(FINISH),
+    };
+    assert_eq!(deployment(&mut world, Party::Deployment { project: PROJECT }, vec![close]), Reply::Done);
+    world.restart();
+    let grace = world.record(ROOT).grace.as_ref().expect("the deployment's grace is kept");
+    assert_eq!((grace.by, grace.message), (Party::Deployment { project: PROJECT }, FINISH));
+    assert!(world.record(ROOT).inbox.iter().any(|word| word.number == FINISH
+        && word.from == Party::Deployment { project: PROJECT }
+        && matches!(word.kind, jig_domain_tasks::MessageKind::FinishRequested { .. })));
+}
+#[test]
 fn the_deployments_compound_refuses_any_other_operation_or_project_whole() {
     use jig_domain_tasks::{Amendment, MessageKind, Refusal, Word};
     let amendment = Amendment {
