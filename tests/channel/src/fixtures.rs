@@ -427,6 +427,9 @@ pub fn provider_turns(script: &Script) -> Box<[skein_fake_llm_domain::api::Turn]
         .into_boxed_slice();
     }
     let mut turns = Vec::new();
+    if matches!(script.story, crate::stories::Story::Facts) {
+        turns.push(Turn { lines: Box::new([crate::live_text::line()]), finish: Finish::Stop, tokens: 1 });
+    }
     for number in 0..script.leading_turns {
         turns.push(Turn {
             lines: Box::new([if matches!(script.story, crate::stories::Story::Call) {

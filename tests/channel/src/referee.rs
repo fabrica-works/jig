@@ -61,7 +61,10 @@ impl skein_world::Referee<Proc> for Referee {
                         host,
                         &mut store,
                         &mut self.rules,
-                        matches!(self.story, crate::stories::Story::DurableRestart) && !self.injected
+                        matches!(self.story, crate::stories::Story::Facts)
+                            && self.injected
+                            && self.views.borrow().reply.prefixes.len() < crate::live_text::PIECES
+                            || matches!(self.story, crate::stories::Story::DurableRestart) && !self.injected
                             || matches!(self.story, crate::stories::Story::HeldCommit | crate::stories::Story::Drain)
                                 && now < Time::from_nanos(1_000_000_000),
                         self.story,
@@ -192,6 +195,7 @@ impl skein_world::Referee<Proc> for Referee {
             && ended
             && replied
             && self.rules.complete()
+            && (!matches!(self.story, crate::stories::Story::Facts) || self.views.borrow().reply.committed)
             && (!matches!(self.story, crate::stories::Story::Providers)
                 || !self.views.borrow().providers_after.1.is_empty())
         {
@@ -581,6 +585,10 @@ impl Referee {
                     }
                 }
             }
+        }
+
+        if matches!(self.story, crate::stories::Story::Facts) && self.injected {
+            self.views.borrow_mut().reply.act(procs, &self.store.borrow());
         }
 
         if matches!(self.story, crate::stories::Story::Shutdown) && !self.injected
