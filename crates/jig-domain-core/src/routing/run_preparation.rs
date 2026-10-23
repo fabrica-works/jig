@@ -260,7 +260,9 @@ pub(super) fn start_brief(core: &mut Core, env: &Env<Limits>, work: &mut Queue<E
         out.push(Request::Decided);
         return Requests::Out(out);
     };
-    if current.phase != tasks::Phase::Active(tasks::Active::Preparing) || current.last_message != context.last_message {
+    if current.phase != tasks::Phase::Active(tasks::Active::Preparing)
+        || core.tasks.run_message(task) != Some(context.last_message)
+    {
         out.push(Request::Decided);
         return Requests::Out(out);
     }
@@ -317,7 +319,9 @@ pub(super) fn plan_brief(
         out.push(Request::Decided);
         return Requests::Out(out);
     };
-    if current.phase != tasks::Phase::Active(tasks::Active::Preparing) || current.last_message != context.last_message {
+    if current.phase != tasks::Phase::Active(tasks::Active::Preparing)
+        || core.tasks.run_message(task) != Some(context.last_message)
+    {
         out.push(Request::Decided);
         return Requests::Out(out);
     }

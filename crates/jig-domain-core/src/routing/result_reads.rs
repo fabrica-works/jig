@@ -155,7 +155,8 @@ pub(super) fn loaded(
             let current = match core.contexts.get(&task) {
                 Some(context) if context.last_message == last_message => match core.tasks.task(task) {
                     Some(row) => {
-                        row.phase == tasks::Phase::Active(tasks::Active::Preparing) && row.last_message == last_message
+                        row.phase == tasks::Phase::Active(tasks::Active::Preparing)
+                            && core.tasks.run_message(task) == Some(last_message)
                     }
                     None => false,
                 },

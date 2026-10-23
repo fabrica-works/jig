@@ -806,6 +806,25 @@ pub(crate) fn activate(domain: &mut Domain, number: u64, out: &mut Queue<Request
 }
 
 impl Domain {
+    /// The newest word a run of this task reads: its own inbox's and the proposals and
+    /// escalations waiting on it, which never enter that inbox. A preparation's context
+    /// carries it as `last_message`, and stays current while it is unchanged.
+    #[must_use]
+    pub fn run_message(&self, number: u64) -> Option<u64> {
+        let task = record(self, number)?;
+        let mut last = task.last_message;
+        for word in &task.inbox {
+            last = last.max(word.number);
+        }
+        for word in crate::proposals::waiting_for(self, number) {
+            last = last.max(word.number);
+        }
+        for word in crate::escalation::waiting_for(self, number) {
+            last = last.max(word.number);
+        }
+        Some(last)
+    }
+
     /// Fresh read-only preparation facts; admission must not trust an older async snapshot.
     #[must_use]
     pub fn run_context(&self, number: u64) -> Option<Box<crate::RunContext>> {
@@ -862,10 +881,7 @@ impl Domain {
             llm: task.llm.clone(),
             payer: domain.payer(number).expect("admitted financial chain has a payer"),
             task: number,
-            last_message: match inbox.last() {
-                Some(word) => task.last_message.max(word.number),
-                None => task.last_message,
-            },
+            last_message: domain.run_message(number).expect("activation names live task"),
             inbox: inbox.into_boxed(),
             delegates: delegates.into_boxed(),
             dependencies: task.dependencies.clone(),

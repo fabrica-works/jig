@@ -939,7 +939,7 @@ pub(super) fn tag_tasks(
                     let stale = match core.contexts.get(&task.number) {
                         Some(context) => {
                             task.phase != tasks::Phase::Active(tasks::Active::Preparing)
-                                || task.last_message != context.last_message
+                                || core.tasks.run_message(task.number) != Some(context.last_message)
                         }
                         None => false,
                     };

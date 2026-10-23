@@ -426,8 +426,10 @@ them (5.7).
   3.5 and 4.3). Such a terminal, or a checked placement losing its room,
   returns the task to due without a retry counter or polling timer, retaining
   its account and committed conversation. Stale asynchronous preparation also
-  returns to due without a timer. Every attempt, a failed one included, takes a new
-  attempt number.
+  returns to due without a timer. A preparation is stale when its task left
+  preparing or its newest word changed: the newest of its inbox and of the
+  proposals and escalations waiting on it, which never enter that inbox.
+  Every attempt, a failed one included, takes a new attempt number.
 - **A configured bound holds at once.** `End::Exceeded(Exceeded)` becomes
   `Hold::Exceeded(Exceeded)`, with prior lifecycle `Active(Due)` and no
   source. The tasks child's own `Exceeded { bound: Bound, value: u64 }`

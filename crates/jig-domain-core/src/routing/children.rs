@@ -88,7 +88,7 @@ pub(super) fn tag_brief(
                     Some(context) => match core.tasks.task(task) {
                         Some(row) => {
                             row.phase == tasks::Phase::Active(tasks::Active::Preparing)
-                                && row.last_message == context.last_message
+                                && core.tasks.run_message(task) == Some(context.last_message)
                         }
                         None => false,
                     },
