@@ -237,6 +237,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Called { owner, call, ask } => hosted::called(domain, env, owner, call, ask, out),
         Event::Withdrawn { owner, call } => hosted::withdrawn(domain, owner, call, out),
         Event::Turn { owner, turn } => hosted::turned(domain, env, owner, turn, out),
+        // Transitional: live-text M1's task Tb forwards the piece, fenced and counted.
         Event::Piece { .. } => {}
         Event::Activity { owner, activity } => crate::activity::reported(domain, owner, activity),
         Event::Unauthorized { owner, account, generation } => {

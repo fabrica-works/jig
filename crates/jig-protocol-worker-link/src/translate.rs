@@ -64,6 +64,7 @@ pub(crate) fn hello(hello: host::Hello, limits: &wire::v6::Limits) -> Option<Fra
 
 pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v6::Limits) -> Option<Frame> {
     match up {
+        // Transitional: live-text M1's task Tc encodes the piece on worker wire v7.
         host::LinkUp::Piece { .. } => None,
         host::LinkUp::Logins { logins } => logins_frame(logins, limits),
         host::LinkUp::SignedOut { name, result } => signed_out_frame(name, result, limits),
@@ -562,6 +563,7 @@ fn assignment(
             attempt: Token::new(record.attempt),
             workspace,
             save: record.save,
+            // Transitional: live-text M1's task Tc decodes the ask from worker wire v7.
             live: host::LiveAsk::NONE,
             charter: record.charter,
             grants: grants.into_boxed(),
