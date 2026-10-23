@@ -129,11 +129,18 @@ fn a_relayed_call_reaches_the_agent_and_is_answered_once() {
 }
 
 #[test]
-fn smith_s_facts_reach_the_views_as_activity_with_no_text() {
+fn a_conversations_reply_reaches_the_views_before_its_turn() {
     let outcome = run(Story::Facts);
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert!(outcome.activity_seen);
-    assert_eq!(outcome.text_bytes, 0);
+    assert_eq!(
+        outcome.text_prefixes.iter().map(AsRef::as_ref).collect::<Vec<&[u8]>>(),
+        [b"Hello".as_slice(), b"Hello from", b"Hello from worker"]
+    );
+    assert_eq!(outcome.text_bytes, b"Hello from worker".len());
+    assert!(outcome.text_committed);
+    assert_eq!(outcome.turns_committed, 2);
+    assert_eq!(outcome.answers_acknowledged, 1);
 }
 
 #[test]

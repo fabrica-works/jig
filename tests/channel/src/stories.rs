@@ -70,8 +70,7 @@ fn script(story: Story) -> crate::world::Script {
     ) {
         script.latency = Duration::from_secs(1);
     }
-    if matches!(story, Story::Partition { .. } | Story::Facts | Story::Reconnect | Story::Shutdown | Story::Refusals(_))
-    {
+    if matches!(story, Story::Partition { .. } | Story::Reconnect | Story::Shutdown | Story::Refusals(_)) {
         script.latency = Duration::from_secs(1);
     }
     if matches!(story, Story::Refusals(MessageRefusal::Ending | MessageRefusal::Full | MessageRefusal::NameInUse)) {

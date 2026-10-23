@@ -259,6 +259,9 @@ fn text(value: &[u8]) -> c::Text {
 
 #[expect(clippy::wildcard_enum_match_arm, reason = "this fixture checks only run activity and provisional text")]
 fn observe(client: &jig_client_protocol_world::native::NativeClient, views: &mut crate::world::Views) {
+    if let Some(text) = client.text(crate::live_text::RUN) {
+        views.text_bytes = views.text_bytes.max(text.text.bytes().len());
+    }
     for received in &client.received {
         match received {
             Received::Delivery(c::Delivery::Task(task)) => match &*task.chip.details {
@@ -270,7 +273,9 @@ fn observe(client: &jig_client_protocol_world::native::NativeClient, views: &mut
                 views.text_bytes = views.text_bytes.max(text.text.bytes().len());
             }
             Received::Delivery(c::Delivery::RunState(state)) => {
-                assert!(state.writing.is_none(), "process facts contain no provisional text");
+                if let Some(writing) = &state.writing {
+                    assert!(writing.turn.number > state.committed_turn, "committed turns have no writing");
+                }
             }
             _ => {}
         }
