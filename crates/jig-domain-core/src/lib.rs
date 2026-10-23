@@ -597,6 +597,17 @@ impl Core {
                 "core prices seed policies"
             );
         }
+        for (_, configured) in &config.policies {
+            let value = policy::snapshot(&configured.policy, &configured.permissions, &configured.templates)
+                .expect("configured policy snapshot");
+            assert!(
+                match people::policy_bytes(&value) {
+                    Some(bytes) => bytes <= limits.policy_bytes,
+                    None => false,
+                },
+                "core prices configured policies"
+            );
+        }
         let fleet_needs = fleet_needs::configured(&config, limits);
         let room_max = room_max(limits).expect("validated immutable core limits");
         Ok(Core {
