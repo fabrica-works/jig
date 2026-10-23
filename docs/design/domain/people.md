@@ -143,6 +143,37 @@ inbox are the views child's (engine.md, section 11).
 
   Only the printed link offers a held sign-in: a `Mint` and a service's
   sign-in sign in afresh.
+- **Full sign-ins say so.** The deployment holds at most
+  `limits.people.sign_ins` sign-ins (`../protocol/configuration.md`,
+  section 6). A sign-in that would make one more is answered *full*,
+  apart from busy:
+  - *what it carries:* that limit and the earliest saved expiry among
+    the sign-ins held, the wall moment by which one will have ended
+    unless its person signs out sooner. No person, number or count: the
+    printed link's holder, the deployment's first owner on its own
+    machine, learns when the next room comes, and nothing of whose it
+    is; a `Mint` and a service learn only busy (`../protocol/client.md`,
+    section 8);
+  - *after the held sign-in:* a person keeping their own sign-in (above)
+    is never answered full;
+  - *only while every sign-in is live:* the deployment's sign-ins are
+    counted as held, and one past either clock is held until its timer
+    ends it. A sign-in that finds them full while one of them is past
+    either clock ends that one there, the one its timer would end next,
+    as the timer would (its digest erased, its end said), and takes its
+    room: ending what has expired is no eviction. So full is answered
+    only while every sign-in is live by both clocks, and its earliest
+    expiry is always to come;
+  - *it waits for an end:* no wait of seconds frees it, only a sign-in
+    that ends: its person's sign-out, its expiry, or an owner's removal.
+    Nothing ends, shortens or grows to make room;
+  - *nothing is written,* and the numbers drawn go unused, as for busy.
+    Full is an answer, never saved, as busy and not ready are not.
+
+  *Busy* stays for what passes or is the deployment's own: a new identity
+  while the people table is full, and the bootstrap's holdings while it
+  seeds. Neither meets the printed link past bootstrap: its first owner
+  is not new.
 - **Every other way is the application's sign-in.** It runs on the
   application's own routes, redirects included, and verifies who the
   party is. Its server then gives the clients' component a `Mint` naming
@@ -706,7 +737,12 @@ holding a live sign-in of their own keeps it, its number and expiry,
 with nothing written, and signs in so more times than the deployment
 has room for sign-ins; and one holding another person's sign-in, or
 their own ended or expired between the clients' check and people's
-answer, signs in afresh.
+answer, signs in afresh; a sign-in past the deployment's room is
+answered full, with its room and its earliest saved expiry, nothing
+written, while one holding their own live sign-in keeps it, and signs in
+once a sign-in ends; a sign-in finding the room full while one sign-in
+is past its wall expiry, its timer not yet run, ends that one and signs
+in; a new identity past the people table's room is answered busy.
 
 Its referee: every request is answered once, after its commit; a
 compound request is made whole or not at all; no request is acted on

@@ -584,11 +584,31 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   application's startup, `Link { secret }`, which prints a URL carrying
   it. The URL is the application's; the default mapping's is its link
   route (17.1). Signing in with the secret signs that person in as the
-  deployment's first owner it names, and spends it; a sign-in answered
-  not ready spends nothing, so the same link signs in when sent again
-  (below). One link is live at a time: a sign-in with a secret spent,
-  expired or unknown is refused, and the component draws a fresh one,
-  which the startup prints again.
+  deployment's first owner it names, and spends it. One link is live at
+  a time: a sign-in with a secret spent, expired or unknown is refused,
+  and the component draws a fresh one, which the startup prints again,
+  unless the live one is reserved (below).
+  - *The secret is the link's, or its exchange's.* A sign-in that finds
+    the secret live, before its expiry, reserves it for its exchange
+    until people answers. While it is reserved, a sign-in with the same
+    secret is answered *busy* and changes nothing, and one with another
+    secret is refused and draws no fresh link: an attempt that crosses
+    the exchange never replaces its secret. A sign-in the component has
+    no room for among its exchanges is answered busy, and the secret
+    stays the link's.
+  - *Not ready, busy and full spend nothing.* The reserved secret is the
+    link's again, with the expiry it was drawn with, so the same link
+    signs in when sent again, until that expiry, checked again then.
+    Signed in, refused and signed out spend it, as do the core's refusal
+    before people answers and the engine's close or abort, which end the
+    exchange; a spent secret is the link's no more, and the next sign-in
+    by any other draws a fresh one.
+  - *Full* (`../domain/people.md`, section 3) carries the deployment's
+    room for sign-ins and the earliest saved expiry among them, its wall
+    time, for the person to read when the next room comes. A `Mint` is
+    answered busy for it, and a service's sign-in is answered full as the
+    link's is. On the wire, a sign-in's answer is signed in, refused, not
+    ready, busy, or full with those two.
   - *A sign-in held is kept* (`../domain/people.md`, section 3). The
     link's exchange carries a credential as every exchange may, a
     browser's cookie or a native client's bearer (17.3). Once the secret
@@ -655,7 +675,7 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **Installing a credential** ends every pending read visibly in the
   client domain (section 6), including `Held` or `Transport` before
   the first `me`. A `Link` or `Service` exchange that fails, is refused,
-  is lost or is not ready and installs no credential leaves old reads
+  is lost, is not ready, busy or full and installs no credential leaves old reads
   pending; reads made during it still belong to the old credential.
   A read made under that credential cannot answer under its replacement.
 - **While the engine stops** (`../domain/engine.md`, 6.1), a sign-in, a
@@ -883,7 +903,14 @@ section 2).
   `Mint` answered and refused, the printed link spent and drawn again, a
   link's sign-in carrying a live credential kept (no credential drawn,
   no digest kept), and one carrying a credential bad, expired or ended
-  while its check is pending signed in afresh and refused nothing, a
+  while its check is pending signed in afresh and refused nothing; the
+  link's sign-in answered not ready, busy and full, its secret the
+  link's again with its expiry as drawn, and the same link signing in
+  once there is room, or refused past that expiry; the same secret sent
+  again while reserved answered busy, another refused with no fresh link
+  drawn; the reservation dropped by the core's refusal, a close and an
+  abort; the exchanges' admission full answered busy; a `Mint` answered
+  busy for full; a
   service signing in, a key added, sent again under its key with the
   same value and with another. Its referee: one reply per exchange; one
   streamed message in flight per stream; no credential reaches a
@@ -892,7 +919,8 @@ section 2).
 - **The default mapping's ends,** each against a scripted peer of bytes:
   every route, the stream's events cut at random, the credential as a
   cookie and as a bearer, the printed link's route (a browser's link
-  sign-in with its live cookie answered with no `Set-Cookie`), and the
+  sign-in with its live cookie answered with no `Set-Cookie`, and one
+  answered busy or full with none), and the
   example guards' stories (`browser.md`, section 15).
 - **The protocol world,** `jig-client-protocol-world`: the client's
   world's stories (`../client/domain/testing.md`, section 4) run through
@@ -1053,7 +1081,8 @@ prefix; jig's test application mounts it at `/jig`.
   (4.2); signing out clears it, with `Max-Age=0`. The engine end reads
   it as each exchange's credential, the link's sign-in's among them: a
   sign-in kept by the link answers with no credential, so it sets no
-  cookie, and the browser's stays as it was (section 8).
+  cookie, and the browser's stays as it was (section 8); nor does a
+  sign-in refused, not ready, busy or full.
 - **As `Authorization: Bearer`,** everywhere else: the credential in
   base64url, and a service's credential on its sign-in route the same
   way.
