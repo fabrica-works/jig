@@ -521,10 +521,10 @@ act's own subject are its whole check.
 
   | Act | Its subject | Becomes |
   |---|---|---|
-  | `Close` | a live conversation of the named project (tasks.md, section 3) whose requester is a party; a grace within the tasks child's bound, or none; a reason within a cancel's | in one decision, section 7's close with every delegate cancelled: each live task the conversation requested cancelled, then the conversation cancelled with the grace, each with the reason; answered as a compound request (5.1) |
-  | `AddKey` | an LLM provider whose sources offer a key; the key, carried as a request carries one (accounts.md, section 5); one of the deployment's accounts to join, or a new one | the key the deployment's (accounts.md, 3.2 and section 5) |
+  | `Close` | a live conversation of the named project (tasks.md, section 3) whose requester is a person; a grace within the tasks child's bound, or none; a reason within a cancel's | in one decision, the deployment's compound (tasks.md, section 7), section 7's close with every delegate cancelled: each live task the conversation requested cancelled, then the conversation cancelled with the grace, each with the reason; answered as a compound request (5.1) |
+  | `AddKey` | an LLM provider whose sources offer a key; the key, carried as a request carries one (accounts.md, section 5); one of the deployment's accounts to join, or a new one | the key added, the deployment's (accounts.md, 3.2 and section 5) |
   | `RemoveAccount` | an account the deployment holds | the account removed (accounts.md, section 5) |
-  | `Adopt` | one of the acting connector's own resources, as an owner's adoption names one, into a live project | adopted as an owner's adoption is (connectors.md, section 12), the project's roles seeded from the parties the connector knows there, and no party made its owner |
+  | `Adopt` | one of the acting connector's own resources, as an owner's adoption names one, into a live project | adopted as an owner's adoption is, the connector asked and answering as it does a party's (connectors.md, section 12), the project's roles seeded from the parties the connector knows there, and no party made its owner |
   | `MakeProject` | as `MakeProject`'s (5.1), and an owner of the deployment, to be its maker | the project made (5.2), that owner its maker and only party |
 
   A subject outside its act's is refused, naming it: a task that is not
@@ -538,8 +538,9 @@ act's own subject are its whole check.
   pending, and once decided is answered from its saved answer, made
   once; another act under the key is a key conflict. A saved answer is
   given again whatever the configuration grants since, as a party's is
-  whatever their role is now. Busy and not ready are not saved, and the
-  connector sends the act again.
+  whatever their role is now, and a restart restores it whatever the
+  configuration names, until the retention ends it. Busy and not ready
+  are not saved, and the connector sends the act again.
 - **Answered to its connector once durable** (engine.md, 5.2), through
   the root, with the outcome a party's request of its kind gets; each
   send, a joined one among them, is answered once.
@@ -554,9 +555,11 @@ act's own subject are its whole check.
   since as unknown, which its connector takes as done.
 - **The deployment, not a party:** an act makes no party, sign-in,
   inbox or role, and is in no `me`. A task it cancels is cancelled by
-  the deployment, with its reason; a value it carries and leaves unused
-  is said unused and erased, as a request's is
-  (`../protocol/client.md`, section 5); a project it makes has a party
+  the deployment, with its reason. The value an `AddKey` carries is
+  kept by the application first, as a client's request's is
+  (`../protocol/client.md`, section 5), and one the act leaves unused
+  is said unused before its answer, for the application to erase. A
+  project it makes has a party
   as its owner, the deployment's owner the act names.
 
 ## 6. A party's inbox
