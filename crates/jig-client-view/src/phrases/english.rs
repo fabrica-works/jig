@@ -13,6 +13,57 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::SettingsChanged => Box::new([
+                Segment::Text(copy_of(b"Settings changed; revision ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::SettingsStale => Box::new([
+                Segment::Text(copy_of(b"Settings changed; newest revision ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::SettingsFull => Box::new([
+                Segment::Text(copy_of(b"Settings history is full; oldest held revision ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::SettingsFullTask => {
+                Box::new([Segment::Text(copy_of(b"held by task ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::SettingsFullMore => {
+                Box::new([Segment::Hole { index: 0, kind: HoleKind::Number }, Segment::Text(copy_of(b" more tasks"))])
+            }
+            JigPhrase::SettingsUnchanged => {
+                Box::new([Segment::Text(copy_of(b"The change leaves the settings unchanged"))])
+            }
+            JigPhrase::SettingCharter => {
+                Box::new([Segment::Text(copy_of(b"charter ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::SettingTemplate => {
+                Box::new([Segment::Text(copy_of(b"template ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::SettingPolicy => {
+                Box::new([Segment::Text(copy_of(b"policy ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::SettingRules => Box::new([Segment::Text(copy_of(b"the rules"))]),
+            JigPhrase::SettingFaultShape => {
+                Box::new([Segment::Text(copy_of(b"Setting is out of shape or past its bound"))])
+            }
+            JigPhrase::SettingFaultCount => Box::new([Segment::Text(copy_of(b"Setting kind is past its count limit"))]),
+            JigPhrase::SettingFaultReference => {
+                Box::new([Segment::Text(copy_of(b"Setting names a charter, template, model or host not offered"))])
+            }
+            JigPhrase::SettingFaultRules => {
+                Box::new([Segment::Text(copy_of(b"Setting policy is above the deployment rules"))])
+            }
+            JigPhrase::SettingFaultBudget => Box::new([Segment::Text(copy_of(
+                b"Setting charter budget is below its reserve or short of one costliest completion",
+            ))]),
+            JigPhrase::SettingFaultGrace => {
+                Box::new([Segment::Text(copy_of(b"Setting template grace is past the allowed span"))])
+            }
+            JigPhrase::SettingFaultOwner => {
+                Box::new([Segment::Text(copy_of(b"Setting policy owner role cannot be a root requester"))])
+            }
+
             JigPhrase::OpenProgramModel => Box::new([Segment::Text(copy_of(b"This model runs through a program"))]),
             JigPhrase::OpenProgramUnavailable => {
                 Box::new([Segment::Text(copy_of(b"A chat can't stay open through a program yet"))])

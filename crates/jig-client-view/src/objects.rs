@@ -491,6 +491,7 @@ fn delivered_name(value: &jig_client::contract::Delivery, key: ObjectKey) -> Opt
         | Delivery::Me(_)
         | Delivery::Run(_)
         | Delivery::RunState(_)
+        | Delivery::Settings(_)
         | Delivery::Deployment(_)
         | Delivery::OwnerDeployment(_)
         | Delivery::OwnerAccounts(_) => None,
@@ -577,6 +578,7 @@ pub(crate) fn dropping(domain: &mut crate::Ui, watch: jig_client::Handle, value:
         jig_client::contract::Delivery::Me(_)
         | jig_client::contract::Delivery::Run(_)
         | jig_client::contract::Delivery::RunState(_)
+        | jig_client::contract::Delivery::Settings(_)
         | jig_client::contract::Delivery::Deployment(_)
         | jig_client::contract::Delivery::OwnerDeployment(_)
         | jig_client::contract::Delivery::OwnerAccounts(_)
@@ -684,6 +686,10 @@ fn read_key(what: &jig_client::contract::Read) -> Option<ObjectKey> {
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
+        | Read::Settings
+        | Read::Setting(_)
+        | Read::Revision(_)
+        | Read::Revisions(_)
         | Read::Deployment => None,
     }
 }
@@ -904,6 +910,10 @@ pub(crate) fn historical_read(
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
             | ReadValue::OwnerDeployment(_)
+            | ReadValue::Settings(_)
+            | ReadValue::Setting(_)
+            | ReadValue::Revision(_)
+            | ReadValue::Revisions(_)
             | ReadValue::Deployment(_) => None,
         },
         ReadResult::None(_) => None,
@@ -941,6 +951,10 @@ fn read_body(key: ObjectKey, value: jig_client::contract::ReadValue) -> Option<B
         | ReadValue::OwnerSpend(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Deployment(_)
         | ReadValue::OwnerDeployment(_) => None,
         ReadValue::Notes(page) => {
@@ -1115,6 +1129,7 @@ pub(crate) fn contexts(value: &jig_client::contract::Delivery, capacity: u32) ->
         | jig_client::contract::Delivery::Chips(_)
         | jig_client::contract::Delivery::Run(_)
         | jig_client::contract::Delivery::RunState(_)
+        | jig_client::contract::Delivery::Settings(_)
         | jig_client::contract::Delivery::Deployment(_)
         | jig_client::contract::Delivery::OwnerDeployment(_)
         | jig_client::contract::Delivery::OwnerAccounts(_) => {}

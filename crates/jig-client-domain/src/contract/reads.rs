@@ -43,30 +43,65 @@ impl InboxReadGroup {
 /// A document or a bounded page requested without a key.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Read {
+    Settings,
+    Setting(super::ReadSetting),
+    Revision(super::ReadRevision),
+    Revisions(super::ReadRevisions),
     /// A task query with independent group continuations.
-    Tasks { query: super::TaskQuery, live: Option<Cursor>, ended: Option<Cursor> },
+    Tasks {
+        query: super::TaskQuery,
+        live: Option<Cursor>,
+        ended: Option<Cursor>,
+    },
     /// The frame.
     Me,
     /// One committed turn, with the same access as activity.
-    Turn { task: u64, attempt: u64, turn: u32 },
+    Turn {
+        task: u64,
+        attempt: u64,
+        turn: u32,
+    },
     /// One task.
-    Task { task: u64 },
+    Task {
+        task: u64,
+    },
     /// One proposal.
-    Proposal { proposal: ProposalKey },
+    Proposal {
+        proposal: ProposalKey,
+    },
     /// One escalation.
-    Escalation { task: u64 },
+    Escalation {
+        task: u64,
+    },
     /// One question.
-    Question { task: u64, message: u64 },
+    Question {
+        task: u64,
+        message: u64,
+    },
     /// One person task.
-    PersonTask { task: u64 },
+    PersonTask {
+        task: u64,
+    },
     /// One result.
-    Result { task: u64 },
+    Result {
+        task: u64,
+    },
     /// Ended delegates.
-    Ended { task: u64, after: Option<Cursor> },
+    Ended {
+        task: u64,
+        after: Option<Cursor>,
+    },
     /// Task or subtree history.
-    History { task: u64, subtree: bool, after: Option<Cursor> },
+    History {
+        task: u64,
+        subtree: bool,
+        after: Option<Cursor>,
+    },
     /// Activity read from the end.
-    Activity { task: u64, before: Option<Cursor> },
+    Activity {
+        task: u64,
+        before: Option<Cursor>,
+    },
     /// One filtered inbox group, with its own continuation. A kind implies its group.
     Inbox {
         group: InboxReadGroup,
@@ -76,11 +111,20 @@ pub enum Read {
         after: Option<Cursor>,
     },
     /// Project spend by period, with an opaque continuation.
-    Spend { project: u32, after: Option<Cursor> },
+    Spend {
+        project: u32,
+        after: Option<Cursor>,
+    },
     /// One project.
-    Project { project: u32 },
+    Project {
+        project: u32,
+    },
     /// Scoped notes.
-    Notes { scope: NoteScope, description: Option<Text>, after: Option<Cursor> },
+    Notes {
+        scope: NoteScope,
+        description: Option<Text>,
+        after: Option<Cursor>,
+    },
     /// Deployment state.
     Deployment,
 }
@@ -138,6 +182,10 @@ pub struct NotePage {
 /// A read document or page.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ReadValue {
+    Settings(Box<super::SettingsDocument>),
+    Setting(Box<super::SettingDocument>),
+    Revision(Box<super::RevisionAnswer>),
+    Revisions(Box<super::RevisionsPage>),
     /// A task query's two groups.
     Tasks(Box<super::TaskPage>),
     /// Whole authentic project owner document.

@@ -245,6 +245,7 @@ pub(super) fn read_token(rows: &[Request]) -> jig_client::Handle {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "the object fixture table names every unrelated read variant explicitly")]
 fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_working_set() {
     let (mut domain, page) = live();
     let cases = [
@@ -297,6 +298,10 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
             | ReadValue::OwnerSpend(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
+            | ReadValue::Settings(_)
+            | ReadValue::Setting(_)
+            | ReadValue::Revision(_)
+            | ReadValue::Revisions(_)
             | ReadValue::Deployment(_)
             | ReadValue::OwnerDeployment(_) => unreachable!(),
         }

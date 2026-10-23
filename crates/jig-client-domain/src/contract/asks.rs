@@ -115,36 +115,91 @@ pub enum AnswerOn {
 /// Every jig request, without keys owned by the root table.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ask {
+    ChangeSettings(super::ChangeSettings),
     /// Admit and create a batch together.
-    Create { project: u32, tasks: List<super::NewTask> },
+    Create {
+        project: u32,
+        tasks: List<super::NewTask>,
+    },
     /// Submit a proposal in the party's own name.
-    Propose { project: u32, action: super::ProposeAction, reason: Text },
+    Propose {
+        project: u32,
+        action: super::ProposeAction,
+        reason: Text,
+    },
     /// Withdraw the party's pending proposal.
-    Withdraw { project: u32, proposal: u64 },
+    Withdraw {
+        project: u32,
+        proposal: u64,
+    },
     /// Add words to a task inbox.
-    Message { project: u32, task: u64, words: Text },
+    Message {
+        project: u32,
+        task: u64,
+        words: Text,
+    },
     /// Commit the operations together, or refuse at the first failure.
-    Compound { project: u32, operations: List<super::Operation> },
+    Compound {
+        project: u32,
+        operations: List<super::Operation>,
+    },
     /// Answer a named question or a person task revision.
-    Answer { project: u32, on: AnswerOn },
+    Answer {
+        project: u32,
+        on: AnswerOn,
+    },
     /// Take a role-addressed person task.
-    Take { project: u32, task: u64 },
+    Take {
+        project: u32,
+        task: u64,
+    },
     /// Return a person task to its role.
-    HandBack { project: u32, task: u64 },
+    HandBack {
+        project: u32,
+        task: u64,
+    },
     /// Decide an immutable proposal or the hold revision seen.
-    Decide { project: u32, on: DecideOn },
+    Decide {
+        project: u32,
+        on: DecideOn,
+    },
     /// Release a hold, choosing whether to repeat an uncertain effect.
-    Release { project: u32, task: u64, revision: Revision, again: Option<bool> },
+    Release {
+        project: u32,
+        task: u64,
+        revision: Revision,
+        again: Option<bool>,
+    },
     /// Amend a task.
-    Amend { project: u32, task: u64, revision: Option<Revision>, change: Box<Amendment>, reason: Text },
+    Amend {
+        project: u32,
+        task: u64,
+        revision: Option<Revision>,
+        change: Box<Amendment>,
+        reason: Text,
+    },
     /// Stop a run and hold its task.
-    Stop { project: u32, task: u64 },
+    Stop {
+        project: u32,
+        task: u64,
+    },
     /// Cancel a task and its subtree.
-    Cancel { project: u32, task: u64, reason: Text, grace: Option<Duration> },
+    Cancel {
+        project: u32,
+        task: u64,
+        reason: Text,
+        grace: Option<Duration>,
+    },
     /// Become a task requester and fund it.
-    Move { project: u32, task: u64, reason: Text },
+    Move {
+        project: u32,
+        task: u64,
+        reason: Text,
+    },
     /// Move a read position explicitly.
-    Seen { through: SeenThrough },
+    Seen {
+        through: SeenThrough,
+    },
     /// Correct the note revision seen.
     EditNote {
         project: u32,
@@ -156,25 +211,59 @@ pub enum Ask {
         references: List<u64>,
     },
     /// Delete the note revision seen.
-    DeleteNote { project: u32, note: u64, scope: NoteScope, revision: Revision },
+    DeleteNote {
+        project: u32,
+        note: u64,
+        scope: NoteScope,
+        revision: Revision,
+    },
     /// Change a project policy.
-    ChangePolicy { project: u32, edit: super::PolicyEdit },
+    ChangePolicy {
+        project: u32,
+        edit: super::PolicyEdit,
+    },
     /// Replace project roles.
-    SetRoles { project: u32, holdings: List<Holding> },
+    SetRoles {
+        project: u32,
+        holdings: List<Holding>,
+    },
     /// Make a service with a project role.
-    MakeService { project: u32, name: Text, role: HeldRole },
+    MakeService {
+        project: u32,
+        name: Text,
+        role: HeldRole,
+    },
     /// Rename a project as its owner (contract.md, 3.2).
-    Rename { project: u32, name: Text },
+    Rename {
+        project: u32,
+        name: Text,
+    },
     /// Make a project in the deployment scope (contract.md, 7.5).
-    MakeProject { name: Text, policy: u32 },
+    MakeProject {
+        name: Text,
+        policy: u32,
+    },
     /// Set a party pool preserving spend and reservations.
-    SetPool { project: u32, party: u64, budget: u64 },
+    SetPool {
+        project: u32,
+        party: u64,
+        budget: u64,
+    },
     /// Start an LLM account sign-in.
-    SignIn { holder: AccountHolder, provider: u32 },
+    SignIn {
+        holder: AccountHolder,
+        provider: u32,
+    },
     /// Change the holder's LLM account. Key values travel in the envelope only.
-    AccountChange { holder: AccountHolder, change: AccountChange },
+    AccountChange {
+        holder: AccountHolder,
+        change: AccountChange,
+    },
     /// End an LLM account sign-in for a source.
-    SignOut { holder: AccountHolder, source: u32 },
+    SignOut {
+        holder: AccountHolder,
+        source: u32,
+    },
 }
 
 /// The holder of an LLM account sign-in.
@@ -187,16 +276,29 @@ pub enum AccountHolder {
 /// The durable result of one ask.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Outcome {
+    SettingsChanged(super::OutcomeSettingsChanged),
     /// Whole committed owner facts, without inferred names or explanations.
     Owner(super::OwnerOutcome),
     /// A named thing was made.
-    Made { what: Made },
+    Made {
+        what: Made,
+    },
     /// The act became a proposal.
-    Proposed { proposal: ProposalKey },
+    Proposed {
+        proposal: ProposalKey,
+    },
     /// A decision was made.
-    Decided { by: Actor, how: Decision, at: Wall },
+    Decided {
+        by: Actor,
+        how: Decision,
+        at: Wall,
+    },
     /// Another party decided first.
-    DecidedFirst { by: Party, how: Decision, at: Wall },
+    DecidedFirst {
+        by: Party,
+        how: Decision,
+        at: Wall,
+    },
     /// The requested change was made.
     Changed,
 }

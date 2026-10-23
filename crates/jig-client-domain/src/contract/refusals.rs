@@ -163,6 +163,8 @@ pub enum Moved {
 /// A durable request refusal and all facts needed to show it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Refusal {
+    Stale(super::RefusalStale),
+    Full(super::RefusalFull),
     /// An account move refused (client/domain/contract.md, 4).
     AccountMove {
         why: AccountMoveWhy,

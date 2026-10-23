@@ -103,6 +103,10 @@ impl Check {
                 | ReadValue::OwnerSpend(_)
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::Deployment(_)
                 | ReadValue::OwnerDeployment(_) => {}
             },
@@ -223,6 +227,7 @@ pub fn named(ask: &Ask) -> Vec<(Object, Revision)> {
         | Ask::AccountChange { .. }
         | Ask::SignOut { .. }
         | Ask::Rename { .. }
+        | Ask::ChangeSettings(_)
         | Ask::MakeProject { .. }
         | Ask::SetPool { .. } => Vec::new(),
     }

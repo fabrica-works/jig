@@ -4,7 +4,7 @@ use crate::Limits;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
 use jig_client_domain::{Ask, Family};
-use jig_client_protocol_wire::{self as wire, v18 as w};
+use jig_client_protocol_wire::{self as wire, v19 as w};
 use skein_lib::{List, Reader, RequestRecord, Wall, Writer, bytes};
 
 pub(super) fn text(value: &[u8], limits: &Limits) -> Result<c::Text, w::Problem> {
@@ -64,6 +64,9 @@ fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, 
 #[expect(clippy::too_many_lines, reason = "one total match restores every client ask")]
 pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
     Ok(match value {
+        w::Ask::ChangeSettings(value) => {
+            c::Ask::ChangeSettings(super::settings::restore_change_settings(&value, limits)?)
+        }
         w::Ask::Propose(value) => super::operations::restore_propose(&value, limits)?,
         w::Ask::Withdraw(value) => c::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
         w::Ask::Create(value) => super::operations::restore_create(&value, limits)?,

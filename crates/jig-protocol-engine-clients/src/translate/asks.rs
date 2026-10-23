@@ -1,7 +1,7 @@
 //! Wire asks into the people vocabulary (client/domain/contract.md, 3).
 use super::Untranslatable;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v18 as w;
+use jig_client_protocol_wire::v19 as w;
 use jig_domain_people as p;
 use skein_lib::{List, Reader, Wall};
 #[derive(Debug)]
@@ -43,6 +43,8 @@ fn decode(
     names: &mut List<Box<[u8]>>,
 ) -> Result<p::Ask, Untranslatable> {
     Ok(match record {
+        // task B
+        w::Ask::ChangeSettings(_) => return Err(Untranslatable { path: w::Path::ChangeSettingsItems }),
         w::Ask::Propose(value) => super::operations::propose(value, models, limits, names)?,
         w::Ask::Withdraw(value) => p::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
         w::Ask::Create(value) => super::operations::create(value, models, limits, names)?,

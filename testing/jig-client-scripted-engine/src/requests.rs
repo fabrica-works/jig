@@ -89,6 +89,27 @@ impl<A: crate::Application> Engine<A> {
         ask: &Ask,
         wall: Wall,
     ) -> core::result::Result<(Answer, Vec<crate::Change>), Invalid> {
+        if let Ask::ChangeSettings(_) = ask {
+            let held = self.truth.frames.get(&party).and_then(|me| me.deployment_role);
+            if held != Some(jig_client_domain::contract::HeldRole::Owner) {
+                return Ok((Answer::Refused { refusal: Refusal::Role { held }, at: None }, Vec::new()));
+            }
+            if let Some(rule) = self
+                .rules
+                .iter()
+                .find(|r| r.ask == *ask && r.party == Some(party))
+                .or_else(|| self.rules.iter().find(|r| r.ask == *ask && r.party.is_none()))
+                .cloned()
+            {
+                let mut next = self.truth.clone();
+                for change in &rule.changes {
+                    next.apply(change)?;
+                }
+                self.truth = next;
+                return Ok((rule.answer, rule.changes));
+            }
+            return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
+        }
         if let Some(result) = self.project_request(party, ask) {
             return result;
         }
@@ -171,6 +192,10 @@ impl<A: crate::Application> Engine<A> {
                         | ReadValue::OwnerProject(_)
                         | ReadValue::Project(_)
                         | ReadValue::Notes(_)
+                        | ReadValue::Settings(_)
+                        | ReadValue::Setting(_)
+                        | ReadValue::Revision(_)
+                        | ReadValue::Revisions(_)
                         | ReadValue::Deployment(_)
                         | ReadValue::OwnerDeployment(_),
                         Moved::Hold { .. } | Moved::Spec | Moved::PersonTask | Moved::Note | Moved::Waiting,
@@ -207,6 +232,10 @@ impl<A: crate::Application> Engine<A> {
                                     | ReadValue::OwnerProject(_)
                                     | ReadValue::Project(_)
                                     | ReadValue::Notes(_)
+                                    | ReadValue::Settings(_)
+                                    | ReadValue::Setting(_)
+                                    | ReadValue::Revision(_)
+                                    | ReadValue::Revisions(_)
                                     | ReadValue::Deployment(_)
                                     | ReadValue::OwnerDeployment(_) => None,
                                 };
@@ -262,6 +291,10 @@ impl<A: crate::Application> Engine<A> {
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::Deployment(_)
                 | ReadValue::OwnerDeployment(_) => None,
             };
@@ -301,6 +334,7 @@ impl<A: crate::Application> Engine<A> {
             | Ask::AccountChange { .. }
             | Ask::SignOut { .. }
             | Ask::Rename { .. }
+            | Ask::ChangeSettings(_)
             | Ask::MakeProject { .. }
             | Ask::SetPool { .. } => None,
         };
@@ -357,6 +391,7 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::MakeService { .. }
                 | Ask::Withdraw { .. }
                 | Ask::Rename { .. }
+                | Ask::ChangeSettings(_)
                 | Ask::MakeProject { .. }
                 | Ask::SetPool { .. } => Admission::Refused(Refusal::NotOffered),
             },
@@ -449,6 +484,7 @@ impl<A: crate::Application> Engine<A> {
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
             | Ask::Rename { .. }
+            | Ask::ChangeSettings(_)
             | Ask::MakeProject { .. }
             | Ask::SetPool { .. } => None,
         };
@@ -499,6 +535,10 @@ impl<A: crate::Application> Engine<A> {
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::Deployment(_)
                 | ReadValue::OwnerDeployment(_) => {
                     return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
@@ -579,6 +619,10 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Deployment(_)
         | ReadValue::OwnerDeployment(_) => None,
     }
@@ -618,6 +662,10 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Deployment(_)
         | ReadValue::OwnerDeployment(_) => None,
     }
@@ -634,7 +682,11 @@ fn decision_kind(decision: &Decision) -> ActKind {
 type Target = (Option<u32>, Option<ObjectKey>, ActKind, Option<(Revision, Moved)>);
 fn target(ask: &Ask) -> Option<Target> {
     Some(match ask {
-        Ask::MakeProject { .. } | Ask::SignIn { .. } | Ask::SignOut { .. } | Ask::AccountChange { .. } => return None,
+        Ask::ChangeSettings(_)
+        | Ask::MakeProject { .. }
+        | Ask::SignIn { .. }
+        | Ask::SignOut { .. }
+        | Ask::AccountChange { .. } => return None,
         Ask::Compound { project, operations } => {
             compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Message, None))
         }

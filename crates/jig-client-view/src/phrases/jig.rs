@@ -6,6 +6,24 @@ use skein_ui::phrases::{HoleKind, HoleShape, PhraseId, PhraseShape};
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    SettingsChanged,
+    SettingsStale,
+    SettingsFull,
+    SettingsFullTask,
+    SettingsFullMore,
+    SettingsUnchanged,
+    SettingCharter,
+    SettingTemplate,
+    SettingPolicy,
+    SettingRules,
+    SettingFaultShape,
+    SettingFaultCount,
+    SettingFaultReference,
+    SettingFaultRules,
+    SettingFaultBudget,
+    SettingFaultGrace,
+    SettingFaultOwner,
+
     ActRename,
     NameTaken,
     NameEmpty,
@@ -1043,6 +1061,24 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::SettingsChanged => 7900,
+            Self::SettingsStale => 7901,
+            Self::SettingsFull => 7902,
+            Self::SettingsFullTask => 7903,
+            Self::SettingsFullMore => 7904,
+            Self::SettingsUnchanged => 7905,
+            Self::SettingCharter => 7906,
+            Self::SettingTemplate => 7907,
+            Self::SettingPolicy => 7908,
+            Self::SettingRules => 7909,
+            Self::SettingFaultShape => 7910,
+            Self::SettingFaultCount => 7911,
+            Self::SettingFaultReference => 7912,
+            Self::SettingFaultRules => 7913,
+            Self::SettingFaultBudget => 7914,
+            Self::SettingFaultGrace => 7915,
+            Self::SettingFaultOwner => 7916,
+
             Self::ActRename => 7837,
             Self::NameTaken => 7830,
             Self::NameEmpty => 7831,
@@ -1680,6 +1716,7 @@ impl JigPhrase {
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
             Self::Word(word) => return word.shape(text),
+
             Self::DependencyByTask | Self::DependencyByParty | Self::DependencyByDeployment => {
                 Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }, HoleShape { kind: HoleKind::Wall, bytes: 0 }])
             }
@@ -1695,7 +1732,16 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::OpenProgramModel
+            Self::SettingsUnchanged
+            | Self::SettingRules
+            | Self::SettingFaultShape
+            | Self::SettingFaultCount
+            | Self::SettingFaultReference
+            | Self::SettingFaultRules
+            | Self::SettingFaultBudget
+            | Self::SettingFaultGrace
+            | Self::SettingFaultOwner
+            | Self::OpenProgramModel
             | Self::OpenProgramUnavailable
             | Self::OpenProgramChooseModel
             | Self::OpenProgramNoSwitch
@@ -2111,7 +2157,15 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::MalformedEndedBy
+            Self::SettingsChanged
+            | Self::SettingsStale
+            | Self::SettingsFull
+            | Self::SettingsFullTask
+            | Self::SettingsFullMore
+            | Self::SettingCharter
+            | Self::SettingTemplate
+            | Self::SettingPolicy
+            | Self::MalformedEndedBy
             | Self::TurnUnreadVersion
             | Self::FrameResultsSeen
             | Self::PolicyEditRole
@@ -2337,7 +2391,24 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 619] = [
+pub const ALL: [JigPhrase; 636] = [
+    JigPhrase::SettingsChanged,
+    JigPhrase::SettingsStale,
+    JigPhrase::SettingsFull,
+    JigPhrase::SettingsFullTask,
+    JigPhrase::SettingsFullMore,
+    JigPhrase::SettingsUnchanged,
+    JigPhrase::SettingCharter,
+    JigPhrase::SettingTemplate,
+    JigPhrase::SettingPolicy,
+    JigPhrase::SettingRules,
+    JigPhrase::SettingFaultShape,
+    JigPhrase::SettingFaultCount,
+    JigPhrase::SettingFaultReference,
+    JigPhrase::SettingFaultRules,
+    JigPhrase::SettingFaultBudget,
+    JigPhrase::SettingFaultGrace,
+    JigPhrase::SettingFaultOwner,
     JigPhrase::ActRename,
     JigPhrase::NameTaken,
     JigPhrase::NameEmpty,

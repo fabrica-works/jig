@@ -6,12 +6,16 @@ use alloc::boxed::Box;
 use jig_client_domain::Readable;
 use jig_client_domain::contract as c;
 use jig_client_protocol_wire::VERSION;
-use jig_client_protocol_wire::v18 as w;
+use jig_client_protocol_wire::v19 as w;
 use skein_lib::{Reader, Writer, bytes};
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub fn read(read: &c::Read, limits: &w::Limits) -> Result<w::Read, w::Problem> {
     Ok(match read {
+        c::Read::Settings => w::Read::Settings,
+        c::Read::Setting(value) => w::Read::Setting(super::settings::wire_read_setting(value, limits)?),
+        c::Read::Revision(value) => w::Read::Revision(super::settings::wire_read_revision(value, limits)?),
+        c::Read::Revisions(value) => w::Read::Revisions(super::settings::wire_read_revisions(value, limits)?),
         c::Read::Tasks { query, live, ended } => w::Read::Tasks(w::ReadTasks::new(
             limits,
             w::ReadTasksParts {
@@ -154,6 +158,30 @@ pub fn value(bytes: &[u8], limits: &Limits) -> Result<c::ReadValue, Undecodable>
         Err(problem) => return Err(documents::classify(problem)),
     };
     Ok(match record {
+        w::ReadValue::Settings(v) => {
+            c::ReadValue::Settings(Box::new(match super::settings::restore_settings_document(&v, &receiving) {
+                Ok(value) => value,
+                Err(problem) => return Err(documents::classify(problem)),
+            }))
+        }
+        w::ReadValue::Setting(v) => {
+            c::ReadValue::Setting(Box::new(match super::settings::restore_setting_document(&v, &receiving) {
+                Ok(value) => value,
+                Err(problem) => return Err(documents::classify(problem)),
+            }))
+        }
+        w::ReadValue::Revision(v) => {
+            c::ReadValue::Revision(Box::new(match super::settings::restore_revision_answer(v.value(), &receiving) {
+                Ok(value) => value,
+                Err(problem) => return Err(documents::classify(problem)),
+            }))
+        }
+        w::ReadValue::Revisions(v) => {
+            c::ReadValue::Revisions(Box::new(match super::settings::restore_revisions_page(&v, &receiving) {
+                Ok(value) => value,
+                Err(problem) => return Err(documents::classify(problem)),
+            }))
+        }
         w::ReadValue::OwnerProject(record) => {
             c::ReadValue::OwnerProject(Box::new(documents::owner_project(record, limits)?))
         }

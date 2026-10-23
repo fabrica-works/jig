@@ -328,7 +328,7 @@ pub(crate) fn delivery(
 ) {
     let source = Source::Watch(watch);
     match value {
-        Delivery::Me(_) | Delivery::OwnerProject(_) | Delivery::OwnerAccounts(_) => {}
+        Delivery::Me(_) | Delivery::OwnerProject(_) | Delivery::OwnerAccounts(_) | Delivery::Settings(_) => {}
         Delivery::Run(_) | Delivery::RunState(_) => crate::activity::routing::text(domain, env, watch, out, lent),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
@@ -416,6 +416,7 @@ fn owner_proposal_read(
     }
 }
 /// Consumes one read terminal and drops old-generation values before applying them.
+#[expect(clippy::too_many_lines, reason = "the closed read terminal table routes every public read explicitly")]
 pub(crate) fn read_result(
     domain: &mut Ui,
     env: &Env<crate::Limits>,
@@ -475,6 +476,10 @@ pub(crate) fn read_result(
         | Read::Turn { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
+        | Read::Settings
+        | Read::Setting(_)
+        | Read::Revision(_)
+        | Read::Revisions(_)
         | Read::Deployment => false,
         Read::Inbox { .. } => true,
     };
@@ -544,7 +549,14 @@ fn read_value(
     lent: &jig_client::Client,
 ) {
     match value {
-        ReadValue::Me(_) | ReadValue::OwnerInbox(_) | ReadValue::OwnerEnded(_) | ReadValue::OwnerSpend(_) => {}
+        ReadValue::Me(_)
+        | ReadValue::OwnerInbox(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::OwnerSpend(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_) => {}
         ReadValue::OwnerProject(value) => crate::page::project::owner_document(domain, value),
         ReadValue::Notes(page) => crate::page::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::page::project::spend(domain, *page),
@@ -680,6 +692,10 @@ fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> b
             | ReadValue::Spend(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
+            | ReadValue::Settings(_)
+            | ReadValue::Setting(_)
+            | ReadValue::Revision(_)
+            | ReadValue::Revisions(_)
             | ReadValue::Deployment(_)
             | ReadValue::OwnerDeployment(_) => return true,
         },
@@ -705,6 +721,10 @@ fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> b
         | Read::Inbox { .. }
         | Read::Spend { .. }
         | Read::Notes { .. }
+        | Read::Settings
+        | Read::Setting(_)
+        | Read::Revision(_)
+        | Read::Revisions(_)
         | Read::Deployment => false,
     }
 }
@@ -737,6 +757,10 @@ fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, r
             | ReadValue::OwnerProject(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
+            | ReadValue::Settings(_)
+            | ReadValue::Setting(_)
+            | ReadValue::Revision(_)
+            | ReadValue::Revisions(_)
             | ReadValue::Deployment(_)
             | ReadValue::OwnerDeployment(_) => return true,
         },
@@ -762,6 +786,10 @@ fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, r
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
+        | Read::Settings
+        | Read::Setting(_)
+        | Read::Revision(_)
+        | Read::Revisions(_)
         | Read::Deployment => return false,
     };
     let number = match read.source {
@@ -820,6 +848,10 @@ fn received_value(
             | Read::Inbox { .. }
             | Read::Spend { .. }
             | Read::Notes { .. }
+            | Read::Settings
+            | Read::Setting(_)
+            | Read::Revision(_)
+            | Read::Revisions(_)
             | Read::Deployment => {}
         },
         ReadValue::OwnerDeployment(page) => {
@@ -845,6 +877,10 @@ fn received_value(
                 | Read::Spend { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
+                | Read::Settings
+                | Read::Setting(_)
+                | Read::Revision(_)
+                | Read::Revisions(_)
                 | Read::Deployment => return,
             };
             domain.inbox.owner_page(group, query, *page);
@@ -872,6 +908,10 @@ fn received_value(
         | ReadValue::Spend(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Deployment(_) => read_value(domain, env, source, value, out, lent),
     }
 }
@@ -901,6 +941,7 @@ fn owner_tree_delivery(
         | Subject::Tasks { .. }
         | Subject::Run { .. }
         | Subject::Accounts
+        | Subject::Settings
         | Subject::Deployment => return,
     }
     let owner = &tree;
@@ -940,6 +981,7 @@ fn historical_funders_fit(page: &contract::OwnerSpendPage, project: u32) -> bool
 }
 
 /// Validate the retained original request before consuming its terminal.
+#[expect(clippy::too_many_lines, reason = "the original query checks all closed read variants before applying history")]
 fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, result: &ReadResult) -> bool {
     let value = match result {
         ReadResult::Value(value) => value,
@@ -967,6 +1009,10 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
                 | Read::Spend { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
+                | Read::Settings
+                | Read::Setting(_)
+                | Read::Revision(_)
+                | Read::Revisions(_)
                 | Read::Deployment => return false,
             };
             let source = match read.source {
@@ -996,6 +1042,10 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
                 | Read::Inbox { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
+                | Read::Settings
+                | Read::Setting(_)
+                | Read::Revision(_)
+                | Read::Revisions(_)
                 | Read::Deployment => return false,
             };
             let source = match read.source {
@@ -1034,6 +1084,10 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::OwnerDeployment(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Deployment(_) => true,
     }
 }
@@ -1079,6 +1133,10 @@ fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, l
             | ReadValue::OwnerSpend(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
+            | ReadValue::Settings(_)
+            | ReadValue::Setting(_)
+            | ReadValue::Revision(_)
+            | ReadValue::Revisions(_)
             | ReadValue::Deployment(_)
             | ReadValue::OwnerDeployment(_),
         )
@@ -1104,6 +1162,10 @@ fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, l
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
+        | Read::Settings
+        | Read::Setting(_)
+        | Read::Revision(_)
+        | Read::Revisions(_)
         | Read::Deployment => return false,
     };
     if task != document.task.chip.task {

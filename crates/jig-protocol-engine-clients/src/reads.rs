@@ -47,6 +47,16 @@ impl Component {
         }
         let request = match record.owner {
             w::Owner::Jig => {
+                // task C
+                if settings_read(&record.record, &env.limits.wire) {
+                    let answer = w::ReadAnswer::NotServed(crate::served::not_served(
+                        &self.settings,
+                        w::Owner::Jig,
+                        &env.limits.wire,
+                    ));
+                    self.respond(env, exchange, routes::encoded_read(&answer));
+                    return;
+                }
                 let Some(what) = crate::translate::reads::decode(&record.record, &env.limits.wire) else {
                     self.respond(env, exchange, routes::read_none(core::reads::Why::Unknown, &env.limits.wire));
                     return;
@@ -199,5 +209,32 @@ impl Component {
             }
             Err(_) => self.connections.get_mut(&owner).expect("exchange owner").close(out),
         }
+    }
+}
+
+// task C
+fn settings_read(record: &[u8], limits: &w::Limits) -> bool {
+    let Ok(value) = w::Read::decode(limits, &mut Reader::new(record)) else {
+        return false;
+    };
+    match value {
+        w::Read::Settings | w::Read::Setting(_) | w::Read::Revision(_) | w::Read::Revisions(_) => true,
+        w::Read::Tasks(_)
+        | w::Read::Me
+        | w::Read::Task(_)
+        | w::Read::Proposal(_)
+        | w::Read::Escalation(_)
+        | w::Read::Question(_)
+        | w::Read::PersonTask(_)
+        | w::Read::Result(_)
+        | w::Read::Ended(_)
+        | w::Read::History(_)
+        | w::Read::Activity(_)
+        | w::Read::Inbox(_)
+        | w::Read::Spend(_)
+        | w::Read::Project(_)
+        | w::Read::Notes(_)
+        | w::Read::Deployment
+        | w::Read::Turn(_) => false,
     }
 }

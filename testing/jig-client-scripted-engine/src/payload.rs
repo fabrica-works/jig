@@ -153,6 +153,7 @@ fields!(Decider { kind, role });
 impl Payload for Ask {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::ChangeSettings(value) => value.heap(bounds),
             Self::Create { tasks, .. } => tasks.heap(bounds),
             Self::Propose { action, reason, .. } => sum(&[action.heap(bounds), reason.heap(bounds)]),
             Self::AccountChange { change, .. } => match change {
@@ -241,7 +242,7 @@ impl Payload for Outcome {
             Self::Proposed { proposal } => sum(&[proposal.heap(bounds)]),
             Self::Decided { by, how, at } => sum(&[by.heap(bounds), how.heap(bounds), at.heap(bounds)]),
             Self::DecidedFirst { by, how, at } => sum(&[by.heap(bounds), how.heap(bounds), at.heap(bounds)]),
-            Self::Changed => Some(0),
+            Self::SettingsChanged(_) | Self::Changed => Some(0),
         }
     }
 }
@@ -943,7 +944,13 @@ impl Payload for Read {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Tasks { query, live, ended } => sum(&[query.heap(bounds), live.heap(bounds), ended.heap(bounds)]),
-            Self::Turn { .. } | Self::Me | Self::Deployment => Some(0),
+            Self::Settings
+            | Self::Setting(_)
+            | Self::Revision(_)
+            | Self::Revisions(_)
+            | Self::Turn { .. }
+            | Self::Me
+            | Self::Deployment => Some(0),
             Self::Task { task } | Self::Escalation { task } | Self::PersonTask { task } | Self::Result { task } => {
                 sum(&[task.heap(bounds)])
             }
@@ -973,6 +980,10 @@ fields!(NotePage { cut, rows, before, after });
 impl Payload for ReadValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Settings(value) => value.heap(bounds),
+            Self::Setting(value) => value.heap(bounds),
+            Self::Revision(value) => value.heap(bounds),
+            Self::Revisions(value) => value.heap(bounds),
             Self::Turn(value) => value.heap(bounds),
             Self::Tasks(value0) => value0.heap(bounds),
             Self::Me(value0) => sum(&[value0.heap(bounds)]),
@@ -1075,6 +1086,7 @@ impl Payload for Moved {
 impl Payload for Refusal {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Full(value) => value.tasks.heap(bounds),
             Self::Circle { tasks, .. } => tasks.heap(bounds),
             Self::Kept { pending } => pending.heap(bounds),
 
@@ -1084,7 +1096,8 @@ impl Payload for Refusal {
             Self::Limit { which } => sum(&[which.heap(bounds)]),
             Self::Moved { now, what } => sum(&[now.heap(bounds), what.heap(bounds)]),
             Self::Ended { how } => sum(&[how.heap(bounds)]),
-            Self::Malformed { .. }
+            Self::Stale(_)
+            | Self::Malformed { .. }
             | Self::NotWaiting
             | Self::NoFurther
             | Self::Unknown
@@ -1137,7 +1150,7 @@ fields!(VersionRange { first, last });
 impl Payload for Subject {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Me | Self::Deployment | Self::Accounts => Some(0),
+            Self::Settings | Self::Me | Self::Deployment | Self::Accounts => Some(0),
             Self::Task { task } => sum(&[task.heap(bounds)]),
             Self::Tree { task, window } => sum(&[task.heap(bounds), window.heap(bounds)]),
             Self::Chips { tasks } => sum(&[tasks.heap(bounds)]),
@@ -1150,6 +1163,7 @@ impl Payload for Subject {
 impl Payload for Delivery {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Settings(value) => value.heap(bounds),
             Self::Me(value0) => sum(&[value0.heap(bounds)]),
             Self::Task(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerProject(value0) => sum(&[value0.heap(bounds)]),
@@ -1423,3 +1437,5 @@ impl Payload for jig_client_domain::contract::WaitsOn {
         }
     }
 }
+
+mod settings;

@@ -1,7 +1,7 @@
 //! Account move values are handed to one exchange and bounded before keeping.
 use super::fixtures::{self as f, Exchange};
 use crate::{Event, Message, Request, SecretOwner, SecretsAnswer, SecretsRequest};
-use jig_client_protocol_wire::v18 as w;
+use jig_client_protocol_wire::v19 as w;
 use jig_domain_core as core;
 use jig_domain_people as p;
 use skein_lib::{ReplyTo, Secret, Token, Writer};
@@ -16,7 +16,7 @@ fn outgoing(exchange: &mut Exchange) -> (Token, ReplyTo) {
     let ask = change(w::AccountChange::MoveOut(
         w::AccountChangeMoveOut::new(&f::wire(), w::AccountChangeMoveOutParts { account: 19 }).unwrap(),
     ));
-    let owner = exchange.send(Message::Request(f::keyed(w::Owner::Jig, 18, f::encode_ask(&ask))));
+    let owner = exchange.send(Message::Request(f::keyed(w::Owner::Jig, 19, f::encode_ask(&ask))));
     exchange.authenticate();
     let Some(Request::Core(event)) = exchange.out.pop() else { panic!("core ask") };
     let core::Event::People(p::Event::Ask { reply_to, ask, .. }) = *event else { panic!("people ask") };
@@ -106,7 +106,7 @@ fn carried(exchange: &mut Exchange, kind: u8, value: &[u8], digest: [u8; 32]) ->
         w::KeyedParts {
             key: [5; 16],
             owner: w::Owner::Jig,
-            version: 18,
+            version: 19,
             request: f::encode_ask(&ask),
             value: Some(Secret::new(Box::from(value))),
         },

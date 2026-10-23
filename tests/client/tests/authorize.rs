@@ -26,7 +26,7 @@ fn signed_client() -> (Client, Queue<Request>) {
     while out.pop().is_some() {}
     (client, out)
 }
-// The scripted engine's v18 answers, independent of the codec under test.
+// The scripted engine's v19 answers, independent of the codec under test.
 fn answer(client: &mut Client, exchange: Token, message: Box<[u8]>, out: &mut Queue<Request>) {
     step(client, Event::Reply { exchange, message }, out);
 }

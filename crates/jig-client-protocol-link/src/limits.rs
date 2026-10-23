@@ -1,6 +1,6 @@
 //! Fixed attempt admission and receiving bounds (protocol/client.md, 13).
 use crate::component::Attempt;
-use jig_client_protocol_wire::v18 as w;
+use jig_client_protocol_wire::v19 as w;
 use skein_lib::{Duration, Map};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -181,6 +181,31 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.owner_inbox_page_selection_some = u32::try_from(client.document_bytes).ok()?;
     wire.owner_inbox_page_rows = u32::try_from(client.document_bytes).ok()?;
     wire.subject_chips_tasks = client.rows;
+    // Whole settings share the existing receiving text, rows and message envelopes.
+    wire.charter_instructions = u32::try_from(client.document_bytes).ok()?.min(w::CEILINGS.charter_instructions);
+    wire.change_settings_items = u32::try_from(client.ask_bytes).ok()?.min(w::CEILINGS.change_settings_items);
+    wire.revision_document_items = u32::try_from(client.document_bytes).ok()?.min(w::CEILINGS.revision_document_items);
+    wire.setting_model_name = client.text.min(w::CEILINGS.setting_model_name);
+    wire.setting_model_program_some = client.text.min(w::CEILINGS.setting_model_program_some);
+    wire.setting_model_effort_some = client.text.min(w::CEILINGS.setting_model_effort_some);
+    wire.setting_model_efforts_item = client.text.min(w::CEILINGS.setting_model_efforts_item);
+    wire.charter_alternatives = client.rows.min(w::CEILINGS.charter_alternatives);
+    wire.setting_model_efforts = client.rows.min(w::CEILINGS.setting_model_efforts);
+    wire.setting_policy_projections = client.rows.min(w::CEILINGS.setting_policy_projections);
+    wire.setting_policy_roles = client.rows.min(w::CEILINGS.setting_policy_roles);
+    wire.setting_policy_requirements = client.rows.min(w::CEILINGS.setting_policy_requirements);
+    wire.setting_policy_permissions = client.rows.min(w::CEILINGS.setting_policy_permissions);
+    wire.setting_policy_templates = client.rows.min(w::CEILINGS.setting_policy_templates);
+    wire.rules_implies = client.rows.min(w::CEILINGS.rules_implies);
+    wire.rules_requirements = client.rows.min(w::CEILINGS.rules_requirements);
+    // Settings are a whole inventory, independent of a page's row limit.
+    wire.settings_document_settings =
+        u32::try_from(client.document_bytes).ok()?.min(w::CEILINGS.settings_document_settings);
+    wire.settings_document_held = client.rows.min(w::CEILINGS.settings_document_held);
+    wire.settings_document_pending = client.rows.min(w::CEILINGS.settings_document_pending);
+    wire.revision_row_items = client.rows.min(w::CEILINGS.revision_row_items);
+    wire.revisions_page_rows = client.rows.min(w::CEILINGS.revisions_page_rows);
+    wire.refusal_full_tasks = client.rows.min(w::CEILINGS.refusal_full_tasks);
     w::check_limits(&wire).ok()?;
     Some(wire)
 }

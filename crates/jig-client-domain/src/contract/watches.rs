@@ -7,20 +7,37 @@ use skein_lib::{List, Wall};
 /// A live subject followed by one unkeyed watch.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Subject {
+    Settings,
     /// The frame, always open.
     Me,
     /// A task.
-    Task { task: u64 },
+    Task {
+        task: u64,
+    },
     /// A bounded live subtree.
-    Tree { task: u64, window: u32 },
+    Tree {
+        task: u64,
+        window: u32,
+    },
     /// A bounded set of task chips.
-    Chips { tasks: List<u64> },
+    Chips {
+        tasks: List<u64>,
+    },
     /// Party inbox across projects.
-    Inbox { window: u32 },
+    Inbox {
+        window: u32,
+    },
     /// Filtered live tasks in one project.
-    Tasks { query: super::TaskQuery, window: u32 },
+    Tasks {
+        query: super::TaskQuery,
+        window: u32,
+    },
     /// A task run text from the client offset.
-    Run { task: u64, turn: Option<ProvisionalTurnName>, offset: u32 },
+    Run {
+        task: u64,
+        turn: Option<ProvisionalTurnName>,
+        offset: u32,
+    },
     /// Deployment capacity.
     Deployment,
     /// The signed-in party's accounts.
@@ -30,6 +47,7 @@ pub enum Subject {
 /// A whole current watch value, except the run text stream.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Delivery {
+    Settings(Box<super::SettingsDocument>),
     /// Whole authentic project owner document.
     OwnerProject(Box<super::OwnerProject>),
     /// The frame.

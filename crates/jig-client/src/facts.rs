@@ -240,6 +240,10 @@ pub fn decision(document: Option<&crate::contract::ReadValue>, act: ActKind) -> 
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Deployment(_)
+                | ReadValue::Settings(_)
+                | ReadValue::Setting(_)
+                | ReadValue::Revision(_)
+                | ReadValue::Revisions(_)
                 | ReadValue::OwnerDeployment(_) => {}
             }
         }
@@ -274,6 +278,10 @@ fn decision_offers(value: &crate::contract::ReadValue) -> Option<&skein_lib::Lis
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Deployment(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::OwnerDeployment(_) => None,
     }
 }

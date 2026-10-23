@@ -455,6 +455,7 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
+ "jig-engine-clients-world",
  "jig-fake-parties",
  "jig-fake-workers",
  "jig-protocol-config",
@@ -635,6 +636,7 @@ dependencies = [
  "jig-client-test-domain",
  "jig-client-test-kit",
  "jig-client-test-protocol-wire",
+ "jig-client-test-records",
  "jig-client-test-view",
  "jig-client-view",
  "jig-core-world",
@@ -674,6 +676,11 @@ dependencies = [
 name = "jig-conformance-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-domain",
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "jig-client-test-records",
+ "jig-client-world",
  "jig-conformance",
  "jig-core-world",
  "jig-domain-accounts",

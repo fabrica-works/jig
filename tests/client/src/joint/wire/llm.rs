@@ -194,6 +194,7 @@ pub(super) fn refused(value: &c::Ask, configured: &[Model]) -> Result<Option<c::
         | c::Ask::EditNote { .. }
         | c::Ask::DeleteNote { .. }
         | c::Ask::Rename { .. }
+        | c::Ask::ChangeSettings(_)
         | c::Ask::MakeProject { .. }
         | c::Ask::ChangePolicy { .. }
         | c::Ask::SetRoles { .. }

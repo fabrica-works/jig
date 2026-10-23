@@ -186,7 +186,7 @@ fn ready_client(service: &mut crate::Service) -> &mut crate::Engine {
     engine
 }
 fn link_body(engine: &mut crate::Engine) -> Box<[u8]> {
-    use jig_client_protocol_wire::v18 as w;
+    use jig_client_protocol_wire::v19 as w;
     use skein_lib::{
         Writer,
         base64::{self, Alphabet},
@@ -344,7 +344,7 @@ fn prepared(clients: bool) -> crate::Service {
 }
 
 fn before_restart_is_not_ready(engine: &mut crate::Engine) {
-    use jig_client_protocol_wire::v18 as w;
+    use jig_client_protocol_wire::v19 as w;
     engine.clients.as_mut().expect("clients").starting = Some(());
     let body = link_body(engine);
     let mut peer = Peer::new(engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
@@ -429,7 +429,7 @@ fn response_body(peer: &Peer) -> &[u8] {
     peer.wire.received.get(at..).expect("response body")
 }
 fn application_read(engine: &crate::Engine) -> Box<[u8]> {
-    use jig_client_protocol_wire::v18 as w;
+    use jig_client_protocol_wire::v19 as w;
     let limits = &engine.clients.as_ref().expect("clients").env.limits.wire;
     let owner = w::Owner::Family(w::Family::new(limits, w::FamilyParts { number: 1 }).expect("test family"));
     let window = w::Window::new(limits, w::WindowParts { rows: 2, after: None }).expect("window");
@@ -455,7 +455,7 @@ fn application_read(engine: &crate::Engine) -> Box<[u8]> {
 }
 #[test]
 fn a_core_refusal_finishes_an_application_read() {
-    use jig_client_protocol_wire::v18 as w;
+    use jig_client_protocol_wire::v19 as w;
     let mut service = started(true);
     let engine = ready_client(&mut service);
     let body = application_read(engine);

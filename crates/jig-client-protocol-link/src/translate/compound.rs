@@ -3,7 +3,7 @@ use super::{asks, store};
 use crate::Limits;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v18 as w;
+use jig_client_protocol_wire::v19 as w;
 use skein_lib::{List, Reader, Writer};
 pub(super) fn encode(project: u32, values: &List<c::Operation>, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
     let mut records = List::with_capacity(values.len());
@@ -41,7 +41,8 @@ fn operation(value: &c::Operation, limits: &w::Limits) -> Result<w::Operation, w
         w::Ask::Release(v) => w::Operation::Release(v),
         w::Ask::Stop(v) => w::Operation::Stop(v),
         w::Ask::MoveTask(v) => w::Operation::MoveTask(v),
-        w::Ask::Propose(_)
+        w::Ask::ChangeSettings(_)
+        | w::Ask::Propose(_)
         | w::Ask::Withdraw(_)
         | w::Ask::Create(_)
         | w::Ask::Compound(_)
@@ -92,7 +93,8 @@ pub(super) fn restore(value: w::Compound, limits: &Limits) -> Result<c::Ask, w::
             }
             c::Ask::Stop { project, task } => c::Operation::Stop { project, task },
             c::Ask::Move { project, task, reason } => c::Operation::Move { project, task, reason },
-            c::Ask::Propose { .. }
+            c::Ask::ChangeSettings(_)
+            | c::Ask::Propose { .. }
             | c::Ask::Withdraw { .. }
             | c::Ask::Create { .. }
             | c::Ask::Compound { .. }

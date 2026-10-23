@@ -56,3 +56,6 @@ allow_attributes = "deny"
 allow_attributes_without_reason = "deny"
 disallowed_types = "deny"
 disallowed_methods = "deny"
+
+[dev-dependencies]
+jig-client-test-records = { path = "../../testing/jig-client-test-records" }

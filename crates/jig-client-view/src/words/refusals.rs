@@ -9,6 +9,14 @@ impl Words {
     /// Say the supplied refusal, never deriving permission or numerical limits.
     pub fn refusal(&self, b: &mut Builder, refusal: &Refusal, text_limit: u32) {
         match refusal {
+            Refusal::Stale(value) => self.text(b, JigPhrase::SettingsStale, &[Hole::Number(u64::from(value.newest))]),
+            Refusal::Full(value) => {
+                self.text(b, JigPhrase::SettingsFull, &[Hole::Number(u64::from(value.revision))]);
+                for task in &value.tasks {
+                    self.text(b, JigPhrase::SettingsFullTask, &[Hole::Number(*task)]);
+                }
+                self.text(b, JigPhrase::SettingsFullMore, &[Hole::Number(u64::from(value.more))]);
+            }
             Refusal::Circle { tasks, cut } => {
                 self.text(b, JigPhrase::CircleRefused, &[]);
                 for task in tasks {
@@ -94,6 +102,30 @@ impl Words {
     fn malformed(&self, b: &mut Builder, at: u32, why: Malformed) {
         let position = [Hole::Number(u64::from(at))];
         match why {
+            Malformed::SettingsUnchanged => self.text(b, JigPhrase::SettingsUnchanged, &[]),
+            Malformed::Settings(value) => {
+                use jig_client::contract::{Setting, SettingFault};
+                match value.setting {
+                    Setting::Charter(n) => {
+                        self.text(b, JigPhrase::SettingCharter, &[Hole::Number(u64::from(n.number))]);
+                    }
+                    Setting::Template(n) => {
+                        self.text(b, JigPhrase::SettingTemplate, &[Hole::Number(u64::from(n.number))]);
+                    }
+                    Setting::Policy(n) => self.text(b, JigPhrase::SettingPolicy, &[Hole::Number(u64::from(n.number))]),
+                    Setting::Rules => self.text(b, JigPhrase::SettingRules, &[]),
+                }
+                let phrase = match value.fault {
+                    SettingFault::Shape => JigPhrase::SettingFaultShape,
+                    SettingFault::Count => JigPhrase::SettingFaultCount,
+                    SettingFault::Reference => JigPhrase::SettingFaultReference,
+                    SettingFault::Rules => JigPhrase::SettingFaultRules,
+                    SettingFault::Budget => JigPhrase::SettingFaultBudget,
+                    SettingFault::Grace => JigPhrase::SettingFaultGrace,
+                    SettingFault::Owner => JigPhrase::SettingFaultOwner,
+                };
+                self.text(b, phrase, &[]);
+            }
             Malformed::Name(rule) => {
                 let phrase = match rule {
                     NameRule::Empty => JigPhrase::NameEmpty,

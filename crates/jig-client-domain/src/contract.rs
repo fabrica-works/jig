@@ -122,3 +122,6 @@ pub mod me;
 pub use me::*;
 mod queries;
 pub use queries::*;
+
+pub mod settings;
+pub use settings::*;

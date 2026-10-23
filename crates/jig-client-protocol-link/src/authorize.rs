@@ -4,7 +4,7 @@ use crate::{
     component::{Attempt, ExchangeKind},
 };
 use alloc::boxed::Box;
-use jig_client_protocol_wire::{VERSION, v18 as w};
+use jig_client_protocol_wire::{VERSION, v19 as w};
 use skein_lib::{Queue, Reader, Writer};
 impl Link {
     pub(super) fn authorize(&mut self, query: Box<[u8]>, out: &mut Queue<Request>) {

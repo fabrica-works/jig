@@ -258,6 +258,7 @@ pub(crate) fn tasks(domain: &mut Ui, env: &Env<crate::Limits>, filter: TaskQuery
             | contract::Subject::Inbox { .. }
             | contract::Subject::Run { .. }
             | contract::Subject::Accounts
+            | contract::Subject::Settings
             | contract::Subject::Deployment => {}
         }
     }

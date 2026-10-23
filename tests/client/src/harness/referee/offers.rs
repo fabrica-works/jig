@@ -76,6 +76,10 @@ impl Offers {
             | ReadValue::Spend(_)
             | ReadValue::OwnerSpend(_)
             | ReadValue::Notes(_)
+            | ReadValue::Settings(_)
+            | ReadValue::Setting(_)
+            | ReadValue::Revision(_)
+            | ReadValue::Revisions(_)
             | ReadValue::Deployment(_)
             | ReadValue::OwnerDeployment(_) => {}
         }
@@ -157,6 +161,7 @@ impl Offers {
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
             | Ask::Rename { .. }
+            | Ask::ChangeSettings(_)
             | Ask::MakeProject { .. }
             | Ask::SetPool { .. } => return None,
         };

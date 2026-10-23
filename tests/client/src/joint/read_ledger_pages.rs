@@ -53,6 +53,10 @@ fn retained(source: reads::Page, what: &client::Read, wrong: client::Read) {
         | client::Read::Inbox { .. }
         | client::Read::Project { .. }
         | client::Read::Notes { .. }
+        | client::Read::Settings
+        | client::Read::Setting(_)
+        | client::Read::Revision(_)
+        | client::Read::Revisions(_)
         | client::Read::Deployment => panic!("one of the two original histories"),
     }
     .expect("all exact owner facts");

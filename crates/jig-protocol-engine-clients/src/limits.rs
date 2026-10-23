@@ -19,7 +19,7 @@ pub struct Limits {
     pub exchanges_per_client: u32,
     /// A message's bytes, owned by the component (protocol/client.md, 4.2 and 13).
     pub message_bytes: u32,
-    pub wire: jig_client_protocol_wire::v18::Limits,
+    pub wire: jig_client_protocol_wire::v19::Limits,
     pub link_span: Duration,
 }
 pub const MAX_OUT_DOWN: u32 = 4;
@@ -44,13 +44,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     {
         return None;
     }
-    jig_client_protocol_wire::v18::check_limits(&limits.wire).ok()?;
+    jig_client_protocol_wire::v19::check_limits(&limits.wire).ok()?;
     let body = u64::from(limits.message_bytes);
     let answer = core::cmp::max(
-        jig_client_protocol_wire::v18::KeyedAnswer::worst_case_bytes(&limits.wire)?,
-        jig_client_protocol_wire::v18::ReadAnswer::worst_case_bytes(&limits.wire)?,
+        jig_client_protocol_wire::v19::KeyedAnswer::worst_case_bytes(&limits.wire)?,
+        jig_client_protocol_wire::v19::ReadAnswer::worst_case_bytes(&limits.wire)?,
     );
-    let answer = answer.max(jig_client_protocol_wire::v18::AuthorizeAnswer::worst_case_bytes(&limits.wire)?);
+    let answer = answer.max(jig_client_protocol_wire::v19::AuthorizeAnswer::worst_case_bytes(&limits.wire)?);
     let each = u64::from(limits.wire.signed_in_token_some).checked_add(1)?.checked_add(32)?.checked_add(answer)?;
     Map::<Token, Exchange>::worst_case(limits.exchanges)?
         .checked_add(each.checked_mul(u64::from(limits.exchanges))?)?

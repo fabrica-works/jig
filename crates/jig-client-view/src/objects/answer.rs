@@ -30,8 +30,9 @@ pub fn recovery(object: &Object) -> Recovery {
     match &object.card {
         Card::Unknown { .. } => recovery.look_again = true,
         Card::Refused { refusal } => match refusal {
-            Refusal::Moved { .. } => recovery.look_again = true,
-            Refusal::Circle { .. }
+            Refusal::Stale(_) | Refusal::Moved { .. } => recovery.look_again = true,
+            Refusal::Full(_)
+            | Refusal::Circle { .. }
             | Refusal::Dependency { .. }
             | Refusal::Kept { .. }
             | Refusal::Authority { .. }

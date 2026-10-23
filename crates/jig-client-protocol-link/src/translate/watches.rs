@@ -4,11 +4,12 @@ use crate::{Limits, Undecodable};
 use alloc::boxed::Box;
 use jig_client_domain::Watchable;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::{VERSION, v18 as w};
+use jig_client_protocol_wire::{VERSION, v19 as w};
 use skein_lib::{List, Reader, Writer};
 
 pub fn subject(value: &c::Subject, limits: &w::Limits) -> Result<w::Subject, w::Problem> {
     Ok(match value {
+        c::Subject::Settings => w::Subject::Settings,
         c::Subject::Me => w::Subject::Me,
         c::Subject::Task { task } => {
             w::Subject::Task(w::SubjectTask::new(limits, w::SubjectTaskParts { task: *task })?)
@@ -97,6 +98,12 @@ pub fn delivery(bytes: &[u8], limits: &Limits) -> Result<c::Delivery, Undecodabl
         }
         w::DeliveryValue::OwnerAccounts(value) => {
             c::Delivery::OwnerAccounts(Box::new(match documents::owner_accounts(value, &receiving) {
+                Ok(value) => value,
+                Err(problem) => return Err(documents::classify(problem)),
+            }))
+        }
+        w::DeliveryValue::Settings(value) => {
+            c::Delivery::Settings(Box::new(match super::settings::restore_settings_document(&value, &receiving) {
                 Ok(value) => value,
                 Err(problem) => return Err(documents::classify(problem)),
             }))

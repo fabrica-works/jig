@@ -8,6 +8,7 @@ use skein_lib::Token;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
+    Settings,
     DeploymentRequester,
 }
 
@@ -29,6 +30,7 @@ pub fn watch(watcher: Token, sign_in: u64, value: &client::Subject, default_rows
 
 fn subject(value: &client::Subject, default_rows: u32) -> Result<(documents::Watched, documents::Window), Invalid> {
     let (subject, rows) = match value {
+        client::Subject::Settings => return Err(Invalid::Settings),
         client::Subject::Me => (documents::Watched::Frame, default_rows),
         client::Subject::Task { task } => (documents::Watched::Task { task: *task }, default_rows),
         client::Subject::Tree { task, window } => (documents::Watched::Tree { task: *task }, *window),
