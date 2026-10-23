@@ -15,6 +15,8 @@ pub struct Limits {
     pub program_hosts: u32,
     /// Whole configured worker name bytes in retained operation answers.
     pub program_host_name_bytes: u32,
+    /// Configured connector grants, derived from configuration's unique acts entries.
+    pub act_grants: u32,
     /// Maximum members of one requested or proposed batch.
     pub batch: u32,
     /// Maximum task operations in one keyed compound request.
@@ -77,7 +79,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     limits.waiters.checked_add(2)?;
     limits.sign_ins.checked_add(1)?;
     limits.holdings.checked_add(1)?;
-    if limits.program_hosts == 0
+    if limits.act_grants > u32::from(u16::MAX).saturating_add(1)
+        || limits.program_hosts == 0
         || limits.program_hosts > 128
         || limits.program_host_name_bytes == 0
         || limits.program_host_name_bytes > 4096
@@ -152,7 +155,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Deadlines::<RequestKey>::worst_case(limits.requests)?)?
         // Each retained answer owns its longest visit address or configured-host failure list.
         .checked_add(u64::from(limits.requests).checked_mul(ask_bytes.checked_add(outcome_bytes(limits)?)?)?)?
-        .checked_add(act_worst_case(limits, ask_bytes)?)?
+        .checked_add(act_worst_case(limits)?)?
         .checked_add(Slab::<Pending>::worst_case(limits.pending)?)?
         .checked_add(Map::<RequestKey, Id<Pending>>::worst_case(limits.pending)?)?
         .checked_add(u64::from(limits.pending).checked_mul(List::<skein_lib::ReplyTo>::worst_case(limits.waiters)?)?)?
@@ -206,16 +209,31 @@ fn sign_in_worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Set::<(Wall, u64)>::worst_case(limits.sign_ins)?)
 }
 
-fn act_worst_case(limits: &Limits, ask_bytes: u64) -> Option<u64> {
+pub(crate) fn act_bytes(limits: &Limits) -> Option<u64> {
+    // valid_adoption counts both slice headers and contents within amendment_bytes.
+    Some(u64::from(limits.words).max(u64::from(limits.amendment_bytes)).max(u64::try_from(crate::NAME_BYTES).ok()?))
+}
+
+pub(crate) fn act_outcome_bytes(limits: &Limits) -> Option<u64> {
+    // RemoveAccount retains host failures; Close and every other act can retain
+    // a refusal (Circle: 32 tasks; Kept: 64). The other outcomes own no bytes.
+    Some(host_outcome_bytes(limits)?.max(64_u64.checked_mul(u64::try_from(size_of::<u64>()).ok()?)?))
+}
+
+pub(crate) fn act_worst_case(limits: &Limits) -> Option<u64> {
     Map::<crate::ActKey, crate::domain::acts::Acted>::worst_case(limits.requests)?
         .checked_add(Deadlines::<crate::ActKey>::worst_case(limits.requests)?)?
         .checked_add(Map::<crate::ActKey, Id<Pending>>::worst_case(limits.pending)?)?
-        .checked_add(u64::from(limits.requests).checked_mul(ask_bytes.checked_add(outcome_bytes(limits)?)?)?)?
         .checked_add(
-            65_536_u64.checked_mul(
-                u64::try_from(size_of::<crate::ActGrant>())
-                    .ok()?
-                    .checked_add(5_u64.checked_mul(u64::try_from(size_of::<crate::ActKind>()).ok()?)?)?,
+            u64::from(limits.requests).checked_mul(act_bytes(limits)?.checked_add(act_outcome_bytes(limits)?)?)?,
+        )?
+        .checked_add(
+            u64::from(limits.act_grants).checked_mul(
+                u64::try_from(size_of::<crate::ActGrant>()).ok()?.checked_add(
+                    u64::try_from(crate::ActKind::ALL.len())
+                        .ok()?
+                        .checked_mul(u64::try_from(size_of::<crate::ActKind>()).ok()?)?,
+                )?,
             )?,
         )
 }

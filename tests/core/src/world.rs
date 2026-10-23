@@ -89,6 +89,7 @@ fn profile() -> root::Limits {
         waiters: 2,
         program_hosts: 65,
         program_host_name_bytes: 32,
+        act_grants: 2,
         identity_bytes: 32,
         words: 64,
         amendment_bytes: 512,

@@ -542,6 +542,14 @@ act's own subject are its whole check.
   whatever their role is now, and a restart restores it whatever the
   configuration names, until the retention ends it. Busy and not ready
   are not saved, and the connector sends the act again.
+- **Owned memory:** each retained act charges the larger of the close's
+  reason (`words`), the adoption's whole owned payload (`amendment_bytes`,
+  including its slice headers), and the project name (`NAME_BYTES`), plus
+  the larger of the configured host-failure list and a refusal's 64 task
+  numbers. No act carries party model names or a sign-in address. Grants
+  charge the configured entries, one per connector, each with at most one
+  entry per act kind (`size_of::<ActKind>()` times the number of kinds).
+  The people constructor checks these configured bounds.
 - **Answered to its connector once durable** (engine.md, 5.2), through
   the root, with the outcome a party's request of its kind gets; each
   send, a joined one among them, is answered once.

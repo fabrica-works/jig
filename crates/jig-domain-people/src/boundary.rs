@@ -554,6 +554,11 @@ pub enum ActKind {
     MakeProject,
 }
 
+impl ActKind {
+    /// Every deployment act kind; also bounds a configured grant's owned entries.
+    pub const ALL: &[Self] = &[Self::Close, Self::AddKey, Self::RemoveAccount, Self::Adopt, Self::MakeProject];
+}
+
 /// A connector's configured deployment authority (people.md, 5.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ActGrant {

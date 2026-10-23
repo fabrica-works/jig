@@ -129,6 +129,7 @@ pub fn engine(document: &skein_json::Document, at: u32, directories: &Directorie
             domain::connectors(document, at, &path.member(b"connectors"), limits.core.connectors, &mut problems);
     }
     let acts = acts::parse(&mut object, document, &path, connectors.as_deref().unwrap_or(&[]), &mut problems);
+    limits.core.people.act_grants = u32::try_from(acts.len()).expect("document count fits u32");
     let memory = check::integer(&mut object, document, b"memory_bytes", &path, &mut problems);
     let owners = object.required(document, b"owners", &path, &mut problems);
     object.finish(document, &path, &mut problems);

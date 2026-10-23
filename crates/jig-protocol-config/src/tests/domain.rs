@@ -315,9 +315,13 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
     );
 }
 #[test]
+#[expect(
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    reason = "the memory fixture writer is ordinary test Rust (programming-model.md, 10.2)"
+)]
 fn memory_below_the_components_sum_is_refused() {
     // Connector grants and acted tables/alarms are priced alongside party flights (people.md, 5.3).
-    const DEPLOYMENT_ACTS_GROWTH: u64 = 12_599_136;
     const BEFORE_FINISHING_OVER: u64 = 18_729_868_387;
     // Small's two pending sign-ins need two additional close outputs for cancellation
     // (protocol/llm.md, 5.2). Propagating that room through the core and journal
@@ -474,7 +478,7 @@ fn memory_below_the_components_sum_is_refused() {
     let wall_expiry_index = skein_lib::Set::<(skein_lib::Wall, u64)>::worst_case(limits.people.sign_ins).unwrap();
     let reconciliation_growth = u64::from(limits.views.runs) * RECONCILIATION_GROWTH_PER_RUN;
     let ending_saving = u64::from(limits.views.watchers) * ENDING_SAVING_PER_WATCHER;
-    let over = BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving
+    let without_acts = BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving
         + SOURCE_DEADLINE_GROWTH
         + SIGN_IN_CANCEL_GROWTH
         + ENDING_AUTHORITY_GROWTH
@@ -488,9 +492,6 @@ fn memory_below_the_components_sum_is_refused() {
         + 1_189_328
         // Owner project name: 20 document reservations * (24-byte Text + 4,096 payload bytes).
         + 82_400
-        // Deployment acts add connector grants, retained rows, alarms and key indexes;
-        // the shared pending slab prices either party or deployment flights (people.md, 5.3).
-        + DEPLOYMENT_ACTS_GROWTH
         // Configured policy table, authority policy heap, permission bytes and
         // template overrides at the small profile.
         + 190_256
@@ -499,7 +500,15 @@ fn memory_below_the_components_sum_is_refused() {
         // Account moves add bounded move/arrival tables, payloads and deadlines,
         // and enlarge the accounts output bound and the core's routed envelopes.
         + 14_560_734;
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
+    // Regenerate this charge with JIG_MEMORY_WRITE=1 through heavy, then run
+    // normally to check it. The unchanged terms above keep the act saving local.
+    let charge_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/deployment_act_growth.txt");
+    if std::env::var_os("JIG_MEMORY_WRITE").is_some_and(|value| value == "1") {
+        let What::Memory { over } = problems.problems.get(0).unwrap().what else { panic!("memory refusal") };
+        std::fs::write(&charge_path, format!("{}\n", over.checked_sub(without_acts).unwrap())).unwrap();
+    }
+    let growth: u64 = std::fs::read_to_string(charge_path).unwrap().trim().parse().unwrap();
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: without_acts + growth });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

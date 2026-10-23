@@ -302,3 +302,7 @@ pub(super) fn valid_outcome(limits: &Limits, act: &Act, outcome: &Outcome) -> bo
         ),
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/act_charges.rs"]
+mod tests;

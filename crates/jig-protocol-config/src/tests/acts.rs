@@ -6,7 +6,9 @@ use jig_domain_people::{ActGrant, ActKind};
 
 #[test]
 fn absent_acts_grant_nothing() {
-    assert!(engine(ENGINE_SMALL).expect("valid engine").acts.is_empty());
+    let engine = engine(ENGINE_SMALL).expect("valid engine");
+    assert!(engine.acts.is_empty());
+    assert_eq!(engine.limits.core.people.act_grants, 0);
 }
 #[test]
 fn a_valid_grant_keeps_every_kind_including_make_project() {
@@ -17,6 +19,7 @@ fn a_valid_grant_keeps_every_kind_including_make_project() {
         may: Box::new([ActKind::Close, ActKind::AddKey, ActKind::RemoveAccount, ActKind::Adopt, ActKind::MakeProject]),
     }]);
     assert_eq!(&*engine.acts, &*expected);
+    assert_eq!(engine.limits.core.people.act_grants, 1);
     assert_eq!(&*crate::core(&engine, [1; 16], 1).grants, &*expected);
 }
 #[test]
@@ -45,5 +48,21 @@ fn invalid_grants_refuse_the_start_at_their_paths() {
         let document = with(ENGINE_SMALL, br#""connectors": [1],"#, &member);
         let problems = engine(&document).expect_err("grant refused");
         assert_eq!(problems.problems.as_slice(), &[crate::Problem { path, what }]);
+    }
+}
+
+#[test]
+fn every_configured_connector_can_hold_one_full_grant() {
+    let document = with(
+        ENGINE_SMALL,
+        br#""connectors": [1],"#,
+        br#""connectors": [1,2], "acts": [
+            {"connector":1,"may":["close","add_key","remove_account","adopt","make_project"]},
+            {"connector":2,"may":["close","add_key","remove_account","adopt","make_project"]}],"#,
+    );
+    let engine = engine(&document).expect("one full grant per configured connector");
+    assert_eq!(engine.limits.core.people.act_grants, engine.limits.core.connectors);
+    for grant in &engine.acts {
+        assert_eq!(&*grant.may, ActKind::ALL);
     }
 }

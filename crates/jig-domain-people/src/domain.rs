@@ -177,9 +177,12 @@ impl Domain {
                 );
             }
         }
-        assert!(grants.len() <= usize::from(u16::MAX).saturating_add(1), "one grant per connector");
+        assert!(
+            grants.len() <= usize::try_from(limits.act_grants).expect("u32 fits usize"),
+            "configured act grants fit"
+        );
         for (at, grant) in grants.iter().enumerate() {
-            assert!(grant.may.len() <= 5, "bounded configured act kinds");
+            assert!(grant.may.len() <= crate::ActKind::ALL.len(), "bounded configured act kinds");
             for earlier in grants.iter().take(at) {
                 assert!(earlier.connector != grant.connector, "unique connector grants");
             }

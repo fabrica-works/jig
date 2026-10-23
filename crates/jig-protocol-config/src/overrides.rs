@@ -175,6 +175,7 @@ fn set_people(limits: &mut jig_domain_people::Limits, name: &[u8], value: u64) -
     let jig_domain_people::Limits {
         program_hosts,
         program_host_name_bytes,
+        act_grants: _,
         operations,
         batch,
         people,

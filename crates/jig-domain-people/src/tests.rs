@@ -10,7 +10,7 @@ mod projects;
 use crate::*;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 
-const LIMITS: Limits = Limits {
+pub(crate) const LIMITS: Limits = Limits {
     operations: 2,
     batch: 2,
     people: 4,
@@ -26,6 +26,7 @@ const LIMITS: Limits = Limits {
     waiters: 2,
     program_hosts: 65,
     program_host_name_bytes: 32,
+    act_grants: 2,
     identity_bytes: 16,
     words: 8,
     amendment_bytes: 256,

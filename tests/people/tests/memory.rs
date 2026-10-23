@@ -20,15 +20,28 @@ struct Measured {
 
 impl Measured {
     fn new(limits: Limits) -> Measured {
-        Self::configured(limits, Box::new([]), Box::new([]))
+        Self::configured(limits, false)
     }
-    fn configured(
-        limits: Limits,
-        owners: Box<[jig_domain_people::InitialOwner]>,
-        grants: Box<[jig_domain_people::ActGrant]>,
-    ) -> Measured {
+    fn configured(limits: Limits, deployment: bool) -> Measured {
         let out = Queue::with_capacity(max_out(&limits));
         let meter = Meter::new();
+        // Configuration is allocated inside the meter: these bytes belong to people.
+        let (owners, grants): (Box<[jig_domain_people::InitialOwner]>, Box<[jig_domain_people::ActGrant]>) =
+            if deployment {
+                let owners = Box::new([jig_domain_people::InitialOwner {
+                    project: 1,
+                    identity: jig_people_world::identity(1).key,
+                }]);
+                let grants = (0..limits.act_grants)
+                    .map(|connector| jig_domain_people::ActGrant {
+                        connector: u16::try_from(connector).expect("bounded connector fixture"),
+                        may: jig_domain_people::ActKind::ALL.into(),
+                    })
+                    .collect();
+                (owners, grants)
+            } else {
+                (Box::new([]), Box::new([]))
+            };
         let domain = Domain::new(&limits, owners, 1, grants);
         Measured {
             domain,
@@ -380,44 +393,91 @@ fn retained_program_outcomes_fit_the_people_bound() {
     }
 }
 
+// One full adoption owns its slice header plus the remaining payload bytes.
+fn largest_adoption(limits: &Limits) -> jig_domain_people::Act {
+    use jig_domain_people::{Act, Adoption, ResourceName, ResourceRole};
+    Act::Adopt {
+        project: 1,
+        adoption: Adoption {
+            resource: ResourceName {
+                connector: 1,
+                path: Box::new([vec![
+                    0;
+                    usize::try_from(limits.amendment_bytes).expect("bounded adoption payload")
+                        - size_of::<Box<[u8]>>()
+                ]
+                .into()]),
+            },
+            role: ResourceRole::Owned,
+            options: Box::new([]),
+        },
+    }
+}
+
 #[test]
 fn deployment_act_flights_waiters_answers_and_expiry_fit() {
-    use jig_domain_people::{Act, ActGrant, ActKind, InitialOwner};
-    let limits = Limits { requests: 3, pending: 2, ..LIMITS };
-    let mut test = Measured::configured(
-        limits,
-        Box::new([InitialOwner { project: 1, identity: jig_people_world::identity(1).key }]),
-        Box::new([ActGrant { connector: 1, may: Box::new([ActKind::Close]) }]),
-    );
+    const REFUSAL_TASKS: u64 = 64; // valid_program_outcome's Kept bound.
+    use jig_domain_people::{Outcome, Refusal};
+    // At one host the largest outcome is a 64-task refusal, which an adoption
+    // can retain alongside its largest payload. Fill every request and grant.
+    let limits = Limits { program_hosts: 1, ..LIMITS };
+    let mut test = Measured::configured(limits, true);
     test.event(Event::Restored);
-    let mut requests = Vec::new();
-    for key in 0..limits.pending {
-        let act = Act::Close {
-            project: 1,
-            task: 1,
-            grace: None,
-            reason: vec![0; usize::try_from(limits.words).expect("bounded act memory fixture")].into(),
-        };
-        for waiter in 0..limits.waiters {
-            let reply_to = test.to();
-            let request = test.event(Event::Act {
-                reply_to,
-                connector: 1,
-                key: [u8::try_from(key).expect("bounded act memory fixture"); 16],
-                act: Box::new(act.clone()),
-            });
-            if waiter == 0 {
-                requests.push(request.expect("act routed"));
+    let mut completed = 0;
+    while completed < limits.requests {
+        let flights = limits.pending.min(limits.requests - completed);
+        let mut requests = Vec::new();
+        for key in completed..completed + flights {
+            for waiter in 0..limits.waiters {
+                let reply_to = test.to();
+                let request = test.event(Event::Act {
+                    reply_to,
+                    connector: 1,
+                    key: [u8::try_from(key).expect("bounded act memory fixture"); 16],
+                    act: Box::new(largest_adoption(&limits)),
+                });
+                if waiter == 0 {
+                    requests.push(request.expect("act routed"));
+                }
             }
         }
-    }
-    for request in requests {
-        test.event(Event::Decided { request, outcome: Outcome::Refused(jig_domain_people::Refusal::Unknown) });
+        for request in requests {
+            test.event(Event::Decided {
+                request,
+                outcome: Outcome::Refused(Refusal::Kept { pending: (1..=REFUSAL_TASKS).collect() }),
+            });
+        }
+        completed += flights;
     }
     test.env.now = test.env.now.saturating_add(limits.request_retention);
     while test.domain.is_due(test.env.now) {
         test.meter.start();
         fire(&mut test.domain, &test.env, &mut test.out);
         test.drain();
+    }
+}
+
+#[test]
+fn deployment_account_removal_retains_every_configured_host_failure() {
+    use jig_domain_people::{AccountHostFailure, AccountHostWhy, Act};
+    let mut test = Measured::configured(LIMITS, true);
+    test.event(Event::Restored);
+    for key in 0..LIMITS.requests {
+        let reply_to = test.to();
+        let request = test
+            .event(Event::Act {
+                reply_to,
+                connector: 1,
+                key: [u8::try_from(key).expect("bounded act memory fixture"); 16],
+                act: Box::new(Act::RemoveAccount { account: 1 }),
+            })
+            .expect("act routed");
+        let failed_hosts = (0..LIMITS.program_hosts)
+            .map(|host| AccountHostFailure {
+                name: format!("{host:032}").into_bytes().into(),
+                why: AccountHostWhy::Lost,
+            })
+            .collect();
+        test.event(Event::Decided { request, outcome: Outcome::AccountRemoved { confirmed: false, failed_hosts } });
     }
 }
