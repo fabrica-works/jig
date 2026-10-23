@@ -75,6 +75,7 @@ fn refusal(
         | people::Refusal::Unknown
         | people::Refusal::Account { .. }
         | people::Refusal::Provider
+        | people::Refusal::NameTaken
         | people::Refusal::NotOffered
         | people::Refusal::NoEscalationHolder
         | people::Refusal::KeyConflict => refusals::refusal(value),

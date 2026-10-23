@@ -373,6 +373,7 @@ impl Parties {
             | root::Delivery::Message { .. }
             | root::Delivery::Assigned { .. }
             | root::Delivery::Link { .. }
+            | root::Delivery::ProjectMade { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::System { .. }

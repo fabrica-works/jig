@@ -587,6 +587,7 @@ fn a_dependency_added_while_judges_answer_refuses_a_waiting_effect() {
             | core::Request::Ask { .. }
             | core::Request::Held(_)
             | core::Request::Now(_)
+            | core::Request::ProjectMade { .. }
             | core::Request::Decided => None,
         })
         .expect("judge outstanding");

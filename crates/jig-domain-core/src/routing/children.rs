@@ -23,7 +23,11 @@ pub(super) fn append_people(core: &mut Core, env: &Env<Limits>, event: people::E
     for _ in 0..routed.len() {
         match routed.pop().expect("party route count") {
             Request::Decided => {}
-            request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+            request @ (Request::ProjectMade { .. }
+            | Request::Write(_)
+            | Request::Ask { .. }
+            | Request::Held(_)
+            | Request::Now(_)) => {
                 out.push(request);
             }
         }
@@ -38,7 +42,11 @@ pub(super) fn append_tasks(core: &mut Core, env: &Env<Limits>, event: tasks::Eve
     for _ in 0..routed.len() {
         match routed.pop().expect("task route count") {
             Request::Decided => {}
-            request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+            request @ (Request::ProjectMade { .. }
+            | Request::Write(_)
+            | Request::Ask { .. }
+            | Request::Held(_)
+            | Request::Now(_)) => {
                 out.push(request);
             }
         }
@@ -449,7 +457,11 @@ fn append_account(core: &mut Core, env: &Env<Limits>, event: accounts::Event, ou
     for _ in 0..routed.len() {
         match routed.pop().expect("account route count") {
             Request::Decided => {}
-            request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+            request @ (Request::ProjectMade { .. }
+            | Request::Write(_)
+            | Request::Ask { .. }
+            | Request::Held(_)
+            | Request::Now(_)) => {
                 out.push(request);
             }
         }
@@ -498,7 +510,11 @@ pub(super) fn tag_account(
                 for _ in 0..routed.len() {
                     match routed.pop().expect("grant output count") {
                         Request::Decided => {}
-                        request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+                        request @ (Request::ProjectMade { .. }
+                        | Request::Write(_)
+                        | Request::Ask { .. }
+                        | Request::Held(_)
+                        | Request::Now(_)) => {
                             out.push(request);
                         }
                     }
@@ -781,7 +797,11 @@ fn append_fleet(
     for _ in 0..routed.len() {
         match routed.pop().expect("fleet output count") {
             Request::Decided => {}
-            request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+            request @ (Request::ProjectMade { .. }
+            | Request::Write(_)
+            | Request::Ask { .. }
+            | Request::Held(_)
+            | Request::Now(_)) => {
                 out.push(request);
             }
         }

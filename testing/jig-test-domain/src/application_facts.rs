@@ -5,7 +5,11 @@ use jig_test_connector::application_core as application;
 #[expect(clippy::manual_map, reason = "step code translates optional role numbers by matching")]
 pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
     match value {
-        people::Refusal::Circle { .. } | people::Refusal::Dependency { .. } | people::Refusal::Kept { .. } => {
+        people::Refusal::NotWellFormed { why: people::Malformed::Name(_), .. }
+        | people::Refusal::NameTaken
+        | people::Refusal::Circle { .. }
+        | people::Refusal::Dependency { .. }
+        | people::Refusal::Kept { .. } => {
             unreachable!("the application routes only Release, never Create, Amend or Answer")
         }
         people::Refusal::Role { held } => application::Refusal::Role {
@@ -118,7 +122,8 @@ pub(super) fn limit_kind(value: people::LimitKind) -> application::LimitKind {
         people::LimitKind::Policy => application::LimitKind::Policy,
         people::LimitKind::Resource => application::LimitKind::Resource,
         people::LimitKind::Service => application::LimitKind::Service,
-        people::LimitKind::Accounts
+        people::LimitKind::Projects
+        | people::LimitKind::Accounts
         | people::LimitKind::HolderAccounts
         | people::LimitKind::Sources
         | people::LimitKind::SignIns => unreachable!("an application asks for no account"),

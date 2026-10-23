@@ -140,6 +140,8 @@ pub enum Timer {
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant, reason = "the journal owns complete concrete outputs")]
 pub enum Output {
+    /// A made project, released after its commit.
+    ProjectMade { project: u32 },
     /// One whole connector-owned document held behind the journal's barrier.
     ApplicationDocument { watcher: Token, document: ClientDocument },
     /// One connector-owned read terminal after all reflected commits are durable.

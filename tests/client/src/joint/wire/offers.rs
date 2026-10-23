@@ -27,6 +27,7 @@ pub fn act(value: acts::Act) -> client::ActKind {
         acts::Act::EditNote => client::ActKind::EditNote,
         acts::Act::DeleteNote => client::ActKind::DeleteNote,
         acts::Act::Adopt => client::ActKind::Adopt,
+        acts::Act::Rename => client::ActKind::Rename,
         acts::Act::ChangePolicy => client::ActKind::ChangePolicy,
         acts::Act::SetRoles => client::ActKind::SetRoles,
         acts::Act::MakeService => client::ActKind::MakeService,

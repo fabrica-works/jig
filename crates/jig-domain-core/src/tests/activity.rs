@@ -40,7 +40,11 @@ fn activity_decision(core: &mut Core, env: &Env<Limits>, event: Event) -> Vec<Re
                     ));
                 }
             }
-            Request::Write(Write::Erase(_)) | Request::Ask { .. } | Request::Held(_) | Request::Decided => {}
+            Request::Write(Write::Erase(_))
+            | Request::Ask { .. }
+            | Request::Held(_)
+            | Request::ProjectMade { .. }
+            | Request::Decided => {}
         }
     }
     records

@@ -218,6 +218,8 @@ pub(crate) fn restore_shaped(ask: &crate::Ask) -> bool {
         | crate::Ask::Amend { .. }
         | crate::Ask::SetRoles { .. }
         | crate::Ask::ChangePolicy { .. }
+        | crate::Ask::Rename { .. }
+        | crate::Ask::MakeProject { .. }
         | crate::Ask::SetPool { .. }
         | crate::Ask::DecideEscalation { .. }
         | crate::Ask::AccountSignIn { .. }

@@ -25,6 +25,8 @@ pub struct Carried {
 /// commit relationship before the root translates or wraps it.
 #[derive(Debug)]
 pub enum Request {
+    /// A new project; the root holds this notification until the decision commits.
+    ProjectMade { project: u32 },
     /// Store mutation in the current decision.
     Write(Write),
     /// Synchronous connector handoff within this decision.

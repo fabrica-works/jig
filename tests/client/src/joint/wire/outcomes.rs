@@ -18,6 +18,7 @@ pub enum Outcome {
 
 /// # Errors
 /// Refuses malformed program outcomes or host answers above the link's receiving bounds.
+#[expect(clippy::too_many_lines, reason = "one exhaustive translation retains every owner outcome")]
 pub fn outcome(value: &people::Outcome, limits: &Limits) -> Result<Outcome, owner::Invalid> {
     let owner = match value {
         people::Outcome::NoteEdited { name } => client::OwnerOutcome::NoteEdited { name: *name },
@@ -50,6 +51,8 @@ pub fn outcome(value: &people::Outcome, limits: &Limits) -> Result<Outcome, owne
         people::Outcome::Amended { task, .. } => client::OwnerOutcome::Amended { task: *task },
 
         people::Outcome::RolesSet { project } => client::OwnerOutcome::RolesSet { project: *project },
+        people::Outcome::Renamed { project } => client::OwnerOutcome::Renamed { project: *project },
+        people::Outcome::ProjectMade { project } => client::OwnerOutcome::ProjectMade { project: *project },
         people::Outcome::PolicyChanged { project } => client::OwnerOutcome::PolicyChanged { project: *project },
         people::Outcome::PoolSet { project, person } => {
             client::OwnerOutcome::PoolSet { project: *project, person: *person }

@@ -162,6 +162,7 @@ impl Referee {
             | root::Delivery::Restart(_)
             | root::Delivery::Core(_)
             | root::Delivery::Link { .. }
+            | root::Delivery::ProjectMade { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Assigned { .. }
@@ -271,11 +272,13 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
             Subject::Note { note: *name },
         ),
         people::Ask::Adopt { project, .. } => (Act::Adopt, Subject::Project { project: *project }),
+        people::Ask::Rename { project, .. } => (Act::Rename, Subject::Project { project: *project }),
         people::Ask::ChangePolicy { project, .. } => (Act::ChangePolicy, Subject::Project { project: *project }),
         people::Ask::SetRoles { project, .. } => (Act::SetRoles, Subject::Project { project: *project }),
         people::Ask::MakeService { project, .. } => (Act::MakeService, Subject::Project { project: *project }),
         people::Ask::SetPool { project, .. } => (Act::SetPool, Subject::Project { project: *project }),
-        people::Ask::Compound { .. }
+        people::Ask::MakeProject { .. }
+        | people::Ask::Compound { .. }
         | people::Ask::Propose { .. }
         | people::Ask::Create { .. }
         | people::Ask::Withdraw { .. }

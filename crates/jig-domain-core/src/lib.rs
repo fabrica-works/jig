@@ -54,6 +54,7 @@ mod model_names;
 mod numbers;
 mod person_task;
 mod policy;
+mod projects;
 pub use policy::{authority_to_people, pattern_to_people, snapshot as policy_snapshot};
 mod projections;
 pub use projections::{
@@ -335,7 +336,6 @@ pub struct Core {
     pub relaying: Map<u64, PendingRelay>,
     /// Configured project identifiers for bootstrap.
     pub projects: List<u32>,
-    #[cfg_attr(not(test), expect(dead_code, reason = "retained for later project creation"))]
     pub(crate) policies: Map<u32, ConfiguredPolicy>,
     /// Names seeded or restored with the project policies (core.md, 6.1).
     pub(crate) names: Map<u32, Box<str>>,

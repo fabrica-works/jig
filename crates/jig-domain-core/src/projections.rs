@@ -352,7 +352,11 @@ pub fn finish_decision(core: &mut Core, env: &Env<Limits>) -> Requests {
         for _ in 0..watches.len() {
             match watches.pop().expect("watch decision outputs") {
                 Request::Decided => {}
-                request @ (Request::Write(_) | Request::Held(_) | Request::Now(_) | Request::Ask { .. }) => {
+                request @ (Request::ProjectMade { .. }
+                | Request::Write(_)
+                | Request::Held(_)
+                | Request::Now(_)
+                | Request::Ask { .. }) => {
                     out.push(request);
                 }
             }

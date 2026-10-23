@@ -105,6 +105,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(
             u64::from(limits.amendment_bytes)
                 .checked_add(u64::try_from(size_of::<crate::Amendment>()).ok()?)?
+                .max(u64::try_from(crate::NAME_BYTES).ok()?)
                 .max(u64::from(limits.words)),
         )?
         .checked_add(roles)?
@@ -172,6 +173,7 @@ pub(crate) fn ask_bytes(limits: &Limits) -> Option<u64> {
         u64::from(limits.operations).checked_mul(
             u64::from(limits.amendment_bytes)
                 .checked_add(u64::try_from(size_of::<crate::Amendment>()).ok()?)?
+                .max(u64::try_from(crate::NAME_BYTES).ok()?)
                 .max(u64::from(limits.words)),
         )?,
     )?;

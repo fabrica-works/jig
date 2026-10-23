@@ -66,6 +66,8 @@ pub struct World {
     pub initial_ask: people::Ask,
     pub(crate) creating: crate::fixtures::Creating,
     pub people_answers: Vec<people::Reply>,
+    /// Project notification and the durable store mark at its release.
+    pub project_made: Vec<(u64, u32)>,
     pub act_answers: Vec<(Token, people::Outcome)>,
     pub application_answers: Vec<(Token, u16, connector::ApplicationOutcome)>,
     /// Each carried value the core left unused, with how many answers

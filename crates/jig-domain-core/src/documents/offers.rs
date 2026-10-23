@@ -131,7 +131,7 @@ pub(super) fn subject(
             limits,
             party,
             subject,
-            &[Act::Adopt, Act::Reorder, Act::ChangePolicy, Act::SetRoles, Act::MakeService, Act::SetPool],
+            &[Act::Adopt, Act::Reorder, Act::ChangePolicy, Act::Rename, Act::SetRoles, Act::MakeService, Act::SetPool],
             decision,
         ),
         Subject::Proposal { proposer, .. } => {
@@ -403,6 +403,7 @@ fn effect(core: &Core, limits: &Limits, act: Act, subject: &Subject) -> Option<a
         | Act::EditNote
         | Act::DeleteNote
         | Act::Adopt
+        | Act::Rename
         | Act::ChangePolicy
         | Act::SetRoles
         | Act::MakeService

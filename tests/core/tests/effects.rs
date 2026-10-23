@@ -327,7 +327,10 @@ fn deadline_answers(outputs: Vec<core::Request>) -> Vec<(u64, core::CallKey, cor
                     }
                 }
                 core::Request::Decided => None,
-                core::Request::Write(_) | core::Request::Ask { .. } | core::Request::Now(_) => {
+                core::Request::ProjectMade { .. }
+                | core::Request::Write(_)
+                | core::Request::Ask { .. }
+                | core::Request::Now(_) => {
                     panic!("the deadline makes no new effect or synchronous handoff")
                 }
             }

@@ -2149,7 +2149,7 @@ fn finish_watch_outputs(core: &mut Core, limits: &Limits) -> Box<[Request]> {
         let mut handoff = false;
         while let Some(request) = out.pop() {
             match request {
-                Request::Write(_) | Request::Ask { .. } => handoff = true,
+                Request::ProjectMade { .. } | Request::Write(_) | Request::Ask { .. } => handoff = true,
                 request @ (Request::Held(_) | Request::Now(_) | Request::Decided) => requests.push(request).unwrap(),
             }
         }
@@ -2508,7 +2508,9 @@ fn read_start(core: &mut Core, limits: &Limits, sign_in: u64, read: reads::Read)
                 held = Some(*answer);
             }
             Request::Decided => {}
-            Request::Write(_) | Request::Ask { .. } | Request::Now(_) => panic!("read changes nothing"),
+            Request::ProjectMade { .. } | Request::Write(_) | Request::Ask { .. } | Request::Now(_) => {
+                panic!("read changes nothing")
+            }
         }
     }
     held.expect("one terminal answer")
@@ -2524,7 +2526,9 @@ fn loaded_answer(core: &mut Core, limits: &Limits, load: Token, result: reads::L
                 answer = Some(value);
             }
             Request::Decided => {}
-            Request::Write(_) | Request::Ask { .. } | Request::Now(_) => panic!("read decides nothing"),
+            Request::ProjectMade { .. } | Request::Write(_) | Request::Ask { .. } | Request::Now(_) => {
+                panic!("read decides nothing")
+            }
         }
     }
     answer
@@ -3550,6 +3554,7 @@ fn assert_one_watch_ending(out: &[Request], expected: views::End) {
 }
 
 mod project_names;
+mod projects;
 
 #[test]
 fn configured_policies_are_retained_by_the_core() {

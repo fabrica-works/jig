@@ -156,10 +156,6 @@ pub(super) fn refusal(
 /// Match the real entrance check before names become domain indices.
 pub(super) fn refused(value: &c::Ask, configured: &[Model]) -> Result<Option<c::Answer>, asks::Invalid> {
     let (at, lacking) = match value {
-        // T4: translated to people's Rename / MakeProject.
-        c::Ask::Rename { .. } | c::Ask::MakeProject { .. } => {
-            return Ok(Some(c::Answer::Refused { refusal: c::Refusal::NotOffered, at: None }));
-        }
         c::Ask::Create { tasks, .. } => (None, batch_lacking(tasks, configured)),
         c::Ask::Propose { action, .. } => match action {
             c::ProposeAction::Batch { tasks } => (None, batch_lacking(tasks, configured)),
@@ -197,6 +193,8 @@ pub(super) fn refused(value: &c::Ask, configured: &[Model]) -> Result<Option<c::
         | c::Ask::Seen { .. }
         | c::Ask::EditNote { .. }
         | c::Ask::DeleteNote { .. }
+        | c::Ask::Rename { .. }
+        | c::Ask::MakeProject { .. }
         | c::Ask::ChangePolicy { .. }
         | c::Ask::SetRoles { .. }
         | c::Ask::MakeService { .. }

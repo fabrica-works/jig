@@ -16,6 +16,8 @@ pub enum Accepter {
 /// A final reason a keyed request was refused.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// Another project holds this name under simple case folding.
+    NameTaken,
     /// The bounded wait circle in traversal order (tasks.md, 6.7).
     Circle { tasks: Box<[u64]>, cut: bool },
     /// An added prerequisite already failed or was cancelled (tasks.md, 7).
@@ -65,6 +67,7 @@ pub enum Refusal {
 /// Why a batch member is not well formed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Malformed {
+    Name(crate::NameRule),
     /// A proposed batch must name every budget.
     ProposedAsAllowed,
     Cycle,
@@ -123,6 +126,8 @@ pub enum Lack {
 /// The bound a final refusal identifies.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum LimitKind {
+    /// The deployment has no room for another project.
+    Projects,
     /// Empty or too many operations in one compound request.
     Operations,
     /// The words or other byte payload exceed their bound.

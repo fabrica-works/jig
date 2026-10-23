@@ -61,6 +61,8 @@ pub enum Write {
 /// What the journal releases after its commit, or through its read door.
 #[derive(Debug)]
 pub enum Delivery {
+    /// The root heard this project made after its commit.
+    ProjectMade { project: u32 },
     /// A typed hub record for a worker channel.
     Link { channel: Token, down: jig_domain_host::LinkDown },
     /// The host retries this call after the engine drains.
@@ -917,6 +919,7 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
             | Delivery::Link { .. }
             | Delivery::ApplicationRead { .. }
             | Delivery::Application { .. }
+            | Delivery::ProjectMade { .. }
             | Delivery::Projection { .. }
             | Delivery::Message { .. }
             | Delivery::Restart(_)

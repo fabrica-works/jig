@@ -571,7 +571,11 @@ fn append_stream(requests: Requests, out: &mut Queue<Request>) {
     for _ in 0..requests.len() {
         match requests.pop().expect("stream output count") {
             Request::Decided => {}
-            request @ (Request::Held(_) | Request::Now(_) | Request::Write(_) | Request::Ask { .. }) => {
+            request @ (Request::Held(_)
+            | Request::Now(_)
+            | Request::ProjectMade { .. }
+            | Request::Write(_)
+            | Request::Ask { .. }) => {
                 out.push(request);
             }
         }

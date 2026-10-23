@@ -32,6 +32,7 @@ pub(super) fn request(engine: &mut Engine, request: root::Request) {
 
 fn deliver(engine: &mut Engine, delivery: root::Delivery) {
     match delivery {
+        root::Delivery::ProjectMade { .. } => {}
         root::Delivery::Restart(step) => restart(engine, step),
         root::Delivery::System { connector: number, call } => {
             let read = match &call {

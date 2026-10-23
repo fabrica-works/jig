@@ -163,6 +163,14 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
             limits,
             w::OwnerOutcomeRolesSetParts { project: *project },
         )?),
+        p::Outcome::Renamed { project } => w::OwnerOutcome::Renamed(w::OwnerOutcomeRenamed::new(
+            limits,
+            w::OwnerOutcomeRenamedParts { project: *project },
+        )?),
+        p::Outcome::ProjectMade { project } => w::OwnerOutcome::ProjectMade(w::OwnerOutcomeProjectMade::new(
+            limits,
+            w::OwnerOutcomeProjectMadeParts { project: *project },
+        )?),
         p::Outcome::PolicyChanged { project } => w::OwnerOutcome::PolicyChanged(w::OwnerOutcomePolicyChanged::new(
             limits,
             w::OwnerOutcomePolicyChangedParts { project: *project },

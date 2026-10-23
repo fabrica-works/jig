@@ -70,6 +70,7 @@ fn subscription_answer(outputs: Box<[Output]>, key: core::CallKey) {
             | Output::Read { .. }
             | Output::Agent(_)
             | Output::ToChild(_)
+            | Output::ProjectMade { .. }
             | Output::Busy
             | Output::Stop => {}
         }

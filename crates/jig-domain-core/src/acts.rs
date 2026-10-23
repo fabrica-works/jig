@@ -60,6 +60,8 @@ pub enum Act {
     Adopt,
     /// Change policy.
     ChangePolicy,
+    /// Rename the project.
+    Rename,
     /// Change roles.
     SetRoles,
     /// Make a service.

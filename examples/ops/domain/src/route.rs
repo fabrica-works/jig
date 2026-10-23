@@ -234,6 +234,7 @@ pub(crate) fn core_out(
             core::Request::Held(value) => core_held(domain, env, decision, *value, work),
             core::Request::Now(value) => core_now(domain, env, *value, work),
             core::Request::Ask { connector, ask } => core_ask(domain, env, decision, connector, ask, work),
+            core::Request::ProjectMade { project } => held(decision, Output::ProjectMade { project }),
             core::Request::Decided => {}
         }
     }
@@ -303,6 +304,8 @@ fn core_held(
                 | jig_domain_people::Outcome::RolesSet { .. }
                 | jig_domain_people::Outcome::PolicyChanged { .. }
                 | jig_domain_people::Outcome::PoolSet { .. }
+                | jig_domain_people::Outcome::Renamed { .. }
+                | jig_domain_people::Outcome::ProjectMade { .. }
                 | jig_domain_people::Outcome::EscalationDecided { .. }
                 | jig_domain_people::Outcome::AccountSignInStarted { .. }
                 | jig_domain_people::Outcome::AccountSignedOut { .. }

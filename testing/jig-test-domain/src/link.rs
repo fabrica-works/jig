@@ -317,6 +317,7 @@ pub fn down(domain: &mut Domain, delivery: Delivery) -> Delivery {
         | Delivery::ApplicationDocument { .. }
         | Delivery::ApplicationRead { .. }
         | Delivery::Application { .. }
+        | Delivery::ProjectMade { .. }
         | Delivery::Projection { .. }
         | Delivery::Restart(_)
         | Delivery::System { .. }

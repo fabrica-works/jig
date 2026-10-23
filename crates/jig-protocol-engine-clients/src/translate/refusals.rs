@@ -4,6 +4,7 @@ use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
+        p::Refusal::NameTaken => w::Refusal::NameTaken,
         p::Refusal::Role { held } => {
             let held = match held {
                 Some(value) => Some(role(value, limits)?),
@@ -37,6 +38,10 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
             w::RefusalMalformedParts {
                 at,
                 why: match why {
+                    p::Malformed::Name(rule) => w::Malformed::Name(w::MalformedName::new(
+                        limits,
+                        w::MalformedNameParts { rule: name_rule(rule) },
+                    )?),
                     p::Malformed::AsAllowedTwice => w::Malformed::TwoAsAllowed,
                     p::Malformed::Conversation => w::Malformed::ConversationNotAgent,
 
@@ -153,6 +158,7 @@ fn lack(value: p::Lack, limits: &w::Limits) -> Result<w::Lacking, w::Problem> {
 }
 pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
     match value {
+        p::LimitKind::Projects => w::AdmissionLimit::Projects,
         p::LimitKind::Words => w::AdmissionLimit::Words,
         p::LimitKind::Identity => w::AdmissionLimit::Identity,
         p::LimitKind::Roles => w::AdmissionLimit::Roles,
@@ -317,4 +323,14 @@ fn names(values: &[u64], bound: u32, path: w::Path) -> Result<skein_lib::List<u6
         }
     }
     Ok(rows)
+}
+
+fn name_rule(rule: p::NameRule) -> w::NameRule {
+    match rule {
+        p::NameRule::Empty => w::NameRule::Empty,
+        p::NameRule::Long => w::NameRule::Long,
+        p::NameRule::Control => w::NameRule::Control,
+        p::NameRule::Space => w::NameRule::Space,
+        p::NameRule::Digits => w::NameRule::Digits,
+    }
 }

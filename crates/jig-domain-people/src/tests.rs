@@ -6,6 +6,7 @@
 )]
 mod fixtures;
 mod names;
+mod projects;
 use crate::*;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 

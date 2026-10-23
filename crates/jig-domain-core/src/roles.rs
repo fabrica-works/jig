@@ -134,6 +134,8 @@ impl Core {
             | people::Ask::MakeService { .. }
             | people::Ask::SetRoles { .. }
             | people::Ask::Adopt { .. }
+            | people::Ask::Rename { .. }
+            | people::Ask::MakeProject { .. }
             | people::Ask::ChangePolicy { .. }
             | people::Ask::SetPool { .. }
             | people::Ask::DecideEscalation { .. }
@@ -314,7 +316,17 @@ impl Core {
 
     /// Admit an owner asking to change current role policy.
     pub fn role_allowed(&self, person: u64, project: u32, tasks_left: u32) -> Result<(), people::Refusal> {
-        crate::acts::role(self, project, self.people.role(person, project), crate::acts::Act::ChangePolicy)?;
+        self.role_allowed_for(person, project, tasks_left, crate::acts::Act::ChangePolicy)
+    }
+
+    pub(crate) fn role_allowed_for(
+        &self,
+        person: u64,
+        project: u32,
+        tasks_left: u32,
+        act: crate::acts::Act,
+    ) -> Result<(), people::Refusal> {
+        crate::acts::role(self, project, self.people.role(person, project), act)?;
         if self.authority.policy(project).is_none() {
             return Err(people::Refusal::Unknown);
         }
