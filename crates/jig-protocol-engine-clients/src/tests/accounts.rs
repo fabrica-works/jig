@@ -2,7 +2,7 @@
 use super::fixtures;
 use crate::translate::{accounts, watches};
 use fixtures::list;
-use jig_client_protocol_wire::v14 as w;
+use jig_client_protocol_wire::v15 as w;
 use jig_domain_accounts as a;
 use jig_domain_core::documents as d;
 use jig_domain_people::CapacityAction as A;

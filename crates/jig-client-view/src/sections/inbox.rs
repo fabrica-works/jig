@@ -168,10 +168,8 @@ fn filters(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut
     filter(b, words, bindings, JigPhrase::AllProjects, &[], Filter { project: None, ..current });
     if let Some(frame) = &client.frame().document {
         for project in &frame.projects {
-            let (phrase, hole) = match &project.name {
-                Some(value) => (JigPhrase::Project, crate::words::name(value.bytes())),
-                None => (JigPhrase::FrameProjectNumber, Hole::Number(u64::from(project.project))),
-            };
+            let phrase = JigPhrase::Project;
+            let hole = crate::words::name(project.name.bytes());
             filter(b, words, bindings, phrase, &[hole], Filter { project: Some(project.project), ..current });
             crate::frame_facts::project_loss(b, words, project);
         }

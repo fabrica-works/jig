@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v14 as w;
+use jig_client_protocol_wire::v15 as w;
 use jig_domain_core::documents as d;
 use jig_domain_tasks as t;
 use skein_lib::{Duration, List, Wall};
@@ -187,8 +187,8 @@ pub fn task_with_hold() -> d::Task {
     }
 }
 
-/// The shared v14 fixture with each engine-supplied project's required name.
-pub fn frame_two_projects_record() -> jig_client_protocol_wire::v14::Me {
+/// The shared v15 fixture with each engine-supplied project's required name.
+pub fn frame_two_projects_record() -> jig_client_protocol_wire::v15::Me {
     let limits = w::CEILINGS;
     let mut parts = jig_client_test_records::frame_two_projects_record().into_parts();
     let mut reader = skein_lib::Reader::new(&parts.projects);
@@ -197,10 +197,9 @@ pub fn frame_two_projects_record() -> jig_client_protocol_wire::v14::Me {
     while let Some(bytes) = skein_codec::piece::split(&mut reader).expect("fixture pieces") {
         let project = w::MeProject::decode(&limits, &mut skein_lib::Reader::new(&bytes)).expect("fixture project");
         let mut project = project.into_parts();
-        project.name = Some(
+        project.name =
             w::DocumentText::new(&limits, w::DocumentTextParts { bytes: Box::from(&b"Tally"[..]), cut: false })
-                .expect("literal name"),
-        );
+                .expect("literal name");
         let project = w::MeProject::new(&limits, project).expect("named project");
         size = size
             .checked_add(usize::try_from(project.measure()).expect("fixture size"))

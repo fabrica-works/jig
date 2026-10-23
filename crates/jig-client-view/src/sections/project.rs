@@ -20,16 +20,18 @@ mod tasks;
 /// The project's shared identity while any of its sections is shown.
 pub fn header(b: &mut Builder, client: &Borrowed<'_>, words: &Words, _bindings: &mut JigBindings) -> bool {
     let project_page = client.project_page();
-    let Some(number) = client.shown_project() else {
+    if client.shown_project().is_none() {
         return false;
-    };
+    }
     b.open(Role::Region);
     b.region(crate::regions::JigRegion::ProjectHeader.region());
     b.name(&words.say(JigPhrase::ProjectPage, &[]));
-    words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(number))]);
     if let Some(doc) = &project_page.document {
-        b.text(Run::Plain, doc.name.bytes());
-    } else if project_page.owner.is_none() {
+        words.text(b, JigPhrase::Project, &[crate::words::name(doc.name.bytes())]);
+    } else if let Some(doc) = &project_page.owner {
+        words.text(b, JigPhrase::Project, &[crate::words::name(doc.name.bytes())]);
+        crate::document_text::loss(b, &doc.name, words);
+    } else {
         words.status(b, JigPhrase::LoadingObject, &[]);
     }
     b.close();
@@ -48,7 +50,7 @@ pub fn tabs(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mu
     b.region(crate::regions::JigRegion::ProjectTabs.region());
     match &project_page.document {
         Some(doc) => b.name(doc.name.bytes()),
-        None => b.name(&words.say(JigPhrase::ContextProject, &[Hole::Number(u64::from(number))])),
+        None => b.name(project_page.owner.as_ref().expect("loaded owner project for tabs").name.bytes()),
     }
     for section in [
         ProjectSection::Overview,

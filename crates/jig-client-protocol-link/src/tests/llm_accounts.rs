@@ -22,7 +22,8 @@ fn me_with_model(prices: w::MePricesParts, description: Option<Box<[u8]>>) -> w:
         &limits.wire,
         w::MeProjectParts {
             project: 3,
-            name: None,
+            name: w::DocumentText::new(&limits.wire, w::DocumentTextParts { bytes: Box::from(*b"Tally"), cut: false })
+                .unwrap(),
             role: w::HeldRole::Owner,
             pool: None,
             templates: Box::default(),

@@ -10,15 +10,10 @@ use alloc::boxed::Box;
 use jig_client::contract::{Me, MeParty, MeProject, PartyKind};
 
 pub(crate) fn project_label(words: &Words, project: &MeProject) -> Box<[u8]> {
-    match &project.name {
-        Some(value) => words.say(JigPhrase::Project, &[name(value.bytes())]),
-        None => words.say(JigPhrase::FrameProjectNumber, &[Hole::Number(u64::from(project.project))]),
-    }
+    words.say(JigPhrase::Project, &[name(project.name.bytes())])
 }
 pub(crate) fn project_loss(b: &mut Builder, words: &Words, project: &MeProject) {
-    if let Some(value) = &project.name {
-        document_text::loss(b, value, words);
-    }
+    document_text::loss(b, &project.name, words);
 }
 pub(crate) fn identity(b: &mut Builder, words: &Words, party: &MeParty) {
     words.status(b, JigPhrase::SignedIn, &[name(party.name.bytes())]);

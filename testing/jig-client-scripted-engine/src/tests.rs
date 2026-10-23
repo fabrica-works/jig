@@ -41,7 +41,7 @@ fn frame(number: u64) -> Me {
             templates: skein_lib::List::with_capacity(0),
             creating: None,
             project: 1,
-            name: Some(DocumentText::complete(text(b"project"))),
+            name: DocumentText::complete(text(b"project")),
             role: HeldRole::Policy { role: 1 },
             pool: Some(PoolLedger {
                 source: Funder::Pool { project: 1, person: number, period: 1 },

@@ -234,6 +234,8 @@ pub fn owner_project_record() -> w::OwnerProject {
         w::OwnerProjectParts {
             acts: Box::from([]),
             number: 7,
+            name: w::DocumentText::new(&lim, w::DocumentTextParts { bytes: Box::from(*b"Tally"), cut: false })
+                .expect("project name"),
             resources: Box::from([]),
             policy: w::OwnerProjectPolicy::new(
                 &lim,

@@ -26,7 +26,7 @@ pub(super) fn project(number: u32, chats: bool) -> MeProject {
         templates: if chats { crate::tests::fixtures::chat_templates() } else { List::with_capacity(0) },
         creating: Some(crate::tests::fixtures::creating()),
         project: number,
-        name: Some(DocumentText::complete(text(b"shop"))),
+        name: DocumentText::complete(text(b"shop")),
         role: HeldRole::Policy { role: 1 },
         pool: Some(PoolLedger {
             source: Funder::Pool { project: number, person: 7, period: 1 },

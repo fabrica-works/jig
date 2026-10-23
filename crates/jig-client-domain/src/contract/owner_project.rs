@@ -12,6 +12,7 @@ use skein_lib::List;
 pub struct OwnerProject {
     pub acts: List<Offered>,
     pub number: u32,
+    pub name: DocumentText,
     pub resources: List<OwnerProjectResource>,
     pub policy: OwnerProjectPolicy,
     pub members: List<OwnerProjectMember>,

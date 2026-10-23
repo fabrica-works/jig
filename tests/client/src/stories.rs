@@ -36,7 +36,7 @@ pub fn frame(party: u64) -> Me {
             templates: conversations::templates(),
             creating: Some(goals::creating()),
             project: 1,
-            name: Some(DocumentText::complete(text(b"First"))),
+            name: DocumentText::complete(text(b"First")),
             role: HeldRole::Policy { role: 1 },
             pool: Some(PoolLedger {
                 source: Funder::Pool { project: 1, person: party, period: 1 },
@@ -75,7 +75,7 @@ pub fn configured(settings: Settings) -> World<Test, Scripted> {
         settings,
         Scripted::new(
             Script {
-                versions: VersionRange { first: 14, last: 14 },
+                versions: VersionRange { first: 15, last: 15 },
                 truth,
                 bounds: Bounds {
                     text: 32,

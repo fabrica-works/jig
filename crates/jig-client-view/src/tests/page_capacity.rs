@@ -87,7 +87,7 @@ pub(super) fn entered(address: Address) -> (Fixture, Vec<Request>) {
     let (mut d, watch) = start();
     let mut frame = document();
     let mut project = frame.projects.get(0).unwrap().clone();
-    project.name = Some(DocumentText::complete(full()));
+    project.name = DocumentText::complete(full());
     project.role = HeldRole::Policy { role: 1 };
     let mut second = project.clone();
     second.project = 5;

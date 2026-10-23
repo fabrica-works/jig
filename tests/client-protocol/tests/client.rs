@@ -268,7 +268,7 @@ fn a_request_pending_across_a_restart_that_stops_serving_its_family_stays_unsent
     assert!(story.run_until(|s| s.made(fixtures::FIRST_OWNER) == 1, PROOF_WAIT));
     assert_eq!(story.answered(FAMILY_REQUEST), vec![]);
     story.restart_serving(jig_client_world::test::list([
-        jig_protocol_engine_clients::Served { family: None, first: 14, last: 14 },
+        jig_protocol_engine_clients::Served { family: None, first: 15, last: 15 },
         jig_protocol_engine_clients::Served { family: Some(1), first: 3, last: 3 },
     ]));
     assert!(story.run_until(|s| s.client.link().state == Link::Live, PROOF_WAIT));

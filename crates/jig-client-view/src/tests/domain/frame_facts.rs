@@ -15,7 +15,7 @@ fn member(role: HeldRole) -> MeProject {
         templates: List::with_capacity(0),
         creating: None,
         project: u32::MAX,
-        name: None,
+        name: text(b"Tally"),
         role,
         pool: None,
         models: List::with_capacity(0),

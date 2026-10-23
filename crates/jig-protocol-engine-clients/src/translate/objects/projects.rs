@@ -76,6 +76,7 @@ pub fn project(models: &[crate::Model], value: &d::Project, limits: &w::Limits) 
         w::OwnerProjectParts {
             acts: task::offered(models, &value.acts, limits, limits.owner_project_acts, w::Path::OwnerProjectActs)?,
             number: value.number,
+            name: owner::text(&value.name, limits)?,
             resources,
             policy: policy(models, &value.policy, limits)?,
             members,

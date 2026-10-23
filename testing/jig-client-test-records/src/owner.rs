@@ -20,7 +20,11 @@ pub fn frame_two_projects_record() -> w::Me {
                         templates: Box::from([]),
                         creating: None,
                         project,
-                        name: None,
+                        name: w::DocumentText::new(
+                            &lim,
+                            w::DocumentTextParts { bytes: Box::from(*b"Tally"), cut: false },
+                        )
+                        .expect("project name"),
                         role,
                         pool: None,
                         models: List::with_capacity(0),

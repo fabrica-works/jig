@@ -46,6 +46,7 @@ impl Payload for OwnerProjectSpend {
 impl Payload for OwnerProject {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         crate::offered::heap(&self.acts, bounds)?
+            .checked_add(self.name.heap(bounds)?)?
             .checked_add(self.resources.heap(bounds)?)?
             .checked_add(self.policy.heap(bounds)?)?
             .checked_add(self.members.heap(bounds)?)?

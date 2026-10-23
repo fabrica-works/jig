@@ -77,7 +77,6 @@ pub enum JigPhrase {
     ChipTitleCut,
     ChipDependenciesCut,
     ChipWaitingHolds,
-    FrameProjectNumber,
     FrameLogin,
     FramePerson,
     FrameService,
@@ -1091,7 +1090,6 @@ impl JigPhrase {
             Self::ChipTitleCut => 620,
             Self::ChipDependenciesCut => 621,
             Self::ChipWaitingHolds => 622,
-            Self::FrameProjectNumber => 610,
             Self::FrameLogin => 611,
             Self::FramePerson => 612,
             Self::FrameService => 613,
@@ -2087,7 +2085,6 @@ impl JigPhrase {
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
             Self::MalformedEndedBy
             | Self::TurnUnreadVersion
-            | Self::FrameProjectNumber
             | Self::FrameResultsSeen
             | Self::PolicyEditRole
             | Self::PolicyRequests
@@ -2311,7 +2308,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 611] = [
+pub const ALL: [JigPhrase; 610] = [
     JigPhrase::OpenProgramModel,
     JigPhrase::OpenProgramUnavailable,
     JigPhrase::OpenProgramChooseModel,
@@ -2364,7 +2361,6 @@ pub const ALL: [JigPhrase; 611] = [
     JigPhrase::ChipTitleCut,
     JigPhrase::ChipDependenciesCut,
     JigPhrase::ChipWaitingHolds,
-    JigPhrase::FrameProjectNumber,
     JigPhrase::FrameLogin,
     JigPhrase::FramePerson,
     JigPhrase::FrameService,

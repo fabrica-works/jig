@@ -88,7 +88,7 @@ pub(super) fn document() -> Me {
             templates: crate::tests::fixtures::chat_templates(),
             creating: Some(crate::tests::fixtures::creating()),
             project: 4,
-            name: Some(DocumentText::complete(text(b"One"))),
+            name: DocumentText::complete(text(b"One")),
             role: HeldRole::Policy { role: 1 },
             pool: Some(PoolLedger {
                 source: Funder::Pool { project: 4, person: 1, period: 1 },

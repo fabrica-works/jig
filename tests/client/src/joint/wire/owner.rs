@@ -86,7 +86,7 @@ pub fn frame(
             templates: super::me::templates(&row.templates, limits, models)?,
             creating: row.creating.as_ref().map(|v| super::me::creating(v, limits, models)).transpose()?,
             project: row.project,
-            name: Some(text(&row.name, limits)?),
+            name: text(&row.name, limits)?,
             role: held_role(row.role),
             pool: row.pool.as_ref().map(ledger),
         })
@@ -929,7 +929,7 @@ pub(super) mod tests {
         for (row, (_, expected)) in translated.projects.iter().zip(roles) {
             assert_eq!(row.role, expected);
             assert_eq!(row.project, u32::MAX);
-            assert_eq!(row.name.as_ref().expect("required engine name").bytes.bytes(), b"A");
+            assert_eq!(row.name.bytes(), b"A");
             assert_eq!(row.pool, None);
         }
         assert_eq!(

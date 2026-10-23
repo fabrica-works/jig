@@ -147,7 +147,7 @@ fn project(
         limits,
         w::MeProjectParts {
             project: value.project,
-            name: Some(text(&value.name, limits)?),
+            name: text(&value.name, limits)?,
             role: held_role(value.role, limits)?,
             pool: match &value.pool {
                 Some(item) => Some(ledger(item, limits)?),

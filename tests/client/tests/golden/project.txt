@@ -28,8 +28,7 @@ Navigation:
   [6] Conversations
   [7] Family
 Project:
-  In project 1
-  pppppppppppppppppppppppppppppppp
+  Project: pppppppppppppppppppppppppppppppp
 pppppppppppppppppppppppppppppppp:
   [8] Overview
   [9] Goals

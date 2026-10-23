@@ -1,7 +1,7 @@
 pub mod thread;
 use crate::*;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v14 as w;
+use jig_client_protocol_wire::v15 as w;
 use skein_lib::{Duration, List, Queue, Secret, Time, Token, Wall, Writer};
 pub const PARTY: u64 = 7;
 pub const SUBJECT_TASK: u64 = 9;
@@ -398,7 +398,7 @@ pub fn me() -> contract::Me {
         .push(contract::MeProject {
             models: List::with_capacity(0),
             project: PROJECT,
-            name: None,
+            name: contract::DocumentText::complete(contract::Text::new(Box::from(*b"Tally"), 32).unwrap()),
             role: contract::HeldRole::Owner,
             pool: None,
             templates,

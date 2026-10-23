@@ -41,10 +41,12 @@ fn ready(source: Me) -> Fixture {
     domain
 }
 #[test]
-fn frame_tree_keeps_absent_empty_and_partial_names_separate_from_identity_loss() {
-    for name in
-        [None, Some(DocumentText::complete(text(b""))), Some(DocumentText { bytes: text(b"partial-name"), cut: true })]
-    {
+fn frame_tree_keeps_project_names_separate_from_identity_loss() {
+    for (name, expected, losses) in [
+        (DocumentText::complete(text(b"Tally")), b"Project: Tally".as_slice(), 1),
+        (DocumentText::complete(text(b"")), b"Project: ".as_slice(), 1),
+        (DocumentText { bytes: text(b"partial-name"), cut: true }, b"Project: partial-name".as_slice(), 2),
+    ] {
         let mut source = document();
         source.party.kind = PartyKind::Service;
         source.party.login = DocumentText { bytes: text(b"supplied-login"), cut: true };
@@ -57,11 +59,6 @@ fn frame_tree_keeps_absent_empty_and_partial_names_separate_from_identity_loss()
         assert!(contains(&shown, b"supplied-name"));
         assert!(contains(&shown, b"Service"));
         assert!(contains(&shown, b"Pool ledger not supplied"));
-        let expected = match name {
-            None => b"Project 4".as_slice(),
-            Some(ref value) if value.bytes().is_empty() => b"Project: ".as_slice(),
-            Some(_) => b"Project: partial-name".as_slice(),
-        };
         assert!(shown.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(expected)));
         assert_eq!(
             shown
@@ -69,7 +66,7 @@ fn frame_tree_keeps_absent_empty_and_partial_names_separate_from_identity_loss()
                 .iter()
                 .filter(|node| node.text.iter().any(|run| run.text.as_ref() == b"Only part of this text was supplied"))
                 .count(),
-            if name.as_ref().is_some_and(|value| value.cut) { 2 } else { 1 }
+            losses
         );
         assert_eq!(domain.frame().document, Some(&source));
     }
@@ -286,4 +283,17 @@ fn a_named_control_holds_no_node() {
             assert_eq!(tree.nodes()[WORDS].text.get(FIRST_RUN).unwrap().text.as_ref(), b"Sign out");
         }
     }
+}
+
+#[test]
+fn the_banner_shows_a_whole_multibyte_project_name() {
+    // configuration.md, 6: project names admit 64 UTF-8 bytes.
+    const NAME: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789é";
+    const NAME_BYTES: usize = 64;
+    assert_eq!(NAME.len(), NAME_BYTES);
+    let mut source = document();
+    source.projects.get_mut(0).unwrap().name = DocumentText::complete(text(NAME.as_bytes()));
+    let shown = tree(&ready(source));
+    let expected = "Project: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789é".as_bytes();
+    assert!(shown.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(expected)));
 }

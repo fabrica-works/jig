@@ -153,7 +153,8 @@ pub fn worst_case(l: &Limits, words: &Words) -> Option<ProjectFragment> {
 /// Check every reserved row, raw path and nested authority/template before allocation.
 #[must_use]
 pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<ProjectFragment> {
-    if value.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS
+    if !value.name.bytes.fits(l.text)
+        || value.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS
         || value.resources.capacity() > l.rows
         || value.members.capacity() > l.rows
         || value.pools.capacity() > l.rows
@@ -330,7 +331,8 @@ fn effect(b: &mut Builder, connector: u16, kind: u16, words: &Words) {
 }
 /// Render all source facts in order, with connector resource slots left raw.
 pub fn render(b: &mut Builder, value: &OwnerProject, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
-    region(b, words, P::Project, &[Hole::Number(u64::from(value.number))]);
+    named_region(b, words, JigPhrase::Project, &[crate::words::name(value.name.bytes())]);
+    crate::document_text::loss(b, &value.name, words);
     crate::pages::work::section(
         b,
         words,

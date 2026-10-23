@@ -3,7 +3,7 @@
 //! store.md 9).
 use super::fixtures::{self as f, Exchange};
 use crate::{Event, FromApplication, Request, SecretOwner, SecretsAnswer, SecretsRequest, ToApplication};
-use jig_client_protocol_wire::v14 as w;
+use jig_client_protocol_wire::v15 as w;
 use jig_domain_core as core;
 use jig_domain_people as p;
 use skein_lib::{ReplyTo, Secret, Token, Writer};
@@ -12,7 +12,7 @@ const FIRST: u64 = 1 << 63;
 
 fn carrying(owner: w::Owner, value: &[u8]) -> Box<[u8]> {
     let (request, version) = match owner {
-        w::Owner::Jig => (f::encode_ask(&f::start(&f::wire())), 14),
+        w::Owner::Jig => (f::encode_ask(&f::start(&f::wire())), 15),
         w::Owner::Family(_) => (f::family_request(Box::from(b"abc".as_slice())), 2),
     };
     let record = w::Keyed::new(

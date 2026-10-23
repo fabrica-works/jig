@@ -8,7 +8,7 @@ use crate::Limits;
 use crate::translate::text_problem;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v14 as w;
+use jig_client_protocol_wire::v15 as w;
 use skein_lib::Map;
 use skein_lib::{List, Wall, bytes};
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]

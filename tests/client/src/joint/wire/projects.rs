@@ -1,6 +1,6 @@
 //! Whole project owner facts (contract.md, 5.1–5.3).
-//! Current and configured ledgers remain independent; this boundary neither
-//! infers a project name nor admits a public Project watch.
+//! Current and configured ledgers remain independent; the supplied name is
+//! carried unchanged, and this boundary admits no public Project watch.
 use super::{chips, history, offers, owner};
 use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
@@ -19,6 +19,7 @@ pub fn document(
     Ok(client::OwnerProject {
         acts: offers::offered(&source.acts, limits, models)?,
         number: source.number,
+        name: owner::text(&source.name, limits)?,
         resources: owner::list(&source.resources, limits, |value| {
             Ok(client::OwnerProjectResource {
                 part: owner::part(&value.part, limits)?,

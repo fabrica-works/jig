@@ -73,7 +73,7 @@ fn chat_project() -> List<MeProject> {
         .push(MeProject {
             models: List::with_capacity(0),
             project: PROJECT,
-            name: None,
+            name: DocumentText::complete(Text::new(Box::from(*b"Tally"), 32).unwrap()),
             role: HeldRole::Policy { role: 1 },
             templates,
             creating: None,

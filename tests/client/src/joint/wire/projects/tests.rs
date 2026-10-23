@@ -183,6 +183,7 @@ pub(crate) fn source() -> documents::Project {
     documents::Project {
         acts,
         number: u32::MAX,
+        name: jig_domain_core::documents::Text { bytes: Box::from(*b"Tally"), cut: false },
         resources,
         policy: policy_source(),
         members: members(),

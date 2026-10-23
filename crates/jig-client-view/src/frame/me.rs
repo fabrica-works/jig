@@ -32,19 +32,12 @@ pub fn fits(frame: &Me, limits: &crate::Limits) -> bool {
         return false;
     }
     for project in &frame.projects {
-        if !name_fits(project.name.as_ref(), limits.text) {
+        if !project.name.bytes.fits(limits.text) {
             return false;
         }
     }
     true
 }
-fn name_fits(name: Option<&jig_client::contract::DocumentText>, text: u32) -> bool {
-    match name {
-        Some(name) => name.bytes.fits(text),
-        None => true,
-    }
-}
-
 /// Facts on every page's frame, with exact needs and bounded unread updates.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Summary {

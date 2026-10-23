@@ -566,7 +566,7 @@ pub fn language() -> Language {
             JigPhrase::PartKind => {
                 Box::new([Segment::Text(copy_of(b"Kind ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
-            JigPhrase::PartProject | JigPhrase::FrameProjectNumber => {
+            JigPhrase::PartProject => {
                 Box::new([Segment::Text(copy_of(b"Project ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
             JigPhrase::OutboxEntry => {

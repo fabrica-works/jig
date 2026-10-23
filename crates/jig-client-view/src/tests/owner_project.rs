@@ -133,6 +133,7 @@ fn source() -> OwnerProject {
     ];
     OwnerProject {
         number: u32::MAX,
+        name: doc(b"Tally", false),
         acts: List::with_capacity(4),
         resources: list(
             4,
@@ -324,6 +325,9 @@ fn owner_project_public_whole_view_keeps_four_resource_roles_opaque_raw_slots_me
     let value = source();
     let before = value.clone();
     let (tree, bindings) = build(&value, words(false));
+    assert!(
+        tree.nodes().iter().any(|node| node.role == Role::Region && node.name.as_deref() == Some(b"Project: Tally"))
+    );
     for label in [
         b"Owned".as_slice(),
         b"Participant",
@@ -1284,4 +1288,12 @@ fn historical_spend_page(before: Cursor, after: Cursor) -> OwnerSpendPage {
         after: Some(after),
         cut: true,
     }
+}
+
+#[test]
+fn owner_project_header_and_tabs_show_the_supplied_name() {
+    let domain = native_owner(source());
+    let (tree, _) = owner_page(&domain);
+    assert!(has(&tree, b"Project: Tally"));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Tabs && node.name.as_deref() == Some(b"Tally")));
 }

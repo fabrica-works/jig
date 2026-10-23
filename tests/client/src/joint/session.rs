@@ -912,9 +912,16 @@ mod tests {
     }
 
     fn configured_session(configuration: root::Config, peers: Peers) -> (Session, Time, Wall) {
+        session_with_limits(configuration, jig_core_world::world::limits(), peers)
+    }
+
+    fn session_with_limits(
+        configuration: root::Config,
+        mut owner_limits: root::Limits,
+        peers: Peers,
+    ) -> (Session, Time, Wall) {
         let now = Time::from_nanos(17);
         let wall = Wall::from_nanos(1_000_000_000_000);
-        let mut owner_limits = jig_core_world::world::limits();
         owner_limits.core.authority = *configuration.core.authority.limits();
         owner_limits.core.tasks.batch = owner_limits.core.tasks.batch.max(owner_limits.core.authority.batch);
         for charter in &configuration.core.settings.charters {
@@ -1672,6 +1679,7 @@ mod tests {
     mod carried;
     mod llm;
     mod offline;
+    mod project_names;
 }
 
 mod received;

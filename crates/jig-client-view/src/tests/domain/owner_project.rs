@@ -47,6 +47,7 @@ pub(super) fn source(number: u32) -> OwnerProject {
     });
     OwnerProject {
         number,
+        name: DocumentText::complete(Text::new(copy_of(b"Tally"), 32).unwrap()),
         acts: list(2, [Offered { effect: None, act: ActKind::ChangePolicy, admission: Admission::Allowed }]),
         resources: List::with_capacity(2),
         policy: OwnerProjectPolicy {

@@ -41,6 +41,7 @@ pub fn owner_project() -> c::OwnerProject {
     c::OwnerProject {
         acts: List::with_capacity(0),
         number: 7,
+        name: c::DocumentText::complete(c::Text::new(Box::from(*b"Tally"), 32).unwrap()),
         resources: List::with_capacity(0),
         policy: c::OwnerProjectPolicy {
             templates: List::with_capacity(0),

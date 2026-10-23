@@ -38,7 +38,7 @@ pub struct MeParty {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MeProject {
     pub project: u32,
-    pub name: Option<DocumentText>,
+    pub name: DocumentText,
     pub role: HeldRole,
     pub pool: Option<PoolLedger>,
     pub templates: List<Template>,

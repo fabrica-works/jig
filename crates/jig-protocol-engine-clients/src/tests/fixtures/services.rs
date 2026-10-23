@@ -20,7 +20,7 @@ pub fn service_kept() -> Kept {
 impl Exchange {
     pub fn make_service(&mut self) -> (Token, ReplyTo) {
         let (ask, expected) = make_service_case(&wire());
-        let owner = self.send(crate::Message::Request(keyed(w::Owner::Jig, 14, encode_ask(&ask))));
+        let owner = self.send(crate::Message::Request(keyed(w::Owner::Jig, 15, encode_ask(&ask))));
         self.authenticate();
         let Some(Request::Core(event)) = self.out.pop() else { panic!("core ask") };
         let core::Event::People(people::Event::Ask { reply_to, ask, .. }) = *event else { panic!("people ask") };

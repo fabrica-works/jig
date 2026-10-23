@@ -34,6 +34,7 @@ pub(crate) fn owner_project_fields(value: &w::OwnerProject, limits: &Limits) -> 
     Ok(c::OwnerProject {
         acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
         number: value.number(),
+        name: crate::translate::facts::document_text(value.name(), limits)?,
         resources: owner_project_resource_piece(value.resources(), limits, limits.client.rows)?,
         policy: owner_project_policy_fields(value.policy(), limits)?,
         members: list0,

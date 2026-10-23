@@ -482,7 +482,9 @@ fn memory_below_the_components_sum_is_refused() {
         + 7_288
         // Project names: (18,570 route + 4 load) payloads * 64 bytes,
         // a 336-byte map and two 64-byte names, plus two codec scratch copies.
-        + 1_189_328;
+        + 1_189_328
+        // Owner project name: 20 document reservations * (24-byte Text + 4,096 payload bytes).
+        + 82_400;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

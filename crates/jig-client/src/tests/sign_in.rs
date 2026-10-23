@@ -2,7 +2,7 @@ use super::{
     fixtures::{self, CREDENTIAL, Client, NEW_CREDENTIAL, SERVICE_CREDENTIAL, STOP, TASK},
     *,
 };
-use jig_client_protocol_wire::v14 as w;
+use jig_client_protocol_wire::v15 as w;
 use skein_lib::{Duration, Time};
 const FIRST_BACKOFF: Duration = Duration::from_millis(10);
 const LEAST_BACKOFF: Duration = Duration::from_millis(5);

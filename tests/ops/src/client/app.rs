@@ -304,7 +304,7 @@ impl App for Ops {
                 request @ jig_client::Request::Exchange { message: jig_client::Message::Request(bytes), exchange, .. },
         } = request
         {
-            use jig_client_protocol_wire::v14 as w;
+            use jig_client_protocol_wire::v15 as w;
             let keyed = w::Keyed::decode(&w::CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("keyed Ops bytes");
             if *keyed.owner() == w::Owner::Jig {
                 return jig_client_protocol_world::observe::client_sent(request);
@@ -487,7 +487,7 @@ fn infrastructure_sent(attempt: skein_lib::Token, key: [u8; 16], ask: &infra::As
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_client_protocol_wire::v14 as w;
+    use jig_client_protocol_wire::v15 as w;
     use skein_lib::{Overflow, Token, Writer};
 
     const ATTEMPT: Token = Token::new(7);

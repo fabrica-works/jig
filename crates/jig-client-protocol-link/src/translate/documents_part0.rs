@@ -36,17 +36,13 @@ pub(crate) fn pool_ledger_fields(value: &w::PoolLedger, limits: &Limits) -> c::P
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub(crate) fn project_role_fields(value: &w::MeProject, limits: &Limits) -> Result<c::MeProject, w::Problem> {
-    let opt0 = match value.name() {
-        Some(item) => Some(crate::translate::facts::document_text(item, limits)?),
-        None => None,
-    };
     let opt1 = match value.pool() {
         Some(item) => Some(pool_ledger_fields(item, limits)),
         None => None,
     };
     Ok(c::MeProject {
         project: value.project(),
-        name: opt0,
+        name: crate::translate::facts::document_text(value.name(), limits)?,
         role: crate::translate::answers::held_role(value.role(), limits),
         pool: opt1,
         templates: super::me::templates(value.templates(), limits)?,

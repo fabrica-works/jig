@@ -2,9 +2,11 @@ use super::{frame, script, text};
 use crate::{Bounds, Engine, Invalid, Script, owner_project};
 use jig_client_domain::contract::*;
 use skein_lib::{List, Time, Token};
+const PROJECT_NAME_BYTES: u64 = 3; // Kit.
 fn source() -> OwnerProject {
     OwnerProject {
         number: 1,
+        name: DocumentText::complete(super::text(b"Kit")),
         acts: List::with_capacity(2),
         resources: List::with_capacity(2),
         policy: OwnerProjectPolicy {
@@ -43,6 +45,7 @@ fn source() -> OwnerProject {
 fn owner_project_kit_prices_every_empty_reserved_list_at_exact_bytes_and_refuses_one_under_unchanged() {
     let value = source();
     let bytes = core::mem::size_of::<OwnerProject>() as u64
+        + PROJECT_NAME_BYTES
         + List::<Offered>::worst_case(2).unwrap()
         + List::<OwnerProjectResource>::worst_case(2).unwrap()
         + List::<OwnerGrant>::worst_case(2).unwrap()
@@ -175,6 +178,7 @@ fn owner_project_kit_distinguishes_missing_empty_and_full_width_permission_capac
 // Independently sum the inline carrier and every empty ordinary reservation.
 fn reserved_project_bytes(offer_slots: u32) -> u64 {
     u64::try_from(core::mem::size_of::<OwnerProject>()).unwrap()
+        + PROJECT_NAME_BYTES
         + List::<Offered>::worst_case(offer_slots).unwrap()
         + List::<OwnerProjectResource>::worst_case(2).unwrap()
         + List::<OwnerGrant>::worst_case(2).unwrap()

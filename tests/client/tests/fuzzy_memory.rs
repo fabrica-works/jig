@@ -150,7 +150,7 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
     frame.party.name = jig_client_domain::contract::DocumentText::complete(stories::text(&[b'p'; 32]));
     frame.party.login = jig_client_domain::contract::DocumentText::complete(stories::text(&[b'l'; 32]));
     let mut project = frame.projects.iter().next().expect("project exists").clone();
-    project.name = Some(jig_client_domain::contract::DocumentText::complete(stories::text(&[b'p'; 32])));
+    project.name = jig_client_domain::contract::DocumentText::complete(stories::text(&[b'p'; 32]));
     project.role = jig_client_domain::contract::HeldRole::Policy { role: 1 };
     let mut other = project.clone();
     other.project = 2;

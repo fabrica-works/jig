@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v14 as w;
+use jig_client_protocol_wire::v15 as w;
 use jig_engine_clients_world::fixtures::{self, Peer};
 use jig_protocol_engine_clients::{Event, MintRefusal};
 fn peer() -> Peer {

@@ -2,7 +2,7 @@
 use jig_protocol_engine_clients_http as mapping;
 mod closing;
 use crate::fixtures;
-use jig_client_protocol_wire::v14 as w;
+use jig_client_protocol_wire::v15 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_protocol_engine_clients::{
@@ -527,7 +527,7 @@ impl Peer {
         subject.encode(&mut record).expect("subject");
         let subject = w::Owned::new(
             &self.env.limits.wire,
-            w::OwnedParts { owner: w::Owner::Jig, version: 14, record: record.finish() },
+            w::OwnedParts { owner: w::Owner::Jig, version: 15, record: record.finish() },
         )
         .expect("subject owner");
         let open = w::Open::new(&self.env.limits.wire, w::OpenParts { stream, watch: self.next_watch, subject })

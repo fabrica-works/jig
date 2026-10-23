@@ -280,7 +280,7 @@ pub fn project_role(limits: &Limits) -> MeProject {
             templates: Box::from([]),
             creating: None,
             project: u32::MAX,
-            name: Some(document_text(limits)),
+            name: document_text(limits),
             role: HeldRole::Policy(held_role_policy(limits)),
             pool: Some(pool_ledger(limits)),
         },
@@ -662,7 +662,7 @@ pub fn not_served() -> NotServed {
     let lim = limits();
     let mut served = List::with_capacity(1);
     served
-        .push(Served::new(&lim, ServedParts { owner: Owner::Jig, first: 14, last: 14 }).expect("range"))
+        .push(Served::new(&lim, ServedParts { owner: Owner::Jig, first: 15, last: 15 }).expect("range"))
         .expect("range slot");
     NotServed::new(&lim, NotServedParts { owner: Owner::Jig, served }).expect("version refusal")
 }
@@ -671,3 +671,6 @@ pub use operations::merged_targets;
 
 mod compound;
 pub use compound::{COMPOUND_PROJECT, compound_operations};
+
+// The previous 111-byte minimum plus an empty name: four length bytes and its cut flag.
+pub const OWNER_PROJECT_MIN_BYTES: u32 = 116;

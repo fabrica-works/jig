@@ -450,3 +450,13 @@ fn a_compound_s_operations_round_trip_as_pieces() {
     }
     assert!(reader.is_empty());
 }
+
+#[test]
+fn a_me_project_without_its_name_cannot_decode() {
+    let limits = fixtures::limits();
+    let project = u32::MAX.to_be_bytes();
+    assert_eq!(
+        MeProject::decode(&limits, &mut Reader::new(&project)),
+        Err(Problem { path: Path::DocumentTextBytes, reason: skein_codec::Reason::Short })
+    );
+}

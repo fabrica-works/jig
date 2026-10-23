@@ -106,6 +106,7 @@ pub struct Recurring {
 pub struct Project {
     pub acts: List<crate::acts::Offered>,
     pub number: u32,
+    pub name: Text,
     pub resources: List<ProjectResource>,
     pub policy: Policy,
     pub members: List<Member>,
@@ -473,6 +474,10 @@ pub(super) fn project(
     Ok(Project {
         acts: super::offers::subject(core, limits, party, &super::Subject::Project { project: number }, decision)?,
         number,
+        name: super::small::text(
+            core.names.get(&number).expect("project has a kept name").as_bytes(),
+            limits.documents.text_bytes,
+        ),
         resources,
         policy: policy(
             limits,
@@ -577,5 +582,6 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(super::offers::heap_worst_case(limits)?)?
         .checked_add(List::<people::PermissionRole>::worst_case(limits.lines)?)?
         .checked_add(List::<Ledger>::worst_case(limits.lines)?)?
-        .checked_add(u64::try_from(size_of::<Project>()).ok()?)
+        .checked_add(u64::try_from(size_of::<Project>()).ok()?)?
+        .checked_add(u64::from(limits.text_bytes))
 }

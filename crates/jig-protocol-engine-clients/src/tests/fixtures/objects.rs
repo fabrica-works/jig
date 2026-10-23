@@ -72,6 +72,7 @@ pub fn project_document() -> d::Project {
     d::Project {
         acts: List::with_capacity(0),
         number: 7,
+        name: jig_domain_core::documents::Text { bytes: Box::from(*b"Tally"), cut: false },
         resources: List::with_capacity(0),
         policy: d::Policy {
             templates: List::with_capacity(0),

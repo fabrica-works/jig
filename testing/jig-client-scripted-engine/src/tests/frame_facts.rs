@@ -6,11 +6,11 @@ use crate::{
 use jig_client_domain::contract::*;
 use skein_lib::{List, Wall};
 #[test]
-fn me_prices_memberships_offers_and_optional_document_text() {
+fn me_prices_memberships_offers_and_required_project_names() {
     let mut row = frame(1);
     row.party.login = DocumentText { bytes: text(&[b'l'; 32]), cut: true };
     row.party.name = DocumentText::complete(text(&[b'n'; 32]));
-    row.projects.get_mut(0).unwrap().name = Some(DocumentText::complete(text(&[b'p'; 32])));
+    row.projects.get_mut(0).unwrap().name = DocumentText::complete(text(&[b'p'; 32]));
     let mut bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
     let expected = u64::try_from(core::mem::size_of::<Me>()).unwrap() + List::<MeProject>::worst_case(1).unwrap() + 96;
     assert_eq!(row.heap(&bounds).unwrap() + u64::try_from(core::mem::size_of::<Me>()).unwrap(), expected);
@@ -21,7 +21,7 @@ fn me_prices_memberships_offers_and_optional_document_text() {
     bounds.document_bytes += 2;
     assert!(fits(&row, &bounds));
     bounds.document_bytes = u64::MAX;
-    row.projects.get_mut(0).unwrap().name = Some(DocumentText::complete(text(&[b'p'; 33])));
+    row.projects.get_mut(0).unwrap().name = DocumentText::complete(text(&[b'p'; 33]));
     assert!(!fits(&row, &bounds));
     bounds.text = 33;
     assert!(fits(&row, &bounds));
