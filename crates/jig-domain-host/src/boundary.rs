@@ -31,6 +31,11 @@ pub enum Event {
         owner: Token,
         call: Box<[u8]>,
     },
+    /// A piece of live content (hosts.md, 6.5).
+    Piece {
+        owner: Token,
+        piece: crate::Piece,
+    },
     /// Typed agent activity, kept best effort for the engine.
     Activity {
         owner: Token,
@@ -284,6 +289,12 @@ pub enum FromAgent {
         owner: Token,
         turn: Turn,
     },
+    /// A piece of live content (hosts.md, 6.5).
+    Piece {
+        owner: Token,
+        piece: crate::Piece,
+    },
+    /// Typed agent activity, kept best effort for the engine.
     Activity {
         owner: Token,
         activity: crate::Activity,
@@ -351,6 +362,7 @@ impl Event {
             FromAgent::Called { owner, call, ask } => Event::Called { owner, call, ask },
             FromAgent::Withdrawn { owner, call } => Event::Withdrawn { owner, call },
             FromAgent::Turn { owner, turn } => Event::Turn { owner, turn },
+            FromAgent::Piece { owner, piece } => Event::Piece { owner, piece },
             FromAgent::Activity { owner, activity } => Event::Activity { owner, activity },
             FromAgent::Unauthorized { owner, account, generation } => {
                 Event::Unauthorized { owner, account, generation }
@@ -402,6 +414,7 @@ impl Request {
 /// The agent's complete start (hosts.md, sections 2 and 9).
 #[derive(PartialEq, Eq, Debug)]
 pub struct Start {
+    pub live: crate::LiveAsk,
     pub workspace: Option<Token>,
     pub charter: Box<[u8]>,
     pub activation: u64,
@@ -472,6 +485,7 @@ pub struct RunAssignment {
     pub workspace: Option<Workspace>,
     /// Whether the workspace must save unfinished work before release.
     pub save: bool,
+    pub live: crate::LiveAsk,
     /// What the agent's run is given, passed through.
     pub charter: Box<[u8]>,
     pub grants: Box<[Grant]>,

@@ -33,6 +33,7 @@ const LIMITS: Limits = Limits {
     told: 2,
     turns: 0,
     turn_queue_bytes: 0,
+    piece_bytes: 4096,
 };
 
 fn bytes(len: u64) -> Box<[u8]> {
@@ -104,6 +105,7 @@ impl Measured {
                 Request::Up(
                     LinkUp::Logins { .. }
                     | LinkUp::SignedOut { .. }
+                    | LinkUp::Piece { .. }
                     | LinkUp::Activity { .. }
                     | LinkUp::Unauthorized { .. }
                     | LinkUp::Limited { .. }
@@ -163,6 +165,7 @@ fn assignment(run: u64, limits: &Limits) -> RunAssignment {
         attempt: Token::new(run + 1000),
         workspace: Some(Workspace { workstream: run, items: Token::new(run + 2000) }),
         save: true,
+        live: jig_domain_host::LiveAsk::NONE,
         charter: bytes(limits.charter_bytes),
     }
 }

@@ -201,6 +201,7 @@ pub fn run() -> Box<core::RunCharter> {
 }
 pub fn assignment() -> Assignment {
     Assignment {
+        live: core::LiveAsk::NONE,
         brief: Box::new([]),
         conversation: 1,
         task: RUN.raw(),

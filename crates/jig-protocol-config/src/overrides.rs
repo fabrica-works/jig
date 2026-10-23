@@ -410,6 +410,7 @@ fn set_hub(limits: &mut jig_domain_host::Limits, name: &[u8], value: u64) -> Res
         told,
         turns,
         turn_queue_bytes,
+        piece_bytes,
     } = limits;
     match name {
         b"program_sources" => *program_sources = count(value)?,
@@ -429,6 +430,7 @@ fn set_hub(limits: &mut jig_domain_host::Limits, name: &[u8], value: u64) -> Res
         b"told" => *told = count(value)?,
         b"turns" => *turns = count(value)?,
         b"turn_queue_bytes" => *turn_queue_bytes = value,
+        b"piece_bytes" => *piece_bytes = count(value)?,
         _ => return Err(What::Override),
     }
     Ok(())

@@ -284,6 +284,7 @@ impl Parent {
             Request::Up(
                 LinkUp::Logins { .. }
                 | LinkUp::SignedOut { .. }
+                | LinkUp::Piece { .. }
                 | LinkUp::Activity { .. }
                 | LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }

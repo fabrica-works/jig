@@ -424,6 +424,7 @@ pub fn assignment() -> host::Assignment {
             identity: [9; 16],
             workspace: Some(host::Workspace { workstream: 3, items: Token::new(10) }),
             save: true,
+            live: jig_domain_host::LiveAsk::NONE,
             charter: b"charter".as_slice().into(),
             grants: Box::new([grant(host::Form::Credential(host::Scheme::Bearer)), grant(host::Form::Application)]),
         },

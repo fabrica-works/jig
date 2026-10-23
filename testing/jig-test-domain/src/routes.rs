@@ -439,7 +439,18 @@ fn route_now(
             };
             work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, credentials, writes }));
         }
-        core::Now::RunPrepared { task, attempt, conversation, charter, run, messages, transcript, grants, .. } => {
+        core::Now::RunPrepared {
+            live,
+            task,
+            attempt,
+            conversation,
+            charter,
+            run,
+            messages,
+            transcript,
+            grants,
+            ..
+        } => {
             let budget = run.budget;
             assert!(
                 domain
@@ -447,6 +458,7 @@ fn route_now(
                     .insert(
                         task,
                         crate::Assignment {
+                            live,
                             task,
                             attempt,
                             conversation,

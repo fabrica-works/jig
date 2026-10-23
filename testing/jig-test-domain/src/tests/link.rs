@@ -41,7 +41,7 @@ fn a_worker_s_hello_reaches_the_fleet_with_its_bounds() {
 fn a_turn_from_a_link_reaches_the_fleet_with_its_refusals() {
     let mut domain = fixtures::domain();
     let core::Event::Fleet(fleet::Event::Turn { channel, run, attempt, turn, body }) =
-        link::up(&mut domain, fixtures::CHANNEL, fixtures::turn())
+        link::up(&mut domain, fixtures::CHANNEL, fixtures::turn()).expect("routed turn")
     else {
         panic!("a turn reaches the fleet");
     };
@@ -131,7 +131,7 @@ fn channel_records_leave_as_the_hub_s_vocabulary() {
 
 fn received_answer(domain: &mut crate::Domain, up: jig_domain_host::LinkUp) -> (Token, Token, Token, fleet::Answer) {
     let core::Event::Fleet(fleet::Event::Answer { run, attempt, answer, payload, .. }) =
-        link::up(domain, fixtures::CHANNEL, up)
+        link::up(domain, fixtures::CHANNEL, up).expect("routed answer")
     else {
         panic!("an answer reaches the fleet");
     };
@@ -214,6 +214,7 @@ fn prepare_brief_assignment(
         env,
         decision,
         core_request(core::Request::Now(Box::new(core::Now::RunPrepared {
+            live: fixture.live,
             task: fixture.task,
             attempt: fixture.attempt,
             conversation: fixture.conversation,
@@ -297,13 +298,15 @@ fn program_source_lifecycle_routes_without_run_payloads() {
         fixtures::CHANNEL,
         LinkUp::Logins { logins: Box::new([Login { name, state: LoginState::Usable }]) },
     );
-    let core::Event::Fleet(fleet::Event::Logins { channel, logins }) = inventory else {
+    let core::Event::Fleet(fleet::Event::Logins { channel, logins }) = inventory.expect("routed logins") else {
         panic!("typed fleet inventory")
     };
     assert_eq!(channel, fixtures::CHANNEL);
     assert_eq!(logins.as_ref(), [fleet::Login { name: fleet_name, state: fleet::LoginState::Usable }]);
     let result = link::up(&mut domain, fixtures::CHANNEL, LinkUp::SignedOut { name, result: SignOutResult::SignedOut });
-    let core::Event::Fleet(fleet::Event::SignedOut { channel, name: actual, result }) = result else {
+    let core::Event::Fleet(fleet::Event::SignedOut { channel, name: actual, result }) =
+        result.expect("routed sign-out")
+    else {
         panic!("fleet sign-out result")
     };
     assert_eq!(channel, fixtures::CHANNEL);
@@ -519,4 +522,60 @@ fn direct_resume_observes_wall_expiry_without_firing_or_reordering_the_people_ti
 #[test]
 fn the_hosts_endpoint_cap_is_the_fleets() {
     assert_eq!(host::PROGRAM_ENDPOINTS, fleet::PROGRAM_ENDPOINTS);
+}
+
+#[test]
+fn a_text_piece_reaches_the_core_with_its_numbers_and_bytes() {
+    let mut domain = fixtures::domain();
+    for offset in [0, u32::MAX] {
+        let event = link::up(
+            &mut domain,
+            fixtures::CHANNEL,
+            host::LinkUp::Piece {
+                run: fixtures::RUN,
+                attempt: fixtures::ATTEMPT,
+                piece: host::Piece {
+                    turn: 3,
+                    retry: 2,
+                    kind: host::LiveKind::Text,
+                    offset: u64::from(offset),
+                    bytes: Box::from(&b"words"[..]),
+                },
+            },
+        );
+        let Some(core::Event::RunText { run, attempt, turn, retry, offset: actual, text, call }) = event else {
+            panic!("text reaches core")
+        };
+        assert_eq!((run, attempt, turn, retry, actual), (fixtures::RUN, fixtures::ATTEMPT, 3, 2, offset));
+        assert_eq!(text.as_ref(), b"words");
+        assert_eq!(call, None);
+    }
+    assert_eq!(domain.pieces_dropped(), 0);
+}
+
+#[test]
+fn unkept_piece_kinds_and_offsets_are_dropped_and_counted() {
+    let mut domain = fixtures::domain();
+    for (index, (kind, offset)) in [
+        (host::LiveKind::Reasoning, 0),
+        (host::LiveKind::Input { call: Box::from(&b"call"[..]), tool: Box::from(&b"tool"[..]) }, 0),
+        (host::LiveKind::Text, u64::from(u32::MAX) + 1),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        assert!(
+            link::up(
+                &mut domain,
+                fixtures::CHANNEL,
+                host::LinkUp::Piece {
+                    run: fixtures::RUN,
+                    attempt: fixtures::ATTEMPT,
+                    piece: host::Piece { turn: 3, retry: 2, kind, offset, bytes: Box::from(&b"words"[..]) },
+                }
+            )
+            .is_none()
+        );
+        assert_eq!(domain.pieces_dropped(), u64::try_from(index + 1).expect("three cases"));
+    }
 }

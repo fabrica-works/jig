@@ -19,6 +19,12 @@ pub enum LinkDown {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum LinkUp {
+    /// A piece of live content (hosts.md, 6.5).
+    Piece {
+        run: Token,
+        attempt: Token,
+        piece: crate::Piece,
+    },
     Logins {
         logins: Box<[Login]>,
     },

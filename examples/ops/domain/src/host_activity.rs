@@ -7,7 +7,8 @@ use skein_lib::{Queue, Token};
 
 pub(crate) fn drain(domain: &mut host::Domain, capacity: u32, work: &mut Queue<Work>) {
     for _ in 0..capacity {
-        let Some(host::LinkUp::Activity { run, attempt, activity }) = domain.pop_activity() else { break };
+        let Some(record) = domain.pop_activity() else { break };
+        let host::LinkUp::Activity { run, attempt, activity } = record else { continue };
         work.push(Work::Core(core::Event::Fleet(fleet::Event::Observe {
             channel: Token::new(0),
             run,

@@ -236,6 +236,7 @@ pub(super) fn charter(
             identity: charter::run_identity(deployment, value.task, value.conversation),
             workspace: None,
             save: false,
+            live: host::LiveAsk { text: value.live.text, reasoning: value.live.reasoning, input: value.live.input },
             charter: encoded,
             grants: grants.into_boxed(),
         },

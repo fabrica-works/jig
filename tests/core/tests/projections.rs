@@ -440,3 +440,14 @@ fn tracked_goal(world: &mut World) -> u64 {
         })
         .expect("tracked goal admitted")
 }
+
+#[test]
+fn a_conversation_asks_for_text_and_its_delegate_asks_for_nothing() {
+    let (mut world, _) = tree_world();
+    let parent = world.assigned.as_ref().expect("conversation assigned");
+    let task = parent.task;
+    assert_eq!(parent.live, core::LiveAsk { text: true, reasoning: false, input: false });
+    let child = delegate_agent(&mut world, b"Delegate", 20, 0, 0);
+    assert_ne!(child.0, task, "delegate admitted: {:?}", world.answers);
+    assert_eq!(world.assigned.as_ref().expect("delegate assigned").live, core::LiveAsk::NONE);
+}

@@ -1300,7 +1300,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 writes: Some(Box::new([])),
             }));
         }
-        core::Now::RunPrepared { task, attempt, conversation, run, messages, transcript, grants, .. } => {
+        core::Now::RunPrepared { live, task, attempt, conversation, run, messages, transcript, grants, .. } => {
             let budget = run.budget;
             let placement = run.placement;
             let sections = domain.briefs.remove(&task).expect("completed brief parts");
@@ -1310,6 +1310,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 task,
                 attempt,
                 conversation,
+                live,
                 *run,
                 sections,
                 transcript,
@@ -1542,7 +1543,7 @@ pub(crate) fn host_out(
                     work.push(Work::Host(host::Event::RelayCancelled { run, attempt, call }));
                 }
 
-                host::Request::Hello { .. } => {}
+                host::Request::Up(host::LinkUp::Piece { .. }) | host::Request::Hello { .. } => {}
                 host::Request::Prepare { owner, .. } => work.push(Work::Host(host::Event::Unprepared {
                     owner,
                     failure: host::Preparation::Permanent { resource: None },

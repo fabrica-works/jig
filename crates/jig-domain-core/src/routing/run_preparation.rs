@@ -173,6 +173,11 @@ pub(super) fn workspace_prepared(
     };
     assert!(core.claiming.insert(task, attempt) == Ok(None), "one pending claim per task");
     out.push(Request::Now(Box::new(Now::RunPrepared {
+        live: crate::LiveAsk {
+            text: core.tasks.task(task).expect("live task").flags.conversation,
+            reasoning: false,
+            input: false,
+        },
         task,
         attempt,
         conversation,

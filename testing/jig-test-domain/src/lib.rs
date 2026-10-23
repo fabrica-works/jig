@@ -108,6 +108,7 @@ pub enum Delivery {
 /// The root's assembled, worker assignment.
 #[derive(Debug)]
 pub struct Assignment {
+    pub live: core::LiveAsk,
     /// Ordered sections selected by the brief child, typed until protocol routing.
     pub brief: Box<[jig_domain_brief::GatherPlaced]>,
     /// The conversation's first attempt, shared by its resumes.
@@ -320,6 +321,7 @@ pub struct Config {
 /// The root's live components and one commit barrier.
 #[derive(Debug)]
 pub struct Domain {
+    pieces_dropped: u64,
     core: core::Core,
     first: connector::Domain,
     second: connector::Domain,
@@ -402,6 +404,12 @@ impl Domain {
         );
         assert!(out.is_empty(), "fixed hold vocabulary has no effects");
     }
+    /// Pieces whose kind or offset the core cannot keep (engine.md, 11).
+    #[must_use]
+    pub fn pieces_dropped(&self) -> u64 {
+        self.pieces_dropped
+    }
+
     /// Build the testing application without issuing a store request.
     #[must_use]
     pub fn new(config: Config, limits: &Limits) -> Domain {
@@ -415,6 +423,7 @@ impl Domain {
             "journal admits the whole core and connector route before stepping"
         );
         Domain {
+            pieces_dropped: 0,
             core: core::Core::new(config.core, &limits.core).expect("fixture core configuration"),
             first: connector::Domain::new(config.first, &limits.connector),
             second: connector::Domain::new(config.second, &limits.connector),

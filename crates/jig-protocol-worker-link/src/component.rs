@@ -301,6 +301,10 @@ impl Component {
         }
     }
     fn up(&mut self, now: Time, up: host::LinkUp, parts: &[wire::Part], out: &mut Queue<Request>) {
+        if let host::LinkUp::Piece { .. } = up {
+            self.facts = self.facts.saturating_add(1);
+            return;
+        }
         match self.phase {
             Phase::Open { hello: true, .. } => {
                 let limits = sizes::limits(&self.limits.sizes).expect("checked sizes");
@@ -308,6 +312,7 @@ impl Component {
                     host::LinkUp::Call { run, attempt, call, .. } => Some((*run, *attempt, bytes::copy_of(call))),
                     host::LinkUp::Logins { .. }
                     | host::LinkUp::SignedOut { .. }
+                    | host::LinkUp::Piece { .. }
                     | host::LinkUp::Activity { .. }
                     | host::LinkUp::Unauthorized { .. }
                     | host::LinkUp::Limited { .. }
