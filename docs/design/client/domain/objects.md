@@ -416,7 +416,8 @@ will do:
   then on ("reserves 6 from your pool"). `shapes::close_chat` gives one
   compound request (client.md, section 19): a `Cancel` or a `Move` for
   each live delegate, as the person chose, then a `Cancel` of the chat
-  with the chat template's grace, all made or none.
+  with the chat template's grace, as `me` offers it now, or none once
+  the template is removed, all made or none.
 - **Take over:** a `Move`; makes the party the task's requester, so it
   outlives the task that asked for it; its budget reserved from their
   pool from then on, which the card shows, and refused if it does not

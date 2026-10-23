@@ -500,8 +500,10 @@ Every request has one answer, of one of these kinds:
     batch giving `AsAllowed`; the conversation flag on a task that is not
     an agent's; a proposed batch giving `AsAllowed`; a project's name out
     of shape, saying which rule; a change of settings whose settings
-    would fail their check, naming the item and what fails, or that
-    changes nothing);
+    would fail their check, naming the setting and its fault, one of
+    the check's closed list (`../../domain/engine.md`, 17.1), or that
+    changes nothing). A client words each refusal of a change from
+    these facts, checking no setting itself;
   - *key conflict:* the key names another ask, which is a client's bug
     where the client drew the key (3.1);
   - *account move:* an account's move refused, saying why: *not signed
@@ -608,7 +610,13 @@ served is held, kept and unsent, for its owner's version (client.md,
     positions: one over results, one per conversation over its turns;
   - *a proposal, an escalation, a question, a person task, a result:* each
     object whole, with the acts the party may make on it and what each
-    would do;
+    would do; a pending proposal of settings with its review
+    (`../../domain/engine.md`, 17.6): the revision it was made against,
+    the newest, and for each item the setting, what becomes of it, what
+    it is now (its value, following its default or the change of which
+    revision, or not offered) and what it would be, each value within
+    the document's bound or with its size, as a revision's items are
+    (section 6);
   - *an activity line:* one of a task's words, run boundaries, turns,
     results heard, news heard, decisions, in commit order; a turn as its
     bytes, within the page's byte bound, which the client's link
@@ -947,7 +955,7 @@ party reads is therefore never lost by a crash.
 | `tasks{query}`: a task query's page (6.1) | live state, then the store's indexes of ended tasks |
 | a project; its spend, a page; its notes, a page | live state; the store; the notes child |
 | the deployment | live state |
-| `settings`; `setting{kind, scope, number, revision}`: one setting's value whole, as the newest reads it, or, for a charter, as a held revision reads it; a revision's items, as it set them | live state; the store's history, for a revision no longer held (`../../domain/engine.md`, 17.7) |
+| `settings`; `setting{kind, scope, number, revision}`: one setting's value whole, as the newest reads it, or, for a charter, as a held revision reads it; `revision{n}`: a revision's record and its items, as it set them; `revisions`: its records, a page, newest first | live state; the store's history, for a revision no longer held (`../../domain/engine.md`, 17.7) |
 | an application's read, naming its owner, its scope and its window (7.5) | its owner, the connector, through the engine's root |
 
 - **An ended subject is read, not watched.** A watch on a subject that
@@ -984,6 +992,25 @@ party reads is therefore never lost by a crash.
     client keeps the size the wire carries for a turn too large for a
     page (5.3);
   - *malformed,* when it does not decode, as a page's turn is (5.3).
+- **A revision** is read by its number, by a party who may read the
+  `settings` (5.1), a project's items by a party with a role there.
+  `revision{n}`'s answer is:
+  - *the revision:* its record (the revision it was made against, when,
+    who decided it, a party, the release or the first start, the
+    proposal it came from, whether it moved running work) and its
+    items, each a setting by kind, scope and number and what became of
+    it, set with the value whole, removed, or reset; an item's value
+    past the single read's bound comes with its size instead, as too
+    large, read whole by `setting{…}` while its revision is held;
+  - *forgotten,* a revision made but erased past the history
+    (`../../domain/engine.md`, 17.7), naming the oldest kept;
+  - *unknown,* past the newest;
+  - *busy,* as any read.
+- **`revisions`** is the history a page at a time, newest first, from
+  the newest or a cursor: each row a record without values, its items
+  as settings and what became of each, cut at the page's bound with how
+  many more. The last page says whether older revisions were forgotten.
+  It is read, never watched: the `settings`' mark says a revision came.
 
 ### 6.1 Task queries
 

@@ -1589,7 +1589,15 @@ section 17; the records are `../protocol/store.md`, 4.4.
   set. One function of the core's runs it: at each start over the
   defaults and the current settings, and for a change over the settings
   it would leave. Its refusal names a setting by kind and number, which
-  the parser maps to the document's path when the document gave it.
+  the parser maps to the document's path when the document gave it,
+  and its fault, one of a closed list a client words without checking
+  anything itself: *shape* (a member out of its form or past its
+  bound), *count* (its kind past its limit), *reference* (it names a
+  charter, template, model or host the set does not offer), *rules* (a
+  policy above them), *budget* (a charter's below its reserve or short
+  of one costliest completion), *grace* (a template's past the tasks
+  child's span), *owner* (a policy's owner role unable to be a root's
+  requester).
 - **What is not a setting:** the limits, which size memory at the
   start; the hosts, the LLM providers and models, the connectors, the
   clients and the first owners, the document's; and each project's own
@@ -1797,6 +1805,16 @@ Its code comes after the rest (`../STATUS.md`).
   each pending proposal of settings made against an older one, as no
   longer applying (tasks.md, section 9), and its proposer hears so; a
   fresh proposal names the newest.
+- **Reviewed against its own revision.** A pending proposal is always
+  against the newest, the stale ones withdrawn, so the core serves its
+  review from the current settings: for each item, the setting, what
+  becomes of it (set, removed, reset), what it is now (its value, and
+  whether it follows its default or the change of which revision, or
+  that it is not offered) and what it would be (the value set, none, or
+  its default's). A reviewer never compares against a later revision
+  than the proposal's; once decided or withdrawn, a proposal carries its
+  items alone, and an accepted one names the revision it made
+  (`../client/domain/contract.md`, 5.1).
 - **Bounded:** pending proposals of settings in the deployment are a
   limit of their own, each priced at a whole set (17.8), beside the
   tasks child's limits on pending proposals.
@@ -1817,7 +1835,11 @@ Its code comes after the rest (`../STATUS.md`).
   and for the latest ones within the history limit (17.8); the decision
   that makes a revision, or that ends the last holder of one, erases
   those that fall out. Restoring a version
-  proposes its items again, against the newest.
+  proposes its items again, against the newest. History is read from
+  the store, a revision by its number and the records a page at a
+  time, newest first, each with what it changed; a revision erased is
+  answered as forgotten, naming the oldest kept
+  (`../client/domain/contract.md`, section 6).
 - **A start** reads the settings right after the deployment's
   numbers, before any other record of the core's (section 6, step 1):
   the stored defaults, the changes, the held revisions' records and the

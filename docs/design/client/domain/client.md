@@ -1087,7 +1087,10 @@ with a person in front of a tree, are view.md's, 18.10.
     `Create`;
   - `shapes::close_chat(task, disposals)` gives one compound request:
     each live delegate cancelled or moved to the party, then the chat
-    cancelled with the template's grace;
+    cancelled with the grace of the chat template `me` offers now, or
+    with none once a change of settings removed it: closing is an act,
+    and reads the newest settings as every act does
+    (`../../domain/core.md`, section 13), so a chat can always be closed;
   - `shapes::set_goal(..)` fills the goal template, compares the draft
     with the project's creating bounds in `me` (contract.md, 5.3), a
     deadline given as a span within both, for the engine to judge, and
