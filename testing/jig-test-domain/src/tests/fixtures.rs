@@ -129,6 +129,7 @@ pub fn domain() -> Domain {
                         policy: run().policy,
                     }]),
                     resume_bytes: 256,
+                    tail_bytes: 128,
                     tools: core::ToolFamilies::JIG,
                     key_bytes: 256,
                     llm_providers: jig_domain_accounts::Providers {

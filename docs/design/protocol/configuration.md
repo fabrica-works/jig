@@ -157,6 +157,8 @@ display name is configured.
   - *the engine's tool families' bits* in an authority: jig's own
     numbering, the same in every deployment; a charter names the
     families it allows;
+  - *a fresh brief's transcript text:* `core.brief_core_budgets.tail`,
+    2048 bytes in the small profile, separate from the task section's budget;
   - *a resumed conversation's bytes and the hub's turns:* limits, from
     the profile (section 6).
 - **Resources and homes come by adoption,** after the first start, by an

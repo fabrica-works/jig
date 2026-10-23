@@ -104,8 +104,8 @@ pub(crate) fn store(
             if !domain.core.transcripts.contains_key(&task) {
                 return;
             }
-            for row in rows {
-                if !domain.core.append_transcript(task, row) {
+            for (row, text) in rows {
+                if !domain.core.append_transcript(task, row, text) {
                     work.push(Work::Core(core::Event::PreparationFailed { task }));
                     return;
                 }

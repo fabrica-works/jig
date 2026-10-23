@@ -160,6 +160,7 @@ fn profile() -> root::Limits {
             brief: jig_domain_brief::Limits { briefs: 2, sections: 3, read_bytes: 256, brief_bytes: 384 },
             brief_parts: 2,
             brief_core_budgets: core::CoreBriefBudgets {
+                tail: 128,
                 task: 128,
                 dependencies: 128,
                 attempts: 128,
@@ -369,6 +370,7 @@ pub fn config(seed: u64) -> root::Config {
                     },
                 }]),
                 resume_bytes: 256,
+                tail_bytes: 128,
 
                 tools: core::ToolFamilies::JIG,
                 key_bytes: 256,

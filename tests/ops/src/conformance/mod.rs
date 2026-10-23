@@ -685,7 +685,21 @@ impl Application for Ops {
                 }
                 vec![Input::Event(root::Event::Store(root::Store::Transcript {
                     task,
-                    rows: rows.into_boxed_slice(),
+                    rows: rows
+                        .into_iter()
+                        .map(|row| {
+                            let limits = jig_protocol_transcript::Limits::new(
+                                u32::try_from(row.transcript.len()).expect("stored turn bound"),
+                                jig_client_domain::contract::TurnLimits {
+                                    messages: u32::MAX,
+                                    blocks: u32::MAX,
+                                    text: u32::try_from(row.transcript.len()).expect("stored turn bound"),
+                                },
+                            );
+                            let text = jig_protocol_transcript::brief_text(&limits, &row.transcript).ok();
+                            (row, text)
+                        })
+                        .collect(),
                     done: true,
                 }))]
             }

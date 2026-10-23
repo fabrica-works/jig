@@ -79,6 +79,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
             models: engine.llm.models.clone(),
             charters: engine.charters.clone(),
             resume_bytes: limits.resume_bytes,
+            tail_bytes: limits.brief_core_budgets.tail,
             tools: domain::ToolFamilies::JIG,
             key_bytes: engine
                 .limits

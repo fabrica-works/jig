@@ -23,7 +23,7 @@ pub enum Store {
     /// The store completed this exact restart range.
     Restored(core::RestartStep),
     /// Ordered opaque transcript rows for a prepared activation.
-    Transcript { task: u64, rows: Box<[core::TurnRecord]>, done: bool },
+    Transcript { task: u64, rows: Box<[core::TranscriptRow]>, done: bool },
     /// A child-specific loaded page in the core's vocabulary.
     Loaded(core::Event),
 }

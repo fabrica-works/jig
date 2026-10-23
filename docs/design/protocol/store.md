@@ -668,8 +668,9 @@ the committed length. The next open cuts the file to its committed length
   bound has its fields and length read, not its bytes.
 - **A page of a task's turns,** forwards or backwards, from a cursor that
   is an offset the component gives and takes back.
-- **A tail,** for a fresh run's brief: backwards from the end, within the
-  section's budget.
+- **A tail,** for a fresh run's brief: the window's last turns as text,
+  each rendered by the host's protocol layer when loaded, within the
+  tail's own budget.
 - **Never past what is committed.**
 - **A frame that fails its checksum** fails the read as unread. The core
   treats the transcript as one the agent cannot use: the run fails as

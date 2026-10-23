@@ -502,7 +502,7 @@ fn set_core(limits: &mut jig_domain_core::Limits, name: &[u8], value: u64) -> Re
         documents: _,
         views: _,
     } = limits;
-    let jig_domain_core::CoreBriefBudgets { task, dependencies, attempts, plan, notes } = brief_core_budgets;
+    let jig_domain_core::CoreBriefBudgets { tail, task, dependencies, attempts, plan, notes } = brief_core_budgets;
     match name {
         b"templates" => *templates = count(value)?,
         b"fill_mark" => *fill_mark = value,
@@ -516,6 +516,7 @@ fn set_core(limits: &mut jig_domain_core::Limits, name: &[u8], value: u64) -> Re
         b"call_records" => *call_records = count(value)?,
         b"call_answer_bytes" => *call_answer_bytes = count(value)?,
         b"brief_parts" => *brief_parts = count(value)?,
+        b"brief_core_budgets.tail" => *tail = count(value)?,
         b"brief_core_budgets.task" => *task = count(value)?,
         b"brief_core_budgets.dependencies" => *dependencies = count(value)?,
         b"brief_core_budgets.attempts" => *attempts = count(value)?,

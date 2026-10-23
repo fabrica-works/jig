@@ -78,7 +78,7 @@ fn window_turns(store: &mut Store, task: u64) -> Vec<Box<[u8]>> {
     let mut found = Vec::new();
     for answer in store.answers() {
         if let Up::Root(root::Event::TranscriptLoaded { rows, .. }) = answer {
-            found.extend(rows.into_vec().into_iter().map(|row| row.transcript));
+            found.extend(rows.into_vec().into_iter().map(|(row, _)| row.transcript));
         }
     }
     found

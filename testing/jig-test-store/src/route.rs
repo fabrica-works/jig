@@ -233,7 +233,24 @@ pub fn up(routes: &mut Routes, event: Event, into: &mut Queue<Up>) {
             let Some(Flight::Window { task, .. }) = routes.pending.get(&owner) else {
                 return;
             };
-            into.push(Up::Root(root::Event::TranscriptLoaded { task: *task, rows: turns, done: next.is_none() }));
+            let mut rows = List::with_capacity(u32::try_from(turns.len()).expect("bounded store page"));
+            for turn in turns {
+                let limits = jig_protocol_transcript::Limits::new(
+                    u32::try_from(turn.transcript.len()).expect("stored turn bound"),
+                    jig_protocol_transcript::TurnLimits {
+                        messages: u32::MAX,
+                        blocks: u32::MAX,
+                        text: u32::try_from(turn.transcript.len()).expect("stored turn bound"),
+                    },
+                );
+                let text = jig_protocol_transcript::brief_text(&limits, &turn.transcript).ok();
+                rows.push((turn, text)).expect("bounded store page");
+            }
+            into.push(Up::Root(root::Event::TranscriptLoaded {
+                task: *task,
+                rows: rows.into_boxed(),
+                done: next.is_none(),
+            }));
             if let Some(after) = next {
                 if let Some(request) = transcript(routes, owner, Some(after)) {
                     into.push(Up::Ask(request));

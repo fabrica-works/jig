@@ -139,7 +139,8 @@ fn a_window_read_reaches_the_root_as_transcript_pages() {
             Up::Root(root::Event::TranscriptLoaded { task, rows, done }) => {
                 assert_eq!(task, 21);
                 pages = pages.checked_add(1).expect("bounded pages");
-                for row in rows {
+                for (row, text) in rows {
+                    assert!(text.is_none());
                     assert_eq!(row.turn, expected_turn);
                     assert_eq!(row.transcript.as_ref(), b"opaque");
                     expected_turn = expected_turn.checked_add(1).expect("bounded turns");

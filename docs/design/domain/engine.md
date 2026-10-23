@@ -948,7 +948,9 @@ whom; its delegates, their states, and the
   attempts and why they failed; the calls its task committed since its
   last turn, when it does not resume; the proposals and escalations
   waiting for its decision; the index of its notes; a transcript's tail,
-  when it does not resume; and, for a run whose tools hold `delegate`,
+  when it does not resume, the window's last turns as text rendered by the
+  host's protocol layer when loaded, within the tail's own budget; and,
+  for a run whose tools hold `delegate`,
   the catalogue: each model its authority allows (authority.md, section
   3), with its LLM provider, its window and output, its efforts, its
   prices, and what it is good at, a description its configuration gives

@@ -78,6 +78,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
             deployment_provider: 2,
             models: Box::new([model()]),
             resume_bytes: 256,
+            tail_bytes: 128,
             tools: core::ToolFamilies::JIG,
             key_bytes: 256,
             llm_providers: jig_domain_accounts::Providers::none(),

@@ -426,7 +426,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     )?)?;
     total = total.checked_add(bytes(
         task.tasks,
-        Queue::<Box<[u8]>>::worst_case(limits.resume_bytes)?.checked_add(u64::from(limits.resume_bytes))?,
+        Queue::<Box<[u8]>>::worst_case(limits.resume_bytes)?
+            .checked_add(u64::from(limits.resume_bytes))?
+            .checked_add(Queue::<crate::transcript_text::TranscriptText>::worst_case(limits.brief_core_budgets.tail)?)?
+            .checked_add(u64::from(limits.brief_core_budgets.tail))?,
     )?)?;
     total = total.checked_add(bytes(limits.authority.projects, limits.policy_bytes)?)?;
     // First-start seeds coexist with the configured policy table until people restore. Each held
@@ -488,6 +491,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(task.message_bytes))?
         .checked_add(u64::from(limits.brief.brief_bytes))?
         .checked_add(u64::from(limits.resume_bytes))?
+        .checked_add(u64::from(limits.brief_core_budgets.tail))?
         .checked_add(u64::from(limits.people.batch).checked_mul(
             u64::from(limits.people.amendment_bytes).checked_add(sizeof(size_of::<people::Member>())?)?,
         )?)?

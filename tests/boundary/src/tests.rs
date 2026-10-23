@@ -156,6 +156,7 @@ fn the_test_store_links_only_its_codec_boundary_and_foundation() {
             "jig-domain-notes",
             "jig-domain-people",
             "jig-protocol-store",
+            "jig-protocol-transcript",
             "skein-kv",
             "skein-lib",
             "skein-codec",

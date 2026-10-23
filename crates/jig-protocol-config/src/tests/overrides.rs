@@ -440,3 +440,13 @@ fn the_accounts_move_deadline_is_positive_and_overridden_in_milliseconds() {
     assert_eq!(parse(br#"{"profile":"small","overrides":{"accounts.move_deadline_ms":12345}}"#), Ok(expected));
     refused(br#"{"profile":"small","overrides":{"accounts.move_deadline_ms":0}}"#, b"accounts.move_deadline_ms");
 }
+
+#[test]
+fn the_tail_has_its_own_profile_budget_and_override() {
+    let mut expected = small();
+    assert_eq!(expected.core.brief_core_budgets.tail, 2048);
+    let before = jig_domain_core::worst_case(&expected.core).unwrap();
+    expected.core.brief_core_budgets.tail = 90;
+    assert_eq!(parse(br#"{"profile":"small","overrides":{"core.brief_core_budgets.tail":90}}"#), Ok(expected));
+    assert!(jig_domain_core::worst_case(&expected.core).unwrap() < before);
+}

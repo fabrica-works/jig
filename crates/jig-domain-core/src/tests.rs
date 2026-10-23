@@ -160,7 +160,14 @@ pub(super) fn limits() -> Limits {
         fleet,
         brief: jig_domain_brief::Limits { briefs: 2, sections: 3, read_bytes: 256, brief_bytes: 384 },
         brief_parts: 2,
-        brief_core_budgets: CoreBriefBudgets { task: 128, dependencies: 128, attempts: 128, plan: 128, notes: 64 },
+        brief_core_budgets: CoreBriefBudgets {
+            tail: 128,
+            task: 128,
+            dependencies: 128,
+            attempts: 128,
+            plan: 128,
+            notes: 64,
+        },
         accounts: accounts::Limits {
             accounts: 1,
             holder_accounts: 1,
@@ -329,6 +336,7 @@ fn config(seed: u64) -> Config {
                 },
             }]),
             resume_bytes: 256,
+            tail_bytes: 128,
 
             tools: ToolFamilies::JIG,
             key_bytes: 256,

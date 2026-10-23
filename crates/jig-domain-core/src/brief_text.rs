@@ -115,7 +115,7 @@ pub fn read_brief_part(core: &Core, limits: BriefTextLimits, task: u64, part: Br
         if let Some(last) = part.bytes.last() {
             ended_line = *last == b'\n';
         }
-        if part.left > 0 {
+        if !tail && part.left > 0 {
             length = length
                 .checked_add(usize::from(!tail && !ended_line))?
                 .checked_add(1)?
@@ -130,11 +130,6 @@ pub fn read_brief_part(core: &Core, limits: BriefTextLimits, task: u64, part: Br
     let mut writer = Writer::new(length);
     let mut ended_line = true;
     for part in parts {
-        if tail && part.left > 0 {
-            writer.put(b"[").expect("measured cut marker");
-            writer.put(Decimal::of(part.left).as_bytes()).expect("measured lost count");
-            writer.put(b" bytes cut]\n").expect("measured cut marker");
-        }
         writer.put(&part.bytes).expect("measured part");
         if let Some(last) = part.bytes.last() {
             ended_line = *last == b'\n';
@@ -461,24 +456,46 @@ fn dependency_read(results: &[HistoricalResult], added: &[tasks::Added], bytes: 
 }
 
 fn tail_read(transcript: &Transcript, bytes: u32) -> BriefRead {
-    let lengths = u64::from(transcript.turns.len()).checked_mul(4).expect("bounded retained lengths");
-    let bodies = transcript.kept.checked_sub(lengths).expect("retained lengths were counted");
-    let kept = u64::from(bytes).min(bodies);
-    let skip = bodies.checked_sub(kept).expect("tail within kept bodies");
-    let mut writer = Writer::new(usize::try_from(kept).expect("u32 bound fits usize"));
-    let mut passed = 0_u64;
-    for turn in &transcript.turns {
-        let end = passed.checked_add(u64::try_from(turn.len()).expect("bounded turn")).expect("bounded retained tail");
-        if end > skip {
-            let from = usize::try_from(skip.saturating_sub(passed)).expect("bounded offset");
-            writer.put(turn.get(from..).expect("tail starts inside retained turn")).expect("tail fits chosen budget");
+    let mut kept = transcript.text_kept;
+    let mut skipped = 0_u32;
+    let mut cut = None;
+    for text in &transcript.texts {
+        if kept <= u64::from(bytes) {
+            break;
         }
-        passed = end;
+        kept = kept.checked_sub(u64::try_from(text.bytes.len()).expect("bounded text")).expect("counted texts");
+        skipped = skipped.checked_add(1).expect("bounded text count");
+        if kept < u64::from(bytes) {
+            cut = Some(crate::transcript_text::cut_transcript_text(
+                &text.bytes,
+                usize::try_from(u64::from(bytes).checked_sub(kept).expect("room for oldest text"))
+                    .expect("bounded read"),
+            ));
+            break;
+        }
     }
-    let text = writer.finish();
+    let mut shown = 0_u64;
+    let extra = match &cut {
+        Some(cut) => cut.bytes.len(),
+        None => 0,
+    };
+    let mut writer =
+        Writer::new(usize::try_from(kept).expect("bounded text").checked_add(extra).expect("bounded read"));
+    if let Some(cut) = cut {
+        writer.put(&cut.bytes).expect("measured oldest text");
+        shown = cut.shown;
+    }
+    let mut position = 0_u32;
+    for text in &transcript.texts {
+        if position >= skipped {
+            writer.put(&text.bytes).expect("measured whole text");
+            shown = shown.checked_add(text.shown).expect("loaded text count");
+        }
+        position = position.checked_add(1).expect("bounded text count");
+    }
     BriefRead::Got(Box::new([BriefFragment {
-        left: transcript.bytes.saturating_sub(u64::try_from(text.len()).expect("bounded tail")),
-        bytes: text,
+        left: transcript.text_bytes.checked_sub(shown).expect("shown original text was loaded"),
+        bytes: writer.finish(),
     }]))
 }
 
@@ -597,4 +614,39 @@ fn task_read(record: &tasks::RunContext, parts: u32, bytes: u32) -> BriefRead {
             .expect("bounded omitted bytes");
     }
     BriefRead::Got(gathered.into_boxed())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use skein_lib::Queue;
+
+    #[test]
+    fn tail_reads_count_only_omitted_original_text_and_cut_the_oldest_text() {
+        let mut transcript = Transcript {
+            window: None,
+            previous_attempt: 1,
+            last: None,
+            from: 1,
+            bytes: 0,
+            kept: 0,
+            turns: Queue::with_capacity(0),
+            texts: Queue::with_capacity(128),
+            text_bytes: 0,
+            text_kept: 0,
+        };
+        for byte in [b'a', b'b', b'c'] {
+            transcript.append_text(Some(Box::from(&[byte; 40][..])), 128);
+        }
+        let BriefRead::Got(parts) = tail_read(&transcript, 90) else { panic!("read tail") };
+        let mut expected = [b'c'; 80];
+        expected.get_mut(..40).unwrap().fill(b'b');
+        assert_eq!(parts[0].bytes.as_ref(), expected);
+        assert_eq!(parts[0].left, 40);
+        let BriefRead::Got(parts) = tail_read(&transcript, 70) else { panic!("read tail") };
+        assert_eq!(parts[0].bytes.get(..19).unwrap(), b"[earlier text cut]\n");
+        assert_eq!(parts[0].bytes.get(19..30).unwrap(), &[b'b'; 11]);
+        assert_eq!(parts[0].bytes.get(30..).unwrap(), &[b'c'; 40]);
+        assert_eq!(parts[0].left, 69);
+    }
 }

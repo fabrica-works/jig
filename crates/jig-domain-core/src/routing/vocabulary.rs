@@ -381,6 +381,8 @@ pub struct Limits {
 /// Budgets for the core's own brief sections.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct CoreBriefBudgets {
+    /// Transcript tail text in a fresh run's brief.
+    pub tail: u32,
     pub task: u32,
     pub dependencies: u32,
     pub attempts: u32,

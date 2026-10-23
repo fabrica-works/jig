@@ -371,7 +371,7 @@ pub(super) fn plan_brief(
             .push(brief::Planned::Core {
                 kind: brief::Core::TranscriptTail,
                 text,
-                limit: env.limits.brief_core_budgets.task,
+                limit: env.limits.brief_core_budgets.tail,
                 priority: 2,
                 required: true,
             })

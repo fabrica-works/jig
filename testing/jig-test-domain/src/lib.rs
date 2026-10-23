@@ -282,7 +282,7 @@ pub enum Event {
     /// A bounded store page of prior opaque turns; pages arrive oldest first.
     TranscriptLoaded {
         task: u64,
-        rows: Box<[core::TurnRecord]>,
+        rows: Box<[core::TranscriptRow]>,
         done: bool,
     },
     /// Store acknowledgement of this exact commit number.
@@ -571,15 +571,15 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
     }
 }
 
-fn transcript_loaded(domain: &mut Domain, env: &Env<Limits>, task: u64, rows: Box<[core::TurnRecord]>, done: bool) {
+fn transcript_loaded(domain: &mut Domain, env: &Env<Limits>, task: u64, rows: Box<[core::TranscriptRow]>, done: bool) {
     if !domain.core.transcripts.contains_key(&task) {
         return;
     }
     if rows.len() > usize::try_from(env.limits.core.resume_bytes).expect("u32 fits usize") {
         return;
     }
-    for row in rows {
-        if !domain.core.append_transcript(task, row) {
+    for (row, text) in rows {
+        if !domain.core.append_transcript(task, row, text) {
             decide(domain, env, Work::Core(core::Event::PreparationFailed { task }));
             return;
         }

@@ -137,10 +137,10 @@ fn stored_turn(attempt: u64, turn: u32, body: &[u8]) -> core::TurnRecord {
 
 fn loaded_transcript_pages_reject_repeated_and_reversed_turns() {
     let mut core = transcript_core((2, 2));
-    assert!(!core.append_transcript(1, stored_turn(2, 1, b"before window")));
-    assert!(core.append_transcript(1, stored_turn(2, 2, b"turn")));
-    assert!(!core.append_transcript(1, stored_turn(2, 2, b"turn")));
-    assert!(!core.append_transcript(1, stored_turn(1, 2, b"old")));
+    assert!(!core.append_transcript(1, stored_turn(2, 1, b"before window"), None));
+    assert!(core.append_transcript(1, stored_turn(2, 2, b"turn"), None));
+    assert!(!core.append_transcript(1, stored_turn(2, 2, b"turn"), None));
+    assert!(!core.append_transcript(1, stored_turn(1, 2, b"old"), None));
     assert_eq!(core.transcripts.get(&1).expect("loaded transcript").bytes, 8);
 }
 
@@ -172,8 +172,8 @@ fn a_window_past_the_resume_limit_starts_fresh_with_its_tail() {
     assert!(!fresh.run.policy.resume);
     assert!(fresh.transcript.is_empty());
     let mut core = transcript_core((2, 2));
-    assert!(core.append_transcript(1, stored_turn(2, 2, &[b'b'; 200])));
-    assert!(core.append_transcript(1, stored_turn(3, 1, &[b'c'; 100])));
+    assert!(core.append_transcript(1, stored_turn(2, 2, &[b'b'; 200]), Some(Box::from(&[b'b'; 200][..]))));
+    assert!(core.append_transcript(1, stored_turn(3, 1, &[b'c'; 100]), Some(Box::from(&[b'c'; 100][..]))));
     let tail = core::read_brief_part(
         &core,
         core::BriefTextLimits { parts: 2, read_bytes: 128, brief_bytes: 256 },
@@ -181,7 +181,7 @@ fn a_window_past_the_resume_limit_starts_fresh_with_its_tail() {
         core::BriefPart::TranscriptTail,
     )
     .expect("window tail");
-    assert_eq!(tail.as_ref(), [b"[208 bytes cut]\n".as_slice(), &[b'c'; 100]].concat());
+    assert_eq!(tail.as_ref(), [b'c'; 100]);
 }
 
 fn an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh() {

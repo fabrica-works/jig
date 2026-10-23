@@ -7,6 +7,7 @@ use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Queue, Token, Wall};
 
+use crate::transcript_text::TranscriptText;
 use crate::translate;
 
 /// The core's decision before a due agent run is prepared or claimed.
@@ -31,6 +32,9 @@ pub struct Transcript {
     pub bytes: u64,
     pub kept: u64,
     pub turns: Queue<Box<[u8]>>,
+    pub texts: Queue<TranscriptText>,
+    pub text_bytes: u64,
+    pub text_kept: u64,
 }
 
 impl Core {
@@ -205,6 +209,9 @@ impl Core {
                         from,
                         bytes: 0,
                         kept: 0,
+                        texts: Queue::with_capacity(self.settings.tail_bytes),
+                        text_bytes: 0,
+                        text_kept: 0,
                         turns: Queue::with_capacity(
                             self.settings.resume_bytes.checked_div(4).expect("nonzero length size")
                         ),
@@ -217,8 +224,9 @@ impl Core {
 
     /// Admit one restored turn in store order, retaining only the bounded
     /// tail while still counting the full current window for resume policy.
+    /// Text is UTF-8 supplied by the host protocol; `None` keeps an unreadable marker.
     #[must_use]
-    pub fn append_transcript(&mut self, task: u64, turn: TurnRecord) -> bool {
+    pub fn append_transcript(&mut self, task: u64, turn: TurnRecord, text: Option<Box<[u8]>>) -> bool {
         let transcript = self.transcripts.get_mut(&task).expect("load belongs to prepared task");
         if turn.task != task || turn.attempt > transcript.previous_attempt || turn.attempt == 0 || turn.turn == 0 {
             return false;
@@ -239,6 +247,7 @@ impl Core {
         let Some(total) = transcript.bytes.checked_add(framed) else { return false };
         transcript.bytes = total;
         transcript.last = Some((turn.attempt, turn.turn));
+        transcript.append_text(text, self.settings.tail_bytes);
         let bound = u64::from(self.settings.resume_bytes);
         if bound < 4 {
             return true;

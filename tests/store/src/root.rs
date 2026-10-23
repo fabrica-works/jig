@@ -134,7 +134,14 @@ pub const CORE_LIMITS: core::Limits = core::Limits {
     fleet: core_fleet_limits(),
     brief: jig_domain_brief::Limits { briefs: 2, sections: 3, read_bytes: 256, brief_bytes: 384 },
     brief_parts: 2,
-    brief_core_budgets: core::CoreBriefBudgets { task: 128, dependencies: 128, attempts: 128, plan: 128, notes: 64 },
+    brief_core_budgets: core::CoreBriefBudgets {
+        tail: 128,
+        task: 128,
+        dependencies: 128,
+        attempts: 128,
+        plan: 128,
+        notes: 64,
+    },
     accounts: jig_domain_accounts::Limits {
         accounts: 1,
         holder_accounts: 1,

@@ -594,3 +594,75 @@ fn a_turns_count_of_jobs_is_not_shown() {
     let with_jobs = smith::Turn::new(&CEILINGS, parts).unwrap();
     assert_eq!(without_jobs, decode(&limits(), &encode(&with_jobs)).unwrap());
 }
+
+#[test]
+fn brief_lines_render_people_agents_calls_and_results() {
+    let turn = source(&[
+        message(smith::Role::User, &[SBlock::Text(text(b"hello"))]),
+        message(smith::Role::Assistant, &[SBlock::Text(text(b"looking")), call(b"id")]),
+        message(
+            smith::Role::User,
+            &[
+                result(b"id", owned(smith::Outcome::NotGranted)),
+                result(
+                    b"other",
+                    smith::Returned::Said(
+                        smith::Said::new(&CEILINGS, smith::SaidParts { text: b"done".as_slice().into(), error: false })
+                            .unwrap(),
+                    ),
+                ),
+            ],
+        ),
+    ]);
+    assert_eq!(brief_text(&limits(), &encode(&turn)).unwrap().as_ref(),
+        b"person: hello\nassistant: looking\ncall read: { \"path\": \"a\" }\nfailed: Tool refused: not granted\nresult: done\n");
+}
+
+#[test]
+fn brief_opaque_blocks_show_only_their_dialect_and_size() {
+    let turn = source(&[message(
+        smith::Role::Assistant,
+        &[SBlock::Opaque(
+            smith::Opaque::new(
+                &CEILINGS,
+                smith::OpaqueParts { dialect: DIALECT, bytes: Box::from(&[0xff, 0, 0x80][..]) },
+            )
+            .unwrap(),
+        )],
+    )]);
+    assert_eq!(brief_text(&limits(), &encode(&turn)).unwrap().as_ref(), b"[opaque 1 block, 3 bytes]\n");
+}
+
+#[test]
+fn brief_text_refuses_broken_records_as_decode_does() {
+    for bytes in [&[0][..], &[0, 4], &[0, 6, 0, 0, 0, 0, 0, 65]] {
+        assert_eq!(brief_text(&limits(), bytes).unwrap_err(), decode(&limits(), bytes).unwrap_err());
+    }
+}
+
+#[test]
+fn brief_output_fits_its_byte_bound_and_ends_in_a_complete_utf8_line() {
+    let block = SBlock::Opaque(
+        smith::Opaque::new(&CEILINGS, smith::OpaqueParts { dialect: DIALECT, bytes: Box::new([]) }).unwrap(),
+    );
+    let mut blocks = List::with_capacity(16);
+    for _ in 0_u8..16 {
+        blocks.push(block.clone()).unwrap();
+    }
+    let turn = source(&[message(smith::Role::Assistant, blocks.as_slice())]);
+    let bytes = encode(&turn);
+    let mut bounds = limits();
+    bounds.bytes = u32::try_from(bytes.len()).unwrap();
+    let rendered = brief_text(&bounds, &bytes).unwrap();
+    assert!(rendered.len() <= bytes.len());
+    assert_eq!(rendered.last(), Some(&b'\n'));
+    assert!(rendered.is_ascii());
+    // Receiving text limits can cut inside a character before brief rendering.
+    bounds.turn.text = 1;
+    assert_eq!(
+        brief_text(&bounds, &encode(&source(&[message(smith::Role::User, &[SBlock::Text(text("é".as_bytes()))])])))
+            .unwrap()
+            .as_ref(),
+        b"person: \n"
+    );
+}

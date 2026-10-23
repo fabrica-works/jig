@@ -75,8 +75,10 @@ mod roles;
 mod routing;
 mod run;
 mod run_choice;
+mod transcript_text;
 pub use host_rule::HostRule;
 pub use run_choice::{RunAllowance, RunChoice, RunWait};
+pub use transcript_text::{TranscriptRow, TranscriptText};
 mod sibling_routes;
 pub use numbers::{Counters, Deployment, Family, fresh};
 pub use routing::{
@@ -175,6 +177,8 @@ pub struct Settings {
     pub charters: Box<[Charter]>,
     /// Maximum committed conversation bytes resumed whole.
     pub resume_bytes: u32,
+    /// Maximum transcript text retained for a fresh run's brief.
+    pub tail_bytes: u32,
     /// Jig's one-bit authority family for each engine tool.
     pub tools: ToolFamilies,
     /// Configured LLM providers, for the accounts child (accounts.md, 3.1).
@@ -567,6 +571,10 @@ impl Core {
         assert!(
             config.settings.resume_bytes > 0 && config.settings.resume_bytes <= limits.resume_bytes,
             "core prices its transcript retention"
+        );
+        assert!(
+            config.settings.tail_bytes <= limits.brief_core_budgets.tail,
+            "core prices its transcript text retention"
         );
         charters::assert_configured(&config.settings, limits);
         templates::assert_configured(&config, limits);

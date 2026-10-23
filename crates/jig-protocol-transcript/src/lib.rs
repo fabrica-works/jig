@@ -3,6 +3,10 @@
 //! refuses unsupported or broken records; a receiving limit cuts the displayed
 //! turn, marked by `Turn::cut`. See client/domain/client.md, 10, and contract.md, 10.
 //!
+//! `brief_text` renders the decoded client blocks as plain UTF-8 lines for a fresh
+//! run's brief, within `Limits::bytes`; opaque blocks show only dialect and size.
+//! It admits exactly the records `decode` admits.
+//!
 //! Calls are numbered by their first call/result block's position within the turn.
 //! Their inputs remain bytes as written. Results also fill the matching call's
 //! outcome, including results outside the display window. This schema has no jig
@@ -12,10 +16,12 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use jig_client_domain::contract::{Block, Call, Message, Speaker, Text, Turn, TurnLimits, Usage};
+pub use jig_client_domain::contract::TurnLimits;
+use jig_client_domain::contract::{Block, Call, Message, Speaker, Text, Turn, Usage};
 use skein_lib::{Decimal, List, Reader};
 use smith_transcript::v6 as smith;
 
+mod brief;
 mod summary;
 #[cfg(test)]
 mod tests;
@@ -63,6 +69,12 @@ pub fn decode(limits: &Limits, bytes: &[u8]) -> Result<Turn, Undecodable> {
     };
     summary::validate(&limits.smith, &source)?;
     Ok(translate(limits.turn, &source))
+}
+
+/// Render one decoded turn as bounded UTF-8 lines for an agent's brief.
+pub fn brief_text(limits: &Limits, bytes: &[u8]) -> Result<Box<[u8]>, Undecodable> {
+    let turn = decode(limits, bytes)?;
+    Ok(brief::render(&turn, limits.bytes))
 }
 
 // Smith's codec reason type is intentionally not a client dependency. Obtain
@@ -193,7 +205,13 @@ struct Budget {
 impl Budget {
     fn text(&mut self, bytes: &[u8]) -> Text {
         let maximum = usize::try_from(self.left).expect("u32 fits usize");
-        let length = bytes.len().min(maximum);
+        let mut length = bytes.len().min(maximum);
+        for _ in 0_u8..3 {
+            match bytes.get(length) {
+                Some(byte) if byte & 0xc0 == 0x80 => length = length.checked_sub(1).expect("UTF-8 prefix"),
+                Some(_) | None => break,
+            }
+        }
         self.cut |= length < bytes.len();
         self.left =
             self.left.checked_sub(u32::try_from(length).expect("bounded length")).expect("length within budget");

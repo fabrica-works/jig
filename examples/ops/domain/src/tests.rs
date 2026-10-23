@@ -850,3 +850,42 @@ fn a_host_start_refusal_assembles_its_grants_cause_with_a_refused_end() {
         assert!(work.is_empty());
     }
 }
+
+#[test]
+fn a_loaded_transcript_passes_its_protocol_rendered_text_to_the_brief() {
+    let (mut domain, env) = fixture();
+    domain.core.begin_transcript(1, 1);
+    domain.core.transcripts.get_mut(&1).unwrap().window = Some((1, 1));
+    step(
+        &mut domain,
+        &env,
+        Event::Store(Store::Transcript {
+            task: 1,
+            rows: Box::new([(
+                core::TurnRecord {
+                    task: 1,
+                    attempt: 1,
+                    turn: 1,
+                    spent: 0,
+                    read: None,
+                    opens_window: true,
+                    at: Wall::EPOCH,
+                    transcript: Box::from(&[0xff, 0x80][..]),
+                },
+                Some(Box::from(&b"assistant: conversation before restart\n"[..])),
+            )]),
+            done: false,
+        }),
+    );
+    assert_eq!(
+        core::read_brief_part(
+            &domain.core,
+            core::BriefTextLimits { parts: 1, read_bytes: 128, brief_bytes: 128 },
+            1,
+            core::BriefPart::TranscriptTail
+        )
+        .expect("ops preparation tail")
+        .as_ref(),
+        b"assistant: conversation before restart\n"
+    );
+}

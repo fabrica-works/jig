@@ -154,6 +154,7 @@ fn the_cores_settings_take_the_deployment_provider() {
 fn the_cores_limits_and_tools_take_the_profile_and_jigs_numbering() {
     let core = core_config(fixtures::ENGINE_SMALL);
     assert_eq!(core.settings.resume_bytes, 65536);
+    assert_eq!(core.settings.tail_bytes, 2048);
     assert_eq!(core.hub_turns, 8);
     assert_eq!(core.settings.tools.message, jig_domain_authority::Tools(2));
 }
@@ -337,6 +338,9 @@ fn memory_below_the_components_sum_is_refused() {
     // Live pieces price all 64 hub activity slots at the piece bound plus
     // Input's provider id and tool wire bounds (hosts.md, 6.5).
     const LIVE_PIECE_GROWTH: u64 = 64 * (4096 + 256 + 64);
+    // Each of 8 preparations keeps 2048 bytes and 2048 24-byte text carriers.
+    // Each of 18,590 routed payloads and 4 loads prices one more tail buffer.
+    const TRANSCRIPT_TEXT_GROWTH: u64 = 8 * (2048 * 24 + 2048) + (18_590 + 4) * 2048;
     // Finishing (domain/root.md, section 3; domain/people.md, section 3):
     // people's sign_in_worst_case adds Set<(Wall, u64)> at 8 sign-ins: 576 bytes.
     // Core's Reconciliation scratch replaces the views' Token snapshot:
@@ -485,6 +489,7 @@ fn memory_below_the_components_sum_is_refused() {
         + LIVE_ASK_GROWTH
         + FINISH_MESSAGE_GROWTH
         + LIVE_PIECE_GROWTH
+        + TRANSCRIPT_TEXT_GROWTH
         // Deployment role storage and project-role scratch: people.projects 2 -> 3.
         + 7_288
         // Project names: (18,570 route + 4 load) payloads * 64 bytes,
