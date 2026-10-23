@@ -1,4 +1,4 @@
-//! Total translations of the worker records (protocol/channel.md, section 3).
+//! Total translations of the worker records (protocol/channel.md, sections 3 and 6.4).
 use alloc::boxed::Box;
 use jig_domain_host as host;
 use jig_protocol_worker_wire as wire;
@@ -68,7 +68,7 @@ pub(crate) enum Up {
     Limited(wire::Limited),
     AccountRefused(wire::AccountRefused),
 }
-pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v6::Limits) -> Option<Up> {
+pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v7::Limits) -> Option<Up> {
     let mut found = None;
     for rule in wire::KINDS {
         if rule.kind == kind {
@@ -199,9 +199,31 @@ fn optional_token(value: Option<u64>) -> Option<Token> {
 }
 fn fact(record: wire::Fact) -> host::LinkUp {
     let fields = record.into_parts();
-    let activity = match fields.activity {
-        wire::Activity::Phase(value) => host::Activity::Phase(phase(value.into_parts().value)),
-        wire::Activity::Long(value) => {
+    let activity = match fields.value {
+        wire::FactValue::Piece(piece) => {
+            let piece = piece.into_parts();
+            let kind = match piece.kind {
+                wire::LiveKind::Text => host::LiveKind::Text,
+                wire::LiveKind::Reasoning => host::LiveKind::Reasoning,
+                wire::LiveKind::Input(call) => {
+                    let call = call.into_parts();
+                    host::LiveKind::Input { call: call.id, tool: call.tool }
+                }
+            };
+            return host::LinkUp::Piece {
+                run: Token::new(fields.task),
+                attempt: Token::new(fields.attempt),
+                piece: host::Piece {
+                    turn: piece.turn,
+                    retry: piece.retry,
+                    kind,
+                    offset: piece.offset,
+                    bytes: piece.bytes,
+                },
+            };
+        }
+        wire::FactValue::Phase(value) => host::Activity::Phase(phase(value.into_parts().value)),
+        wire::FactValue::Long(value) => {
             let fields = value.into_parts();
             let operation = match fields.operation {
                 wire::Operation::Checks => host::Operation::Checks,
@@ -210,8 +232,8 @@ fn fact(record: wire::Fact) -> host::LinkUp {
             };
             host::Activity::Long { operation, span: fields.span }
         }
-        wire::Activity::LongDone => host::Activity::LongDone,
-        wire::Activity::Count(value) => {
+        wire::FactValue::LongDone => host::Activity::LongDone,
+        wire::FactValue::Count(value) => {
             let fields = value.into_parts();
             host::Activity::Count { kind: count_kind(fields.kind), elapsed: fields.elapsed, count: fields.value }
         }
@@ -434,7 +456,7 @@ pub(crate) fn down(
     down: host::LinkDown,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v6::Limits,
+    limits: &wire::v7::Limits,
 ) -> Option<Down> {
     match down {
         host::LinkDown::Sources { sources } => {
@@ -507,7 +529,7 @@ fn assignment_record(
     assignment: host::Assignment,
     parts: &[wire::Part],
     values: Box<[Option<crate::GrantValue>]>,
-    limits: &wire::v6::Limits,
+    limits: &wire::v7::Limits,
 ) -> Option<wire::Assignment> {
     let run = assignment.assignment;
     let workspace = match run.workspace {
@@ -557,6 +579,11 @@ fn assignment_record(
             identity: run.identity,
             workspace,
             save: run.save,
+            live: wire::LiveAsk::new(
+                limits,
+                wire::LiveAskParts { text: run.live.text, reasoning: run.live.reasoning, input: run.live.input },
+            )
+            .ok()?,
             charter: run.charter,
             transcript,
             answered,
@@ -589,7 +616,7 @@ fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
     Some(writer.finish())
 }
 /// A grant's form and its value's arm agree, or the grant is not sent.
-fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v6::Limits) -> Option<wire::Grant> {
+fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v7::Limits) -> Option<wire::Grant> {
     let value = match grant.form {
         host::Form::Program(form) => match value {
             crate::GrantValue::Program { name } => {
@@ -636,7 +663,7 @@ const fn grant_scheme(scheme: host::Scheme) -> crate::Scheme {
         host::Scheme::Key => crate::Scheme::Key,
     }
 }
-fn settled(answer: host::SettledAnswer, limits: &wire::v6::Limits) -> Option<wire::SettledAnswer> {
+fn settled(answer: host::SettledAnswer, limits: &wire::v7::Limits) -> Option<wire::SettledAnswer> {
     match answer {
         host::SettledAnswer::Host { error, body } => {
             Some(wire::SettledAnswer::Host(wire::HostAnswer::new(limits, wire::HostAnswerParts { error, body }).ok()?))
@@ -656,7 +683,7 @@ fn settled(answer: host::SettledAnswer, limits: &wire::v6::Limits) -> Option<wir
     }
 }
 
-pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v6::Limits) -> Down {
+pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v7::Limits) -> Down {
     Down::TurnBusy(
         wire::TurnBusy::new(limits, wire::TurnBusyParts { task: run.raw(), attempt: attempt.raw(), number: turn })
             .expect("fixed turn busy fields fit"),

@@ -176,6 +176,7 @@ fn workers(jig: &jig_protocol_config::Limits) -> jig_protocol_engine_workers::Li
     let ceilings = jig_protocol_worker_wire::CEILINGS;
     let sizes = jig_protocol_worker_wire::sizes::Sizes {
         program_sources: core.fleet.program_sources,
+        piece: hub.piece_bytes,
         charter: u32::try_from(hub.charter_bytes).expect("channel byte bound"),
         transcript: u32::try_from(hub.transcript_bytes).expect("channel byte bound"),
         turn: u32::try_from(hub.turn_bytes).expect("channel byte bound"),
@@ -254,4 +255,26 @@ pub(super) fn shared_worker_bytes(io: &skein_io::Limits, queue: u32, workers: u3
         )?
         .checked_add(skein_lib::Map::<(bool, skein_lib::Token), skein_lib::Token>::worst_case(operations)?)?
         .checked_add(skein_lib::List::<crate::Worker>::worst_case(workers)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_profile_reserves_a_largest_piece_fact_and_maps_the_hubs_bound() {
+        use jig_protocol_worker_wire::{Kind, sizes};
+        for name in [Profile::Small, Profile::Standard] {
+            let profile = profile(name);
+            let sizes = workers(&profile).sizes;
+            assert_eq!(sizes.piece, profile.hub.piece_bytes);
+            let codec = sizes::limits(&sizes).expect("profile codec limits");
+            assert_eq!(codec.piece_bytes, profile.hub.piece_bytes);
+            let frame = sizes::largest_body(&sizes, Kind::Fact).expect("fact body") + 8;
+            assert_eq!(frame, 4470);
+            let cap = sizes::worker_cap(&sizes).expect("worker cap");
+            assert!(cap.facts >= frame, "{name:?}: reserve {} must hold {frame}", cap.facts);
+            assert!(cap.cap.frames >= cap.facts / 25);
+        }
+    }
 }
