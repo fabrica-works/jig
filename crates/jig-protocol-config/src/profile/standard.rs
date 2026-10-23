@@ -175,7 +175,6 @@ const JOURNAL: skein_lib::JournalLimits =
 // the optional wait-bound wall adds nine bytes, so the largest row grows by 413 bytes.
 // Ending authority adds (batch + 1)^2 = (4 + 1)^2 = 25 bytes: the row,
 // its recurring members and its proposed creations with their recurring members.
-// Exceeded adds one byte to the largest inline hold encoding.
 const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     value: 10_664_757,
     ops: 285_763,
