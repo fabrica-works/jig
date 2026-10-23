@@ -31,7 +31,7 @@ pub fn one_chat(words: &[u8]) -> Script {
 // People's projects includes the configured project and the deployment's roles.
 const ENGINE: &[u8] = br#"{
 "limits": {"profile": "small", "overrides": {
-"tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1,
+"tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":512,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1,
 "people.operations":2,"tasks.tasks":2,"tasks.funders":2,"tasks.project_tasks":1,"tasks.tree_tasks":1,"tasks.project_goals":1,
 "tasks.batch":1,"tasks.dependencies":1,"tasks.delegates":1,"tasks.charters":1,
 "people.people":1,"people.projects":2,"people.sign_ins":2,"people.holdings":1,

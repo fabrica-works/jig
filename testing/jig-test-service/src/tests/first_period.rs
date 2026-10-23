@@ -168,6 +168,7 @@ fn later_start() -> Service {
         runs: 0,
         calls: 0,
         connector_rows: 0,
+        projects: 0,
         applications: 0,
         commits: 1,
     };

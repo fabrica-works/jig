@@ -5,7 +5,7 @@ use crate::tests::fixtures::core_rows as fixtures;
 use jig_domain_core as core;
 use jig_domain_tasks as tasks;
 
-fn the_deployment_header_reads_back_with_its_id() {
+fn the_deployment_header_reads_back_with_its_id_and_projects_mark() {
     core_round_trip(core::CoreRecord::Deployment(fixtures::deployment()));
 }
 fn a_run_proof_with_its_terminal_reads_back() {
@@ -122,7 +122,10 @@ fn table<const N: usize>(cases: [Case; N]) {
 #[test]
 fn core_rows_read_back_as_written() {
     table([
-        ("the_deployment_header_reads_back_with_its_id", the_deployment_header_reads_back_with_its_id),
+        (
+            "the_deployment_header_reads_back_with_its_id_and_projects_mark",
+            the_deployment_header_reads_back_with_its_id_and_projects_mark,
+        ),
         ("a_terminal_archive_reads_back_with_its_end", a_terminal_archive_reads_back_with_its_end),
         ("a_goal_projection_reads_back_with_its_phase", a_goal_projection_reads_back_with_its_phase),
         ("a_projection_task_reads_back_with_each_requester", a_projection_task_reads_back_with_each_requester),

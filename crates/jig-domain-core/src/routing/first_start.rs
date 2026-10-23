@@ -2,12 +2,14 @@
 //! (protocol/configuration.md, 3 and 8; domain/people.md, 3).
 
 use alloc::boxed::Box;
+use jig_domain_authority as authority;
 use jig_domain_people as people;
 use skein_lib::{Env, List, Map, Queue};
 
 use crate::{Core, Event, Family, Limits, Record, Request, Requests, Write, fresh};
 
 pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) -> Requests {
+    seed_projects(core);
     let owners = core::mem::replace(&mut core.seed_owners, Box::new([]));
     let mut identities = Map::with_capacity(env.limits.people.initial_owners);
     let mut out = Queue::with_capacity(super::route_room(&env.limits));
@@ -47,6 +49,7 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
         out.push(Request::Write(Write::Save(Record::People(record))));
     }
     for &project in &core.projects {
+        core.counters.deployment.projects = core.counters.deployment.projects.max(u64::from(project));
         let policy = core.authority.policy(project).expect("configured project policy");
         let permissions = match core.permission_roles.get(&project) {
             Some(roles) => roles.as_ref(),
@@ -93,4 +96,24 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
         out.push(restored.pop().expect("people restored requests"));
     }
     Requests::Out(out)
+}
+
+pub(crate) fn seed_projects(core: &mut Core) {
+    let projects = core::mem::replace(&mut core.seed_projects, Box::new([]));
+    for project in projects {
+        let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+        authority::step(
+            &mut core.authority,
+            authority::Event::Policy { project: project.number, policy: project.policy.policy },
+            &mut facts,
+        );
+        assert!(
+            facts.pop() == Some(authority::PolicyFact::Added { project: project.number }),
+            "checked seed policy admission"
+        );
+        core.projects.push(project.number).expect("bounded seed projects");
+        core.names.insert(project.number, project.name).expect("bounded seed names");
+        core.permission_roles.insert(project.number, project.policy.permissions).expect("bounded seed permissions");
+        core.template_overrides.insert(project.number, project.policy.templates).expect("bounded seed templates");
+    }
 }

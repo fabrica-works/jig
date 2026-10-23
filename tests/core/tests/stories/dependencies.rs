@@ -132,7 +132,7 @@ fn member_world(seed: u64) -> World {
     limits.core.authority.roles = 2;
     limits.core.tasks.dependencies = 2; // The retained outside task and one newly added inside task.
     let rules = configuration.core.authority.rules().clone();
-    let mut policy = configuration.core.authority.policy(1).expect("plan policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     let owner = policy.roles[0].clone();
     let mut member = owner.clone();
     member.number = people::Role::Member.number();
@@ -142,7 +142,9 @@ fn member_world(seed: u64) -> World {
     let mut domain = authority::Domain::new(rules, limits.core.authority).expect("bounded member policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
-    configuration.core.authority = domain;
+    configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
+    configuration.core.authority =
+        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
     jig_core_world::peers::journal(&mut limits);
     World::configured(seed, false, configuration, limits)
 }

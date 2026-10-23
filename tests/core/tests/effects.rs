@@ -199,6 +199,7 @@ fn retained_effect_core(seed: u64) -> (core::Core, core::Limits, core::CallKey) 
         })
         .expect("the actual world committed its deployment");
     assert!(matches!(domain.restore_core(deployment, &limits.core), core::Restored::Deployment { .. }));
+    jig_core_world::fixtures::restore_project_policies(&mut domain, &limits.core, &world.store);
     let mut out = Queue::with_capacity(tasks::max_out(&limits.core.tasks));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.core.tasks };
     for row in world.store.rows.values() {

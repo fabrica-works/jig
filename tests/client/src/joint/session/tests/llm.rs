@@ -233,12 +233,14 @@ fn me_lists_allowed_models_in_configuration_order() {
     let mut config = configuration();
     let mut rules = config.core.authority.rules().clone();
     rules.ceiling.models = authority::Models::Named(0b011);
-    let mut policy = config.core.authority.policy(1).expect("project policy").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.models = authority::Models::Named(0b011);
     for role in &mut policy.roles {
         role.authority.models = authority::Models::Named(0b011);
     }
-    config.core.authority = install_policy(rules, policy, jig_core_world::world::limits().core.authority);
+    config.core.seed_projects[0].policy.policy = policy.clone();
+    let checked = install_policy(rules, policy, jig_core_world::world::limits().core.authority);
+    config.core.authority = authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
     let (mut session, now, wall) = ready(config);
     let me = me(&mut session, now, wall);
     let models = &me.projects.get(0).expect("project membership").models;
@@ -324,10 +326,12 @@ fn task_authority_keeps_the_named_model() {
 fn authority_admits_a_named_model() {
     let mut config = configuration();
     let rules = config.core.authority.rules().clone();
-    let policy = config.core.authority.policy(1).expect("project policy").clone();
+    let policy = config.core.seed_projects[0].policy.policy.clone();
     let mut limits = *config.core.authority.limits();
     limits.batch = 2;
-    config.core.authority = install_policy(rules, policy, limits);
+    config.core.seed_projects[0].policy.policy = policy.clone();
+    let checked = install_policy(rules, policy, limits);
+    config.core.authority = authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
     let (mut session, now, wall) = ready(config);
     let me = me(&mut session, now, wall);
     let mut chosen = choice(None);

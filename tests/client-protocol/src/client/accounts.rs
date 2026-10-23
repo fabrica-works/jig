@@ -91,16 +91,10 @@ impl Story {
         limits.core.tasks.tasks = 3;
         limits.core.authority.batch = 2;
         let mut config = fixtures::batch_config(seed);
-        let mut policy = config.core.authority.policy(1).expect("story project policy").clone();
+        let mut policy = config.core.seed_projects[0].policy.policy.clone();
         // Leave 100 in the project's period for the Move story's directly funded task.
         policy.roles[0].period_spend = policy.period_spend - 100;
-        let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-        jig_domain_authority::step(
-            &mut config.core.authority,
-            jig_domain_authority::Event::Policy { project: 1, policy },
-            &mut out,
-        );
-        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Changed { project: 1 }));
+        config.core.seed_projects[0].policy.policy = policy;
         let mut story = Self::configured(seed, &limits, config);
         story.sign_in();
         assert!(story.run_until(|s| s.client.link().state == client::Link::Live, Duration::from_secs(1)));

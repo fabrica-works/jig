@@ -30,7 +30,7 @@ pub(super) fn context(task: u64, charter: u32) -> Box<tasks::RunContext> {
         spec: tasks::Spec { words: b"task".as_slice().into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 64 },
         requester: tasks::Party::Person(1),
-        authority: task_authority(&config(1).authority.role(1, 0).unwrap().authority),
+        authority: task_authority(&config(1).seed_projects[0].policy.policy.roles[0].authority),
         numbers: tasks::Numbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
     })
 }

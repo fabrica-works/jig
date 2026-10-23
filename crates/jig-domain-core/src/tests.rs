@@ -251,7 +251,7 @@ fn config(seed: u64) -> Config {
         implies: authority::Implies::new(Box::new([]), 0).expect("empty implication configuration"),
         requirements: Box::new([]),
     };
-    let mut domain = authority::Domain::new(rules, authority_limits()).expect("valid authority configuration");
+    let domain = authority::Domain::new(rules, authority_limits()).expect("valid authority configuration");
     let policy = authority::Policy {
         projections: Box::new([]),
         escalation_role: Some(0),
@@ -274,9 +274,6 @@ fn config(seed: u64) -> Config {
         }]),
         requirements: Box::new([]),
     };
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "policy admitted");
     Config {
         worker_names: Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]),
         deployment: [31; 16],
@@ -288,31 +285,20 @@ fn config(seed: u64) -> Config {
             identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
         }]),
         authority: domain,
-        names: {
-            let mut names = Map::with_capacity(1);
-            names.insert(1, Box::from("Project 1")).expect("one project name");
-            names
-        },
-        projects: {
-            let mut projects = List::with_capacity(1);
-            projects.push(1).expect("one project");
-            projects
-        },
-        template_overrides: Map::with_capacity(limits().authority.projects),
-        permission_roles: {
-            let mut projects: Map<u32, Box<[people::PermissionRole]>> = Map::with_capacity(1);
-            projects
-                .insert(
-                    1,
-                    Box::new([
-                        people::PermissionRole { connector: 1, permission: 3, role: 1 },
-                        people::PermissionRole { connector: 1, permission: 2, role: 2 },
-                        people::PermissionRole { connector: 1, permission: 1, role: 3 },
-                    ]),
-                )
-                .expect("one configured permission policy");
-            projects
-        },
+        seed_projects: Box::new([SeedProject {
+            number: 1,
+            name: Box::from("Project 1"),
+            policy: ConfiguredPolicy {
+                policy,
+                permissions: Box::new([
+                    people::PermissionRole { connector: 1, permission: 3, role: 1 },
+                    people::PermissionRole { connector: 1, permission: 2, role: 2 },
+                    people::PermissionRole { connector: 1, permission: 1, role: 3 },
+                ]),
+                templates: Box::new([]),
+            },
+        }]),
+        policies: Map::with_capacity(0),
         connectors: Box::new([1, 2]),
         settings: Settings {
             templates: Box::new([]),
@@ -383,9 +369,24 @@ fn restore_key_account(core: &mut Core, limits: &Limits, number: u32, source: u3
     }
 }
 
+fn clear_projects(core: &mut Core, limits: &Limits) {
+    core.authority = authority::Domain::new(core.authority.rules().clone(), limits.authority).expect("restore rules");
+    core.projects.clear();
+    core.names = Map::with_capacity(limits.authority.projects);
+    core.permission_roles = Map::with_capacity(limits.authority.projects);
+    core.template_overrides = Map::with_capacity(limits.authority.projects);
+}
+
+fn seeded_core(config: Config, limits: &Limits) -> Result<Core, Problem> {
+    let mut core = Core::new(config, limits)?;
+    routing::first_start::seed_projects(&mut core);
+    Ok(core)
+}
+
 pub(crate) fn core() -> (Core, Limits) {
     let limits = limits();
-    let mut core = Core::new(config(41), &limits).expect("fixture core configuration");
+    let mut core = seeded_core(config(41), &limits).expect("fixture core configuration");
+    core.counters.deployment.projects = 1;
     restore_key_account(&mut core, &limits, 0, 1, 1);
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
@@ -647,11 +648,12 @@ fn tree_core() -> (Core, Limits) {
     limits.tasks.inbox_messages = 16;
     limits.tasks.inbox_bytes = 2048;
     let mut config = config(17);
-    let mut given = config.authority.role(1, 0).unwrap().authority.clone();
+    let mut given = config.seed_projects[0].policy.policy.roles[0].authority.clone();
     given.delegation.tasks = 17;
     given.delegation.depth = 5;
-    set_role_authority(&mut config.authority, given);
-    let mut core = Core::new(config, &limits).expect("fixture core configuration");
+    set_seed_role_authority(&mut config, given);
+    let mut core = seeded_core(config, &limits).expect("fixture core configuration");
+    core.counters.deployment.projects = 1;
     core.people = old.people;
     core.accounts = old.accounts;
     send_task(&mut core, &limits, tasks::Event::Restored);
@@ -3252,7 +3254,7 @@ mod credentials;
 
 mod funding_fixtures;
 mod windows;
-use funding_fixtures::set_role_authority;
+use funding_fixtures::{set_role_authority, set_seed_role_authority};
 
 mod read_activity;
 
@@ -3545,3 +3547,39 @@ fn assert_one_watch_ending(out: &[Request], expected: views::End) {
 }
 
 mod project_names;
+
+#[test]
+fn configured_policies_are_retained_by_the_core() {
+    let limits = limits();
+    let mut config = config(41);
+    let policy = config.seed_projects[0].policy.policy.clone();
+    config.policies = Map::with_capacity(limits.authority.projects);
+    config
+        .policies
+        .insert(
+            1,
+            ConfiguredPolicy {
+                policy,
+                permissions: Box::new([people::PermissionRole { connector: 1, permission: 1, role: 0 }]),
+                templates: Box::new([]),
+            },
+        )
+        .expect("one configured policy");
+    let core = Core::new(config, &limits).expect("fixture configuration");
+    let policy = core.policies.get(&1).expect("retained configured policy");
+    assert_eq!(policy.policy.period_spend, 1000);
+    assert_eq!(policy.permissions.as_ref(), &[people::PermissionRole { connector: 1, permission: 1, role: 0 }]);
+    assert!(policy.templates.is_empty());
+}
+
+#[test]
+fn a_restored_policy_cannot_pass_the_deployments_projects_mark() {
+    let limits = limits();
+    let config = config(41);
+    let value = policy::snapshot(&config.seed_projects[0].policy.policy, &[], &[]).expect("bounded policy");
+    let mut core = Core::new(config, &limits).expect("restoring core");
+    core.counters.deployment.projects = 0;
+    assert!(!core.restore_policy(&limits, 1, Box::from("Project 1"), value.clone()));
+    core.counters.deployment.projects = 1;
+    assert!(core.restore_policy(&limits, 1, Box::from("Project 1"), value));
+}

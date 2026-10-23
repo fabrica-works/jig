@@ -13,7 +13,7 @@ fn goal(budget: u64) -> people::Ask {
 
 fn raise_pool_ceiling(world: &mut World, seed: u64) {
     let (configuration, _) = fixture(seed, false);
-    let role = &configuration.core.authority.policy(1).expect("configured goal policy").roles[0];
+    let role = &configuration.core.seed_projects[0].policy.policy.roles[0];
     let authority = &role.authority;
     ask(
         world,

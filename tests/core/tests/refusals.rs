@@ -133,15 +133,13 @@ fn policy_without_effect_approvers() -> (root::Config, root::Limits) {
     let (mut config, limits) = jig_core_world::effects::fixture(155, false);
 
     let rules = config.core.authority.rules().clone();
-    let mut policy = config.core.authority.policy(1).expect("policy").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     for role in &mut policy.roles {
         role.decides = authority::Proposals(16);
         role.authority.grants = Box::new([]);
     }
     config.core.authority = authority::Domain::new(rules, limits.core.authority).expect("authority");
-    let mut out = skein_lib::Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut config.core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+    config.core.seed_projects[0].policy.policy = policy;
     (config, limits)
 }
 

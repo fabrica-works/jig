@@ -485,14 +485,9 @@ fn reserve_fixture(seed: u64, spend: u64) -> (root::Config, root::Limits) {
     config.core.settings.charters[0].policy.model.price_unit = 1_000;
     let mut rules = config.core.authority.rules().clone();
     rules.maximum_run_spend = spend;
-    let policy = config.core.authority.policy(1).expect("project policy").clone();
+    let policy = config.core.seed_projects[0].policy.policy.clone();
     config.core.authority = jig_domain_authority::Domain::new(rules, limits.core.authority).expect("authority bounds");
-    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-    jig_domain_authority::step(
-        &mut config.core.authority,
-        jig_domain_authority::Event::Policy { project: 1, policy },
-        &mut out,
-    );
+    config.core.seed_projects[0].policy.policy = policy;
     (config, limits)
 }
 

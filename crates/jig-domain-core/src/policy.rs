@@ -249,8 +249,9 @@ pub(crate) fn apply(
     Some(())
 }
 
-/// Capture the entire mutable value after a validated policy event.
-pub(crate) fn snapshot(
+/// Capture the whole policy after a validated policy event.
+#[must_use]
+pub fn snapshot(
     policy: &authority::Policy,
     permissions: &[people::PermissionRole],
     templates: &[people::TemplateOverride],
@@ -272,6 +273,8 @@ pub(crate) fn snapshot(
         requirements.push(requirement_to_people(requirement)).ok()?;
     }
     Some(people::PolicyValue {
+        ceiling: authority_to_people(&policy.ceiling)?,
+        escalation_role: policy.escalation_role,
         period_spend: policy.period_spend,
         projections: grants_to_people(&policy.projections)?,
         roles: roles.into_boxed(),
@@ -281,7 +284,7 @@ pub(crate) fn snapshot(
     })
 }
 
-/// Restore a complete committed mutable value over the configured ceiling.
+/// Restore the whole committed policy (store.md, 4.4; core.md, 6.1).
 pub(crate) fn restore(
     policy: &mut authority::Policy,
     permissions: &mut Box<[people::PermissionRole]>,
@@ -289,6 +292,8 @@ pub(crate) fn restore(
     value: people::PolicyValue,
     limit: u32,
 ) -> Option<()> {
+    policy.ceiling = authority_to_authority(value.ceiling)?;
+    policy.escalation_role = value.escalation_role;
     policy.period_spend = value.period_spend;
     policy.projections = grants_to_authority(value.projections)?;
     let mut roles = List::with_capacity(u32::try_from(value.roles.len()).ok()?);
@@ -420,7 +425,7 @@ impl Core {
         }
     }
 
-    /// Restore a committed mutable policy row before admitting new party requests.
+    /// Add a project from its committed row alone before admitting party requests.
     pub fn restore_policy(
         &mut self,
         limits: &Limits,
@@ -428,7 +433,15 @@ impl Core {
         name: Box<str>,
         value: people::PolicyValue,
     ) -> bool {
-        if people::name_rule(&name).is_some() {
+        if project == 0
+            || self.authority.policy(project).is_some()
+            || self.projects.len() >= self.projects.capacity()
+            || self.names.len() >= self.names.capacity()
+            || self.permission_roles.len() >= self.permission_roles.capacity()
+            || self.template_overrides.len() >= self.template_overrides.capacity()
+            || u64::from(project) > self.counters.deployment().projects
+            || people::name_rule(&name).is_some()
+        {
             return false;
         }
         for (&other, previous) in &self.names {
@@ -440,11 +453,16 @@ impl Core {
             Some(bytes) if bytes <= limits.policy_bytes => {}
             Some(_) | None => return false,
         }
-        let Some(mut policy) = self.authority.policy(project).cloned() else { return false };
-        let mut permissions = match self.permission_roles.get(&project) {
-            Some(mappings) => mappings.clone(),
-            None => Box::new([]),
+        let Some(ceiling) = authority_to_authority(value.ceiling.clone()) else { return false };
+        let mut policy = authority::Policy {
+            ceiling,
+            escalation_role: None,
+            projections: Box::new([]),
+            period_spend: 0,
+            roles: Box::new([]),
+            requirements: Box::new([]),
         };
+        let mut permissions: Box<[people::PermissionRole]> = Box::new([]);
         if value.templates.len() > usize::try_from(limits.templates).expect("template bound") {
             return false;
         }
@@ -456,10 +474,19 @@ impl Core {
         }
         let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
         authority::step(&mut self.authority, authority::Event::Policy { project, policy }, &mut facts);
-        facts.pop() == Some(authority::PolicyFact::Changed { project })
-            && self.permission_roles.insert(project, permissions).is_ok()
-            && self.template_overrides.insert(project, templates).is_ok()
-            && self.names.insert(project, name).is_ok()
+        match facts.pop().expect("policy restore terminal") {
+            authority::PolicyFact::Added { .. } => {
+                self.projects.push(project).expect("preflighted project room");
+                self.permission_roles.insert(project, permissions).expect("preflighted permission room");
+                self.template_overrides.insert(project, templates).expect("preflighted template room");
+                self.names.insert(project, name).expect("preflighted name room");
+                true
+            }
+            authority::PolicyFact::Refused { .. } => false,
+            authority::PolicyFact::Changed { .. } | authority::PolicyFact::Dropped { .. } => {
+                unreachable!("absent project policy restoration")
+            }
+        }
     }
 }
 

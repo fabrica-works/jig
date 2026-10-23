@@ -17,6 +17,7 @@ pub(super) fn encode_deployment(
         connector_rows,
         applications,
         commits,
+        projects,
     } = source;
     wire::Deployment::new(
         &limits.core,
@@ -31,6 +32,7 @@ pub(super) fn encode_deployment(
             connector_rows: *connector_rows,
             applications: *applications,
             commits: *commits,
+            projects: *projects,
         },
     )
 }
@@ -46,8 +48,21 @@ pub(super) fn decode_deployment(source: wire::Deployment, _limits: &Limits) -> d
         connector_rows,
         applications,
         commits,
+        projects,
     } = source.into_parts();
-    domain::Deployment { id, tasks, people, sign_ins, messages, runs, calls, connector_rows, applications, commits }
+    domain::Deployment {
+        id,
+        tasks,
+        people,
+        sign_ins,
+        messages,
+        runs,
+        calls,
+        connector_rows,
+        applications,
+        commits,
+        projects,
+    }
 }
 pub(super) fn encode_terminal_record(
     source: &domain::TerminalRecord,

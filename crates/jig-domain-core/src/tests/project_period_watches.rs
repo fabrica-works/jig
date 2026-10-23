@@ -15,28 +15,19 @@ fn period_core(configured: u64) -> (Core, Limits) {
     limits.views.watchers_per_party = 4;
     limits.documents.lines = 4;
     let mut config = config(61);
-    let policy = config.authority.policy(1).unwrap().clone();
+    let policy = config.seed_projects[0].policy.policy.clone();
     config.authority = authority::Domain::new(
         config.authority.rules().clone(),
         authority::Limits { projects: 2, ..*config.authority.limits() },
     )
     .unwrap();
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    for project in [1, 2] {
-        authority::step(
-            &mut config.authority,
-            authority::Event::Policy { project, policy: policy.clone() },
-            &mut facts,
-        );
-        assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
-    }
-    config.names = Map::with_capacity(2);
-    config.names.insert(1, Box::from("Project 1")).expect("first project name");
-    config.names.insert(2, Box::from("Project 2")).expect("second project name");
-    config.projects = List::with_capacity(2);
-    config.projects.push(1).unwrap();
-    config.projects.push(2).unwrap();
-    let mut core = Core::new(config, &limits).expect("fixture core configuration");
+    let seed = |number: u32, name: &str| SeedProject {
+        number,
+        name: name.into(),
+        policy: ConfiguredPolicy { policy: policy.clone(), permissions: Box::new([]), templates: Box::new([]) },
+    };
+    config.seed_projects = Box::new([seed(1, "Project 1"), seed(2, "Project 2")]);
+    let mut core = seeded_core(config, &limits).expect("fixture core configuration");
     core.people = auth.people;
     send_task(&mut core, &limits, tasks::Event::Restored);
     let opened = watch_outputs(

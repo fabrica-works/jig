@@ -276,7 +276,7 @@ pub fn config(seed: u64) -> root::Config {
         implies: authority::Implies::new(Box::new([]), 0).expect("empty implication configuration"),
         requirements: Box::new([]),
     };
-    let mut domain = authority::Domain::new(rules, authority_limits()).expect("valid authority configuration");
+    let domain = authority::Domain::new(rules, authority_limits()).expect("valid authority configuration");
     let policy = authority::Policy {
         projections: Box::new([]),
         escalation_role: Some(0),
@@ -299,9 +299,6 @@ pub fn config(seed: u64) -> root::Config {
         }]),
         requirements: Box::new([]),
     };
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "policy admitted");
     let mut first = jig_test_connector_world::config(1);
     first.deployment = [31; 16];
     let mut second = jig_test_connector_world::config(2);
@@ -328,31 +325,20 @@ pub fn config(seed: u64) -> root::Config {
                 identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
             }]),
             authority: domain,
-            names: {
-                let mut names = skein_lib::Map::with_capacity(1);
-                names.insert(1, Box::from("Project 1")).expect("one project name");
-                names
-            },
-            projects: {
-                let mut projects = skein_lib::List::with_capacity(1);
-                projects.push(1).expect("one project");
-                projects
-            },
-            template_overrides: skein_lib::Map::with_capacity(limits().core.authority.projects),
-            permission_roles: {
-                let mut projects: skein_lib::Map<u32, Box<[people::PermissionRole]>> = skein_lib::Map::with_capacity(1);
-                projects
-                    .insert(
-                        1,
-                        Box::new([
-                            people::PermissionRole { connector: 1, permission: 3, role: 1 },
-                            people::PermissionRole { connector: 1, permission: 2, role: 2 },
-                            people::PermissionRole { connector: 1, permission: 1, role: 3 },
-                        ]),
-                    )
-                    .expect("one configured permission policy");
-                projects
-            },
+            seed_projects: Box::new([core::SeedProject {
+                number: 1,
+                name: Box::from("Project 1"),
+                policy: core::ConfiguredPolicy {
+                    policy,
+                    permissions: Box::new([
+                        people::PermissionRole { connector: 1, permission: 3, role: 1 },
+                        people::PermissionRole { connector: 1, permission: 2, role: 2 },
+                        people::PermissionRole { connector: 1, permission: 1, role: 3 },
+                    ]),
+                    templates: Box::new([]),
+                },
+            }]),
+            policies: skein_lib::Map::with_capacity(0),
             connectors: Box::new([1, 2]),
             settings: core::Settings {
                 templates: crate::fixtures::templates(),
@@ -476,18 +462,6 @@ impl World {
                 }]),
             })));
         }
-        events.push_back(root::Event::Core(core::Event::People(people::Event::Roles {
-            project: 1,
-            holdings: Box::new([]),
-        })));
-        events.push_back(root::Event::Core(core::Event::People(people::Event::Restored)));
-        events.push_back(root::Event::Core(core::Event::Tasks(tasks::Event::Restored)));
-        events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Loaded)));
-        for row in crate::fixtures::account_rows(&config(seed).core.settings.llm_providers) {
-            if let root::Record::Core(core::Record::Accounts(record)) = row {
-                events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Restore { record })));
-            }
-        }
         events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Want)));
         events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
             accounts::FromComponent::Granted {
@@ -519,10 +493,13 @@ impl World {
             },
         }));
         let heap = crate::observations::Heap::new(&limits);
+        let bootstrap = crate::effects::World::first_start_with_accounts(config(seed), &limits);
+        let mut observer = crate::observations::Observer::new(&config(seed));
+        observer.durable(0, &bootstrap.store);
         World {
             creating: crate::fixtures::Creating::new(&config(seed).core, limits.core.tasks.tree_tasks),
-            domain: root::Domain::new(config(seed), &limits),
-            store: Store::new(&limits, &config(seed).core.settings.models),
+            domain: bootstrap.domain,
+            store: bootstrap.store,
             events,
             trace: Vec::new(),
             sign_in: None,
@@ -533,7 +510,7 @@ impl World {
             results: 0,
             procedure: None,
             batch_refusals: 0,
-            observer: crate::observations::Observer::new(&config(seed)),
+            observer,
             heap,
             scenario,
             delegated: false,

@@ -96,6 +96,16 @@ impl World {
         else {
             panic!("durable header");
         };
+        // Direct fixture policy seeds must carry the same high-water mark as a first start.
+        for write in &writes {
+            if let root::Write::Save(root::Record::Core(core::Record::People(jig_domain_people::Stored::Policy {
+                project,
+                ..
+            }))) = write
+            {
+                header.projects = header.projects.max(u64::from(*project));
+            }
+        }
         header.commits = self.store.applied + 1;
         writes.push(root::Write::Save(root::Record::Core(core::Record::Core(core::CoreRecord::Deployment(header)))));
         self.store.submit(header.commits, writes.into_boxed_slice(), 0);

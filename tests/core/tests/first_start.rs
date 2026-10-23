@@ -5,7 +5,7 @@ use jig_domain_authority as authority;
 use jig_domain_core::{self as core, documents, reads};
 use jig_domain_people as people;
 use jig_test_domain as root;
-use skein_lib::{Queue, ReplyTo, Token};
+use skein_lib::{ReplyTo, Token};
 
 fn cold() -> World {
     let mut world = World::first_start(world::config(11_001), world::limits());
@@ -36,10 +36,14 @@ fn sign_in(world: &mut World, subject: u64) -> (u64, u64) {
 }
 
 fn project(world: &mut World, sign_in: u64) -> documents::Project {
+    project_at(world, sign_in, 1)
+}
+
+fn project_at(world: &mut World, sign_in: u64, number: u32) -> documents::Project {
     world.send(root::Event::Core(core::Event::Read {
         reply: ReplyTo::new(Token::new(11_002)),
         sign_in,
-        read: reads::Read::Project { project: 1 },
+        read: reads::Read::Project { project: number },
     }));
     let (_, root::Delivery::Core(core::Held::Read { answer: reads::Answer::Document(document), .. })) =
         world.client_peer.as_mut().expect("client peer").delivered.pop().expect("project read reply")
@@ -80,13 +84,13 @@ fn a_restart_seeds_nothing_and_keeps_the_saved_policy_and_owner() {
     let rows = world.store.rows.clone();
     let commits = world.commits.len();
     let mut configuration = world::config(11_002);
-    let mut policy = configuration.core.authority.policy(1).expect("configured policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.period_spend = 700;
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
-    assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+    policy.ceiling.budget.spend = 700;
+    policy.escalation_role = None;
+
+    configuration.core.seed_projects[0].policy.policy = policy;
     configuration.core.owners = Box::new([]);
-    configuration.core.projects.clear();
     world.restart_with(configuration);
     assert!(world.domain.ready());
     assert_eq!(world.store.rows, rows);
@@ -98,6 +102,8 @@ fn a_restart_seeds_nothing_and_keeps_the_saved_policy_and_owner() {
     assert_eq!(project.members.len(), 1);
     assert_eq!(project.members.as_slice()[0].role, people::Role::Owner);
     assert_eq!(project.policy.period_spend, 1000);
+    assert_eq!(project.policy.ceiling.ceiling.spend, 1000);
+    assert_eq!(project.policy.escalation_role, Some(0));
 }
 
 #[test]
@@ -114,6 +120,10 @@ fn a_restart_does_not_grant_new_configured_owners() {
 }
 
 fn two_projects(people_projects: u32) -> (root::Config, root::Limits) {
+    numbered_projects(people_projects, 2)
+}
+
+fn numbered_projects(people_projects: u32, second: u32) -> (root::Config, root::Limits) {
     let mut configuration = world::config(11_020);
     let mut limits = world::limits();
     limits.core.authority.projects = 2;
@@ -123,28 +133,22 @@ fn two_projects(people_projects: u32) -> (root::Config, root::Limits) {
     let connectors = jig_test_connector::MAX_OUT * 2;
     limits.journal.writes = room.writes + connectors;
     limits.journal.held = limits.journal.held.max(room.held + connectors);
-    let mut authority = authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
-        .expect("two policies");
-    let mut projects = skein_lib::List::with_capacity(2);
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    for (project, spend) in [(1, 1000), (2, 700)] {
-        let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
-        policy.period_spend = spend;
-        authority::step(&mut authority, authority::Event::Policy { project, policy }, &mut facts);
-        assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project }));
-        projects.push(project).expect("two configured projects");
-    }
-    configuration.core.authority = authority;
-    configuration.core.projects = projects;
-    configuration.core.names = skein_lib::Map::with_capacity(limits.core.authority.projects);
-    configuration.core.names.insert(1, Box::from("Tally")).expect("first name");
-    configuration.core.names.insert(2, Box::from("Project 2")).expect("second name");
-    let mut permissions = skein_lib::Map::with_capacity(limits.core.authority.projects);
-    for (&project, roles) in &configuration.core.permission_roles {
-        permissions.insert(project, roles.clone()).expect("two project permission maps");
-    }
-    configuration.core.permission_roles = permissions;
-    configuration.core.template_overrides = skein_lib::Map::with_capacity(limits.core.authority.projects);
+    configuration.core.authority =
+        authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
+            .expect("two policies");
+    let projects = [(1, 1000), (second, 700)]
+        .into_iter()
+        .map(|(number, spend)| {
+            let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
+            policy.period_spend = spend;
+            core::SeedProject {
+                number,
+                name: if number == 1 { Box::from("Tally") } else { format!("Project {number}").into_boxed_str() },
+                policy: core::ConfiguredPolicy { policy, permissions: Box::new([]), templates: Box::new([]) },
+            }
+        })
+        .collect();
+    configuration.core.seed_projects = projects;
     // The fixture's sole owner belongs to project 1; project 2 still needs a roster.
     (configuration, limits)
 }
@@ -180,7 +184,7 @@ fn all_configured_projects_seed_together_at_or_below_people_capacity() {
         let commits = world.commits.len();
         let (mut changed, _) = two_projects(capacity);
         changed.core.owners = Box::new([]);
-        changed.core.projects.clear();
+        changed.core.seed_projects = Box::new([]);
         world.restart_with(changed);
         assert!(world.domain.ready());
         assert_eq!(world.store.rows, rows, "restart keeps every seeded policy and roster");
@@ -197,13 +201,12 @@ fn model(name: &[u8]) -> core::Model {
 fn with_models(seed: u64, models: Box<[core::Model]>, role: authority::Models) -> root::Config {
     let mut configuration = world::config(seed);
     configuration.core.settings.models = models;
-    let mut policy = configuration.core.authority.policy(1).expect("configured policy").clone();
+    let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     let mut roles = policy.roles.into_vec();
     roles[0].authority.models = role;
     policy.roles = roles.into_boxed_slice();
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
-    assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+
+    configuration.core.seed_projects[0].policy.policy = policy;
     configuration
 }
 
@@ -267,7 +270,7 @@ fn the_frame_and_me_list_no_project_for_the_deployments_roles() {
 #[test]
 fn with_no_project_configured_the_first_owner_owns_the_deployment() {
     let mut configuration = world::config(11_030);
-    configuration.core.projects.clear();
+    configuration.core.seed_projects = Box::new([]);
     // Configuration carries a deployment bootstrap entry when there is no project.
     for owner in &mut configuration.core.owners {
         owner.project = people::DEPLOYMENT;
@@ -376,10 +379,100 @@ fn a_restart_keeps_each_projects_name() {
     world.client_peer = Some(ClientPeer::default());
     let (mut changed, _) = named_projects();
     // Even swapped configured names cannot collide with the names being restored.
-    changed.core.names.insert(1, Box::from("Project 2")).expect("first name");
-    changed.core.names.insert(2, Box::from("Tally")).expect("second name");
-    changed.core.projects.clear();
+    changed.core.seed_projects[0].name = Box::from("Project 2");
+    changed.core.seed_projects[1].name = Box::from("Tally");
     world.restart_with(changed);
     let (_, signed) = sign_in(&mut world, FIRST_OWNER_SUBJECT);
     assert_eq!(project_names(&mut world, signed), [(1, Box::from(&b"Tally"[..])), (2, Box::from(&b"Project 2"[..]))]);
+}
+
+const LAST_SEEDED_PROJECT: u32 = 5;
+
+fn sparse_projects() -> World {
+    let (config, limits) = numbered_projects(AT_ROSTER_BOUND, LAST_SEEDED_PROJECT);
+    World::first_start(config, limits)
+}
+fn projects_mark(world: &World) -> u64 {
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::Deployment));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::Deployment(header))) = &world.store.rows[&key] else {
+        panic!("durable deployment header")
+    };
+    header.projects
+}
+#[test]
+fn the_first_start_marks_past_every_seeded_project() {
+    assert_eq!(projects_mark(&sparse_projects()), 5);
+}
+#[test]
+fn a_restart_keeps_the_projects_mark_in_later_commits() {
+    let mut world = sparse_projects();
+    let (mut config, _) = numbered_projects(AT_ROSTER_BOUND, LAST_SEEDED_PROJECT);
+    config.core.seed_projects = Box::new([]);
+    world.restart_with(config);
+    world.client_peer = Some(ClientPeer::default());
+    sign_in(&mut world, OTHER_SUBJECT);
+    assert_eq!(projects_mark(&world), 5);
+}
+#[test]
+fn a_first_start_without_projects_keeps_the_mark_zero() {
+    let mut config = world::config(11_040);
+    config.core.seed_projects = Box::new([]);
+    let world = World::first_start(config, world::limits());
+    assert_eq!(projects_mark(&world), 0);
+}
+
+#[test]
+fn a_restart_restores_a_project_whose_policy_configuration_no_longer_names() {
+    const REMOVED_PROJECT: u32 = 2;
+    let (configuration, limits) = named_projects();
+    let mut world = World::first_start(configuration, limits);
+    world.client_peer = Some(ClientPeer::default());
+    world.send(root::Event::Core(core::Event::Period { project: REMOVED_PROJECT, period: 1, budget: 700, next: None }));
+    let (mut changed, _) = named_projects();
+    changed.core.seed_projects =
+        changed.core.seed_projects.into_vec().into_iter().filter(|project| project.number == 1).collect();
+    world.restart_with(changed);
+    let (_, signed) = sign_in(&mut world, FIRST_OWNER_SUBJECT);
+    assert_eq!(project_names(&mut world, signed), [(1, Box::from(&b"Tally"[..])), (2, Box::from(&b"Project 2"[..]))]);
+    let restored = project_at(&mut world, signed, REMOVED_PROJECT);
+    assert_eq!(restored.policy.ceiling.ceiling.spend, 1000);
+    assert_eq!(restored.policy.escalation_role, Some(0));
+    let ask = jig_core_world::fixtures::chat(&world, REMOVED_PROJECT, Box::from(&b"still funded"[..]));
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(11_050)),
+        sign_in: signed,
+        key: [90; 16],
+        ask,
+    })));
+    let root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Live(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(jig_domain_tasks::Key::Live(1)))]
+    else {
+        panic!("funded chat")
+    };
+    assert_eq!(row.project, REMOVED_PROJECT);
+    assert_eq!(row.numbers.budget, 100);
+    assert_eq!(row.funder, jig_domain_tasks::Funder::Pool { project: REMOVED_PROJECT, person: 1, period: 1 });
+}
+
+#[test]
+fn a_project_configured_after_the_first_start_is_not_seeded() {
+    const LATER_PROJECT: u32 = 3;
+    let (mut configuration, limits) = named_projects();
+    configuration.core.seed_projects =
+        configuration.core.seed_projects.into_vec().into_iter().filter(|project| project.number == 1).collect();
+    let mut world = World::first_start(configuration, limits);
+    world.client_peer = Some(ClientPeer::default());
+    let rows = world.store.rows.clone();
+    let (mut changed, _) = named_projects();
+    changed.core.seed_projects[1].number = LATER_PROJECT;
+    changed.core.seed_projects[1].name = Box::from("Later");
+    changed.core.owners[1].project = LATER_PROJECT;
+    world.restart_with(changed);
+    assert_eq!(world.store.rows, rows, "restart saves nothing for the added seed");
+    let (_, signed) = sign_in(&mut world, FIRST_OWNER_SUBJECT);
+    assert_eq!(project_names(&mut world, signed), [(1, Box::from(&b"Tally"[..]))]);
+    for key in [people::Key::Policy(LATER_PROJECT), people::Key::Roles(LATER_PROJECT)] {
+        assert!(!world.store.rows.contains_key(&root::Key::Core(core::Key::People(key))));
+    }
 }

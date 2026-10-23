@@ -83,9 +83,9 @@ fn a_first_commit_puts_the_format_row_and_the_installation_with_its_header() {
         format_row(&mut store),
         codec::component::Format {
             component: 2,
-            core: 5,
+            core: 6,
             tasks: 9,
-            people: 9,
+            people: 10,
             notes: 1,
             accounts: 1,
             application: 1,

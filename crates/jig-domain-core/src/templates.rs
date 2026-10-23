@@ -153,8 +153,8 @@ pub(crate) fn assert_configured(config: &crate::Config, limits: &crate::Limits) 
         assert!(jig_domain_tasks::valid_contract(&limits.tasks, &template.contract), "core prices template contracts");
     }
     assert!(valid(&config.settings, &[]), "configured template choices fit their executors");
-    assert!(config.template_overrides.capacity() <= limits.authority.projects, "core prices project overrides");
-    for (_, overrides) in &config.template_overrides {
+    for project in &config.seed_projects {
+        let overrides = &project.policy.templates;
         assert!(valid(&config.settings, overrides), "merged template choices fit their effective executors");
         assert!(
             overrides.len() <= usize::try_from(limits.templates).expect("template bound"),

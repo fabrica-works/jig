@@ -37,7 +37,7 @@ fn exchange(session: &mut Session, client: &mut Client, now: Time, wall: Wall, e
 #[test]
 fn the_frame_names_each_project() {
     let (mut configuration, limits) = jig_core_world::fixtures::two_projects(8455);
-    configuration.core.names.insert(1, Box::from("Tally")).expect("configured name");
+    configuration.core.seed_projects[0].name = Box::from("Tally");
     // The shared deployment fixture leaves project 2 unnamed: its seed is Project 2.
     let (mut session, now, wall) = session_with_limits(configuration, limits, Peers::new(Vec::new(), Vec::new()));
     session.bind(ClientId(0), 1, identity(), now, wall);
