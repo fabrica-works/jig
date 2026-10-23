@@ -33,12 +33,18 @@ pub(super) fn valid(limits: &Limits, act: &Act) -> Result<(), Refusal> {
                 return Err(Refusal::Limit { which: LimitKind::Resource });
             }
         }
+        Act::MakeProject { name, .. } => {
+            if name.len() > crate::NAME_BYTES {
+                return Err(Refusal::Limit { which: LimitKind::Words });
+            }
+        }
         Act::AddKey { .. } | Act::RemoveAccount { .. } => {}
     }
     Ok(())
 }
 fn kind(act: &Act) -> ActKind {
     match act {
+        Act::MakeProject { .. } => ActKind::MakeProject,
         Act::Close { .. } => ActKind::Close,
         Act::AddKey { .. } => ActKind::AddKey,
         Act::RemoveAccount { .. } => ActKind::RemoveAccount,
@@ -200,6 +206,8 @@ fn permanent(outcome: &Outcome) -> bool {
         | Outcome::Adopted { .. }
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
+        | Outcome::Renamed { .. }
+        | Outcome::ProjectMade { .. }
         | Outcome::PoolSet { .. }
         | Outcome::Said { .. }
         | Outcome::QuestionAnswered { .. }
@@ -245,6 +253,8 @@ pub(super) fn valid_outcome(limits: &Limits, act: &Act, outcome: &Outcome) -> bo
             | Outcome::Adopted { .. }
             | Outcome::RolesSet { .. }
             | Outcome::PolicyChanged { .. }
+            | Outcome::Renamed { .. }
+            | Outcome::ProjectMade { .. }
             | Outcome::PoolSet { .. }
             | Outcome::Said { .. }
             | Outcome::QuestionAnswered { .. }
@@ -283,6 +293,9 @@ pub(super) fn valid_outcome(limits: &Limits, act: &Act, outcome: &Outcome) -> bo
             },
             outcome.clone(),
         ),
+        Act::MakeProject { name, policy, .. } => {
+            super::valid_answer_shape(&crate::Ask::MakeProject { name: name.clone(), policy: *policy }, outcome.clone())
+        }
         Act::Adopt { project, adoption } => super::valid_answer_shape(
             &crate::Ask::Adopt { project: *project, adoption: adoption.clone() },
             outcome.clone(),

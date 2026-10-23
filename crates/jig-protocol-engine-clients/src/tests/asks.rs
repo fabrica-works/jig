@@ -276,3 +276,26 @@ fn a_sign_in_ask_is_made_a_people_ask_for_its_holder() {
         assert_eq!(ask(wire, &f::models(), &limits), Ok(p::Ask::AccountSignOut { holder: expected, source: u32::MAX }));
     }
 }
+
+#[test]
+fn project_records_reach_people_with_their_whole_name_and_policy() {
+    let limits = f::wire();
+    for (record, expected) in [
+        (
+            w::Ask::Rename(
+                w::Rename::new(&limits, w::RenameParts { project: 3, name: b"Tally".as_slice().into() })
+                    .expect("rename"),
+            ),
+            p::Ask::Rename { project: 3, name: "Tally".into() },
+        ),
+        (
+            w::Ask::MakeProject(
+                w::MakeProject::new(&limits, w::MakeProjectParts { name: b"Tally".as_slice().into(), policy: 7 })
+                    .expect("make"),
+            ),
+            p::Ask::MakeProject { name: "Tally".into(), policy: 7 },
+        ),
+    ] {
+        assert_eq!(ask(record, &f::models(), &limits), Ok(expected));
+    }
+}

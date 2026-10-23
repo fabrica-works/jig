@@ -178,6 +178,7 @@ impl World {
                     | root::Output::ReadResult { .. }
                     | root::Output::Read { .. }
                     | root::Output::Agent(_)
+                    | root::Output::ProjectMade { .. }
                     | root::Output::Busy
                     | root::Output::Stop) => seen.push(other),
                 }

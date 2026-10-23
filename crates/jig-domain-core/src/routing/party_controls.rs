@@ -200,6 +200,8 @@ pub(super) fn cancel_request(
         | people::Ask::DecideProposal { .. }
         | people::Ask::Amend { .. }
         | people::Ask::SetRoles { .. }
+        | people::Ask::Rename { .. }
+        | people::Ask::MakeProject { .. }
         | people::Ask::ChangePolicy { .. }
         | people::Ask::SetPool { .. }
         | people::Ask::DecideEscalation { .. }
@@ -270,6 +272,8 @@ pub(super) fn release_request(
                 | people::Ask::AnswerQuestion { .. }
                 | people::Ask::Amend { .. }
                 | people::Ask::SetRoles { .. }
+                | people::Ask::Rename { .. }
+                | people::Ask::MakeProject { .. }
                 | people::Ask::ChangePolicy { .. }
                 | people::Ask::SetPool { .. }
                 | people::Ask::DecideEscalation { .. }

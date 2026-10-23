@@ -11,7 +11,7 @@ pub(crate) fn role(core: &Core, project: u32, held: Option<people::Role>, act: A
                 Err(people::Refusal::Role { held })
             }
         },
-        Act::Adopt | Act::ChangePolicy | Act::SetRoles | Act::MakeService | Act::SetPool => {
+        Act::Adopt | Act::Rename | Act::ChangePolicy | Act::SetRoles | Act::MakeService | Act::SetPool => {
             if !core.people.has_project(project) {
                 return Err(people::Refusal::Unknown);
             }

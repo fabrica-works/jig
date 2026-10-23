@@ -171,7 +171,11 @@ fn a_connector_delivery_waits_for_the_last_commit_the_root_made() {
                 assert!(delivery.is_none());
                 delivery = Some(*held);
             }
-            Request::Write(_) | Request::Ask { .. } | Request::Now(_) | Request::Decided => {}
+            Request::ProjectMade { .. }
+            | Request::Write(_)
+            | Request::Ask { .. }
+            | Request::Now(_)
+            | Request::Decided => {}
         }
     }
     let delivery = delivery.unwrap();

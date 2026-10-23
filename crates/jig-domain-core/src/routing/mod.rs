@@ -64,6 +64,7 @@ mod party_decisions;
 #[path = "people.rs"]
 mod people_routes;
 pub(crate) mod procedure_steps;
+mod projects;
 mod proposal_revisions;
 pub(crate) mod refusals;
 mod run_controls;
@@ -425,7 +426,11 @@ pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
         for _ in 0..batch.len() {
             match batch.pop().expect("core route output count") {
                 Request::Decided => {}
-                request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+                request @ (Request::ProjectMade { .. }
+                | Request::Write(_)
+                | Request::Ask { .. }
+                | Request::Held(_)
+                | Request::Now(_)) => {
                     out.push(request);
                 }
             }

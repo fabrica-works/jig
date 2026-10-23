@@ -227,6 +227,7 @@ impl Peers {
             | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Projection { .. }
             | root::Delivery::Link { .. }
+            | root::Delivery::ProjectMade { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::System { .. }
             | root::Delivery::Procedure { .. } => {}
@@ -566,6 +567,9 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         } => parties::Refusal::Limit { which: parties::LimitKind::Spec },
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,
+        people::Refusal::NameTaken | people::Refusal::NotWellFormed { why: people::Malformed::Name(_), .. } => {
+            unreachable!("fake parties ask for no project changes")
+        }
         people::Refusal::Unknown => parties::Refusal::Unknown,
         people::Refusal::Account { .. }
         | people::Refusal::Provider
@@ -642,7 +646,8 @@ fn party_limit(value: people::LimitKind) -> parties::LimitKind {
         people::LimitKind::Grace => parties::LimitKind::Grace,
         people::LimitKind::Goals => parties::LimitKind::Goals,
         people::LimitKind::Service => parties::LimitKind::Service,
-        people::LimitKind::Accounts
+        people::LimitKind::Projects
+        | people::LimitKind::Accounts
         | people::LimitKind::HolderAccounts
         | people::LimitKind::Sources
         | people::LimitKind::SignIns => unreachable!("a fake party asks for no account"),

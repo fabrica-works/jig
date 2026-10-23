@@ -62,7 +62,7 @@ fn accept(journal: &mut Journal<Write, Box<Held>>, requests: Requests) -> u32 {
                 writes = writes.checked_add(1).unwrap();
             }
             Request::Held(held) => decision.hold(held).unwrap(),
-            Request::Decided => {}
+            Request::ProjectMade { .. } | Request::Decided => {}
             Request::Ask { .. } | Request::Now(_) => panic!("timer/reply must not escape the journal"),
         }
     }

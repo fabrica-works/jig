@@ -228,6 +228,7 @@ fn a_connector_adopts_its_own_resource_into_a_project() {
             | core::Request::Ask { .. }
             | core::Request::Held(_)
             | core::Request::Now(_)
+            | core::Request::ProjectMade { .. }
             | core::Request::Decided => {}
         }
     }
@@ -381,8 +382,76 @@ fn a_deployment_adoption_of_an_unknown_project_is_refused() {
             {
                 answered = true;
             }
-            core::Request::Write(_) | core::Request::Held(_) | core::Request::Now(_) | core::Request::Decided => {}
+            core::Request::Write(_)
+            | core::Request::Held(_)
+            | core::Request::Now(_)
+            | core::Request::ProjectMade { .. }
+            | core::Request::Decided => {}
         }
     }
     assert!(answered);
+}
+
+// The seed and one made project, plus deployment roles, fit both child capacities.
+fn project_world(granted: bool) -> World {
+    let (mut config, mut limits) = configuration(1850);
+    limits.core.authority.projects = 2;
+    limits.core.people.projects = 3;
+    config.core.authority =
+        jig_domain_authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority)
+            .expect("room past the seed");
+    if granted {
+        config.core.grants =
+            Box::new([people::ActGrant { connector: CONNECTOR, may: Box::new([people::ActKind::MakeProject]) }]);
+    }
+    let seed = &config.core.seed_projects[0].policy;
+    config.core.policies = skein_lib::Map::with_capacity(1);
+    config
+        .core
+        .policies
+        .insert(
+            1,
+            core::ConfiguredPolicy {
+                policy: seed.policy.clone(),
+                permissions: seed.permissions.clone(),
+                templates: seed.templates.clone(),
+            },
+        )
+        .expect("one configured policy");
+    jig_core_world::peers::journal(&mut limits);
+    World::first_start(config, limits)
+}
+fn make_project(maker: u64) -> people::Act {
+    people::Act::MakeProject { maker, name: "Tally".into(), policy: 1 }
+}
+#[test]
+fn a_connector_granted_make_project_makes_a_project_for_a_deployment_owner() {
+    const OWNER: u64 = 1;
+    const MADE: u32 = 2;
+    let mut world = project_world(true);
+    act(&mut world, KEY, make_project(OWNER));
+    assert_eq!(answered(&world), &people::Outcome::ProjectMade { project: MADE });
+    assert_eq!(
+        world.store.rows[&root::Key::Core(core::Key::People(people::Key::Roles(MADE)))],
+        root::Record::Core(core::Record::People(people::Stored::Roles {
+            project: MADE,
+            holdings: Box::new([people::Holding { person: OWNER, role: people::Role::Owner }]),
+        }))
+    );
+    let commits = world.commits.len();
+    act(&mut world, KEY, make_project(OWNER));
+    assert_eq!(answered(&world), &people::Outcome::ProjectMade { project: MADE });
+    assert_eq!(world.commits.len(), commits);
+}
+#[test]
+fn make_project_is_not_offered_to_a_connector_without_its_grant() {
+    let mut world = project_world(false);
+    act(&mut world, KEY, make_project(1));
+    assert_eq!(answered(&world), &people::Outcome::Refused(people::Refusal::NotOffered));
+}
+#[test]
+fn a_make_project_act_refuses_a_maker_outside_its_subject() {
+    let mut world = project_world(true);
+    act(&mut world, KEY, make_project(u64::MAX));
+    assert_eq!(answered(&world), &people::Outcome::Refused(people::Refusal::Unknown));
 }

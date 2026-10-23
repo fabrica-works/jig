@@ -214,6 +214,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
             | Output::Read { .. }
             | Output::Agent(_)
             | Output::ToChild(_)
+            | Output::ProjectMade { .. }
             | Output::Busy
             | Output::Stop => panic!("one initial commit"),
         }
@@ -258,6 +259,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                 | Output::IncidentAssociationRefused { .. }
                 | Output::Read { .. }
                 | Output::Agent(_)
+                | Output::ProjectMade { .. }
                 | Output::Busy
                 | Output::Stop) => panic!("empty restart has no other work: {other:?}"),
             }
@@ -320,6 +322,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
                 | Output::IncidentAssociationRefused { .. }
                 | Output::Read { .. }
                 | Output::Agent(_)
+                | Output::ProjectMade { .. }
                 | Output::Busy
                 | Output::Stop) => seen.push(other).unwrap(),
             }
@@ -400,6 +403,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::Read { .. }
             | Output::Agent(_)
             | Output::ToChild(_)
+            | Output::ProjectMade { .. }
             | Output::Busy
             | Output::Stop => {}
         }
@@ -436,6 +440,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
             | Output::ToChild(_)
+            | Output::ProjectMade { .. }
             | Output::Busy
             | Output::Stop => {}
         }
@@ -573,6 +578,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
             | Output::Read { .. }
             | Output::Agent(_)
             | Output::ToChild(_)
+            | Output::ProjectMade { .. }
             | Output::Busy
             | Output::Stop => {}
         }

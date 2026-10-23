@@ -123,7 +123,9 @@ pub fn remap_models(ask: &mut Ask, moved: &[u64; 64]) {
             | PolicyChange::Permissions { .. }
             | PolicyChange::Templates { .. } => {}
         },
-        Ask::MarkSeen { .. }
+        Ask::Rename { .. }
+        | Ask::MakeProject { .. }
+        | Ask::MarkSeen { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }
         | Ask::MakeService { .. }
@@ -202,7 +204,9 @@ pub fn valid_model_context(ask: &Ask, names: &[Box<[u8]>]) -> bool {
             | PolicyChange::Permissions { .. }
             | PolicyChange::Templates { .. } => 0,
         },
-        Ask::MarkSeen { .. }
+        Ask::Rename { .. }
+        | Ask::MakeProject { .. }
+        | Ask::MarkSeen { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }
         | Ask::MakeService { .. }
@@ -265,7 +269,9 @@ pub(crate) fn has_model_selector(ask: &Ask) -> bool {
             | PolicyChange::Permissions { .. }
             | PolicyChange::Templates { .. } => false,
         },
-        Ask::MarkSeen { .. }
+        Ask::Rename { .. }
+        | Ask::MakeProject { .. }
+        | Ask::MarkSeen { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }
         | Ask::MakeService { .. }

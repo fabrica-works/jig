@@ -444,6 +444,14 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
             limits,
             wire::AskSetRolesParts { project: *project, holdings: encode_holdings(holdings, limits)? },
         )?),
+        domain::Ask::Rename { project, name } => wire::Ask::Rename(wire::AskRename::new(
+            limits,
+            wire::AskRenameParts { project: *project, name: name.as_bytes().into() },
+        )?),
+        domain::Ask::MakeProject { name, policy } => wire::Ask::MakeProject(wire::AskMakeProject::new(
+            limits,
+            wire::AskMakeProjectParts { name: name.as_bytes().into(), policy: *policy },
+        )?),
         domain::Ask::ChangePolicy { project, change } => wire::Ask::ChangePolicy(wire::AskChangePolicy::new(
             limits,
             wire::AskChangePolicyParts { project: *project, change: encode_policy_change(change, limits)? },
@@ -595,6 +603,14 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             let wire::AskSetRolesParts { project, holdings } = value.into_parts();
             domain::Ask::SetRoles { project, holdings: decode_holdings(holdings) }
         }
+        wire::Ask::Rename(value) => {
+            let wire::AskRenameParts { project, name } = value.into_parts();
+            domain::Ask::Rename { project, name: project_name(&name, wire::Path::AskRenameName)? }
+        }
+        wire::Ask::MakeProject(value) => {
+            let wire::AskMakeProjectParts { name, policy } = value.into_parts();
+            domain::Ask::MakeProject { name: project_name(&name, wire::Path::AskMakeProjectName)?, policy }
+        }
         wire::Ask::ChangePolicy(value) => {
             let wire::AskChangePolicyParts { project, change } = value.into_parts();
             domain::Ask::ChangePolicy { project, change: decode_policy_change(change, limits)? }
@@ -654,5 +670,13 @@ fn decode_application_scope(scope: wire::ApplicationScope) -> domain::Applicatio
         wire::ApplicationScope::Project(project) => domain::ApplicationScope::Project(project.into_parts().project),
         wire::ApplicationScope::Deployment => domain::ApplicationScope::Deployment,
         wire::ApplicationScope::Own => domain::ApplicationScope::Own,
+    }
+}
+
+#[expect(clippy::disallowed_methods, reason = "stored project names are UTF-8 text")]
+pub(super) fn project_name(bytes: &[u8], path: wire::Path) -> Result<Box<str>, wire::Problem> {
+    match core::str::from_utf8(bytes) {
+        Ok(name) => Ok(name.into()),
+        Err(_) => Err(wire::Problem { path, reason: skein_codec::Reason::Utf8 }),
     }
 }

@@ -4,6 +4,7 @@
 //! (`domain/testing.md`, 4, 6).
 pub mod acceptance;
 pub mod intents;
+mod projects;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -255,6 +256,7 @@ impl SeenFence {
 pub struct Observer {
     pub referee: r::Referee,
     intents: intents::Intents,
+    project_makes: projects::Makes,
     policy_generation: u64,
     roles: BTreeMap<(u32, u32), r::Scope>,
     decisions_by_role: BTreeMap<(u32, u32), u8>,
@@ -380,6 +382,7 @@ impl Observer {
             forgetting: BTreeMap::new(),
             recorded: None,
             intents: intents::Intents::configured(configuration),
+            project_makes: projects::Makes::new(configuration),
         }
     }
 
@@ -408,6 +411,7 @@ impl Observer {
 
     /// Observe inbound peer traffic, before the root may decide it.
     pub fn inbound(&mut self, store: &Store, now: u64, event: &mut root::Event) {
+        self.project_makes.inbound(store, event);
         for observed in self.intents.inbound_root(store, event) {
             self.observe(now, observed);
         }
@@ -514,6 +518,34 @@ impl Observer {
     #[must_use]
     pub const fn policy_generation(&self) -> u64 {
         self.policy_generation
+    }
+
+    /// A restart changes future makes' configured policies, never an existing project's.
+    pub fn configure_projects(&mut self, config: &root::Config) {
+        self.project_makes.configure(config);
+    }
+
+    fn made_project(&mut self, project: u32, policy: &authority::Policy) {
+        self.policy_generation = self.policy_generation.checked_add(1).expect("policy generation fits");
+        self.referee.policy.projects.insert(project, scope(&policy.ceiling));
+        self.referee.policy.projections.insert(project, authority_grants(&policy.projections));
+        for role in &policy.roles {
+            self.roles.insert((project, role.number), scope(&role.authority));
+            self.decisions_by_role.insert((project, role.number), role.decides.0);
+        }
+        for requirement in &policy.requirements {
+            self.referee.policy.requirements.push(r::Requirement {
+                project: Some(project),
+                connector: requirement.connector,
+                kind: requirement.kind,
+                pattern: authority_pattern(&requirement.pattern),
+                judge: requirement.judge.connector,
+                freshness: match requirement.guard {
+                    authority::Guard::Guarded => None,
+                    authority::Guard::Observed { freshness } => Some(freshness.as_nanos()),
+                },
+            });
+        }
     }
 
     fn policy_change(&mut self, project: u32, change: &people::PolicyChange) {
@@ -679,6 +711,11 @@ impl Observer {
         }
         for observed in self.intents.durable(store) {
             self.observe(now, observed);
+        }
+        for (project, policy) in self.project_makes.durable(store) {
+            if !self.referee.policy.projects.contains_key(&project) {
+                self.made_project(project, &policy);
+            }
         }
         // Apply only an externally requested policy edit whose durable answer
         // says it succeeded. Saved policy carriers are never an authority oracle.
@@ -1028,31 +1065,9 @@ impl Observer {
                     "answer preceded its durable named-call record"
                 );
             }
-            root::Delivery::Core(core::Held::PeopleReply { to, reply }) => match reply {
-                people::Reply::SignedIn { sign_in, .. } => requires.push(r::Receipt::SignIn(*sign_in)),
-                people::Reply::Full { .. }
-                | people::Reply::Again(_)
-                | people::Reply::SignedOut
-                | people::Reply::Refused(_) => {
-                    let to = destination(to);
-                    if self.requests.get(&to).is_some_and(|(_, _, seen)| seen.is_some()) {
-                        self.requests.remove(&to);
-                    }
-                }
-                people::Reply::Outcome(_) => {
-                    let to = destination(to);
-                    if let Some((person, key, seen)) = self.requests.remove(&to) {
-                        if let Some(fence) = seen {
-                            assert!(
-                                self.applied >= fence.after,
-                                "Seen reply preceded its durable position/forget commit"
-                            );
-                        } else {
-                            requires.push(r::Receipt::Party(person, key));
-                        }
-                    }
-                }
-            },
+            root::Delivery::Core(core::Held::PeopleReply { to, reply }) => {
+                self.reply_receipts(to, reply, &mut requires);
+            }
             root::Delivery::Message { task: run, word, .. } => {
                 requires.push(r::Receipt::Word(*run, word.number));
                 self.observe(now, r::Observed::Reached(r::Receipt::Word(*run, word.number)));
@@ -1087,10 +1102,36 @@ impl Observer {
             | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Projection { .. }
             | root::Delivery::Link { .. }
+            | root::Delivery::ProjectMade { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::System { .. } => {}
         }
         self.observe(now, r::Observed::Released { requires });
+    }
+
+    fn reply_receipts(&mut self, to: &mut skein_lib::ReplyTo, reply: &people::Reply, requires: &mut Vec<r::Receipt>) {
+        match reply {
+            people::Reply::SignedIn { sign_in, .. } => requires.push(r::Receipt::SignIn(*sign_in)),
+            people::Reply::Full { .. }
+            | people::Reply::Again(_)
+            | people::Reply::SignedOut
+            | people::Reply::Refused(_) => {
+                let to = destination(to);
+                if self.requests.get(&to).is_some_and(|(_, _, seen)| seen.is_some()) {
+                    self.requests.remove(&to);
+                }
+            }
+            people::Reply::Outcome(_) => {
+                let to = destination(to);
+                if let Some((person, key, seen)) = self.requests.remove(&to) {
+                    if let Some(fence) = seen {
+                        assert!(self.applied >= fence.after, "Seen reply preceded its durable position/forget commit");
+                    } else {
+                        requires.push(r::Receipt::Party(person, key));
+                    }
+                }
+            }
+        }
     }
 }
 

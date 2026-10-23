@@ -1,6 +1,8 @@
 //! Admission refuses party proposals with no accepting role (QUESTIONS 31).
 use super::*;
 const READ_CREATING: u64 = 94;
+// Project subject actions, including Rename (people.md, 5.1).
+const PROJECT_ACTS: u32 = 7;
 use jig_core_world::stories::offers::{goal, no_acceptor_fixture, project};
 
 #[test]
@@ -107,9 +109,10 @@ fn an_observer_is_offered_nothing_and_told_why() {
         panic!("project");
     };
     let refused = people::Refusal::Role { held: Some(people::Role::Observer) };
-    assert_eq!(project.acts.len(), 6);
+    assert_eq!(project.acts.len(), PROJECT_ACTS);
     assert!(project.acts.iter().all(|value| value.admission == Admission::Refused(refused.clone())));
     assert!(project.acts.iter().any(|value| value.act == Act::Reorder));
+    assert!(project.acts.iter().any(|value| value.act == Act::Rename));
     let task_rows = world
         .store
         .rows

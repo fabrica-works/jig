@@ -1122,7 +1122,11 @@ pub(super) fn tag_tasks(
                 for _ in 0..ended.len() {
                     match ended.pop().expect("ended run outputs") {
                         Request::Decided => {}
-                        request @ (Request::Write(_) | Request::Held(_) | Request::Now(_) | Request::Ask { .. }) => {
+                        request @ (Request::ProjectMade { .. }
+                        | Request::Write(_)
+                        | Request::Held(_)
+                        | Request::Now(_)
+                        | Request::Ask { .. }) => {
                             out.push(request);
                         }
                     }

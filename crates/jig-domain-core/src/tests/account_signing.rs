@@ -72,7 +72,7 @@ fn stepped(core: &mut Core, env: &Env<Limits>, event: Event) -> (Option<accounts
                 };
                 assert!(answered.replace(outcome).is_none(), "one outcome: {answered:?}");
             }
-            Request::Write(_) | Request::Decided => {}
+            Request::Write(_) | Request::ProjectMade { .. } | Request::Decided => {}
             Request::Ask { .. } => panic!("only the accounts' component is asked: {request:?}"),
         }
     }

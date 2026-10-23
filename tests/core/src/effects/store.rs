@@ -161,6 +161,7 @@ impl World {
     pub fn restart_with(&mut self, config: root::Config) {
         self.observer.observe(self.wall, crate::referee::Observed::Restart);
         self.store.reconfigure(18, &config.core.settings.models);
+        self.observer.configure_projects(&config);
         if let Some(watches) = &mut self.watches {
             watches.restart(self.store.applied);
         }

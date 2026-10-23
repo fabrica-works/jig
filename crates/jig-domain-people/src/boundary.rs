@@ -278,6 +278,10 @@ pub enum Ask {
     },
     /// Owner changes one mutable part of the project policy for future decisions.
     ChangePolicy { project: u32, change: crate::PolicyChange },
+    /// Owner replaces this project's name (people.md, 5.1).
+    Rename { project: u32, name: Box<str> },
+    /// Deployment owner makes a project from a configured policy (people.md, 5.2).
+    MakeProject { name: Box<str>, policy: u32 },
     /// Owner changes one person's current-period pool, preserving already spent and reserved funds.
     SetPool { project: u32, person: u64, budget: u64 },
     /// Decide one held chat's exact semantic revision. Root verifies current waiting recipient and
@@ -432,6 +436,10 @@ pub enum Outcome {
     },
     /// The full committed policy now applies to later checks; existing grants remain.
     PolicyChanged { project: u32 },
+    /// The project now carries its new name.
+    Renamed { project: u32 },
+    /// A configured policy became a new project owned by its maker.
+    ProjectMade { project: u32 },
     /// One person's finite pool was opened or resized in its original period.
     PoolSet { project: u32, person: u64 },
     /// Root's committed current or historical decision for one task revision; first commit decides
@@ -510,6 +518,11 @@ pub struct ActKey {
 /// One act a connector makes in the deployment's name (people.md, 5.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Act {
+    MakeProject {
+        maker: u64,
+        name: Box<str>,
+        policy: u32,
+    },
     Close {
         project: u32,
         task: u64,

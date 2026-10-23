@@ -332,7 +332,11 @@ fn an_observers_core_role_refusals_match_their_offers() {
                         saved += 1;
                     }
                     Request::Write(Write::Save(Record::Tasks(_))) => panic!("refused act wrote a task"),
-                    Request::Write(_) | Request::Ask { .. } | Request::Now(_) | Request::Decided => {}
+                    Request::ProjectMade { .. }
+                    | Request::Write(_)
+                    | Request::Ask { .. }
+                    | Request::Now(_)
+                    | Request::Decided => {}
                 }
             }
             assert!(replied, "index {index}, replay {replay}: {out:?}");

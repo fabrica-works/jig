@@ -206,8 +206,6 @@ pub(crate) fn refused(
     limits: &w::Limits,
 ) -> Result<Option<w::KeyedAnswer>, w::Problem> {
     let (at, found) = match record {
-        // T4: translated to people's Rename / MakeProject.
-        w::Ask::Rename(_) | w::Ask::MakeProject(_) => return not_offered(limits),
         w::Ask::Create(value) => (None, batch(value.tasks(), models, limits)?),
         w::Ask::Propose(value) => match value.action() {
             w::ProposeAction::Batch(value) => (None, batch(value.tasks(), models, limits)?),
@@ -215,7 +213,9 @@ pub(crate) fn refused(
         },
         w::Ask::Amend(value) => (None, lacking(value.change().llm().as_ref(), models)),
         w::Ask::Compound(value) => operations(value.operations(), models, limits)?,
-        w::Ask::Message(_)
+        w::Ask::Rename(_)
+        | w::Ask::MakeProject(_)
+        | w::Ask::Message(_)
         | w::Ask::Answer(_)
         | w::Ask::Take(_)
         | w::Ask::HandBack(_)
@@ -372,12 +372,4 @@ pub(crate) fn refusal(
         p::LlmWhy::Repeated => w::LlmWhy::Repeated,
     };
     Ok(w::Refusal::Llm(w::RefusalLlm::new(limits, w::RefusalLlmParts { model: bytes::copy_of(&model.name), why })?))
-}
-
-fn not_offered(limits: &w::Limits) -> Result<Option<w::KeyedAnswer>, w::Problem> {
-    let answer =
-        w::Final::Refused(w::Refused::new(limits, w::RefusedParts { refusal: w::Refusal::NotOffered, at: None })?);
-    let mut out = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
-    answer.encode(&mut out).expect("measured answer");
-    Ok(Some(super::answers::owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits)?))
 }

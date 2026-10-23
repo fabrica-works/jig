@@ -25,6 +25,7 @@ impl World {
             }
         }
         match delivery {
+            root::Delivery::ProjectMade { project } => self.project_made.push((self.store.applied, project)),
             root::Delivery::Core(core::Held::Acted { to, outcome }) => {
                 self.act_answers.push((to.into_token(), outcome));
             }

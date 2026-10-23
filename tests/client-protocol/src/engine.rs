@@ -322,6 +322,7 @@ impl Engine {
                     }
                 }
                 root::Delivery::Link { .. }
+                | root::Delivery::ProjectMade { .. }
                 | root::Delivery::CallBusy { .. }
                 | root::Delivery::Projection { .. }
                 | root::Delivery::Message { .. }

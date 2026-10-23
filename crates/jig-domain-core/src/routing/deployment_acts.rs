@@ -19,7 +19,10 @@ pub(super) fn start(
 ) -> Requests {
     let digest = match &*act {
         people::Act::AddKey { digest, .. } => Some(*digest),
-        people::Act::Close { .. } | people::Act::RemoveAccount { .. } | people::Act::Adopt { .. } => None,
+        people::Act::MakeProject { .. }
+        | people::Act::Close { .. }
+        | people::Act::RemoveAccount { .. }
+        | people::Act::Adopt { .. } => None,
     };
     let valid = match carried {
         Some(carried) => digest == Some(carried.digest),
@@ -44,12 +47,16 @@ pub(super) fn start(
 
 pub(super) fn route(
     core: &mut Core,
+    env: &Env<Limits>,
     work: &mut Queue<Event>,
     out: &mut Queue<Request>,
     request: Token,
     act: people::Act,
 ) {
     match act {
+        people::Act::MakeProject { maker, name, policy } => {
+            super::projects::make_project_act(core, env, work, out, request, maker, name, policy);
+        }
         people::Act::Close { project, task, grace, reason } => {
             if core.tasks.task(task).is_none() {
                 return super::result_reads::closed_subject(core, work, out, request, project, task);

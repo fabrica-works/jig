@@ -366,3 +366,90 @@ fn dependency_refusals_keep_all_names_and_outcomes_through_the_client() {
         );
     }
 }
+
+#[test]
+fn project_outcomes_keep_the_project_number() {
+    let limits = f::wire();
+    for (outcome, expected) in [
+        (
+            p::Outcome::Renamed { project: 3 },
+            w::OwnerOutcome::Renamed(
+                w::OwnerOutcomeRenamed::new(&limits, w::OwnerOutcomeRenamedParts { project: 3 }).expect("renamed"),
+            ),
+        ),
+        (
+            p::Outcome::ProjectMade { project: 4 },
+            w::OwnerOutcome::ProjectMade(
+                w::OwnerOutcomeProjectMade::new(&limits, w::OwnerOutcomeProjectMadeParts { project: 4 }).expect("made"),
+            ),
+        ),
+    ] {
+        let expected = w::Final::Done(
+            w::Done::new(
+                &limits,
+                w::DoneParts {
+                    outcome: w::Outcome::Owner(
+                        w::OutcomeOwner::new(&limits, w::OutcomeOwnerParts { value: expected }).expect("owner"),
+                    ),
+                },
+            )
+            .expect("done"),
+        );
+        assert_eq!(f::translated(&p::Reply::Outcome(outcome), &limits), expected);
+    }
+}
+
+#[test]
+#[expect(clippy::disallowed_macros, reason = "ordinary test builds typed refusal cases")]
+fn project_refusals_keep_their_facts() {
+    let limits = f::wire();
+    let mut cases = vec![
+        (p::Refusal::NameTaken, w::Refusal::NameTaken),
+        (
+            p::Refusal::Limit { which: p::LimitKind::Projects },
+            w::Refusal::Limit(
+                w::RefusalLimit::new(
+                    &limits,
+                    w::RefusalLimitParts {
+                        which: w::Limit::Admission(
+                            w::LimitAdmission::new(
+                                &limits,
+                                w::LimitAdmissionParts { which: w::AdmissionLimit::Projects },
+                            )
+                            .expect("admission limit"),
+                        ),
+                    },
+                )
+                .expect("limit"),
+            ),
+        ),
+    ];
+    for (rule, expected) in [
+        (p::NameRule::Empty, w::NameRule::Empty),
+        (p::NameRule::Long, w::NameRule::Long),
+        (p::NameRule::Control, w::NameRule::Control),
+        (p::NameRule::Space, w::NameRule::Space),
+        (p::NameRule::Digits, w::NameRule::Digits),
+    ] {
+        cases.push((
+            p::Refusal::NotWellFormed { at: 0, why: p::Malformed::Name(rule) },
+            w::Refusal::Malformed(
+                w::RefusalMalformed::new(
+                    &limits,
+                    w::RefusalMalformedParts {
+                        at: 0,
+                        why: w::Malformed::Name(
+                            w::MalformedName::new(&limits, w::MalformedNameParts { rule: expected })
+                                .expect("name rule"),
+                        ),
+                    },
+                )
+                .expect("malformed"),
+            ),
+        ));
+    }
+    for (why, expected) in cases {
+        let w::Final::Refused(value) = f::translated(&p::Reply::Refused(why), &limits) else { panic!("refused") };
+        assert_eq!(value.refusal(), &expected);
+    }
+}

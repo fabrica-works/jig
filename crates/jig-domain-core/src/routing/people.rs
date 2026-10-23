@@ -138,7 +138,7 @@ pub(super) fn tag_people(
         let Some(next) = pending.pop() else { break };
         let request = match next {
             people::Request::Act { request, connector: _, act } => {
-                super::deployment_acts::route(core, work, &mut out, request, *act);
+                super::deployment_acts::route(core, env, work, &mut out, request, *act);
                 continue;
             }
             people::Request::Acted { to, outcome } => {
@@ -207,6 +207,8 @@ pub(super) fn tag_people(
                     | people::Outcome::Amended { .. }
                     | people::Outcome::RolesSet { .. }
                     | people::Outcome::PolicyChanged { .. }
+                    | people::Outcome::Renamed { .. }
+                    | people::Outcome::ProjectMade { .. }
                     | people::Outcome::PoolSet { .. }
                     | people::Outcome::EscalationDecided { .. }
                     | people::Outcome::AccountSignInStarted { .. }
@@ -300,6 +302,12 @@ pub(super) fn tag_people(
                             release,
                             super::amendment_reads::Evidence::new(&env.limits.tasks),
                         );
+                    }
+                    people::Ask::Rename { name, .. } => {
+                        super::projects::rename_request(core, env, work, &mut out, request, person, project, name);
+                    }
+                    people::Ask::MakeProject { name, policy } => {
+                        super::projects::make_project_request(core, env, work, &mut out, request, person, name, policy);
                     }
                     people::Ask::ChangePolicy { change, .. } => {
                         change_policy_request(core, env, work, request, person, project, &mut out, change);

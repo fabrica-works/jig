@@ -124,6 +124,7 @@ impl ClientPeer {
             | root::Delivery::Message { .. }
             | root::Delivery::Restart(_)
             | root::Delivery::Link { .. }
+            | root::Delivery::ProjectMade { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Assigned { .. }

@@ -623,6 +623,7 @@ impl Application for Testing {
             | root::Delivery::Application { .. }
             | root::Delivery::Core(_)
             | root::Delivery::Link { .. }
+            | root::Delivery::ProjectMade { .. }
             | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Message { .. } => Vec::new(),

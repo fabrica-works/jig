@@ -109,6 +109,7 @@ pub(crate) fn application(value: root::Delivery) -> Option<kit::Event> {
             kit::FromApplication::Answered { to, family: number, record: codec::outcome(&outcome) }
         }
         root::Delivery::Link { .. }
+        | root::Delivery::ProjectMade { .. }
         | root::Delivery::CallBusy { .. }
         | root::Delivery::Projection { .. }
         | root::Delivery::Message { .. }

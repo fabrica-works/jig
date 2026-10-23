@@ -15,7 +15,13 @@ fn grants() -> Box<[ActGrant]> {
     [CONNECTOR, OTHER]
         .map(|connector| ActGrant {
             connector,
-            may: Box::new([ActKind::Close, ActKind::Adopt, ActKind::AddKey, ActKind::RemoveAccount]),
+            may: Box::new([
+                ActKind::Close,
+                ActKind::Adopt,
+                ActKind::MakeProject,
+                ActKind::AddKey,
+                ActKind::RemoveAccount,
+            ]),
         })
         .into()
 }
@@ -59,6 +65,7 @@ fn any_act_with_no_owner_lacks_the_role_and_is_unsaved() {
         close(),
         Act::AddKey { provider: 1, join: None, digest: [7; 32] },
         Act::RemoveAccount { account: 1 },
+        Act::MakeProject { maker: 1, name: "Tally".into(), policy: 1 },
         Act::Adopt {
             project: PROJECT,
             adoption: jig_domain_people::Adoption {

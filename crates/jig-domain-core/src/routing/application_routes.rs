@@ -247,6 +247,8 @@ impl Core {
                 | people::Outcome::Amended { .. }
                 | people::Outcome::RolesSet { .. }
                 | people::Outcome::PolicyChanged { .. }
+                | people::Outcome::Renamed { .. }
+                | people::Outcome::ProjectMade { .. }
                 | people::Outcome::PoolSet { .. }
                 | people::Outcome::EscalationDecided { .. }
                 | people::Outcome::AccountSignInStarted { .. }

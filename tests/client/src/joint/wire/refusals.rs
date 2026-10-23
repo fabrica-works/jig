@@ -25,6 +25,7 @@ pub fn refusal(value: people::Refusal) -> Result<client::Refusal, super::owner::
         people::Refusal::NotWellFormed { at, why } => client::Refusal::Malformed {
             at,
             why: match why {
+                people::Malformed::Name(rule) => client::Malformed::Name(name_rule(rule)),
                 people::Malformed::AsAllowedTwice => client::Malformed::TwoAsAllowed,
                 people::Malformed::EndedBy => client::Malformed::EndedBy,
                 people::Malformed::Conversation => client::Malformed::ConversationNotAgent,
@@ -55,6 +56,7 @@ pub fn refusal(value: people::Refusal) -> Result<client::Refusal, super::owner::
             },
         },
         people::Refusal::Provider => client::Refusal::Provider,
+        people::Refusal::NameTaken => client::Refusal::NameTaken,
         people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => client::Refusal::NotOffered,
         people::Refusal::KeyConflict => client::Refusal::KeyConflict,
         people::Refusal::Llm { .. } => return Err(super::owner::Invalid::Llm),
@@ -91,6 +93,7 @@ pub fn lack(value: people::Lack) -> client::Lacking {
 #[must_use]
 pub fn limit(value: people::LimitKind) -> client::AdmissionLimit {
     match value {
+        people::LimitKind::Projects => client::AdmissionLimit::Projects,
         people::LimitKind::Words => client::AdmissionLimit::Words,
         people::LimitKind::Identity => client::AdmissionLimit::Identity,
         people::LimitKind::Roles => client::AdmissionLimit::Roles,
@@ -221,6 +224,16 @@ fn names(values: &[u64]) -> skein_lib::List<u64> {
         rows.push(*number).expect("same number count");
     }
     rows
+}
+
+fn name_rule(rule: people::NameRule) -> client::NameRule {
+    match rule {
+        people::NameRule::Empty => client::NameRule::Empty,
+        people::NameRule::Long => client::NameRule::Long,
+        people::NameRule::Control => client::NameRule::Control,
+        people::NameRule::Space => client::NameRule::Space,
+        people::NameRule::Digits => client::NameRule::Digits,
+    }
 }
 
 #[cfg(test)]

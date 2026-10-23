@@ -113,10 +113,14 @@ fn decode(
         w::Ask::SignOut(value) => {
             p::Ask::AccountSignOut { holder: account_holder(value.holder()), source: value.source() }
         }
-        // T4: translated to people's Rename / MakeProject.
-        w::Ask::Rename(_) => return Err(Untranslatable { path: w::Path::RenameProject }),
-        // T4: translated to people's Rename / MakeProject.
-        w::Ask::MakeProject(_) => return Err(Untranslatable { path: w::Path::MakeProjectPolicy }),
+        w::Ask::Rename(value) => {
+            let v = value.into_parts();
+            p::Ask::Rename { project: v.project, name: project_name(&v.name, w::Path::RenameName)? }
+        }
+        w::Ask::MakeProject(value) => {
+            let v = value.into_parts();
+            p::Ask::MakeProject { name: project_name(&v.name, w::Path::MakeProjectName)?, policy: v.policy }
+        }
         w::Ask::SetPool(value) => {
             let v = value.into_parts();
             p::Ask::SetPool { project: v.project, person: v.party, budget: v.budget }
@@ -600,4 +604,12 @@ fn account_change(value: &w::AccountChange) -> Result<p::AccountChange, Untransl
             },
         },
     })
+}
+
+#[expect(clippy::disallowed_methods, reason = "project names cross the wire as UTF-8 bytes")]
+fn project_name(bytes: &[u8], path: w::Path) -> Result<Box<str>, Untranslatable> {
+    match core::str::from_utf8(bytes) {
+        Ok(name) => Ok(name.into()),
+        Err(_) => Err(Untranslatable { path }),
+    }
 }

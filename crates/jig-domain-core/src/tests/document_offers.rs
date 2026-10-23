@@ -13,6 +13,8 @@ fn find(offers: &List<crate::acts::Offered>, act: Act) -> Option<&Admission> {
 
 #[test]
 fn document_offers_fit_the_object_and_preserve_actor_specific_refusals() {
+    // Project subject actions, including Rename (people.md, 5.1).
+    const PROJECT_ACTS: u32 = 7;
     let (mut core, mut limits) = make_tree();
     limits.authority.roles = 2;
     let mut policy = core.authority.policy(1).unwrap().clone();
@@ -55,7 +57,8 @@ fn document_offers_fit_the_object_and_preserve_actor_specific_refusals() {
     else {
         panic!("project")
     };
-    assert_eq!(value.acts.len(), 6);
+    assert_eq!(value.acts.len(), PROJECT_ACTS);
+    assert!(find(&value.acts, Act::Rename).is_some());
     for offer in &value.acts {
         assert_eq!(offer.admission, Admission::Refused(people::Refusal::Role { held: Some(people::Role::Observer) }));
     }

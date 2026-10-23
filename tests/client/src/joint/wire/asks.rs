@@ -11,8 +11,6 @@ use skein_lib::List;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
-    // T4: translated to people's Rename / MakeProject.
-    NotOffered,
     Decision,
     NoteRevision,
     NoteProject,
@@ -132,8 +130,14 @@ fn translate(
         client::Ask::SignOut { holder, source } => {
             people::Ask::AccountSignOut { holder: account_holder(*holder), source: *source }
         }
-        // T4: translated to people's Rename / MakeProject.
-        client::Ask::Rename { .. } | client::Ask::MakeProject { .. } => return Err(Invalid::NotOffered),
+        client::Ask::Rename { project, name } => people::Ask::Rename {
+            project: *project,
+            name: core::str::from_utf8(name.bytes()).expect("client text is UTF-8").into(),
+        },
+        client::Ask::MakeProject { name, policy } => people::Ask::MakeProject {
+            name: core::str::from_utf8(name.bytes()).expect("client text is UTF-8").into(),
+            policy: *policy,
+        },
         client::Ask::SetPool { project, party, budget } => {
             people::Ask::SetPool { project: *project, person: *party, budget: *budget }
         }

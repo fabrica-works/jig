@@ -58,7 +58,11 @@ fn current_stream(out: &[Request]) -> &Request {
                 | Now::HistoricalEscalation { .. }
                 | Now::RestoreRefused => {}
             },
-            Request::Write(..) | Request::Ask { .. } | Request::Held(..) | Request::Decided => {}
+            Request::Write(..)
+            | Request::Ask { .. }
+            | Request::Held(..)
+            | Request::ProjectMade { .. }
+            | Request::Decided => {}
         }
     }
     panic!("current supplied retry reaches the public stream boundary")
@@ -67,7 +71,11 @@ fn only_decided(out: &[Request]) -> bool {
     for request in out {
         match request {
             Request::Decided => {}
-            Request::Write(..) | Request::Ask { .. } | Request::Held(..) | Request::Now(..) => return false,
+            Request::ProjectMade { .. }
+            | Request::Write(..)
+            | Request::Ask { .. }
+            | Request::Held(..)
+            | Request::Now(..) => return false,
         }
     }
     true
@@ -76,7 +84,11 @@ fn has_write(out: &[Request]) -> bool {
     for request in out {
         match request {
             Request::Write(..) => return true,
-            Request::Decided | Request::Ask { .. } | Request::Held(..) | Request::Now(..) => {}
+            Request::ProjectMade { .. }
+            | Request::Decided
+            | Request::Ask { .. }
+            | Request::Held(..)
+            | Request::Now(..) => {}
         }
     }
     false
@@ -122,7 +134,11 @@ fn has_watch_end(out: &[Request]) -> bool {
                 | Held::NotesWritten { .. }
                 | Held::NotesDeleted { .. } => {}
             },
-            Request::Write(..) | Request::Ask { .. } | Request::Now(..) | Request::Decided => {}
+            Request::Write(..)
+            | Request::Ask { .. }
+            | Request::Now(..)
+            | Request::ProjectMade { .. }
+            | Request::Decided => {}
         }
     }
     false
@@ -229,7 +245,11 @@ fn delivered_run(out: &[Request]) -> Option<&Run> {
                     return Some(run);
                 }
             }
-            Request::Write(..) | Request::Ask { .. } | Request::Now(..) | Request::Decided => {}
+            Request::Write(..)
+            | Request::Ask { .. }
+            | Request::Now(..)
+            | Request::ProjectMade { .. }
+            | Request::Decided => {}
         }
     }
     None

@@ -380,6 +380,12 @@ impl Domain {
         Some(result)
     }
 
+    /// Whether another project roster fits, including the deployment roster.
+    #[must_use]
+    pub fn project_room(&self) -> bool {
+        self.roles.len() < self.roles.capacity()
+    }
+
     /// Borrow the retained role holders of one project without changing admission.
     #[must_use]
     pub fn project_members(&self, project: u32) -> Option<&[Holding]> {
@@ -638,6 +644,8 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::Amended { .. }
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
+        | Outcome::Renamed { .. }
+        | Outcome::ProjectMade { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }
@@ -685,6 +693,8 @@ fn apply_roles(
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::ChangePolicy { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
@@ -733,6 +743,8 @@ fn apply_roles(
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::ChangePolicy { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
@@ -855,6 +867,8 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         | Ask::Amend { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. }
         | Ask::DecideEscalation { .. }
         | Ask::AccountSignIn { .. }
@@ -1070,7 +1084,9 @@ fn project(ask: &Ask) -> u32 {
         },
         // An account request names no project; its check is its holder (domain/authority.md, 8.4).
         Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } | Ask::AccountChange { .. } => 0,
-        Ask::Compound { project, .. }
+        Ask::MakeProject { .. } => crate::DEPLOYMENT,
+        Ask::Rename { project, .. }
+        | Ask::Compound { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
@@ -1226,6 +1242,7 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
         Ask::AnswerPerson { task, result, .. } => *task != 0 && valid_person_result(limits, result),
         Ask::Adopt { adoption, .. } => valid_adoption(limits, adoption),
         Ask::SetRoles { holdings, .. } => holdings.len() <= usize::try_from(limits.holdings).expect("u32 fits usize"),
+        Ask::Rename { name, .. } | Ask::MakeProject { name, .. } => name.len() <= crate::NAME_BYTES,
         Ask::ChangePolicy { change, .. } => match crate::policy_change_bytes(change) {
             Some(bytes) => bytes <= u64::from(limits.amendment_bytes),
             None => false,
@@ -1315,7 +1332,10 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
         Ask::Create { batch, .. } | Ask::Propose { action: crate::Action::Batch(batch), .. } => {
             crate::batch::invalid(limits, batch)
         }
-        Ask::AccountChange { .. } | Ask::Propose { action: crate::Action::Amend { .. }, .. } => LimitKind::Words,
+        Ask::Rename { .. }
+        | Ask::MakeProject { .. }
+        | Ask::AccountChange { .. }
+        | Ask::Propose { action: crate::Action::Amend { .. }, .. } => LimitKind::Words,
         Ask::Say { task, words, .. } => {
             if *task == 0 {
                 return Refusal::Unknown;
@@ -1375,6 +1395,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Amend(u64, bool),
         Roles(u32, bool),
         Policy(u32),
+        Rename(u32),
+        MakeProject,
         Pool(u32, u64),
         Adoption(u32),
         Escalation,
@@ -1422,6 +1444,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
             Expected::Roles(*project, valid)
         }
         Ask::ChangePolicy { project, .. } => Expected::Policy(*project),
+        Ask::Rename { project, .. } => Expected::Rename(*project),
+        Ask::MakeProject { .. } => Expected::MakeProject,
         Ask::SetPool { project, person, .. } => Expected::Pool(*project, *person),
         Ask::DecideEscalation { .. } => Expected::Escalation,
         Ask::AccountSignIn { .. } => Expected::AccountSignIn,
@@ -1475,6 +1499,8 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         }
         Outcome::RolesSet { project } => expected == Expected::Roles(project, true),
         Outcome::PolicyChanged { project } => expected == Expected::Policy(project),
+        Outcome::Renamed { project } => expected == Expected::Rename(project),
+        Outcome::ProjectMade { project } => expected == Expected::MakeProject && project != crate::DEPLOYMENT,
         Outcome::PoolSet { project, person } => expected == Expected::Pool(project, person),
         Outcome::EscalationDecided { .. } => expected == Expected::Escalation,
         Outcome::AccountSignInStarted { .. } => expected == Expected::AccountSignIn,
@@ -1668,6 +1694,8 @@ fn reserves_answer(ask: &Ask) -> bool {
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
@@ -1727,6 +1755,8 @@ pub(super) fn answer_decided(
         | Outcome::Adopted { .. }
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
+        | Outcome::Renamed { .. }
+        | Outcome::ProjectMade { .. }
         | Outcome::PoolSet { .. }
         | Outcome::Said { .. }
         | Outcome::QuestionAnswered { .. }
@@ -1913,6 +1943,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 | Ask::MakeService { .. }
                 | Ask::Adopt { .. }
                 | Ask::ChangePolicy { .. }
+                | Ask::Rename { .. }
+                | Ask::MakeProject { .. }
                 | Ask::SetPool { .. }
                 | Ask::DecideEscalation { .. }
                 | Ask::DecideProposal { .. }
@@ -1942,6 +1974,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::NoteEdited { .. }
             | Outcome::Adopted { .. }
             | Outcome::PolicyChanged { .. }
+            | Outcome::Renamed { .. }
+            | Outcome::ProjectMade { .. }
             | Outcome::PoolSet { .. }
             | Outcome::Said { .. }
             | Outcome::QuestionAnswered { .. }
@@ -2015,6 +2049,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
@@ -2051,6 +2087,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
@@ -2111,6 +2149,8 @@ fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, as
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
+        | Ask::Rename { .. }
+        | Ask::MakeProject { .. }
         | Ask::SetPool { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
@@ -2197,6 +2237,8 @@ fn valid_program_outcome(limits: &Limits, outcome: &Outcome) -> bool {
         | Outcome::Amended { .. }
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
+        | Outcome::Renamed { .. }
+        | Outcome::ProjectMade { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }

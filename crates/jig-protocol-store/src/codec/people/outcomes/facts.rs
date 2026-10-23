@@ -345,6 +345,7 @@ pub(super) fn decode_lack(value: wire::Lack) -> domain::Lack {
 }
 pub(super) fn encode_limit_kind(value: domain::LimitKind, _limits: &wire::Limits) -> wire::LimitKind {
     match value {
+        domain::LimitKind::Projects => wire::LimitKind::Projects,
         domain::LimitKind::Words => wire::LimitKind::Words,
         domain::LimitKind::Identity => wire::LimitKind::Identity,
         domain::LimitKind::Roles => wire::LimitKind::Roles,
@@ -391,6 +392,7 @@ pub(super) fn encode_limit_kind(value: domain::LimitKind, _limits: &wire::Limits
 }
 pub(super) fn decode_limit_kind(value: wire::LimitKind) -> domain::LimitKind {
     match value {
+        wire::LimitKind::Projects => domain::LimitKind::Projects,
         wire::LimitKind::Words => domain::LimitKind::Words,
         wire::LimitKind::Identity => domain::LimitKind::Identity,
         wire::LimitKind::Roles => domain::LimitKind::Roles,
@@ -444,6 +446,10 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
                 why: match why {
                     domain::Malformed::ProposedAsAllowed => wire::Malformed::ProposedAsAllowed,
                     domain::Malformed::Cycle => wire::Malformed::Cycle,
+                    domain::Malformed::Name(rule) => wire::Malformed::Name(wire::MalformedName::new(
+                        limits,
+                        wire::MalformedNameParts { rule: encode_name_rule(*rule) },
+                    )?),
                     domain::Malformed::AsAllowedTwice => wire::Malformed::AsAllowedTwice,
                     domain::Malformed::Conversation => wire::Malformed::Conversation,
 
@@ -515,6 +521,7 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         )?),
         domain::Refusal::NotWaiting => wire::Refusal::NotWaiting,
         domain::Refusal::NoFurther => wire::Refusal::NoFurther,
+        domain::Refusal::NameTaken => wire::Refusal::NameTaken,
         domain::Refusal::Unknown => wire::Refusal::Unknown,
         domain::Refusal::Provider => wire::Refusal::Provider,
         domain::Refusal::NotOffered => wire::Refusal::NotOffered,
@@ -539,6 +546,7 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
                 why: match why {
                     wire::Malformed::ProposedAsAllowed => domain::Malformed::ProposedAsAllowed,
                     wire::Malformed::Cycle => domain::Malformed::Cycle,
+                    wire::Malformed::Name(value) => domain::Malformed::Name(decode_name_rule(value.rule().clone())),
                     wire::Malformed::AsAllowedTwice => domain::Malformed::AsAllowedTwice,
                     wire::Malformed::Conversation => domain::Malformed::Conversation,
 
@@ -603,6 +611,7 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
         }
         wire::Refusal::NotWaiting => domain::Refusal::NotWaiting,
         wire::Refusal::NoFurther => domain::Refusal::NoFurther,
+        wire::Refusal::NameTaken => domain::Refusal::NameTaken,
         wire::Refusal::Unknown => domain::Refusal::Unknown,
         wire::Refusal::Provider => domain::Refusal::Provider,
         wire::Refusal::NotOffered => domain::Refusal::NotOffered,
@@ -680,4 +689,24 @@ fn names(values: &[u64], bound: u32, path: wire::Path) -> Result<skein_lib::List
         }
     }
     Ok(rows)
+}
+
+fn encode_name_rule(rule: domain::NameRule) -> wire::NameRule {
+    match rule {
+        domain::NameRule::Empty => wire::NameRule::Empty,
+        domain::NameRule::Long => wire::NameRule::Long,
+        domain::NameRule::Control => wire::NameRule::Control,
+        domain::NameRule::Space => wire::NameRule::Space,
+        domain::NameRule::Digits => wire::NameRule::Digits,
+    }
+}
+
+fn decode_name_rule(rule: wire::NameRule) -> domain::NameRule {
+    match rule {
+        wire::NameRule::Empty => domain::NameRule::Empty,
+        wire::NameRule::Long => domain::NameRule::Long,
+        wire::NameRule::Control => domain::NameRule::Control,
+        wire::NameRule::Space => domain::NameRule::Space,
+        wire::NameRule::Digits => domain::NameRule::Digits,
+    }
 }

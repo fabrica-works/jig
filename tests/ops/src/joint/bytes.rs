@@ -633,6 +633,7 @@ impl Bytes {
             | root::Output::Read { .. }
             | root::Output::Agent(_)
             | root::Output::ToChild(_)
+            | root::Output::ProjectMade { .. }
             | root::Output::Busy
             | root::Output::Stop => panic!("only public client packets enter the byte face"),
         }

@@ -502,7 +502,11 @@ fn append(requests: Requests, out: &mut Queue<Request>) {
     for _ in 0..requests.len() {
         match requests.pop().expect("watch route outputs") {
             Request::Decided => {}
-            request @ (Request::Write(_) | Request::Held(_) | Request::Now(_) | Request::Ask { .. }) => {
+            request @ (Request::ProjectMade { .. }
+            | Request::Write(_)
+            | Request::Held(_)
+            | Request::Now(_)
+            | Request::Ask { .. }) => {
                 out.push(request);
             }
         }
