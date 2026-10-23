@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-22. What carries jig's API
+Provisional, 2026-10-10, revised 2026-10-23. What carries jig's API
 (`../client/domain/contract.md`) as messages and bytes, whatever the
 transport: jig's messages; the clients' component's messages toward the
 application's transport and server, and the client's link toward its
@@ -554,7 +554,9 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   sign-in, which gives it its number; the component keeps the digest of
   a fresh credential under that number, in the store's secrets' records;
   and only then hands the credential out. The core says each sign-in
-  that ends or expires, and the component erases its digest then.
+  that ends or expires, and the component erases its digest then. A
+  sign-in kept by the printed link (below) is no sign-in made: nothing
+  is committed, drawn or kept.
 - **The application's sign-in.** An application whose people sign in
   another way (an OAuth or OpenID server, a company's directory, a chat
   platform's identity) runs that flow on its own routes, redirects
@@ -587,6 +589,20 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   (below). One link is live at a time: a sign-in with a secret spent,
   expired or unknown is refused, and the component draws a fresh one,
   which the startup prints again.
+  - *A sign-in held is kept* (`../domain/people.md`, section 3). The
+    link's exchange carries a credential as every exchange may, a
+    browser's cookie or a native client's bearer (17.3). Once the secret
+    is found live and reserved, the component checks that credential as
+    any exchange's, its digest under its number and its saved expiry,
+    and names its sign-in to the core as held; one that fails the check
+    is no refusal, and the link signs in afresh. When people answers
+    with the held sign-in, the component draws no credential and keeps
+    no digest: its answer is signed in, with that sign-in's party and
+    saved expiry, carrying no credential, and sets no cookie, since the
+    client already holds it. The secret is spent, as by any sign-in.
+  - *Reuse extends nothing:* the kept sign-in's expiry, the cookie's
+    `Max-Age` and the bearer's file stay as they were.
+
   It is enabled by configuration (`configuration.md`, section 3,
   clients), and only where the application's clients' listener is on
   loopback, which its startup checks (`service.md`, section 3).
@@ -621,7 +637,9 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   (`../client/domain/client.md`, section 12). A transport may keep it
   itself, as a browser's cookie the client never sees: a sign-in's
   answer then carries none, and every exchange leaves with none, the
-  transport adding it (17.3).
+  transport adding it (17.3). A link's answer that carries none to a
+  client that sent the sign-in with a credential in hand names the
+  sign-in kept: the client goes on holding that credential.
 - **Signed out:** a credential the engine does not know, or a sign-in
   ended or expired, is answered signed out on every exchange and ends
   the stream, and the client reports signed out to the application
@@ -863,6 +881,9 @@ section 2).
   each with its own name, a stream sent gone by the client that followed
   it, signed out, records that do not decode, a version not served, a
   `Mint` answered and refused, the printed link spent and drawn again, a
+  link's sign-in carrying a live credential kept (no credential drawn,
+  no digest kept), and one carrying a credential bad, expired or ended
+  while its check is pending signed in afresh and refused nothing, a
   service signing in, a key added, sent again under its key with the
   same value and with another. Its referee: one reply per exchange; one
   streamed message in flight per stream; no credential reaches a
@@ -870,8 +891,9 @@ section 2).
   answer.
 - **The default mapping's ends,** each against a scripted peer of bytes:
   every route, the stream's events cut at random, the credential as a
-  cookie and as a bearer, the printed link's route, and the example
-  guards' stories (`browser.md`, section 15).
+  cookie and as a bearer, the printed link's route (a browser's link
+  sign-in with its live cookie answered with no `Set-Cookie`), and the
+  example guards' stories (`browser.md`, section 15).
 - **The protocol world,** `jig-client-protocol-world`: the client's
   world's stories (`../client/domain/testing.md`, section 4) run through
   bytes: `jig-client` over the native shell's machines and the default
@@ -1029,7 +1051,9 @@ prefix; jig's test application mounts it at `/jig`.
   loopback listener (why each: `browser.md`, section 19). Its life is
   the sign-in's, from the sign-in's expiry, which a `Minted` carries
   (4.2); signing out clears it, with `Max-Age=0`. The engine end reads
-  it as each exchange's credential.
+  it as each exchange's credential, the link's sign-in's among them: a
+  sign-in kept by the link answers with no credential, so it sets no
+  cookie, and the browser's stays as it was (section 8).
 - **As `Authorization: Bearer`,** everywhere else: the credential in
   base64url, and a service's credential on its sign-in route the same
   way.

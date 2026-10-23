@@ -1,6 +1,6 @@
 # Parties
 
-Provisional, 2026-10-07, revised 2026-10-22. How people, and the
+Provisional, 2026-10-07, revised 2026-10-23. How people, and the
 services that act like them, take part: who they are and the credentials
 they sign in with, what their role in a project lets them do, the
 operations they ask of the engine and what waits for them, the
@@ -112,6 +112,37 @@ inbox are the views child's (engine.md, section 11).
     only;
   - *a service's credential* (below), presented to sign in as that
     service.
+- **A sign-in held is kept.** A person signing in by the printed link
+  while presenting the credential of a sign-in of their own keeps that
+  sign-in, rather than making another beside it:
+  - *the clients' component authenticates it* as it does any exchange's
+    credential, its digest under its number and its saved expiry
+    (`../protocol/client.md`, section 8), and names that sign-in to the
+    core as *held*; one unknown, ended or expired is held by no one,
+    and signs nobody out;
+  - *people decides whether it is the same person's:* a held sign-in
+    whose person is the one the identity signs in, live by both its
+    clocks, is the sign-in's answer, with its own number and its saved
+    expiry, and nothing is written. Anything else (no sign-in held,
+    another person's, one past either clock) signs in afresh, as
+    without one;
+  - *it extends nothing:* the kept sign-in's expiry stays as it was
+    saved, and its credential is the one the person holds, so none is
+    drawn, kept or handed out;
+  - *before capacity:* the held sign-in is checked before the
+    deployment's sign-ins are counted, so signing in again by a fresh
+    link never fills them;
+  - *the numbers drawn go unused:* the candidate person and the sign-in
+    number the core drew for the exchange are kept by no one, and the
+    core's next commit saves its counters past them, as after a sign-in
+    refused as busy. A gap in the numbers is harmless: they name, and
+    are never reused or counted; capacity counts the sign-ins held;
+  - *checked once, by people:* a held sign-in that ends or expires
+    after the clients' component checked it, before people answers, is
+    no longer live there, and the person signs in afresh.
+
+  Only the printed link offers a held sign-in: a `Mint` and a service's
+  sign-in sign in afresh.
 - **Every other way is the application's sign-in.** It runs on the
   application's own routes, redirects included, and verifies who the
   party is. Its server then gives the clients' component a `Mint` naming
@@ -670,7 +701,12 @@ application, the
 deployment's among them, is refused; a person task given a dependency by
 its requester, its answer refused naming it, then answered once the
 dependency is done; a member's amendment adding a dependency beyond
-their reach, refused.
+their reach, refused; a person signing in again by a fresh link while
+holding a live sign-in of their own keeps it, its number and expiry,
+with nothing written, and signs in so more times than the deployment
+has room for sign-ins; and one holding another person's sign-in, or
+their own ended or expired between the clients' check and people's
+answer, signs in afresh.
 
 Its referee: every request is answered once, after its commit; a
 compound request is made whole or not at all; no request is acted on

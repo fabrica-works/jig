@@ -1,6 +1,6 @@
 # The client
 
-Provisional, 2026-10-09, revised 2026-10-22. `jig-client`: the client an
+Provisional, 2026-10-09, revised 2026-10-23. `jig-client`: the client an
 application holds, as a component, to reach jig's engine. It holds the
 link, the watches the application names by handle and the latest
 document of each, the application's keyed requests in skein-lib's
@@ -145,7 +145,7 @@ jig_client::Client: step(now, wall, Event, &mut Queue<Request>), fire(now, wall,
 Event, in
   from the application:
     Start { kept }                                the small store's records, as the host loaded them
-    SignIn { with } | SignOut                     with: Link(secret) | Service(credential) | Held(credential) | Transport
+    SignIn { with } | SignOut                     with: Link { secret, held } | Service(credential) | Held(credential) | Transport
     Watch { handle, subject, window } | Unwatch { handle }
     Read { handle, read, cursor }
     Send { key, name, request }                   an operation, a compound request, or a family's request as bytes; name optional
@@ -799,9 +799,15 @@ for any presentation of a chat or of any agent task's activity.
   server gives the clients' component (`../../protocol/client.md`,
   section 8).
 - **`SignIn { with }`:**
-  - *`Link(secret)`:* the printed link's secret. The client sends the
-    component's sign-in with it, and holds the credential the answer
-    gives, unless the transport keeps it;
+  - *`Link { secret, held }`:* the printed link's secret, beside the
+    credential the application holds from an earlier sign-in, if any.
+    The client sends the component's sign-in with the secret, carrying
+    `held` as its credential, and holds the credential the answer gives;
+    an answer that gives none keeps `held`, the sign-in the engine kept
+    (`../../protocol/client.md`, section 8), unless the transport keeps
+    it: a browser's `held` is none, its cookie carried by the transport.
+    An answer refused, not ready or lost installs nothing, and `held`
+    stays the application's to give again;
   - *`Service(credential)`:* a service's credential, sent the same way,
     and answered with a sign-in's credential, held the same way;
   - *`Held(credential)`:* a credential the application obtained by its own
@@ -810,10 +816,11 @@ for any presentation of a chat or of any agent task's activity.
     sees, as a browser carries a cookie its server set.
 
   The `credential` on `Exchange` and `OpenStream` is the one held, or
-  none. Signed in, the client opens the stream,
-  watches `me` (8.2), and opens the watches asked before (8.1); under
-  `Transport` it is signed in from its `SignIn`. So a host may sign in
-  after `Start { kept }`, its children watching from their start.
+  none; a `Link` sign-in's is its `held`. Signed in, the client opens
+  the stream, watches `me` (8.2), and opens the watches asked before
+  (8.1); under `Transport` it is signed in from its `SignIn`. So a host
+  may sign in after `Start { kept }`, its children watching from their
+  start.
 - **The credential is never in the small store.** It is the link's, and
   `client.link()` gives it: a host that keeps a sign-in across its own
   restart keeps the credential where its platform keeps secrets, and
@@ -1003,18 +1010,19 @@ the client's protocol designs (`../../protocol/client.md`):
 
 `jig-client-world` (`tests/client`) runs the client through its surface
 alone, as an application holds it, with the engine scripted (testing.md,
-section 4), and joins the engine's domain in the joint world (testing.md,
-section 5). Its stories: signing in by the printed link and starting a
-chat by `shapes::chat`; a held chat amended and released in one
-compound request; a proposal accepted while two handles watch it; two
-clients deciding one thing; a restart with requests pending, the kept
-work told and sent; the engine restarting under a pending request; the
-stream dropped, every handle behind, then live; a handle given another
-subject while a delivery for the old one is in flight; a store write
-that fails; another party signing in on a client with kept work; a
-family's request, read and watch as bytes; a version not served; a
-sign-out lost, then sent again; a one-shot client that sends, waits for
-the durable answer and stops.
+section 4), and joins the engine's domain in the joint world
+(testing.md, section 5). Its stories: signing in by the printed link and
+starting a chat by `shapes::chat`; signing in by a fresh link with a
+credential held, kept when the answer carries none; a held chat amended
+and released in one compound request; a proposal accepted while two
+handles watch it; two clients deciding one thing; a restart with
+requests pending, the kept work told and sent; the engine restarting
+under a pending request; the stream dropped, every handle behind, then
+live; a handle given another subject while a delivery for the old one is
+in flight; a store write that fails; another party signing in on a
+client with kept work; a family's request, read and watch as bytes; a
+version not served; a sign-out lost, then sent again; a one-shot client
+that sends, waits for the durable answer and stops.
 
 Its referee is testing.md's, 6.1 and 6.2; the reference UI's stories,
 with a person in front of a tree, are view.md's, 18.10.
