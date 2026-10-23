@@ -212,6 +212,7 @@ A held task whose escalation reached the party
 | Held because | The card says | It offers |
 |---|---|---|
 | out of tries | the class of failure, and each failed attempt's reason | release; amend its instructions and release; cancel |
+| a configured bound on its model call | which bound, and its configured allowance (`contract.md`, 5.5); no try was spent | release, which meets the same bound unless the model answers differently; cancel |
 | stalled | what it waited for, and since when | release; for a person task, address it to someone else; cancel |
 | a dependency failed or was cancelled | which, and why | amend it to drop that dependency and release; cancel; start a chat about a replacement |
 | drift | what changed on the system, by whom, when: its connector's words (a part) | release, which does what the connector says; cancel |
