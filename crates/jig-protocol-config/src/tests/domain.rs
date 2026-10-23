@@ -492,11 +492,9 @@ fn memory_below_the_components_sum_is_refused() {
         + 1_189_328
         // Owner project name: 20 document reservations * (24-byte Text + 4,096 payload bytes).
         + 82_400
-        // Configured policy table, authority policy heap, permission bytes and
-        // template overrides at the small profile.
-        + 190_256
-        // First-start seed policy heap, names and their retained table.
-        + 187_504
+        // The first start's seeds and the configured policy table: their slots, and each
+        // policy at `policy_bytes` (a seed with its name), as the rows cost.
+        + 68_576
         // Account moves add bounded move/arrival tables, payloads and deadlines,
         // and enlarge the accounts output bound and the core's routed envelopes.
         + 14_560_734;

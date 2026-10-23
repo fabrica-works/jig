@@ -17,6 +17,31 @@ use skein_lib::{Id, List, Map, Queue, Set, Slab};
 
 use crate::{CallKey, Event, HistoricalResult, Limits, Request};
 
+// A held authority policy is priced by its people snapshot's `policy_bytes`, which counts the
+// people mirrors' sizes; each mirror is at least as large as the authority type it copies.
+const _: () = assert!(
+    size_of::<authority::Role>() <= size_of::<people::PolicyRole>(),
+    "people's PolicyRole prices authority's Role"
+);
+const _: () = assert!(
+    size_of::<authority::Authority>() <= size_of::<people::Authority>(),
+    "people's Authority prices authority's Authority"
+);
+const _: () =
+    assert!(size_of::<authority::Grant>() <= size_of::<people::Grant>(), "people's Grant prices authority's Grant");
+const _: () = assert!(
+    size_of::<authority::ResourceScope>() <= size_of::<people::ResourceScope>(),
+    "people's ResourceScope prices authority's ResourceScope"
+);
+const _: () = assert!(
+    size_of::<authority::Executor>() <= size_of::<people::Executor>(),
+    "people's Executor prices authority's Executor"
+);
+const _: () = assert!(
+    size_of::<authority::Requirement>() <= size_of::<people::Requirement>(),
+    "people's Requirement prices authority's Requirement"
+);
+
 /// The bytes a run's policy from `policy`, a charter's, owns whatever its task's LLM choice: its
 /// models, and its largest once more for a main model its sub-agents name again, each with its
 /// longest declared effort chosen (domain/engine.md, 7.1).
@@ -404,22 +429,16 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         Queue::<Box<[u8]>>::worst_case(limits.resume_bytes)?.checked_add(u64::from(limits.resume_bytes))?,
     )?)?;
     total = total.checked_add(bytes(limits.authority.projects, limits.policy_bytes)?)?;
-    // First-start seeds coexist with the configured policy table until people restore.
+    // First-start seeds coexist with the configured policy table until people restore. Each held
+    // policy is checked against `policy_bytes` as its row would be (configured at the start, asserted
+    // at construction), so it costs its slot, its name and that bound, as the rows do.
     total = total.checked_add(List::<crate::SeedProject>::worst_case(limits.authority.projects)?)?;
-    total = total.checked_add(authority::worst_case(&limits.authority)?)?;
     total = total.checked_add(bytes(
         limits.authority.projects,
         limits.policy_bytes.checked_add(u64::try_from(people::NAME_BYTES).ok()?)?,
     )?)?;
-    // The configured table owns full authority policies, permission mappings and overrides.
-    // Authority's bound conservatively includes its rules and table as well as policy heap.
     total = total.checked_add(Map::<u32, crate::ConfiguredPolicy>::worst_case(limits.authority.projects)?)?;
-    total = total.checked_add(authority::worst_case(&limits.authority)?)?;
     total = total.checked_add(bytes(limits.authority.projects, limits.policy_bytes)?)?;
-    total = total.checked_add(bytes(
-        limits.authority.projects,
-        List::<people::TemplateOverride>::worst_case(limits.templates)?,
-    )?)?;
     total = total.checked_add(bytes(
         limits.people.initial_owners,
         sizeof(size_of::<people::InitialOwner>())?.checked_add(u64::from(limits.people.identity_bytes))?,
