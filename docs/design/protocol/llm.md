@@ -1,6 +1,6 @@
 # LLM calls and accounts in the engine
 
-Provisional, 2026-10-10, revised 2026-10-19. How a host that runs agents
+Provisional, 2026-10-10, revised 2026-10-23. How a host that runs agents
 in its own process makes their LLM calls, and how every engine that runs
 agents carries out its LLM accounts: the completions
 `smith-inline-agent`'s runs ask for, in the engine or on a worker whose
@@ -237,6 +237,9 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 | release a source | release |
 | sign out a source, or remove it | sign out: revoke its record, take the account out |
 | cancel a sign-in | cancel |
+| withdraw a source for a move | release, then remove: an exchange already sent finishes and keeps its record first (5.6) |
+| bring a moved source back, or adopt a moved record | add, with its record and the owner's store as keeper (5.6) |
+| refresh a source once before it is lent | rejected, of the generation its record holds, before any grant of it (5.6) |
 | close | cancel each sign-in under way, then close: a sign-in waiting on a person never holds the close |
 
 | The driver says | The accounts child hears |
@@ -253,10 +256,11 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 | failed: cancelled; a grant refused as closed | failed, cancelled |
 | a grant refused as full | failed, later, after the child's backoff |
 | signed out: revocation confirmed, or not | signed out, and whether revocation was confirmed |
+| removed, for a withdrawn source | withdrawn, once its record is read and the file's bytes made; or, with no record that reads, withdrawn unread (5.6) |
 | closed | closed |
 
 - **Unreachable in the engine:** `hand in` and `expiring`, since no
-  record is handed in (5.4); `redirected`, since a confidential
+  access-only record is handed in (5.4); `redirected`, since a confidential
   registration is refused at its start; a grant's refusals for an
   account the driver does not hold. The translation names them, and
   asserts they never come.
@@ -317,9 +321,12 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
   drops it and the secrets' store erases it, so a new sign-in's record
   takes its place (skein's `oauth.md`, 6.4).
 - **No record is handed in.** No account is read from a file another
-  program's login fills: a live test runs on a key, on a sign-in made as
-  it starts, or on a program's login on its host (`service.md`, section
-  8).
+  program's login fills, and none is the driver's handed-in, access-only
+  kind: a live test runs on a key, on a sign-in made as it starts, on a
+  record moved in (5.6), or on a program's login on its host
+  (`service.md`, section 8). A moved record is this application's own,
+  moved by its holder: it enters as a kept record, refreshed once before
+  it is lent.
 
 ### 5.5 Program sources and *none*
 
@@ -353,6 +360,55 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
   `protocol/programs.md`, section 2).
 - **A *none* source** lends no value: its endpoint takes none, such as a
   local model's server on loopback.
+
+### 5.6 A moved record
+
+- **The file's form,** one account a file, opaque, private and never
+  printed: a magic, `JIGM`, and the form's version, then, each after its
+  length, the application's name (its root gives it to the accounts'
+  protocol layer), the issuer, the client id the record refreshes with
+  (the one its LLM provider issued, kept in the record, or the
+  registration's own where none was issued), the subject, the display
+  name, and the record in skein's form (skein's `encode_record`, its own
+  version inside). Each part has its bound, the whole at most their sum,
+  and nothing follows the record. `jig-protocol-accounts`' `moved`
+  module encodes and decodes it with total functions; a decode refuses a
+  wrong magic, another version, a part past its bound, a short or
+  trailing input and a record skein does not read.
+- **Out.** The child releases the source and asks to withdraw it,
+  giving its account's display name for the file. The
+  routing removes it from the driver; at `removed`, it reads the
+  source's record from the secrets' store, and the moves make the
+  file's bytes and hold them for the client that asked, telling the
+  child it is withdrawn. They go out once: the clients' protocol layer
+  takes them as it encodes the answer *moving out*, which names the
+  source (`client.md`, section 5). They are dropped when the move is
+  written (the record then erased from the secrets' store), cancelled,
+  or the engine closes, and are never committed, logged or kept
+  elsewhere. A source whose record cannot be read is withdrawn unread,
+  and the child refuses the move "not signed in".
+- **Back.** A cancelled move's source is added to the driver again with
+  the record read for it; one held moving at a restart is added as
+  every signed-in source is (5.1). It is then **refreshed once**: the
+  driver hears `rejected` of the generation the record holds, before
+  any grant of it, so that it lends nothing of that generation and
+  refreshes first (skein's `oauth.md`, 6.3; no refresh is asked before
+  the record's earliest refresh time). A refresh refused as sign in
+  again leaves the source needing sign-in.
+- **In.** The carried value is read from the secrets' store and
+  decoded. It is this application's when its name is the one the root
+  gave, its issuer a configured LLM provider's registration's, and its
+  client id the one that registration refreshes the record with; the
+  child then hears the LLM provider, the subject and the display name,
+  or "not ours". Accepted, the record, renamed to its new source's
+  number, is adopted into the source's row in one secrets' commit that
+  erases the carried value (`store.md`, section 9); the source is added
+  to the driver with it, refreshed once as above, and the child hears
+  it adopted.
+- **The file left behind is dead** once the receiving deployment's
+  first refresh is kept: the issuer has rotated its refresh token
+  (`../domain/providers.md`, 2.3), so a copy that refreshes is refused,
+  and signs nobody out.
 
 ## 6. Grants
 
@@ -412,7 +468,10 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
   allow; exchanges at once; listeners, the sign-ins at once; the sign-in
   deadline (skein's `oauth.md`, section 3); the refresh lead (skein's
   `oauth.md`, 6.7). The table's, from the accounts' bounds
-  and a credential's bytes (`configuration.md`, section 6). The engine's
+  and a credential's bytes (`configuration.md`, section 6). The moves'
+  (5.6): a file's bytes and its record for each source withdrawn, at
+  most the accounts' sources, and one for each move in under way, at
+  most the sign-ins at once, each at most the file's bound. The engine's
   only.
 - **A host's worst case,** the engine's or a worker's that composes
   `smith-inline-agent`, includes all of them, beside the agent's slots'
@@ -425,6 +484,8 @@ section 2).
 
 - **The driver is skein's,** tested in skein's worlds; jig tests what it
   adds.
+- **The moved record's form:** its codec's step tests, each refusal of
+  a decode, and a fuzzed decode, total and bounded.
 - **The translation's step tests:** every request and event each way;
   every failure class mapped; the unreachable ones asserted; the table's
   generations, schemes, expiry and pushing out.
@@ -440,7 +501,9 @@ section 2).
   drives, its subject renewed and refused for another holder, a key
   added and replaced from a request, a source limited and resumed, a
   sign-out with and without confirmed revocation, a record that cannot
-  be read, text reaching a watch by turn, retry and offset, and a tool
+  be read, a record moved from one owner to another, which refreshes it
+  once, and the file left behind refused by the issuer, after a move
+  written and after one cancelled, text reaching a watch by turn, retry and offset, and a tool
   begun shown with its call. Its referee: no token reaches a run before
   its record is kept; a name never means two values; no value is in a
   committed request, answer or record outside the secrets' store; every

@@ -56,8 +56,10 @@ in section 7.
   number once the protocol layer has kept it. The engine alone
   refreshes, so no two processes race a rotating token (section 5;
   `../protocol/store.md`, section 9).
-- **Moving an account, later:** between deployments of one application,
-  never copied (section 6).
+- **Moving an account:** a signed-in source, between deployments of one
+  application, never copied: out into a private file, then erased; in
+  from it, refreshed once before it is lent, so that a copy left behind
+  is dead (section 6).
 
 ## 2. Each application is its own client
 
@@ -145,8 +147,8 @@ Account
   a key's may.
 - **A holder decides about their account:** the order of its sources
   and its place among their accounts, its uses, signing it out,
-  removing it, and later moving it. For the deployment's accounts, its
-  owners decide: the first owners its configuration names (people.md,
+  removing it, and moving it (section 6). For the deployment's
+  accounts, its owners decide: the first owners its configuration names (people.md,
   section 3; `../protocol/configuration.md`, section 3), and, in their
   name, a connector the configuration grants the deployment's `AddKey`
   or `RemoveAccount` (people.md, 5.3), where no client is there to ask.
@@ -284,7 +286,10 @@ A source's state is one of:
 - **needs sign-in:** no record, or one revoked or past refreshing; for
   a program, on which host;
 - **misconfigured:** the LLM provider rejected the application's client;
-- **unloaded:** its record could not be read, saying where and why.
+- **unloaded:** its record could not be read, saying where and why;
+- **moving:** a signed-in source whose record is out with a move, or
+  back from one and not yet refreshed (section 6). No run takes it, and
+  nothing of the record's generation is lent.
 
 Each source's mechanism maps its LLM provider's failures onto these,
 skein for what a provider's API answers (skein's `llm.md`, section 2.5)
@@ -355,12 +360,15 @@ says (`../protocol/llm.md`, section 5) and what runs' agents notice
   limit to `None`; an indefinite limit stays indefinite until resumed.
   No wall from a losing reset replaces the winner's wall.
 - **What the store keeps** of each source is its kind, its name, its
-  state, and a limit's reset as a wall time (engine.md, 5.4): a restart
-  preserves that saved wall exactly, maps it once to a fresh monotonic
+  hold (limited, refused or moving), and a limit's reset as a wall
+  time (engine.md, 5.4): a restart preserves that saved wall exactly,
+  maps it once to a fresh monotonic
   `at`, lifts a limit whose reset passed while the engine was down,
   and holds a later one until it. The existing optional wall reset
   represents both timed and indefinite limits; no store or wire layout
-  changes. A program's login on a worker is not stored: its
+  changes. A source held moving is stored so, and a restart brings it
+  back as a cancelled move does (section 6). A program's login on a
+  worker is not stored: its
   half reports it as `logins`, which follow the worker's hello
   (`../protocol/channel.md`, 4.3).
 
@@ -506,23 +514,28 @@ among their own (`../client/domain/contract.md`, 7.1).
 | check a program's login | has each host's half check the source's login now (3.4) |
 | order, uses, resume | the holder's: an account's place among theirs and its sources' order, its uses, a limited source resumed |
 | remove an account | signs each of its sources out, as sign out does, and erases its keys; its number is never reused, and a task that kept it chooses again (4.3); the deployment's also by the deployment's `RemoveAccount` (people.md, 5.3) |
-| move out, move in | later (section 6) |
+| move out | withdraws the account's signed-in source and hands its record to the client that asked, never in a committed answer, naming the move; refused "not signed in" without a signed-in source holding a record (section 6) |
+| written | the client wrote the moved record: erases the source, and the account with it when no source is left; refused "cancelled" for a move not under way |
+| move in | takes a moved record carried as a key is: refused "not ours" for another application's, "held" for a subject another holder holds; makes the account or renews the holder's of its subject, refreshing the record once before it is usable (section 6) |
 
-- **A value is never committed.** A key, and later a moved record, is
+- **A value is never committed.** A key, or a moved record, is
   taken out by the clients' protocol layer as it decodes the request,
   kept in the secrets' store first, and handed to the core by a drawn
-  number and its digest. An LLM key is then adopted into its source's
-  secret row before it is granted (`../protocol/store.md`, section 9).
+  number and its digest. An LLM key, or a moved record, is then adopted
+  into its source's secret row before it is granted (`../protocol/store.md`, section 9).
   Requests and their answers are committed and kept (engine.md, 5.4);
   a value is not. A client sends a request carrying a value once, and
   never keeps nor resends it
-  (`../protocol/client.md`, sections 5 and 10).
+  (`../protocol/client.md`, sections 5 and 10). A moved-out record goes
+  the other way once, with the answer to the client that asked, and is
+  never in the answer kept (section 6).
 - **The sign-in's redirect is on the engine's machine.** The engine
   binds a loopback listener on an ephemeral port for each sign-in, or
   on the port its configuration fixes (`../protocol/llm.md`, section 5),
   as an LLM provider that requires a loopback redirect allows
   (providers.md, 2.2). The person signs in from a browser on the
-  engine's machine, or, later, through a move (section 6).
+  engine's machine, or on another computer, whose record a move then
+  brings in (section 6).
 - **Plan usage declined** keeps the sign-in and marks the source
   refused, and the answer offers its two ways on: sign in again with
   the scope, or another source (providers.md, 2.2).
@@ -533,25 +546,59 @@ among their own (`../client/domain/contract.md`, 7.1).
 
 ## 6. Moving an account
 
-Later: designed here so that the accounts' records leave room for it,
-and built after them.
+A signed-in source moves between deployments of one application, each
+side by its holder's request: out of one deployment into a private
+file, and from the file into another. A rotating refresh token is valid
+in one place (providers.md, 2.3), so the move keeps one holder by
+construction, never by a person deleting a copy.
 
-- **Out:** its holder asks. The source is withdrawn while it moves: no
-  run takes it, and its grant is released at the component, so that no
-  refresh follows; live runs keep their access token until it lapses.
-  Its record goes to the client that asked, from the secrets' store,
-  never in a committed answer, and the client writes it to a private
-  file and says so; the engine then erases it.
-- **A cancelled move,** when the client never says so, refreshes the
-  record once before it is lent again, so that a file written meanwhile
-  holds a dead refresh token.
-- **In:** a client sends a moved record, taken into the secrets' store
-  as a key is (section 5); the engine checks that it is its
-  application's (the registration's name and its LLM provider) and that
-  no other holder holds its subject (3.3), and makes the account or
-  renews the one of its subject; the client then removes the file.
 - **Signed-in sources only.** A key is added again; a program's login is
-  per host.
+  per host. Moving out an account with no signed-in source, or whose
+  signed-in source holds no record that reads (it needs sign-in, or is
+  unloaded), is refused "not signed in".
+- **Out, in two steps.** Its holder asks to move the account out. The
+  child takes the move's number from its counter, and withdraws the
+  signed-in source: it releases its grant, and the component takes it
+  out of the driver, so that no run takes it and no refresh follows; an
+  exchange already sent finishes and keeps its record first, and live
+  runs keep their access token until it lapses. The source is held
+  *moving*, stored. Once the protocol layer has read the source's
+  latest record and made the file's bytes (`../protocol/llm.md`, 5.6),
+  the request is answered *moving out*, naming the move's number; the
+  bytes go to the client that asked with that answer, never in a
+  committed one. The client writes the file new and private, and says
+  *written*, naming the move: the child then erases the source and its
+  record, and the account with them when it has no other source; its
+  number is never reused. The file is then the only holder.
+- **Cancelled.** A move with no *written* within the move's deadline (a
+  limit, `../protocol/configuration.md`, section 6), or under way at a
+  restart, is cancelled: the source comes back to the driver with its
+  kept record, which is **refreshed once before it is lent again**, so
+  that a file written meanwhile holds a dead refresh token. The source
+  stays held moving until its first new generation is granted, so a
+  restart before then refreshes it again; a refresh refused as sign in
+  again leaves it needing sign-in. A *written* of a move that is not
+  under way is refused "cancelled", and the client removes the file it
+  wrote. A move whose record cannot be read is refused "not signed in",
+  and its source comes back the same way.
+- **In.** Its holder sends the file's bytes as a carried value, taken
+  into the secrets' store as a key is (section 5). The protocol layer
+  reads them and checks that they are this application's: its name, and
+  the issuer and client id of a configured LLM provider's registration;
+  otherwise the request is refused "not ours". The child then decides
+  as for a sign-in (3.2, 3.3): it refuses the deployment where the LLM
+  provider's sign-in brings a plan, and a subject another holder holds
+  ("held"), else makes the account, or renews the holder's account of
+  that subject. A move in counts as a sign-in at once (3.6). The record
+  is adopted into the new source's row, the carried value erased, and
+  the source added to the driver, held moving: **refreshed once before
+  it is usable**, so that a file left behind is dead at once. The
+  request is answered once the record is durable, naming the account;
+  the client then removes the file.
+- **While a source moves,** its holder may order it and set its
+  account's uses, but its sign-out, its account's removal, another move
+  out, and a renewal of its account by a sign-in or a move in are
+  refused "moving", until the move is written or cancelled.
 - **One holder at a time.** A rotating refresh token is valid in one
   place: a copy that refreshes signs the other out (providers.md, 2.3),
   so a record is moved, never copied.
@@ -559,8 +606,8 @@ and built after them.
   computer with one (providers.md, 2.2); a deployment moved to another
   machine; and unattended tests of the live layer on a signed-in
   subscription, which move one account in and out of each run's fresh
-  deployment. Until then, such a test signs in as it starts, and one on
-  a program's login finds it signed in on its host (3.4).
+  deployment. A test on a program's login finds it signed in on its
+  host (3.4).
 
 ## 7. Open questions
 

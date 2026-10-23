@@ -199,7 +199,7 @@ child puts live first.
 | tasks | ended tasks, past periods, decided proposals, history, milestones, activity | task, then a position or revision; funder, period; proposal | on demand |
 | people | parties, sign-ins (no secret), roles, projects' names and whole policies (their ceilings, escalation roles and overrides of templates among them), seeded and made alike, read positions over results and over live conversations, answered keys within the retention, a party's or, for the deployment's acts, a connector's (`../domain/people.md`, 5.3), including program declarations and checks, their declared names, and sign-out/removal answers naming unconfirmed configured workers with their original failure reasons | as the people child keys them; a live conversation's position by party, then task | at start |
 | people | ended conversations' read positions (7.4) | task, then party | at start, by the census, every row (7.2); otherwise on demand |
-| accounts | issued program names, including retired ones, with their source number and original holder and desired sign-out (key tag 4, after the installation's reserved tag); the next number the accounts child gives, below which it gives none again; LLM accounts: each one's holder, LLM provider, subject and display name, and its uses; their sources, each at its place in its holder's order, with its kind, its name for a program's, and its hold: limited, with its reset as a wall time where it has one, or refused. The rest of a source's state is heard again at each start, and none is kept per host (`../domain/accounts.md`, 3.5) | source for an issued name; none: one row; account; account, source | at start, issued names before live account/source records |
+| accounts | issued program names, including retired ones, with their source number and original holder and desired sign-out (key tag 4, after the installation's reserved tag); the next number the accounts child gives, below which it gives none again; LLM accounts: each one's holder, LLM provider, subject and display name, and its uses; their sources, each at its place in its holder's order, with its kind, its name for a program's, and its hold: limited, with its reset as a wall time where it has one, refused, or moving (a signed-in source whose record is out with a move, or back and not yet refreshed: `../domain/accounts.md`, section 6). The rest of a source's state is heard again at each start, and none is kept per host (`../domain/accounts.md`, 3.5) | source for an issued name; none: one row; account; account, source | at start, issued names before live account/source records |
 | notes | entries, and an index line per entry per scope | name; scope, name | when a scope is in use; entries on demand |
 | tasks | the results' index, the inbox's census's (7.2): a row per result of a task a party requested, at its position among that party's results, past the tasks child's live families | party, position | at start, by the census, past each party's read position over results |
 | tasks, people | indexes for parties' reads (7.4): each party's inbox by time; ended tasks by requester party and by project; ended delegates; a subtree's delegates | the index's own, newest first where it reads so: an ended index's by party or project, then label, ended at reversed and task | on demand |
@@ -217,7 +217,9 @@ secrets' store (section 9).
 The current tasks family is version 9: its durable `MessageKind` adds
 `FinishRequested { revision }` for a cancel grace. Tasks version 8 stores
 refuse to open under the existing format check; no migration is added.
-Component2/core5/people8/notes1/accounts1 remain unchanged.
+Component2/core5/people8/notes1 remain unchanged. The accounts family
+is version 2: a source's hold adds *moving* (`../domain/accounts.md`,
+section 6); accounts version 1 stores refuse to open likewise.
 
 ### 5.1 Codecs
 
@@ -694,7 +696,8 @@ Removing a missing file is not a failure.
   - each signed-in source's record, by the source's number: its tokens,
     the client id the provider issued, the scopes granted and the ID
     token, as skein's accounts driver hands it to keep (skein's
-    `oauth.md`, 6.4; `llm.md`, 5.1);
+    `oauth.md`, 6.4; `llm.md`, 5.1), or as a moved record brought it
+    (`llm.md`, 5.6);
   - each LLM key, by its source's number, adopted from the value its
     request carried (`client.md`, section 5);
   - an application's own records, under its tag: its connectors'
@@ -744,14 +747,26 @@ Removing a missing file is not a failure.
   key as its next generation (`llm.md`, 5.1). A later erase of the
   carried number is a no-op. A source's record or LLM key occupies one
   secret row under a fixed-size store key.
+- **A moved record adopted the same way,** in one secrets commit that
+  writes the source's row and erases the carried row: the row holds
+  the record the carried file holds, in skein's form, not the file's
+  bytes as they came (`llm.md`, 5.6), and the adoption states the
+  carried value's digest, answering stale when it changed. The record
+  is added to the driver only once adoption is durable, and lent only
+  after its first refresh is kept.
+- **A moved-out record is read, never copied in the store:** the
+  routing reads the source's row once the driver has removed it, and
+  the file's bytes made from it live only in the protocol layer until
+  the client takes them (`llm.md`, 5.6). The row is erased when the
+  move is written.
 - **A presented credential names its sign-in:** a credential is the
   sign-in's number and its random bytes, opaque to the transport that
   carries it. The component gets the digest by number, and the clients'
   component compares in constant time.
 - **Erased** when the core says a sign-in ended (signed out or revoked)
   or expired, or a service was removed; and when the accounts child
-  says a source was signed out or removed, a key replaced, or a record
-  revoked. A crash between that commit and the erase leaves a value
+  says a source was signed out or removed, a key replaced, a record
+  revoked, or a move written. A crash between that commit and the erase leaves a value
   nobody names, which the restart sweeps: once people's families are
   restored, the component erases each of jig's digests whose sign-in or
   service it did not hand up. For sources, the accounts child names

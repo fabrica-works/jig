@@ -384,7 +384,10 @@ host's half reports it (`llm.md`, 5.5).
   document lines in each account, source and sign-in list
   (`../client/domain/client.md`, section 14). A sign-in waits for its
   redirect only within the sign-in deadline, a limit of the driver's
-  (skein's `oauth.md`, section 3).
+  (skein's `oauth.md`, section 3). A move out waits for its client's
+  *written* only within the move's deadline, the accounts child's, past
+  which the move is cancelled (`../domain/accounts.md`, section 6); it
+  is positive, or the start is refused.
 - **A model's description** is optional. When present it is nonempty
   text of at most 512 bytes (`MODEL_DESCRIPTION_BYTES`), or the start is
   refused at the model's `description` path.
