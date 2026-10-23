@@ -183,7 +183,7 @@ pub(crate) fn activation(
         End::FinishedWithFollowups { result, followups } => {
             crate::run::invalid_followups(&old.contract, result, followups, &environment.limits).is_none()
         }
-        End::Parked | End::Failed(_) | End::Refused | End::Recheck => true,
+        End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => true,
     };
     let kept = crate::run::ends::kept(domain, number);
     let parked = kept.discards(&end) || valid && kept.parks(&end);
@@ -253,14 +253,14 @@ pub(crate) fn activation(
                 }
             }
         }
-        End::Parked | End::Failed(_) | End::Refused | End::Recheck => {}
+        End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => {}
     }
     let result_admitted = match &admitted_end {
         End::FinishedWithFollowups { result, followups } => {
             !old.narrowing
                 && crate::run::invalid_followups(&old.contract, result, followups, &environment.limits).is_none()
         }
-        End::Finished { .. } | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
+        End::Finished { .. } | End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
     };
     post(domain, environment, number, cumulative, spent, out);
     crate::run::activation(domain, environment, to, number, attempt, end.clone(), saved, out);
@@ -273,6 +273,7 @@ pub(crate) fn activation(
             crate::proposals::propose_result(domain, environment, (**proposal).clone(), out);
         }
         (End::FinishedWithFollowups { .. }, false)
-        | (End::Finished { .. } | End::Parked | End::Failed(_) | End::Refused | End::Recheck, _) => {}
+        | (End::Finished { .. } | End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck, _) => {
+        }
     }
 }

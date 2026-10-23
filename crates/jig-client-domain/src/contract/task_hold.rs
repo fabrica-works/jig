@@ -37,7 +37,8 @@ impl TaskHold {
             },
             Self::Owner(value) => match value.reason {
                 HoldCategory::Uncertain { .. } => true,
-                HoldCategory::Failures { .. }
+                HoldCategory::Exceeded(_)
+                | HoldCategory::Failures { .. }
                 | HoldCategory::Stalled
                 | HoldCategory::Dependency { .. }
                 | HoldCategory::Stopped

@@ -225,12 +225,36 @@ pub(crate) fn ending(value: host::Ending) -> tasks::End {
     match value {
         host::Ending::Refused(_) => tasks::End::Refused,
         host::Ending::Parked { .. } => tasks::End::Parked,
-        host::Ending::Failed { failure, .. } => tasks::End::Failed(match failure {
-            host::Failure::Unprepared(host::Preparation::Transient) => tasks::Class::Transient,
-            host::Failure::Unprepared(host::Preparation::Permanent { .. }) => tasks::Class::Permanent,
-            host::Failure::Run(_) => tasks::Class::Run,
-            host::Failure::Agent(_) | host::Failure::Cancelled(_) => tasks::Class::Agent,
-        }),
+        host::Ending::Failed { failure, .. } => match failure {
+            host::Failure::Run(host::RunFailure::Exceeded(value)) => tasks::End::Exceeded(tasks::Exceeded {
+                bound: match value.bound {
+                    host::Bound::Reasoning => tasks::Bound::Reasoning,
+                    host::Bound::Metadata => tasks::Bound::Metadata,
+                    host::Bound::Items => tasks::Bound::Items,
+                    host::Bound::Answer => tasks::Bound::Answer,
+                    host::Bound::Tools => tasks::Bound::Tools,
+                    host::Bound::HistoryItems => tasks::Bound::HistoryItems,
+                    host::Bound::History => tasks::Bound::History,
+                    host::Bound::Window => tasks::Bound::Window,
+                    host::Bound::Output => tasks::Bound::Output,
+                },
+                value: value.value,
+            }),
+            host::Failure::Unprepared(host::Preparation::Transient) => tasks::End::Failed(tasks::Class::Transient),
+            host::Failure::Unprepared(host::Preparation::Permanent { .. }) => {
+                tasks::End::Failed(tasks::Class::Permanent)
+            }
+            host::Failure::Run(
+                host::RunFailure::Model
+                | host::RunFailure::Budget
+                | host::RunFailure::Policy
+                | host::RunFailure::Cancelled
+                | host::RunFailure::Stale
+                | host::RunFailure::Limited { .. }
+                | host::RunFailure::Refused { .. },
+            ) => tasks::End::Failed(tasks::Class::Run),
+            host::Failure::Agent(_) | host::Failure::Cancelled(_) => tasks::End::Failed(tasks::Class::Agent),
+        },
         host::Ending::Ended { .. } => unreachable!("ended results leave for protocol reading"),
     }
 }

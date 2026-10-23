@@ -489,6 +489,17 @@ fn moved(task: u64, now: &jig_domain_people::Moved) -> Rendered {
 fn hold_reason(reason: &jig_domain_people::HoldReason) -> &'static [u8] {
     use jig_domain_people::{FailureClass, HoldReason};
     match reason {
+        HoldReason::Exceeded(value) => match value.bound {
+            jig_domain_people::Bound::Reasoning => b"for its configured reasoning bound",
+            jig_domain_people::Bound::Metadata => b"for its configured metadata bound",
+            jig_domain_people::Bound::Items => b"for its configured answer items bound",
+            jig_domain_people::Bound::Answer => b"for its configured answer bytes bound",
+            jig_domain_people::Bound::Tools => b"for its configured tools bound",
+            jig_domain_people::Bound::HistoryItems => b"for its configured request items bound",
+            jig_domain_people::Bound::History => b"for its configured history bound",
+            jig_domain_people::Bound::Window => b"for its configured window bound",
+            jig_domain_people::Bound::Output => b"for its configured output bound",
+        },
         HoldReason::Failures { class } => match class {
             FailureClass::Transient => b"for transient failures",
             FailureClass::Permanent => b"for permanent failures",

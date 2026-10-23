@@ -1,5 +1,5 @@
 //! Sparse entrance facts without invented names, words or bounds (contract.md, 4).
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
@@ -239,6 +239,23 @@ fn hold(value: p::HoldReason, limits: &w::Limits) -> Result<w::HoldCategory, w::
         p::HoldReason::PoolLost { pool } => {
             w::HoldCategory::PoolLost(w::HoldCategoryPoolLost::new(limits, w::HoldCategoryPoolLostParts { pool })?)
         }
+        p::HoldReason::Exceeded(value) => w::HoldCategory::Exceeded(w::Exceeded::new(
+            limits,
+            w::ExceededParts {
+                bound: match value.bound {
+                    p::Bound::Reasoning => w::Bound::Reasoning,
+                    p::Bound::Metadata => w::Bound::Metadata,
+                    p::Bound::Items => w::Bound::Items,
+                    p::Bound::Answer => w::Bound::Answer,
+                    p::Bound::Tools => w::Bound::Tools,
+                    p::Bound::HistoryItems => w::Bound::HistoryItems,
+                    p::Bound::History => w::Bound::History,
+                    p::Bound::Window => w::Bound::Window,
+                    p::Bound::Output => w::Bound::Output,
+                },
+                value: value.value,
+            },
+        )?),
         p::HoldReason::Failures { class } => {
             let class = match class {
                 p::FailureClass::Transient => w::HoldFailure::Transient,

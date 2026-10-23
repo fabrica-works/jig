@@ -175,15 +175,16 @@ const JOURNAL: skein_lib::JournalLimits =
 // the optional wait-bound wall adds nine bytes, so the largest row grows by 413 bytes.
 // Ending authority adds (batch + 1)^2 = (4 + 1)^2 = 25 bytes: the row,
 // its recurring members and its proposed creations with their recurring members.
+// Exceeded adds one byte to the largest inline hold encoding.
 const STORE_KV: skein_kv::Limits = skein_kv::Limits {
-    value: 10_664_756,
+    value: 10_664_757,
     ops: 285_763,
     commit: 865_108_626,
     queued_bytes: 2_595_325_878,
     segment: 1_730_217_252,
     snapshot_after: 865_108_626,
-    chunk: 10_666_855,
-    page: skein_kv::Page { rows: 2, bytes: 10_666_835 },
+    chunk: 10_666_856,
+    page: skein_kv::Page { rows: 2, bytes: 10_666_836 },
     ..small::STORE_KV
 };
 const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {

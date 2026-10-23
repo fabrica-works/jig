@@ -115,7 +115,7 @@ pub const TOKEN_TWO: &[u8] = b"app-access";
 pub const RUN_SEVEN: Token = Token::new(7);
 pub const ATTEMPT_TWO: Token = Token::new(2);
 #[must_use]
-pub fn codec() -> wire::v6::Limits {
+pub fn codec() -> wire::v7::Limits {
     wire::sizes::limits(&SIZES).expect("small codec limits")
 }
 #[must_use]

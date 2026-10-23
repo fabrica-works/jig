@@ -1,7 +1,7 @@
 //! Wire asks into the people vocabulary (client/domain/contract.md, 3).
 use super::Untranslatable;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use jig_domain_people as p;
 use skein_lib::{List, Reader, Wall};
 #[derive(Debug)]

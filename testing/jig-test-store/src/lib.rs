@@ -8,10 +8,10 @@ pub mod keys;
 pub mod records;
 pub mod route;
 #[rustfmt::skip]
-#[path = "generated/v1.rs"]
-pub mod v1;
+#[path = "generated/v2.rs"]
+pub mod v2;
 /// The test application's durable format.
-pub const STORE_VERSION: u32 = 1;
+pub const STORE_VERSION: u32 = 2;
 /// A record outside its format or configured bounds.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Undecodable;
@@ -29,19 +29,19 @@ pub fn application(limits: &connector::Limits) -> jig_protocol_store::sizes::App
     jig_protocol_store::sizes::Application {
         version: STORE_VERSION,
         key: path.saturating_add(17).max(83),
-        value: u32::try_from(v1::Row::worst_case_bytes(&bounds).expect("checked codec bounds"))
+        value: u32::try_from(v2::Row::worst_case_bytes(&bounds).expect("checked codec bounds"))
             .expect("row fits store length"),
     }
 }
-fn bounds(limits: &connector::Limits) -> Option<v1::Limits> {
-    let mut bounds = v1::CEILINGS;
+fn bounds(limits: &connector::Limits) -> Option<v2::Limits> {
+    let mut bounds = v2::CEILINGS;
     bounds.record_procedure_delegate_outcome_revisions = limits.tasks;
     bounds.segment_bytes = limits.segment_bytes;
     bounds.resource_path_segments = limits.path_segments;
     bounds.effect_resources = limits.resources_per_effect;
     bounds.record_task_resources = limits.resources_per_task;
     bounds.record_made_resources = limits.resources_per_effect;
-    v1::check_limits(&bounds).ok()?;
+    v2::check_limits(&bounds).ok()?;
     Some(bounds)
 }
 #[cfg(test)]

@@ -375,6 +375,26 @@ pub(super) fn decode_moved(value: w::Moved, limits: &d::Limits) -> d::applicatio
 }
 pub(super) fn encode_hold_reason(value: &d::application_core::HoldReason) -> w::HoldReason {
     match value {
+        d::application_core::HoldReason::Exceeded(value) => w::HoldReason::Exceeded(
+            w::Exceeded::new(
+                &w::CEILINGS,
+                w::ExceededParts {
+                    bound: match value.bound {
+                        d::application_core::Bound::Reasoning => w::Bound::Reasoning,
+                        d::application_core::Bound::Metadata => w::Bound::Metadata,
+                        d::application_core::Bound::Items => w::Bound::Items,
+                        d::application_core::Bound::Answer => w::Bound::Answer,
+                        d::application_core::Bound::Tools => w::Bound::Tools,
+                        d::application_core::Bound::HistoryItems => w::Bound::HistoryItems,
+                        d::application_core::Bound::History => w::Bound::History,
+                        d::application_core::Bound::Window => w::Bound::Window,
+                        d::application_core::Bound::Output => w::Bound::Output,
+                    },
+                    value: value.value,
+                },
+            )
+            .expect("admitted fields fit schema"),
+        ),
         d::application_core::HoldReason::Failures { class } => w::HoldReason::Failures(
             w::HoldReasonFailures::new(
                 &w::CEILINGS,
@@ -414,6 +434,20 @@ pub(super) fn encode_hold_reason(value: &d::application_core::HoldReason) -> w::
 }
 pub(super) fn decode_hold_reason(value: w::HoldReason, limits: &d::Limits) -> d::application_core::HoldReason {
     match value {
+        w::HoldReason::Exceeded(value) => d::application_core::HoldReason::Exceeded(d::application_core::Exceeded {
+            bound: match value.bound() {
+                w::Bound::Reasoning => d::application_core::Bound::Reasoning,
+                w::Bound::Metadata => d::application_core::Bound::Metadata,
+                w::Bound::Items => d::application_core::Bound::Items,
+                w::Bound::Answer => d::application_core::Bound::Answer,
+                w::Bound::Tools => d::application_core::Bound::Tools,
+                w::Bound::HistoryItems => d::application_core::Bound::HistoryItems,
+                w::Bound::History => d::application_core::Bound::History,
+                w::Bound::Window => d::application_core::Bound::Window,
+                w::Bound::Output => d::application_core::Bound::Output,
+            },
+            value: value.value(),
+        }),
         w::HoldReason::Failures(value) => {
             let w::HoldReasonFailuresParts { class } = value.into_parts();
             d::application_core::HoldReason::Failures { class: decode_failure_class(class, limits) }

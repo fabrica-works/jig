@@ -1,6 +1,6 @@
 //! Task lifecycle values and bounded creation templates (protocol/store.md, 5.1).
 use super::value;
-use crate::tasks_v7 as wire;
+use crate::tasks_v8 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as domain;
 use skein_lib::{List, Wall};
@@ -128,6 +128,23 @@ pub fn read_overlap(
 /// Translate `Hold` to its store value.
 pub fn hold(source: &domain::Hold, limits: &wire::Limits) -> Result<wire::Hold, wire::Problem> {
     Ok(match source {
+        domain::Hold::Exceeded(value) => wire::Hold::Exceeded(wire::Exceeded::new(
+            limits,
+            wire::ExceededParts {
+                bound: match value.bound {
+                    domain::Bound::Reasoning => wire::Bound::Reasoning,
+                    domain::Bound::Metadata => wire::Bound::Metadata,
+                    domain::Bound::Items => wire::Bound::Items,
+                    domain::Bound::Answer => wire::Bound::Answer,
+                    domain::Bound::Tools => wire::Bound::Tools,
+                    domain::Bound::HistoryItems => wire::Bound::HistoryItems,
+                    domain::Bound::History => wire::Bound::History,
+                    domain::Bound::Window => wire::Bound::Window,
+                    domain::Bound::Output => wire::Bound::Output,
+                },
+                value: value.value,
+            },
+        )?),
         domain::Hold::Failures(class) => wire::Hold::Failures(wire::FailedClass::new(
             limits,
             wire::FailedClassParts { class: value::class(*class) },
@@ -161,6 +178,20 @@ pub fn hold(source: &domain::Hold, limits: &wire::Limits) -> Result<wire::Hold, 
 /// Read `Hold` from its store value.
 pub fn read_hold(source: wire::Hold, _limits: &wire::Limits) -> Result<domain::Hold, wire::Problem> {
     Ok(match source {
+        wire::Hold::Exceeded(value) => domain::Hold::Exceeded(domain::Exceeded {
+            bound: match value.bound() {
+                wire::Bound::Reasoning => domain::Bound::Reasoning,
+                wire::Bound::Metadata => domain::Bound::Metadata,
+                wire::Bound::Items => domain::Bound::Items,
+                wire::Bound::Answer => domain::Bound::Answer,
+                wire::Bound::Tools => domain::Bound::Tools,
+                wire::Bound::HistoryItems => domain::Bound::HistoryItems,
+                wire::Bound::History => domain::Bound::History,
+                wire::Bound::Window => domain::Bound::Window,
+                wire::Bound::Output => domain::Bound::Output,
+            },
+            value: value.value(),
+        }),
         wire::Hold::Failures(value) => {
             let wire::FailedClassParts { class } = value.into_parts();
             domain::Hold::Failures(value::read_class(class))

@@ -151,6 +151,20 @@ pub fn moved(value: people::Moved) -> client::Refusal {
 #[must_use]
 pub fn hold(value: people::HoldReason) -> client::HoldCategory {
     match value {
+        people::HoldReason::Exceeded(value) => client::HoldCategory::Exceeded(client::Exceeded {
+            bound: match value.bound {
+                people::Bound::Reasoning => client::Bound::Reasoning,
+                people::Bound::Metadata => client::Bound::Metadata,
+                people::Bound::Items => client::Bound::Items,
+                people::Bound::Answer => client::Bound::Answer,
+                people::Bound::Tools => client::Bound::Tools,
+                people::Bound::HistoryItems => client::Bound::HistoryItems,
+                people::Bound::History => client::Bound::History,
+                people::Bound::Window => client::Bound::Window,
+                people::Bound::Output => client::Bound::Output,
+            },
+            value: value.value,
+        }),
         people::HoldReason::Failures { class } => client::HoldCategory::Failures { class: failure(class) },
         people::HoldReason::Stalled => client::HoldCategory::Stalled,
         people::HoldReason::Dependency { task } => client::HoldCategory::Dependency { task },

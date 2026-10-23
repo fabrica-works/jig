@@ -1,7 +1,7 @@
 //! Facts decoded independently at the byte boundary, before the root sees them.
 use crate::native::Received;
 use jig_client::{Message, Request as ClientRequest, contract as c};
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use jig_client_test_domain::{Event, Request};
 use jig_client_world::harness::{Receipt, Sent};
 use skein_lib::{Reader, RequestEnvelope, Token};
@@ -129,7 +129,7 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
             }
         }
         w::Owner::Family(_) => {
-            use jig_client_test_protocol_wire::v1 as family;
+            use jig_client_test_protocol_wire::v2 as family;
             let envelope = w::FamilyRequest::decode(&w::CEILINGS, &mut Reader::new(keyed.request()))
                 .expect("family request envelope");
             let request = family::Request::decode(&family::CEILINGS, &mut Reader::new(envelope.record()))

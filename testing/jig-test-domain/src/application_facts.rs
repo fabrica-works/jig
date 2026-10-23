@@ -136,6 +136,20 @@ pub(super) fn moved(value: people::Moved) -> application::Moved {
 
 pub(super) fn hold_reason(value: people::HoldReason) -> application::HoldReason {
     match value {
+        people::HoldReason::Exceeded(value) => application::HoldReason::Exceeded(application::Exceeded {
+            bound: match value.bound {
+                people::Bound::Reasoning => application::Bound::Reasoning,
+                people::Bound::Metadata => application::Bound::Metadata,
+                people::Bound::Items => application::Bound::Items,
+                people::Bound::Answer => application::Bound::Answer,
+                people::Bound::Tools => application::Bound::Tools,
+                people::Bound::HistoryItems => application::Bound::HistoryItems,
+                people::Bound::History => application::Bound::History,
+                people::Bound::Window => application::Bound::Window,
+                people::Bound::Output => application::Bound::Output,
+            },
+            value: value.value,
+        }),
         people::HoldReason::Failures { class } => application::HoldReason::Failures { class: failure_class(class) },
         people::HoldReason::Stalled => application::HoldReason::Stalled,
         people::HoldReason::Dependency { task } => application::HoldReason::Dependency { task },

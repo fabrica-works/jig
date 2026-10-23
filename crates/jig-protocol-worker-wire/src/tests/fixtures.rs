@@ -1,6 +1,6 @@
 use crate::{
     Bounds, BoundsParts, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,
-    ModelBoundParts, Phase, v6,
+    ModelBoundParts, Phase, v7,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Secret, Writer};
@@ -9,7 +9,7 @@ pub const WORKER_A: &[u8] = b"worker-a";
 pub const WORKER_B: &[u8] = b"worker-b";
 pub const MODEL_SMALL: &[u8] = b"small";
 
-pub const LIMITS: v6::Limits = v6::Limits {
+pub const LIMITS: v7::Limits = v7::Limits {
     program_source_name: 32,
     sources_sources: 2,
     check_name: 32,
@@ -23,7 +23,7 @@ pub const LIMITS: v6::Limits = v6::Limits {
     credential_secret: 32,
     model_bound_name: 16,
     bounds_models: 2,
-    bounds_program_endpoints: v6::CEILINGS.bounds_program_endpoints,
+    bounds_program_endpoints: v7::CEILINGS.bounds_program_endpoints,
     hello_workstreams: 2,
     hello_hosting: 2,
     turn_refused: 2,
@@ -81,8 +81,8 @@ pub fn hello_fullest() -> Hello {
     let mut models = List::with_capacity(2);
     models.push(model()).expect("first model slot");
     models.push(model()).expect("second model slot");
-    let mut program_endpoints = List::with_capacity(v6::CEILINGS.bounds_program_endpoints);
-    for endpoint in 0..v6::CEILINGS.bounds_program_endpoints {
+    let mut program_endpoints = List::with_capacity(v7::CEILINGS.bounds_program_endpoints);
+    for endpoint in 0..v7::CEILINGS.bounds_program_endpoints {
         program_endpoints.push(endpoint).unwrap();
     }
     let bounds = Bounds::new(
@@ -244,7 +244,7 @@ pub fn grant(value: crate::GrantValue, number: u32, generation: u64) -> crate::G
         .expect("grant within small limits")
 }
 
-pub fn granted_key(limits: &v6::Limits, key: &[u8]) -> crate::Granted {
+pub fn granted_key(limits: &v7::Limits, key: &[u8]) -> crate::Granted {
     let value = crate::CredentialValue::new(
         limits,
         crate::CredentialValueParts { scheme: crate::Scheme::Key, bytes: Secret::new(key.into()) },
@@ -388,7 +388,7 @@ pub const SIZES_LARGE: crate::sizes::Sizes = crate::sizes::Sizes {
     facts: 4096,
 };
 
-fn one_slot_limits() -> v6::Limits {
+fn one_slot_limits() -> v7::Limits {
     crate::sizes::limits(&SIZES_ONE_SLOT).expect("small size bounds")
 }
 
@@ -416,7 +416,7 @@ pub fn fullest_turn() -> crate::Turn {
     .expect("full turn")
 }
 
-fn fullest_call(limits: &v6::Limits) -> crate::AnsweredCall {
+fn fullest_call(limits: &v7::Limits) -> crate::AnsweredCall {
     let answer = crate::HostAnswer::new(limits, crate::HostAnswerParts { error: true, body: full_bytes() })
         .expect("full host answer");
     crate::AnsweredCall::new(
@@ -426,7 +426,7 @@ fn fullest_call(limits: &v6::Limits) -> crate::AnsweredCall {
     .expect("full answered call")
 }
 
-fn fullest_grants(limits: &v6::Limits) -> List<crate::Grant> {
+fn fullest_grants(limits: &v7::Limits) -> List<crate::Grant> {
     let mut grants = List::with_capacity(2);
     for number in [5, 6] {
         let mut name =

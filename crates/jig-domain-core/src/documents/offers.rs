@@ -344,7 +344,8 @@ fn effect(core: &Core, limits: &Limits, act: Act, subject: &Subject) -> Option<a
             let tasks::Phase::Held { why, .. } = row.phase else { return None };
             let what = match why {
                 tasks::Hold::Uncertain { .. } => acts::ReleaseEffect::Uncertain,
-                tasks::Hold::Failures(_)
+                tasks::Hold::Exceeded(_)
+                | tasks::Hold::Failures(_)
                 | tasks::Hold::Stalled
                 | tasks::Hold::Stopped
                 | tasks::Hold::StoppedBy { .. } => acts::ReleaseEffect::RunAgain,

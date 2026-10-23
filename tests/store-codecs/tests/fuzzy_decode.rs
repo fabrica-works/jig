@@ -1,5 +1,5 @@
 //! Arbitrary and mutated family bytes (protocol/store.md, sections 5.1 and 14).
-use jig_protocol_store::{accounts_v1, component_v2, notes_v1, people_v7};
+use jig_protocol_store::{accounts_v1, component_v2, notes_v1, people_v8};
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -109,8 +109,8 @@ fn mutated_accounts_goldens_never_panic() {
 }
 
 fn tasks(bytes: &[u8]) {
-    use jig_protocol_store::tasks_v7;
-    if let Ok(row) = tasks_v7::Row::decode(&tasks_v7::CEILINGS, &mut Reader::new(bytes)) {
+    use jig_protocol_store::tasks_v8;
+    if let Ok(row) = tasks_v8::Row::decode(&tasks_v8::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -126,7 +126,7 @@ fn mutated_tasks_goldens_never_panic() {
 }
 
 fn people(bytes: &[u8]) {
-    if let Ok(row) = people_v7::Row::decode(&people_v7::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = people_v8::Row::decode(&people_v8::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -143,8 +143,8 @@ fn mutated_people_goldens_never_panic() {
 }
 
 fn core(bytes: &[u8]) {
-    use jig_protocol_store::core_v4;
-    if let Ok(row) = core_v4::Row::decode(&core_v4::CEILINGS, &mut Reader::new(bytes)) {
+    use jig_protocol_store::core_v5;
+    if let Ok(row) = core_v5::Row::decode(&core_v5::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -160,11 +160,11 @@ fn mutated_core_goldens_never_panic() {
 }
 
 fn frames(bytes: &[u8]) {
-    use jig_protocol_store::{codec, core_v4, notes_v1, tasks_v7, transcripts::frame};
+    use jig_protocol_store::{codec, core_v5, notes_v1, tasks_v8, transcripts::frame};
     let limits = codec::Limits {
-        core: core_v4::CEILINGS,
-        tasks: tasks_v7::CEILINGS,
-        people: people_v7::CEILINGS,
+        core: core_v5::CEILINGS,
+        tasks: tasks_v8::CEILINGS,
+        people: people_v8::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
     if let Ok(turn) = frame::decode(bytes, &limits) {
@@ -177,16 +177,16 @@ fn arbitrary_frames_never_panic_and_round_trip_when_they_decode() {
 }
 #[test]
 fn mutated_and_short_frames_never_panic() {
-    use jig_protocol_store::{codec, core_v4, notes_v1, tasks_v7, transcripts::frame};
+    use jig_protocol_store::{codec, core_v5, notes_v1, tasks_v8, transcripts::frame};
     let limits = codec::Limits {
-        core: core_v4::CEILINGS,
-        tasks: tasks_v7::CEILINGS,
-        people: people_v7::CEILINGS,
+        core: core_v5::CEILINGS,
+        tasks: tasks_v8::CEILINGS,
+        people: people_v8::CEILINGS,
         notes: notes_v1::CEILINGS,
     };
-    let turn = core_v4::TurnRecord::new(
+    let turn = core_v5::TurnRecord::new(
         &limits.core,
-        core_v4::TurnRecordParts {
+        core_v5::TurnRecordParts {
             opens_window: true,
             task: 11,
             attempt: 2,
@@ -213,8 +213,8 @@ fn mutated_and_short_frames_never_panic() {
 }
 
 fn test_connector(bytes: &[u8]) {
-    use jig_test_store::v1;
-    if let Ok(row) = v1::Row::decode(&v1::CEILINGS, &mut Reader::new(bytes)) {
+    use jig_test_store::v2;
+    if let Ok(row) = v2::Row::decode(&v2::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -227,6 +227,6 @@ fn arbitrary_test_connector_rows_never_panic_and_round_trip_when_they_decode() {
 
 #[test]
 fn mutated_test_connector_goldens_never_panic() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-store/golden/v1");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-store/golden/v2");
     mutate_goldens(&root, 0x5702_e018, test_connector);
 }

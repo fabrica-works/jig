@@ -15,7 +15,7 @@ pub enum Invalid {
 
 /// Preserve the supplied scope and every scripted subject kind.
 #[must_use]
-pub fn subject(value: family::Subject) -> (ClientScope, jig_client_test_protocol_wire::v1::FamilySubject) {
+pub fn subject(value: family::Subject) -> (ClientScope, jig_client_test_protocol_wire::v2::FamilySubject) {
     let scope = match value.scope {
         family::Scope::Project(project) => ClientScope::Project(project),
         family::Scope::Deployment => ClientScope::Deployment,
@@ -24,13 +24,13 @@ pub fn subject(value: family::Subject) -> (ClientScope, jig_client_test_protocol
 }
 /// Recover the whole family subject, including jig proposal makers.
 #[must_use]
-pub fn subject_value(value: jig_client_test_protocol_wire::v1::FamilySubject) -> family::Subject {
+pub fn subject_value(value: jig_client_test_protocol_wire::v2::FamilySubject) -> family::Subject {
     scripted::subject_value(value)
 }
 /// Carry absent parameters explicitly, separately from an explicit zero.
 #[must_use]
-pub fn request(value: &family::Ask) -> (u32, jig_client_test_protocol_wire::v1::ApplicationRequest) {
-    use jig_client_test_protocol_wire::v1 as w;
+pub fn request(value: &family::Ask) -> (u32, jig_client_test_protocol_wire::v2::ApplicationRequest) {
+    use jig_client_test_protocol_wire::v2 as w;
     let (project, object, revision, value) = match value {
         family::Ask::Touch { project, item, revision, parameters } => (*project, *item, revision.value, *parameters),
         family::Ask::ChangeObject { project, object, revision, value } => {
@@ -211,7 +211,7 @@ mod scripted {
     //! Exact scripted-family fields, separate from the connector's vocabulary.
     use crate::family as d;
     use jig_client::contract::{ProposalKey, Proposer, Revision};
-    use jig_client_test_protocol_wire::v1 as w;
+    use jig_client_test_protocol_wire::v2 as w;
     use skein_lib::List;
 
     pub(super) fn key(value: ProposalKey) -> w::FamilyProposalKey {
@@ -376,7 +376,7 @@ mod scripted {
 /// Encode every scripted field and the complete connector document, with its supplied subject.
 #[must_use]
 pub fn encode_document(value: &family::Document) -> Box<[u8]> {
-    use jig_client_test_protocol_wire::{codec, v1 as w};
+    use jig_client_test_protocol_wire::{codec, v2 as w};
     let value = match value {
         family::Document::Item(value) => w::FamilyDocument::Item(scripted::item(value)),
         family::Document::Part(value) => w::FamilyDocument::Part(scripted::part(value)),
@@ -400,7 +400,7 @@ pub fn decode_document(
     bounds: &jig_test_connector::Limits,
     limits: &ConnectorLimits,
 ) -> Result<family::Document, Invalid> {
-    use jig_client_test_protocol_wire::{codec, v1 as w};
+    use jig_client_test_protocol_wire::{codec, v2 as w};
     let Ok(value) = codec::family::document_value(bytes, bounds, limits.rows) else { return Err(Invalid::TooLarge) };
     let value = match value {
         w::FamilyDocument::Item(value) => family::Document::Item(scripted::item_value(value)),
@@ -426,7 +426,7 @@ pub fn decode_document(
 /// # Errors
 /// Entrance refusals belong to jig's wire and have no application record.
 pub fn encode_answer(value: &family::Answer) -> Result<Box<[u8]>, Invalid> {
-    use jig_client_test_protocol_wire::{codec, v1 as w};
+    use jig_client_test_protocol_wire::{codec, v2 as w};
     let value = match value {
         family::Answer::Touched { item, revision } => w::FamilyAnswer::Touched(
             w::FamilyRevision::new(&w::CEILINGS, w::FamilyRevisionParts { item: *item, revision: revision.value })
@@ -446,7 +446,7 @@ pub fn encode_answer(value: &family::Answer) -> Result<Box<[u8]>, Invalid> {
 /// Refuses malformed records or values outside the family's configured bounds.
 pub fn decode_answer(bytes: &[u8], bounds: &jig_test_connector::Limits) -> Result<family::Answer, Invalid> {
     use jig_client::contract::Revision;
-    use jig_client_test_protocol_wire::{codec, v1 as w};
+    use jig_client_test_protocol_wire::{codec, v2 as w};
     let Ok(value) = codec::family::answer_value(bytes, bounds) else { return Err(Invalid::TooLarge) };
     let value = match value {
         w::FamilyAnswer::Touched(value) => {

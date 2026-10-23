@@ -1,7 +1,7 @@
 use super::fixtures;
 use crate::translate;
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use jig_client_test_records as records;
 use jig_domain_core::{documents as d, reads};
 use jig_domain_people as p;

@@ -31,6 +31,20 @@ pub fn retry(value: tasks::RetryNotice) -> client::RetryNotice {
 #[must_use]
 pub fn hold(value: tasks::Hold) -> client::HoldCategory {
     match value {
+        tasks::Hold::Exceeded(value) => client::HoldCategory::Exceeded(client::Exceeded {
+            bound: match value.bound {
+                tasks::Bound::Reasoning => client::Bound::Reasoning,
+                tasks::Bound::Metadata => client::Bound::Metadata,
+                tasks::Bound::Items => client::Bound::Items,
+                tasks::Bound::Answer => client::Bound::Answer,
+                tasks::Bound::Tools => client::Bound::Tools,
+                tasks::Bound::HistoryItems => client::Bound::HistoryItems,
+                tasks::Bound::History => client::Bound::History,
+                tasks::Bound::Window => client::Bound::Window,
+                tasks::Bound::Output => client::Bound::Output,
+            },
+            value: value.value,
+        }),
         tasks::Hold::Failures(value) => client::HoldCategory::Failures { class: class(value) },
         tasks::Hold::Stalled => client::HoldCategory::Stalled,
         tasks::Hold::Dependency(task) => client::HoldCategory::Dependency { task },

@@ -1,5 +1,5 @@
 //! Values carried by core rows in their own family (protocol/store.md, 5.1).
-use crate::tasks_v7 as wire;
+use crate::tasks_v8 as wire;
 use alloc::boxed::Box;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Reader, Writer};
@@ -458,6 +458,23 @@ pub(super) fn encode_end(value: &tasks::End, limits: &Limits) -> Result<wire::En
                 },
             )?))
         }
+        tasks::End::Exceeded(value) => wire::End::Exceeded(wire::Exceeded::new(
+            limits,
+            wire::ExceededParts {
+                bound: match value.bound {
+                    tasks::Bound::Reasoning => wire::Bound::Reasoning,
+                    tasks::Bound::Metadata => wire::Bound::Metadata,
+                    tasks::Bound::Items => wire::Bound::Items,
+                    tasks::Bound::Answer => wire::Bound::Answer,
+                    tasks::Bound::Tools => wire::Bound::Tools,
+                    tasks::Bound::HistoryItems => wire::Bound::HistoryItems,
+                    tasks::Bound::History => wire::Bound::History,
+                    tasks::Bound::Window => wire::Bound::Window,
+                    tasks::Bound::Output => wire::Bound::Output,
+                },
+                value: value.value,
+            },
+        )?),
         tasks::End::Parked => wire::End::Parked,
         tasks::End::Failed(value) => wire::End::Failed(wire::EndFailed::new(
             limits,
@@ -480,6 +497,20 @@ pub(super) fn decode_end(value: wire::End, limits: &Limits) -> Result<tasks::End
                 followups: decode_result_followups(followups, limits)?,
             }
         }
+        wire::End::Exceeded(value) => tasks::End::Exceeded(tasks::Exceeded {
+            bound: match value.bound() {
+                wire::Bound::Reasoning => tasks::Bound::Reasoning,
+                wire::Bound::Metadata => tasks::Bound::Metadata,
+                wire::Bound::Items => tasks::Bound::Items,
+                wire::Bound::Answer => tasks::Bound::Answer,
+                wire::Bound::Tools => tasks::Bound::Tools,
+                wire::Bound::HistoryItems => tasks::Bound::HistoryItems,
+                wire::Bound::History => tasks::Bound::History,
+                wire::Bound::Window => tasks::Bound::Window,
+                wire::Bound::Output => tasks::Bound::Output,
+            },
+            value: value.value(),
+        }),
         wire::End::Parked => tasks::End::Parked,
         wire::End::Failed(value) => {
             let wire::EndFailedParts { value } = value.into_parts();

@@ -201,6 +201,8 @@ pub enum Moved {
 /// The reason a task is held, in the party's vocabulary.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum HoldReason {
+    /// A configured bound refused the run's model call (domain/hosts.md, 6.3).
+    Exceeded(Exceeded),
     /// A queue join would close a circle of waits.
     Circle,
     /// Its retry allowance was exhausted.
@@ -252,4 +254,37 @@ pub enum FailureClass {
     Lost,
     /// The result broke its contract.
     Invalid,
+}
+
+/// A configured bound a run's model call met, and that bound's configured
+/// value in its own unit: never a measured size.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Exceeded {
+    pub bound: Bound,
+    pub value: u64,
+}
+
+/// A configured bound on a model call.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Bound {
+    /// The model's reasoning, per item or in all: bytes.
+    Reasoning,
+    /// The model's other replay metadata: bytes.
+    Metadata,
+    /// The items of the model's answer: a count.
+    Items,
+    /// The model's answer: bytes.
+    Answer,
+    /// The tools offered to the model: a count.
+    Tools,
+    /// The messages and blocks one request carries: a count of both.
+    HistoryItems,
+    /// The run's retained history, which compaction could not bring under
+    /// one of its configured ceilings: on messages, on blocks or on bytes.
+    /// The value is that ceiling, and the bound doesn't name its unit.
+    History,
+    /// The model's window: tokens.
+    Window,
+    /// The model's declared output ceiling: tokens.
+    Output,
 }

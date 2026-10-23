@@ -6,7 +6,7 @@ mod shapes;
 mod thread;
 use crate::{engine::Engine, fixtures, net::Net};
 use jig_client::{self as client, Ask, Event, Handle, Key, Latest, Link, Outcome, Readable, Told, Watchable};
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use jig_client_shell_native::{Conn, Connections};
 use jig_client_world::{ClientId, harness::Observed};
 use skein_lib::Reader;
@@ -447,7 +447,7 @@ impl Story {
         let mut settings = fixtures::settings(self.engine.limits.core.documents.rows);
         settings.served = jig_client_world::test::list([
             jig_protocol_engine_clients::Served { family: None, first: version, last: version },
-            jig_protocol_engine_clients::Served { family: Some(1), first: 1, last: 1 },
+            jig_protocol_engine_clients::Served { family: Some(1), first: 2, last: 2 },
         ]);
         while self.engine.out.pop().is_some() {}
         self.engine.component =

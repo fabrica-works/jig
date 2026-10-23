@@ -432,6 +432,7 @@ pub fn failure_kind(failure: Failure) -> &'static str {
     match failure {
         Failure::Unprepared(Preparation::Transient) => "failed: unprepared, transient",
         Failure::Unprepared(Preparation::Permanent { .. }) => "failed: unprepared, permanent",
+        Failure::Run(RunFailure::Exceeded(_)) => "failed: run, exceeded",
         Failure::Run(RunFailure::Model) => "failed: run, model",
         Failure::Run(RunFailure::Budget) => "failed: run, budget",
         Failure::Run(RunFailure::Policy) => "failed: run, policy",

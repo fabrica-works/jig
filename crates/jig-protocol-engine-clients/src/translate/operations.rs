@@ -1,7 +1,7 @@
 //! General operation targets and template overrides, translated into people records.
 use super::{Untranslatable, asks};
 use alloc::boxed::Box;
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use jig_domain_people as p;
 use skein_lib::List;
 

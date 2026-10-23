@@ -2,7 +2,7 @@ use crate::{Request, tests::fixtures, translate};
 use jig_domain_host as host;
 use jig_protocol_worker_wire::{self as wire, Part};
 use skein_lib::{List, Queue, Reader, Time, Token};
-fn translated(kind: u16, bytes: &[u8], limits: &wire::v6::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
+fn translated(kind: u16, bytes: &[u8], limits: &wire::v7::Limits) -> (host::LinkDown, Box<[Part]>, Queue<Request>) {
     let mut parts = List::with_capacity(1);
     let mut values = Queue::with_capacity(4);
     let down =
@@ -367,7 +367,7 @@ fn a_refused_later_program_grant_leaves_no_value_queued() {
 
 #[test]
 fn the_hosts_endpoint_cap_is_the_worker_wires_ceiling() {
-    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v6::CEILINGS.bounds_program_endpoints);
+    assert_eq!(host::PROGRAM_ENDPOINTS, wire::v7::CEILINGS.bounds_program_endpoints);
 }
 
 fn hello_with_program_endpoints(count: u32) -> host::Hello {

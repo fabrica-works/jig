@@ -11,7 +11,8 @@ pub(crate) fn valid(limits: &Limits, why: Hold, source: Option<&HoldSource>) -> 
                 && match why {
                     Hold::EffectFailed | Hold::Effects => true,
                     Hold::Uncertain { entry: held } => held == *entry,
-                    Hold::Failures(_)
+                    Hold::Exceeded(_)
+                    | Hold::Failures(_)
                     | Hold::Stalled
                     | Hold::Dependency(_)
                     | Hold::Stopped

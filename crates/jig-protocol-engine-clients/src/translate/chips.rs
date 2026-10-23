@@ -31,6 +31,23 @@ pub fn retry(value: t::RetryNotice, limits: &w::Limits) -> Result<w::RetryNotice
 }
 pub fn hold(value: t::Hold, limits: &w::Limits) -> Result<w::HoldCategory, w::Problem> {
     Ok(match value {
+        t::Hold::Exceeded(value) => w::HoldCategory::Exceeded(w::Exceeded::new(
+            limits,
+            w::ExceededParts {
+                bound: match value.bound {
+                    t::Bound::Reasoning => w::Bound::Reasoning,
+                    t::Bound::Metadata => w::Bound::Metadata,
+                    t::Bound::Items => w::Bound::Items,
+                    t::Bound::Answer => w::Bound::Answer,
+                    t::Bound::Tools => w::Bound::Tools,
+                    t::Bound::HistoryItems => w::Bound::HistoryItems,
+                    t::Bound::History => w::Bound::History,
+                    t::Bound::Window => w::Bound::Window,
+                    t::Bound::Output => w::Bound::Output,
+                },
+                value: value.value,
+            },
+        )?),
         t::Hold::Failures(value) => w::HoldCategory::Failures(w::HoldCategoryFailures::new(
             limits,
             w::HoldCategoryFailuresParts { class: class(value, limits)? },

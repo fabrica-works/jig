@@ -145,7 +145,8 @@ fn filled(why: Refusal) -> bool {
                 HoldReason::StoppedBy { party } => party != 0,
                 HoldReason::Uncertain { entry } => entry != 0,
                 HoldReason::PoolLost { pool } => pool != 0,
-                HoldReason::Failures { .. }
+                HoldReason::Exceeded(_)
+                | HoldReason::Failures { .. }
                 | HoldReason::Stalled
                 | HoldReason::Stopped
                 | HoldReason::Drift

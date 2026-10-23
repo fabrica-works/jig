@@ -94,7 +94,7 @@ impl Kept {
         self.open
             && match end {
                 End::Finished { .. } | End::FinishedWithFollowups { .. } => true,
-                End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
+                End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
             }
     }
 
@@ -103,7 +103,7 @@ impl Kept {
         self.dependencies
             && match end {
                 End::Finished { result, .. } | End::FinishedWithFollowups { result, .. } => done(result),
-                End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
+                End::Exceeded(_) | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
             }
     }
 }

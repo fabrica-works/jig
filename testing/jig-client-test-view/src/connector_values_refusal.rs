@@ -100,6 +100,20 @@ fn limit(value: owner::LimitKind) -> client::AdmissionLimit {
 }
 fn hold(value: owner::HoldReason) -> client::HoldCategory {
     match value {
+        owner::HoldReason::Exceeded(value) => client::HoldCategory::Exceeded(client::Exceeded {
+            bound: match value.bound {
+                owner::Bound::Reasoning => client::Bound::Reasoning,
+                owner::Bound::Metadata => client::Bound::Metadata,
+                owner::Bound::Items => client::Bound::Items,
+                owner::Bound::Answer => client::Bound::Answer,
+                owner::Bound::Tools => client::Bound::Tools,
+                owner::Bound::HistoryItems => client::Bound::HistoryItems,
+                owner::Bound::History => client::Bound::History,
+                owner::Bound::Window => client::Bound::Window,
+                owner::Bound::Output => client::Bound::Output,
+            },
+            value: value.value,
+        }),
         owner::HoldReason::Failures { class } => client::HoldCategory::Failures {
             class: match class {
                 owner::FailureClass::Transient => client::HoldFailure::Transient,

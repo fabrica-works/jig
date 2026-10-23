@@ -99,7 +99,7 @@ pub use boundary::{
     Request, RequestKey, ResourceName, ResourceRole, Role, Seed, Stored, USES, Use, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
-pub use decisions::{FailureClass, HoldReason, Moved};
+pub use decisions::{Bound, Exceeded, FailureClass, HoldReason, Moved};
 pub use domain::{Domain, application_part, application_part_done, fire, max_out, step};
 pub use facts::Fact;
 pub use limits::{Limits, outcome_bytes, worst_case};

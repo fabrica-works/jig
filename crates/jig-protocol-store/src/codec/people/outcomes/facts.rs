@@ -38,6 +38,23 @@ pub(super) fn encode_hold_reason(
     limits: &wire::Limits,
 ) -> Result<wire::HoldReason, wire::Problem> {
     Ok(match value {
+        domain::HoldReason::Exceeded(value) => wire::HoldReason::Exceeded(wire::Exceeded::new(
+            limits,
+            wire::ExceededParts {
+                bound: match value.bound {
+                    domain::Bound::Reasoning => wire::Bound::Reasoning,
+                    domain::Bound::Metadata => wire::Bound::Metadata,
+                    domain::Bound::Items => wire::Bound::Items,
+                    domain::Bound::Answer => wire::Bound::Answer,
+                    domain::Bound::Tools => wire::Bound::Tools,
+                    domain::Bound::HistoryItems => wire::Bound::HistoryItems,
+                    domain::Bound::History => wire::Bound::History,
+                    domain::Bound::Window => wire::Bound::Window,
+                    domain::Bound::Output => wire::Bound::Output,
+                },
+                value: value.value,
+            },
+        )?),
         domain::HoldReason::Failures { class } => wire::HoldReason::Failures(wire::HoldReasonFailures::new(
             limits,
             wire::HoldReasonFailuresParts { class: encode_failure_class(*class, limits) },
@@ -74,6 +91,20 @@ pub(super) fn encode_hold_reason(
 }
 pub(super) fn decode_hold_reason(value: wire::HoldReason) -> domain::HoldReason {
     match value {
+        wire::HoldReason::Exceeded(value) => domain::HoldReason::Exceeded(domain::Exceeded {
+            bound: match value.bound() {
+                wire::Bound::Reasoning => domain::Bound::Reasoning,
+                wire::Bound::Metadata => domain::Bound::Metadata,
+                wire::Bound::Items => domain::Bound::Items,
+                wire::Bound::Answer => domain::Bound::Answer,
+                wire::Bound::Tools => domain::Bound::Tools,
+                wire::Bound::HistoryItems => domain::Bound::HistoryItems,
+                wire::Bound::History => domain::Bound::History,
+                wire::Bound::Window => domain::Bound::Window,
+                wire::Bound::Output => domain::Bound::Output,
+            },
+            value: value.value(),
+        }),
         wire::HoldReason::Failures(value) => {
             let wire::HoldReasonFailuresParts { class } = value.into_parts();
             domain::HoldReason::Failures { class: decode_failure_class(class) }

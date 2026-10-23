@@ -1,11 +1,47 @@
 use crate::{
-    contract::{HoldCategory as H, HoldFailure, Phase},
+    contract::{Bound, Exceeded, HoldCategory as H, HoldFailure, Phase},
     words::{self, Word},
 };
 use skein_ui::phrases::{Form, Hole, Language, PhraseLimits, Phrasebook, PluralClass, Segment};
 const TEXT: u32 = 32;
 const TASK: u64 = 7;
 const HOLDS: &[(H, &[u8])] = &[
+    (
+        H::Exceeded(Exceeded { bound: Bound::Reasoning, value: u64::MAX }),
+        b"Held: the model's reasoning went past its configured allowance of 18446744073709551615 bytes",
+    ),
+    (
+        H::Exceeded(Exceeded { bound: Bound::Metadata, value: u64::MAX }),
+        b"Held: the model's metadata went past its configured allowance of 18446744073709551615 bytes",
+    ),
+    (
+        H::Exceeded(Exceeded { bound: Bound::Items, value: u64::MAX }),
+        b"Held: the model's answer went past its configured allowance of 18446744073709551615 items",
+    ),
+    (
+        H::Exceeded(Exceeded { bound: Bound::Answer, value: u64::MAX }),
+        b"Held: the model's answer went past its configured allowance of 18446744073709551615 bytes",
+    ),
+    (
+        H::Exceeded(Exceeded { bound: Bound::Tools, value: u64::MAX }),
+        b"Held: the run's tools went past their configured allowance of 18446744073709551615 tools",
+    ),
+    (
+        H::Exceeded(Exceeded { bound: Bound::HistoryItems, value: u64::MAX }),
+        b"Held: the run's request went past its configured allowance of 18446744073709551615 messages and blocks",
+    ),
+    (
+        H::Exceeded(Exceeded { bound: Bound::History, value: u64::MAX }),
+        b"Held: the run's history no longer fits its configured allowance, even compacted",
+    ),
+    (
+        H::Exceeded(Exceeded { bound: Bound::Window, value: u64::MAX }),
+        b"Held: the run no longer fits the model's window of 18446744073709551615 tokens",
+    ),
+    (
+        H::Exceeded(Exceeded { bound: Bound::Output, value: u64::MAX }),
+        b"Held: the request went past the model's output ceiling of 18446744073709551615 tokens",
+    ),
     (H::Circle, b"Held for a circle of waits"),
     (H::Failures { class: HoldFailure::Lost }, b"Held: out of tries"),
     (H::Stalled, b"The executor stopped progressing"),
@@ -44,8 +80,8 @@ fn each_hold_category_says_its_own_phrase() {
     let book = book(Box::new([words::english()]));
     for (hold, expected) in HOLDS {
         let holes: &[Hole] = match hold {
-            H::Dependency { .. } | H::Uncertain { .. } | H::PoolLost { .. } => &[Hole::Number(TASK)],
-            H::Circle
+            H::Exceeded(Exceeded { bound: Bound::History, .. })
+            | H::Circle
             | H::Failures { .. }
             | H::Stalled
             | H::Stopped
@@ -59,6 +95,8 @@ fn each_hold_category_says_its_own_phrase() {
             | H::ResourceUnavailable
             | H::ResourceAccess
             | H::Procedure => &[],
+            H::Exceeded(Exceeded { value, .. }) => &[Hole::Number(*value)],
+            H::Dependency { .. } | H::Uncertain { .. } | H::PoolLost { .. } => &[Hole::Number(TASK)],
         };
         assert_eq!(book.say(0, Word::hold(hold).id(), holes).unwrap().text.as_ref(), *expected, "{hold:?}");
     }

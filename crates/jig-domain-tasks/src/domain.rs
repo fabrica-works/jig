@@ -654,6 +654,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                     refused(reply_to, Some(task), Refusal::Contract, out);
                 }
                 crate::End::Finished { .. }
+                | crate::End::Exceeded(_)
                 | crate::End::Parked
                 | crate::End::Failed(_)
                 | crate::End::Refused

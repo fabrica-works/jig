@@ -1263,7 +1263,8 @@ impl Payload for CurrentHold {
 impl Payload for HoldCategory {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Failures { .. }
+            Self::Exceeded(_)
+            | Self::Failures { .. }
             | Self::Stalled
             | Self::Dependency { .. }
             | Self::Stopped

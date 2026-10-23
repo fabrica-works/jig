@@ -57,8 +57,8 @@ pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
         heartbeat: Duration::from_millis(50),
         rows,
         served: jig_client_world::test::list([
-            Served { family: None, first: 12, last: 12 },
-            Served { family: Some(1), first: 1, last: 1 },
+            Served { family: None, first: 13, last: 13 },
+            Served { family: Some(1), first: 2, last: 2 },
         ]),
         providers: List::with_capacity(0),
         seed: Secret::new(Box::new([7; 32])),
@@ -101,7 +101,7 @@ pub fn engine_limits() -> Limits {
         exchanges: 8,
         exchanges_per_client: 4,
         message_bytes: MESSAGE_BYTES,
-        wire: jig_client_protocol_wire::v12::CEILINGS,
+        wire: jig_client_protocol_wire::v13::CEILINGS,
         link_span: Duration::from_secs(300),
     }
 }
@@ -301,21 +301,21 @@ pub fn callable_turn() -> Box<[u8]> {
 fn turn_with_blocks(blocks: List<smith_transcript::v6::Block>) -> Box<[u8]> {
     use smith_transcript::v6 as s;
     let mut turn =
-        s::Turn::decode(&s::CEILINGS, &mut skein_lib::Reader::new(TURN_BYTES)).expect("v6 fixture").into_parts();
+        s::Turn::decode(&s::CEILINGS, &mut skein_lib::Reader::new(TURN_BYTES)).expect("v7 fixture").into_parts();
     let mut message = turn.messages.get(0).expect("person message").clone().into_parts();
     message.blocks = blocks;
     turn.messages = List::with_capacity(1);
     turn.messages.push(s::Message::new(&s::CEILINGS, message).expect("source message")).expect("one message");
     let turn = s::Turn::new(&s::CEILINGS, turn).expect("source turn");
     let mut writer = skein_lib::Writer::new(usize::try_from(turn.measure()).expect("turn size"));
-    turn.encode(&mut writer).expect("v6 encoding");
+    turn.encode(&mut writer).expect("v7 encoding");
     writer.finish()
 }
 
 // Eight KiB fits the committed marker and its owner; an extra byte cannot fit whole.
 pub const TURN_PAGE_BYTES: u32 = 8192;
 pub const LARGE_TURN_TEXT_BYTES: u32 = TURN_PAGE_BYTES + 1;
-// The v6 fixture's metadata and field framing measure 132 bytes.
+// The v7 fixture's metadata and field framing measure 132 bytes.
 const TURN_FRAMING_BYTES: u64 = 132;
 pub const LARGE_TURN_BYTES: u64 = LARGE_TURN_TEXT_BYTES as u64 + TURN_FRAMING_BYTES;
 #[must_use]

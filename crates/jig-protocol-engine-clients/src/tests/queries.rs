@@ -1,6 +1,6 @@
 use super::fixtures;
 use crate::translate::watches;
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use jig_domain_core::{Event, documents as d};
 use jig_domain_tasks as t;
 use skein_lib::Token;

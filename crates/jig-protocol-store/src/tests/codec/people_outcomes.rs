@@ -160,8 +160,8 @@ fn an_account_sign_in_address_over_its_bound_is_an_encode_error() {
     let result = crate::codec::people::encode(&row, &super::people_limits(), &fixtures::model_names(&[]));
     assert_eq!(
         result,
-        Err(crate::people_v7::Problem {
-            path: crate::people_v7::Path::OutcomeAccountSignInStartedAddress,
+        Err(crate::people_v8::Problem {
+            path: crate::people_v8::Path::OutcomeAccountSignInStartedAddress,
             reason: skein_codec::Reason::Bound,
         })
     );

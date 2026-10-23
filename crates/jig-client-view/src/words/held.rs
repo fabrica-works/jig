@@ -13,6 +13,20 @@ impl Words {
                 self.text(b, JigPhrase::CircleHold, &[]);
                 self.text(b, JigPhrase::CircleLifts, &[]);
             }
+            HoldCategory::Exceeded(value) => {
+                let holes: &[Hole] = match value.bound {
+                    jig_client::contract::Bound::History => &[],
+                    jig_client::contract::Bound::Reasoning
+                    | jig_client::contract::Bound::Metadata
+                    | jig_client::contract::Bound::Items
+                    | jig_client::contract::Bound::Answer
+                    | jig_client::contract::Bound::Tools
+                    | jig_client::contract::Bound::HistoryItems
+                    | jig_client::contract::Bound::Window
+                    | jig_client::contract::Bound::Output => &[Hole::Number(value.value)],
+                };
+                self.text(b, JigPhrase::Word(Word::hold(&reason)), holes);
+            }
             HoldCategory::Failures { class } => {
                 self.text(b, JigPhrase::Word(Word::Hold(HoldWord::Failures)), &[]);
                 let phrase = match class {
