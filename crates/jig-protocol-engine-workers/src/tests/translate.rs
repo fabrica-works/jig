@@ -196,7 +196,7 @@ fn down(record: jig_domain_host::LinkDown) -> translate::Down {
     };
     translated.expect("complete output")
 }
-fn codec() -> jig_protocol_worker_wire::v6::Limits {
+fn codec() -> jig_protocol_worker_wire::v7::Limits {
     jig_protocol_worker_wire::sizes::limits(&fixtures::SIZES).expect("small codec")
 }
 fn assignment_output() -> jig_domain_host::LinkDown {
@@ -544,4 +544,80 @@ fn a_duplicate_program_endpoint_hello_is_refused_before_delivery() {
     hello.bounds = jig_protocol_worker_wire::Bounds::new(&limits, bounds).unwrap();
     let hello = jig_protocol_worker_wire::Hello::new(&limits, hello).unwrap();
     assert!(translate::hello(hello).is_none());
+}
+
+#[test]
+fn an_assignment_encodes_each_live_ask_without_changing_it() {
+    use jig_domain_host as host;
+    for ask in [
+        host::LiveAsk::NONE,
+        host::LiveAsk { text: true, reasoning: false, input: false },
+        host::LiveAsk { text: false, reasoning: true, input: false },
+        host::LiveAsk { text: false, reasoning: false, input: true },
+        host::LiveAsk { text: true, reasoning: true, input: true },
+    ] {
+        let mut assignment = fixtures::assignment();
+        assignment.assignment.live = ask;
+        let record = assignment_record(down(host::LinkDown::Assign { assignment }));
+        let mut bytes = skein_lib::Writer::new(usize::try_from(record.measure()).unwrap());
+        record.encode(&mut bytes).unwrap();
+        let bytes = bytes.finish();
+        let record =
+            jig_protocol_worker_wire::Assignment::decode(&codec(), &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(
+            (record.live().text(), record.live().reasoning(), record.live().input()),
+            (ask.text, ask.reasoning, ask.input)
+        );
+    }
+}
+#[test]
+fn every_piece_kind_decodes_whole_including_offsets_past_u32() {
+    use jig_domain_host as host;
+    use jig_protocol_worker_wire as wire;
+    let limits = codec();
+    let call = wire::InputCall::new(
+        &limits,
+        wire::InputCallParts { id: Box::from(&b"call-id"[..]), tool: Box::from(&b"tool"[..]) },
+    )
+    .unwrap();
+    for (kind, expected) in [
+        (wire::LiveKind::Text, host::LiveKind::Text),
+        (wire::LiveKind::Reasoning, host::LiveKind::Reasoning),
+        (
+            wire::LiveKind::Input(call),
+            host::LiveKind::Input { call: Box::from(&b"call-id"[..]), tool: Box::from(&b"tool"[..]) },
+        ),
+    ] {
+        let piece = wire::Piece::new(
+            &limits,
+            wire::PieceParts {
+                turn: 17,
+                retry: 23,
+                kind,
+                offset: u64::from(u32::MAX) + 19,
+                bytes: Box::from([0xff, 0, 0x80]),
+            },
+        )
+        .unwrap();
+        let fact =
+            wire::Fact::new(&limits, wire::FactParts { task: 83, attempt: 97, value: wire::FactValue::Piece(piece) })
+                .unwrap();
+        let mut bytes = skein_lib::Writer::new(usize::try_from(fact.measure()).unwrap());
+        fact.encode(&mut bytes).unwrap();
+        let decoded = translate::decode(wire::Kind::Fact.number(), &bytes.finish(), &limits).unwrap();
+        assert_eq!(
+            up(decoded),
+            host::LinkUp::Piece {
+                run: Token::new(83),
+                attempt: Token::new(97),
+                piece: host::Piece {
+                    turn: 17,
+                    retry: 23,
+                    kind: expected,
+                    offset: u64::from(u32::MAX) + 19,
+                    bytes: Box::from([0xff, 0, 0x80])
+                }
+            }
+        );
+    }
 }

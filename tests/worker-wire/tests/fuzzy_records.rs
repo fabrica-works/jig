@@ -27,6 +27,9 @@ fn fuzzy_up_decoders_never_panic_and_reencode_what_they_read() {
         check!(&bytes, Call);
         check!(&bytes, Answer);
         check!(&bytes, Fact);
+        check!(&bytes, Piece);
+        check!(&bytes, InputCall);
+        check!(&bytes, LiveAsk);
         check!(&bytes, Unauthorized);
         check!(&bytes, Limited);
         check!(&bytes, AccountRefused);

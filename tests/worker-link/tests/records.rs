@@ -150,7 +150,7 @@ fn a_transcript_piece_that_does_not_split_is_refused_as_invalid() {
     }
 }
 
-fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v6::Limits) {
+fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v7::Limits) {
     let turn = wire::Turn::decode(limits, &mut Reader::new(&records[1].body)).expect("turn");
     assert_eq!(
         (turn.task(), turn.attempt(), turn.number(), turn.spent(), *turn.read(), turn.opens_window(), turn.body()),
@@ -173,7 +173,7 @@ fn check_up_records(records: &[skein_fake_channel::Observed], limits: &wire::v6:
         (b"result".as_slice(), Some(b"left".as_slice()), Some(b"saved".as_slice()))
     );
     let fact = wire::Fact::decode(limits, &mut Reader::new(&records[4].body)).expect("fact");
-    let wire::Activity::Long(long) = fact.activity() else { panic!("long") };
+    let wire::FactValue::Long(long) = fact.value() else { panic!("long") };
     assert_eq!(
         (fact.task(), fact.attempt(), long.operation(), long.span()),
         (7, 2, &wire::Operation::Command, Duration::from_secs(2))

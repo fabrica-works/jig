@@ -18,6 +18,7 @@ mod records {
         Call,
         Answer,
         Activity,
+        Piece,
         Unauthorized,
         Limited,
         AccountRefused,
@@ -35,7 +36,8 @@ mod records {
                 LinkUp::Turn { .. } => Record::Turn,
                 LinkUp::Call { .. } => Record::Call,
                 LinkUp::Answer { .. } => Record::Answer,
-                LinkUp::Piece { .. } | LinkUp::Activity { .. } => Record::Activity,
+                LinkUp::Piece { .. } => Record::Piece,
+                LinkUp::Activity { .. } => Record::Activity,
                 LinkUp::Unauthorized { .. } => Record::Unauthorized,
                 LinkUp::Limited { .. } => Record::Limited,
                 LinkUp::AccountRefused { .. } => Record::AccountRefused,
@@ -75,6 +77,61 @@ mod records {
                 Record::AccountRefused
             ]
         );
+    }
+    #[test]
+    fn a_piece_fact_reaches_the_root_as_a_piece_with_every_field() {
+        use jig_domain_host as host;
+        use jig_protocol_worker_wire as wire;
+        let limits = wire::sizes::limits(&fixtures::SIZES).expect("codec");
+        for (kind, expected) in [
+            (wire::LiveKind::Text, host::LiveKind::Text),
+            (wire::LiveKind::Reasoning, host::LiveKind::Reasoning),
+            (
+                wire::LiveKind::Input(
+                    wire::InputCall::new(
+                        &limits,
+                        wire::InputCallParts { id: Box::from(&b"call"[..]), tool: Box::from(&b"tool"[..]) },
+                    )
+                    .expect("call"),
+                ),
+                host::LiveKind::Input { call: Box::from(&b"call"[..]), tool: Box::from(&b"tool"[..]) },
+            ),
+        ] {
+            let piece = wire::Piece::new(
+                &limits,
+                wire::PieceParts { turn: 17, retry: 23, kind, offset: u64::MAX, bytes: Box::from([0xff, 0, 0x80]) },
+            )
+            .expect("piece");
+            let fact = wire::Fact::new(
+                &limits,
+                wire::FactParts { task: 83, attempt: 97, value: wire::FactValue::Piece(piece) },
+            )
+            .expect("fact");
+            let mut body = skein_lib::Writer::new(usize::try_from(fact.measure()).expect("body length"));
+            fact.encode(&mut body).expect("body");
+            let mut peer = reporting();
+            peer.play(fixtures::frame(wire::Kind::Fact.number(), &body.finish()));
+            let mut world = world();
+            world.connect(peer);
+            world.run();
+            assert_eq!(observed(&world), [Record::Hello, Record::Piece]);
+            let Request::Up { up, parts, .. } = &world.root()[1] else { panic!("piece") };
+            assert!(parts.is_empty());
+            assert_eq!(
+                *up,
+                host::LinkUp::Piece {
+                    run: Token::new(83),
+                    attempt: Token::new(97),
+                    piece: host::Piece {
+                        turn: 17,
+                        retry: 23,
+                        kind: expected,
+                        offset: u64::MAX,
+                        bytes: Box::from([0xff, 0, 0x80])
+                    }
+                }
+            );
+        }
     }
     #[test]
     fn an_undecodable_turn_body_is_refused_as_framing() {
