@@ -41,6 +41,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
             told: 2,
             turns: 2,
             turn_queue_bytes: 2048,
+            piece_bytes: 4096,
         },
         charter: smith_charter::v4::CEILINGS,
         endpoints: 1,

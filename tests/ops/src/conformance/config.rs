@@ -79,6 +79,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             told: 2,
             turns: 32,
             turn_queue_bytes: 32768,
+            piece_bytes: 4096,
         },
         charter: smith_charter::v4::CEILINGS,
         endpoints: 1,

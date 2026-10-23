@@ -396,6 +396,7 @@ pub fn assignment() -> jig_domain_host::Assignment {
             identity: IDENTITY,
             workspace: Some(host::Workspace { workstream: 9, items: Token::new(500) }),
             save: true,
+            live: jig_domain_host::LiveAsk::NONE,
             charter: Box::from(b"charter".as_slice()),
             grants: Box::new([grant(host::Form::Credential(host::Scheme::Bearer)), grant(host::Form::Application)]),
         },

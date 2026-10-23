@@ -322,6 +322,8 @@ fn memory_below_the_components_sum_is_refused() {
     const SIGN_IN_CANCEL_GROWTH: u64 = 1_617_424;
     // Open ending authority grows the small profile's owned rows and carriers.
     const ENDING_AUTHORITY_GROWTH: u64 = 992;
+    // The live ask grows the small profile's typed host carriers by 24 bytes.
+    const LIVE_ASK_GROWTH: u64 = 24;
     // Finishing (domain/root.md, section 3; domain/people.md, section 3):
     // people's sign_in_worst_case adds Set<(Wall, u64)> at 8 sign-ins: 576 bytes.
     // Core's Reconciliation scratch replaces the views' Token snapshot:
@@ -467,6 +469,7 @@ fn memory_below_the_components_sum_is_refused() {
         + SOURCE_DEADLINE_GROWTH
         + SIGN_IN_CANCEL_GROWTH
         + ENDING_AUTHORITY_GROWTH
+        + LIVE_ASK_GROWTH
         // Deployment role storage and project-role scratch: people.projects 2 -> 3.
         + 7_288;
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over });

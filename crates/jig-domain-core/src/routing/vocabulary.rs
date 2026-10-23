@@ -306,6 +306,7 @@ pub enum Now {
     RunPreparationFailed { task: u64 },
     /// Core-owned run parts are ready for root assembly with the connector workspace.
     RunPrepared {
+        live: crate::LiveAsk,
         task: u64,
         attempt: u64,
         conversation: u64,

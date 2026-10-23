@@ -192,6 +192,7 @@ impl Engine {
             Request::Up(
                 LinkUp::Logins { .. }
                 | LinkUp::SignedOut { .. }
+                | LinkUp::Piece { .. }
                 | LinkUp::Activity { .. }
                 | LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }
@@ -298,6 +299,7 @@ impl Engine {
             attempt,
             workspace: Some(Workspace { workstream: run.raw(), items: Token::new(run.raw().saturating_add(1000)) }),
             save: self.rng.chance(self.script.saves),
+            live: jig_domain_host::LiveAsk::NONE,
             charter,
         };
         let mut assignment = Assignment { messages: Box::new([]), assignment, turns, answered: Box::new([]) };

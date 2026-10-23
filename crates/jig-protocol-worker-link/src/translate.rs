@@ -64,6 +64,7 @@ pub(crate) fn hello(hello: host::Hello, limits: &wire::v6::Limits) -> Option<Fra
 
 pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v6::Limits) -> Option<Frame> {
     match up {
+        host::LinkUp::Piece { .. } => None,
         host::LinkUp::Logins { logins } => logins_frame(logins, limits),
         host::LinkUp::SignedOut { name, result } => signed_out_frame(name, result, limits),
         host::LinkUp::Activity { run, attempt, activity: value } => {
@@ -561,6 +562,7 @@ fn assignment(
             attempt: Token::new(record.attempt),
             workspace,
             save: record.save,
+            live: host::LiveAsk::NONE,
             charter: record.charter,
             grants: grants.into_boxed(),
         },

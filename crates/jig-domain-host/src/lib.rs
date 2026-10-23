@@ -25,6 +25,8 @@ mod facts;
 mod hosted;
 mod limits;
 mod link;
+mod live;
+pub use live::{LiveAsk, LiveKind, Piece};
 mod refusals;
 pub mod sources;
 #[cfg(test)]

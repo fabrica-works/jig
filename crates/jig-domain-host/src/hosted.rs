@@ -35,6 +35,7 @@ pub(crate) struct Hosted {
     pub(crate) answer: Option<crate::answers::Kept>,
     /// Whether the workspace saves unfinished work before release.
     save: bool,
+    pub(crate) live: crate::LiveAsk,
     /// The application's token for the last delivery that changed the workspace.
     left: Option<Token>,
     /// Its relayed calls in flight, while it is live.
@@ -208,7 +209,7 @@ fn assign_runtime(
         refused(&assignment, Refusal::Busy, &runtime, out);
         return;
     }
-    let RunAssignment { run, attempt, workspace, save, charter, grants, identity: _ } = assignment;
+    let RunAssignment { run, attempt, workspace, save, live, charter, grants, identity: _ } = assignment;
     let held = Queue::with_capacity(env.limits.held);
     let entry = Hosted {
         run,
@@ -218,6 +219,7 @@ fn assign_runtime(
         answer: None,
         refusals: crate::refusals::Refusals::new(env.limits.inbox),
         save: save && workspace.is_some(),
+        live,
         left: None,
         relays: Set::with_capacity(env.limits.run_calls),
         delivery: None,
@@ -434,6 +436,7 @@ fn start_prepared(domain: &mut Domain, owner: Token, workspace: Option<Token>, o
             out.push(Request::Start {
                 owner,
                 start: Box::new(crate::Start {
+                    live: entry.live,
                     workspace,
                     charter,
                     activation: entry.attempt.raw(),

@@ -224,6 +224,7 @@ pub(super) const HUB: host::Limits = host::Limits {
     told: 64,
     turns: 8,
     turn_queue_bytes: 524_288,
+    piece_bytes: 4096,
 };
 pub(super) const LINK: Link = Link {
     chunk: 16_384,

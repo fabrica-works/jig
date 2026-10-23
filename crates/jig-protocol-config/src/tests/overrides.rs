@@ -282,6 +282,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"hub.run_calls", 8),
     (b"hub.facts", 64),
     (b"hub.told", 64),
+    (b"hub.piece_bytes", 4096),
     (b"hub.turns", 8),
     (b"hub.turn_queue_bytes", 524_288),
     (b"link.chunk", 16_384),

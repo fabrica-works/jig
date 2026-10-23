@@ -35,7 +35,7 @@ mod records {
                 LinkUp::Turn { .. } => Record::Turn,
                 LinkUp::Call { .. } => Record::Call,
                 LinkUp::Answer { .. } => Record::Answer,
-                LinkUp::Activity { .. } => Record::Activity,
+                LinkUp::Piece { .. } | LinkUp::Activity { .. } => Record::Activity,
                 LinkUp::Unauthorized { .. } => Record::Unauthorized,
                 LinkUp::Limited { .. } => Record::Limited,
                 LinkUp::AccountRefused { .. } => Record::AccountRefused,

@@ -98,3 +98,26 @@ fn a_nonfact_that_fills_the_cap_loses_the_link() {
     }
     assert_eq!(lost(&world), 1);
 }
+
+#[test]
+fn a_piece_has_no_v6_record_and_counts_as_a_dropped_fact() {
+    let mut world = world();
+    let before = world.records();
+    world.down(Event::Up {
+        up: host::LinkUp::Piece {
+            run: fixtures::RUN_SEVEN,
+            attempt: fixtures::ATTEMPT_TWO,
+            piece: host::Piece {
+                turn: 1,
+                retry: 0,
+                kind: host::LiveKind::Text,
+                offset: 0,
+                bytes: Box::from(&b"words"[..]),
+            },
+        },
+        parts: Box::new([]),
+    });
+    assert_eq!(world.dropped_facts(), 1);
+    assert_eq!(world.records(), before);
+    assert_eq!(lost(&world), 0);
+}

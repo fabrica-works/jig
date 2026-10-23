@@ -75,6 +75,7 @@ impl Settings {
                 told: 8,
                 turns: 0,
                 turn_queue_bytes: 0,
+                piece_bytes: 4096,
             },
             engine: engine::Script {
                 assignments: 8,
@@ -554,16 +555,16 @@ impl World {
         let hosted: Vec<(Token, Token)> = self.admitted.keys().copied().collect();
         for (run, attempt) in hosted {
             if self.rng.chance(self.settings.duplicates) {
-                let assignment = host::RunAssignment {
+                let event = crate::fixtures::assign(host::RunAssignment {
                     identity: [0; 16],
                     grants: Box::new([]),
                     run,
                     attempt,
                     workspace: Some(host::Workspace { workstream: run.raw(), items: Token::new(0) }),
                     save: false,
+                    live: jig_domain_host::LiveAsk::NONE,
                     charter: Box::from(&b"again"[..]),
-                };
-                let event = crate::fixtures::assign(assignment);
+                });
                 self.stage.inbox.push_front(Arrival { event, stale: false, duplicate: true });
             }
         }
@@ -649,6 +650,7 @@ impl World {
                 | LinkDown::Relayed { .. }
                 | LinkDown::TurnKept { .. },
             )
+            | Event::Piece { .. }
             | Event::Activity { .. }
             | Event::Unauthorized { .. }
             | Event::Limited { .. }
@@ -757,6 +759,7 @@ impl World {
             Request::Up(
                 LinkUp::Logins { .. }
                 | LinkUp::SignedOut { .. }
+                | LinkUp::Piece { .. }
                 | LinkUp::Activity { .. }
                 | LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }
@@ -804,6 +807,7 @@ impl World {
             Request::Up(
                 LinkUp::Logins { .. }
                 | LinkUp::SignedOut { .. }
+                | LinkUp::Piece { .. }
                 | LinkUp::Activity { .. }
                 | LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }

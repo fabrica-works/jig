@@ -80,8 +80,25 @@ pub fn lost(channel: Token) -> core::Event {
 }
 /// Retain a worker's bytes and translate only their boundary metadata.
 #[must_use]
-pub fn up(domain: &mut Domain, channel: Token, up: host::LinkUp) -> core::Event {
+pub fn up(domain: &mut Domain, channel: Token, up: host::LinkUp) -> Option<core::Event> {
     let event = match up {
+        host::LinkUp::Piece { run, attempt, piece } => {
+            if piece.kind == host::LiveKind::Text
+                && let Ok(offset) = u32::try_from(piece.offset)
+            {
+                return Some(core::Event::RunText {
+                    run,
+                    attempt,
+                    turn: piece.turn,
+                    retry: piece.retry,
+                    offset,
+                    text: piece.bytes,
+                    call: None,
+                });
+            }
+            domain.pieces_dropped = domain.pieces_dropped.saturating_add(1);
+            return None;
+        }
         host::LinkUp::Logins { logins } => {
             let mut rows = List::with_capacity(u32::try_from(logins.len()).expect("bounded source rows"));
             for login in logins {
@@ -157,7 +174,7 @@ pub fn up(domain: &mut Domain, channel: Token, up: host::LinkUp) -> core::Event 
             fleet::Event::Observe { channel, run, attempt, report: report(activity) }
         }
     };
-    core::Event::Fleet(event)
+    Some(core::Event::Fleet(event))
 }
 /// The account a failed run turned on, as the fleet carries it.
 const fn turned(failure: host::Failure) -> Option<fleet::Turned> {
@@ -194,15 +211,17 @@ pub(super) fn receive(domain: &mut Domain, channel: Token, link: Event, work: &m
         Event::Hello { worker, hello: value } => {
             // The port is routing state; the fleet owns admission and its refusal.
             let _inserted = domain.links.insert(channel);
-            hello(channel, worker, value)
+            Some(hello(channel, worker, value))
         }
         Event::Up(value) => up(domain, channel, value),
         Event::Lost => {
             let _removed = domain.links.remove(&channel);
-            lost(channel)
+            Some(lost(channel))
         }
     };
-    work.push(Work::Core(event));
+    if let Some(event) = event {
+        work.push(Work::Core(event));
+    }
 }
 
 /// Translate complete channel deliveries; typed charters stay handed out.

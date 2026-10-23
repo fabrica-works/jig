@@ -193,6 +193,7 @@ impl World {
             attempt: Token::new(933),
             workspace: None,
             save: false,
+            live: jig_domain_host::LiveAsk::NONE,
             charter: Box::from(&b"charter"[..]),
             grants: Box::new([]),
         };
@@ -237,6 +238,7 @@ impl World {
             attempt: ATTEMPT,
             workspace,
             save: true,
+            live: jig_domain_host::LiveAsk::NONE,
             charter: Box::from(&b"charter"[..]),
             grants,
         };
@@ -261,6 +263,7 @@ impl World {
             attempt: ATTEMPT,
             workspace: None,
             save: false,
+            live: jig_domain_host::LiveAsk::NONE,
             charter: Box::from(&b"charter"[..]),
             grants: Box::new([]),
         };
@@ -278,6 +281,7 @@ impl World {
             attempt: ATTEMPT,
             workspace: None,
             save: false,
+            live: jig_domain_host::LiveAsk::NONE,
             charter: Box::from(&b"charter"[..]),
             grants: Box::new([]),
         };
@@ -573,6 +577,7 @@ impl World {
                 | LinkUp::AccountRefused { .. }
                 | LinkUp::Logins { .. }
                 | LinkUp::SignedOut { .. }
+                | LinkUp::Piece { .. }
                 | LinkUp::Activity { .. }),
             ) => {
                 self.receive_report(record);
@@ -686,7 +691,8 @@ impl World {
     }
 
     fn start(&mut self, owner: Token, start: host::Start) {
-        let host::Start { workspace, charter, activation, identity, turns, answered, messages, grants } = start;
+        let host::Start { workspace, charter, activation, identity, turns, answered, messages, grants, live: _ } =
+            start;
         assert_eq!(workspace, if self.space_live { Some(SPACE) } else { None });
         assert_eq!(&*charter, b"charter");
         for grant in &grants {

@@ -29,6 +29,7 @@ const LIMITS: Limits = Limits {
     told: 2,
     turns: 2,
     turn_queue_bytes: 128,
+    piece_bytes: 4096,
 };
 
 struct Harness {
@@ -86,6 +87,7 @@ fn assignment(run: u64) -> RunAssignment {
         attempt: Token::new(run.checked_add(1000).expect("small run")),
         workspace: Some(Workspace { workstream: run, items: Token::new(run.checked_add(100).expect("small run")) }),
         save: true,
+        live: crate::LiveAsk::NONE,
         charter: Box::from(&b"charter"[..]),
         grants: Box::new([]),
     }
@@ -842,5 +844,19 @@ fn program_endpoints_are_valid_up_to_the_cap_and_distinct() {
         (duplicate, false),
     ] {
         assert_eq!(crate::valid_program_endpoints(&endpoints), valid, "endpoints: {endpoints:?}");
+    }
+}
+
+#[test]
+fn an_assignments_live_ask_reaches_the_agents_start() {
+    for live in [crate::LiveAsk::NONE, crate::LiveAsk { text: true, reasoning: true, input: true }] {
+        let mut h = Harness::new();
+        let mut assignment = assignment(1);
+        assignment.live = live;
+        let requests = h.step(fixtures::assign(assignment));
+        let [Request::Prepare { owner, .. }] = &*requests else { panic!("prepare workspace") };
+        let requests = h.step(Event::Prepared { owner: *owner, workspace: Token::new(201) });
+        let [Request::Start { start, .. }] = &*requests else { panic!("start agent") };
+        assert_eq!(start.live, live);
     }
 }

@@ -11,6 +11,8 @@ use crate::turns::{Name, Pending};
 /// step read-only.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
+    /// The most bytes of one piece of live content (hosts.md, 6.5).
+    pub piece_bytes: u32,
     /// Local program sources; their command lifecycle does not consume run slots.
     pub program_sources: u32,
     /// Positive delay from a completed check to the next periodic check.

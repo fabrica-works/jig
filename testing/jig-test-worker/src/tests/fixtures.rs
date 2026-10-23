@@ -141,6 +141,7 @@ pub fn assignment(charter: Box<[u8]>) -> host::Assignment {
             attempt: ATTEMPT,
             workspace: Some(host::Workspace { workstream: 1, items: Token::new(9) }),
             save: false,
+            live: jig_domain_host::LiveAsk::NONE,
             charter,
             grants: Box::new([]),
         },

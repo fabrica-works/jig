@@ -27,6 +27,7 @@ impl Referee {
             Event::Turn { .. }
             | Event::Called { .. }
             | Event::Withdrawn { .. }
+            | Event::Piece { .. }
             | Event::Activity { .. }
             | Event::Unauthorized { .. }
             | Event::Limited { .. }
