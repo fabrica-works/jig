@@ -14,6 +14,7 @@ pub enum Event {
     Resend { run: Token, attempt: Token, turn: u32 },
     RelayCancelled { run: Token, attempt: Token, call: Box<[u8]> },
     Process(Box<smith::process::Event>),
+    Live { agent: Token, piece: host::Piece },
     Decoded { agent: Token, start: Result<Box<smith::Start>, Invalid> },
     Encoded { owner: Token, encoded: Encoded },
     Activity { owner: Token, activity: Option<host::Activity> },
