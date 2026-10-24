@@ -1,0 +1,2 @@
+family fixture-label 1
+versioned record Label { caption: text 32 }
