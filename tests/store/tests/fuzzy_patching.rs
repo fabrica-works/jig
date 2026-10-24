@@ -83,7 +83,7 @@ fn seeded_patch_cuts_keep_one_whole_modeled_generation() {
         let active = world.active();
         assert!(active == b"1\n" || active == b"2\n", "seed {seed}, cut {cut}: {active:?}");
         if active == b"1\n" {
-            assert_eq!(patches::source(&mut world), original, "v1 generation, seed {seed}, cut {cut}");
+            patches::kept(&original, &patches::source(&mut world), &("v1 generation", seed, cut));
         }
         let opened = world.open();
         if has_empty {

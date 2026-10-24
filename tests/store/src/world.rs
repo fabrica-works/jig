@@ -404,6 +404,9 @@ impl World {
                     Event::Patched { of, patch, counts, .. } => self.patched.push((of, patch, counts)),
                     Event::Opened { last, installation, .. } => {
                         self.installation = installation;
+                        if !self.patched.is_empty() {
+                            self.model.patched(last);
+                        }
                         self.next = last + 1;
                         return Some(last);
                     }

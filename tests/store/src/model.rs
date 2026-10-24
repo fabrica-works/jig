@@ -71,6 +71,15 @@ impl Model {
         self.acknowledged = number;
     }
 
+    /// A patched open's commits are the store's own (store.md 10.2): the
+    /// acknowledged prefix moves to its last as the root wrote it, and the
+    /// fixtures' model, not this one, checks the records' patched bytes.
+    pub fn patched(&mut self, last: u64) {
+        let state = self.prefixes.get(&self.acknowledged).expect("acknowledged prefix").clone();
+        self.prefixes.insert(last, state);
+        self.acknowledged = last;
+    }
+
     pub fn recovered(&mut self, last: u64) {
         assert!(self.prefixes.contains_key(&last), "recovered a model prefix");
         self.acknowledged = last;

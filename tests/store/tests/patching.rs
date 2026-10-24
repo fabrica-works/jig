@@ -21,7 +21,7 @@ fn old_records_patch_in_order_and_the_root_continues() {
     );
     assert_eq!(last, 6); // Initial commit, four patch pages and the seal.
     patches::whole(&mut world);
-    assert_eq!(patches::source(&mut world), original);
+    patches::kept(&original, &patches::source(&mut world), &"story");
     records.check(&mut world, 2, &"story");
     world.crash(902);
     assert_eq!(world.open(), Some(last));
@@ -34,7 +34,7 @@ fn old_records_patch_in_order_and_the_root_continues() {
 }
 
 #[test]
-fn level_and_set_refusals_leave_every_disk_byte_unchanged() {
+fn level_and_set_refusals_leave_every_file_as_it_was() {
     const BAD: PatchSets =
         PatchSets { sets: &[PatchSet { patches: &["patch 1\nowner other 1\n"], ..SETS.sets[0] }, SETS.sets[1]] };
     let records = Records::story();
@@ -48,7 +48,7 @@ fn level_and_set_refusals_leave_every_disk_byte_unchanged() {
         let before = world.contents();
         assert_eq!(world.open(), None);
         assert_eq!(world.refusal(), Some(&expected));
-        assert_eq!(world.contents(), before);
+        patches::kept(&before, &world.contents(), &expected);
     }
 }
 
@@ -67,7 +67,7 @@ fn an_empty_shelf_refuses_again_from_an_unchanged_source() {
         assert_eq!((*owner, *patch, key.as_ref()), (Owner::Application, 2, b"s/1".as_slice()));
         assert_eq!(*halt, skein_codec::patch::Halt::Refused(jig_test_patches::patches::refusal::p0002::EMPTY));
         assert_eq!(world.active(), b"1\n");
-        assert_eq!(patches::source(&mut world), before);
+        patches::kept(&before, &patches::source(&mut world), &seed);
         assert!(!world.paths().iter().any(|path| path == b"generations/2/failed-copy"));
         // Cleanup must remove this marker with the old failed copy.
         world.lay(&[skein_fake_machine::Item::file(b"generations/2/failed-copy", b"remove on retry")]);

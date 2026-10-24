@@ -214,3 +214,25 @@ pub fn whole(world: &mut World) {
 pub fn source(world: &mut World) -> BTreeMap<Vec<u8>, Option<Vec<u8>>> {
     world.contents().into_iter().filter(|(path, _)| path.starts_with(b"generations/1/")).collect()
 }
+
+/// A start leaves every file it found as it was; the one write before its
+/// checks is skein-kv's recovery, which may open an empty log segment in
+/// the store it reads (store.md 10.1, step 4).
+pub fn kept(
+    before: &BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+    after: &BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+    what: &impl std::fmt::Debug,
+) {
+    for (path, bytes) in before {
+        assert_eq!(after.get(path), Some(bytes), "{} changed, {what:?}", String::from_utf8_lossy(path));
+    }
+    for (path, bytes) in after {
+        if !before.contains_key(path) {
+            assert!(
+                path.starts_with(b"generations/1/store/") && bytes.as_deref() == Some(&[][..]),
+                "{} is new and not an empty recovery segment, {what:?}",
+                String::from_utf8_lossy(path)
+            );
+        }
+    }
+}
