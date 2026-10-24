@@ -305,7 +305,6 @@ pub(crate) struct Copying {
     step: CopyStep,
     progress: Progress,
 }
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 pub(crate) fn copy(root: Root, from: u64, chunk: u32, below: &mut crate::Below) -> Copying {
     let to = from.checked_add(1);
     let valid = from != 0 && to.is_some() && chunk != 0;
@@ -405,7 +404,6 @@ fn copy_read(copying: &mut Copying, queue: &mut Queue<file::Request>) {
         copying.step = CopyStep::Read;
     }
 }
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 pub(crate) fn copied(copying: &mut Copying, arrived: Arrived, below: &mut crate::Below) -> Progress {
     if copying.progress != Progress::Pending {
         return Progress::Failed;
@@ -621,7 +619,6 @@ pub(crate) struct Switching {
     active: Option<Active>,
     progress: Progress,
 }
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 pub(crate) fn switch(root: Root, active: Active, below: &mut crate::Below) -> Switching {
     let number = active.number.checked_add(1);
     if let Some(number) = number {
@@ -636,7 +633,6 @@ pub(crate) fn switch(root: Root, active: Active, below: &mut crate::Below) -> Sw
     }
     Switching { number, active: None, progress: if number.is_some() { Progress::Pending } else { Progress::Failed } }
 }
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 pub(crate) fn switched(switching: &mut Switching, arrived: Arrived) -> Progress {
     if switching.progress != Progress::Pending {
         return Progress::Failed;
@@ -670,7 +666,6 @@ pub(crate) struct Dropping {
     step: DropStep,
     progress: Progress,
 }
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 pub(crate) fn drop_previous(root: Root, active: u64, below: &mut crate::Below) -> Dropping {
     if active > FIRST {
         below.transcripts.push(file::Request::OpenDirectory {
@@ -702,7 +697,6 @@ fn drop_close(dropping: &mut Dropping, progress: Progress, queue: &mut Queue<fil
         progress
     }
 }
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 pub(crate) fn dropped(dropping: &mut Dropping, arrived: Arrived, below: &mut crate::Below) -> Progress {
     if dropping.progress != Progress::Pending {
         return Progress::Failed;
@@ -779,7 +773,8 @@ fn drop_arrived(dropping: &mut Dropping, arrived: Arrived, queue: &mut Queue<fil
 /// The caller owns one operation at a time. Include inline states, a copy's one
 /// page with names, paths, and the single chunk while its `WriteAt` is in flight.
 pub(crate) fn operations_worst_case(chunk: u32) -> Option<u64> {
-    let state = size_of::<Copying>().max(size_of::<Dropping>()).max(size_of::<Switching>());
+    let state =
+        size_of::<Copying>().max(size_of::<Dropping>()).max(size_of::<Switching>()).max(size_of::<Manifesting>());
     u64::try_from(state)
         .ok()?
         .checked_add(u64::from(chunk))?
@@ -787,21 +782,18 @@ pub(crate) fn operations_worst_case(chunk: u32) -> Option<u64> {
         .checked_add(1024)
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 impl Copying {
     pub(crate) fn progress(&self) -> Progress {
         self.progress
     }
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 impl Dropping {
     pub(crate) fn progress(&self) -> Progress {
         self.progress
     }
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "M3's patch path calls it (store.md 10.2)"))]
 impl Switching {
     pub(crate) fn progress(&self) -> Progress {
         self.progress
@@ -810,4 +802,50 @@ impl Switching {
     pub(crate) fn active(&self) -> Option<Active> {
         self.active
     }
+}
+
+/// A generation's manifest stored once by durable replace (store.md 2 and 10.2).
+#[derive(Debug)]
+pub(crate) struct Manifesting {
+    progress: Progress,
+}
+pub(crate) fn store_manifest(root: Root, generation: u64, bytes: Box<[u8]>, below: &mut crate::Below) -> Manifesting {
+    below.transcripts.push(file::Request::Store {
+        owner: OWNER,
+        root: root.token,
+        path: join(&self::generation(generation), b"/manifest"),
+        bytes,
+        expected: file::Expect::Absent,
+        no_follow: true,
+    });
+    Manifesting { progress: Progress::Pending }
+}
+pub(crate) fn manifested(manifesting: &mut Manifesting, arrived: Arrived) -> Progress {
+    if manifesting.progress != Progress::Pending {
+        return Progress::Failed;
+    }
+    manifesting.progress = match arrived.event {
+        file::Event::Stored { .. } => Progress::Done,
+        file::Event::Opened { .. }
+        | file::Event::Refused { .. }
+        | file::Event::Locked { .. }
+        | file::Event::Busy { .. }
+        | file::Event::Loaded { .. }
+        | file::Event::Scanned { .. }
+        | file::Event::Conflict { .. }
+        | file::Event::TooLarge { .. }
+        | file::Event::Stated { .. }
+        | file::Event::Written { .. }
+        | file::Event::Read { .. }
+        | file::Event::Cut { .. }
+        | file::Event::Synced { .. }
+        | file::Event::Closed { .. }
+        | file::Event::Renamed { .. }
+        | file::Event::Removed { .. }
+        | file::Event::Listed { .. }
+        | file::Event::Cancelled { .. }
+        | file::Event::Made { .. }
+        | file::Event::Failed { .. } => Progress::Failed,
+    };
+    manifesting.progress
 }
