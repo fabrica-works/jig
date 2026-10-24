@@ -59,6 +59,7 @@ fn take(world: &mut World, turn: u32, read: u64, cumulative: u64) {
         turn,
         read: Some(read),
         offered: Some(read),
+        outstanding: Box::new([]),
         cumulative,
     });
     assert_eq!(world.replies[&request.raw()], Reply::Turn(Accepted::New));

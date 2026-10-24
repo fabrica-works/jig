@@ -49,6 +49,7 @@ pub(crate) fn turn(
     read: Option<u64>,
     refusals: &[u64],
     offered: Option<u64>,
+    outstanding: &[u64],
     cumulative: u64,
     out: &mut Queue<Request>,
 ) {
@@ -74,7 +75,8 @@ pub(crate) fn turn(
         None => false,
     };
     if beyond_offer
-        || !crate::inbox::readable(domain, number, read)
+        || outstanding.len() > usize::try_from(environment.limits.run_inbox).expect("run inbox fits usize")
+        || !crate::inbox::readable(domain, number, read, outstanding)
         || !crate::inbox::valid_refusals(old, offered, refusals)
     {
         return refused(to, Some(number), Refusal::Read, out);

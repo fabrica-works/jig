@@ -47,6 +47,7 @@ pub fn run() -> core::RunProof {
         window: Some((14, 2)),
         host: HostKind::Worker,
         offered: Some(13),
+        outstanding: Box::new([13]),
         turn: Some(core::TurnProof { turn: 3, cumulative: 17, read: Some(12) }),
         terminal: Some(terminal()),
     }

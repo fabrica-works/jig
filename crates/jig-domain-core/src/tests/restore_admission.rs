@@ -541,3 +541,47 @@ fn a_restored_projects_mark_precedes_the_next_project_allocation() {
     assert_eq!(core.restore_core(CoreRecord::Deployment(header), &limits), Restored::Deployment { commits: 0 });
     assert_eq!(fresh(&mut core.counters, Family::Project), Some(6));
 }
+
+// A two-slot run inbox exercises both the exact bound and one past it.
+const OFFER_SLOTS: u32 = 2;
+const PROOF_ATTEMPT: u64 = 7;
+
+fn restore_offers(ids: &[u64], offered: Option<u64>, read: Option<u64>, attempt: u64) -> bool {
+    let mut limits = limits();
+    limits.tasks.run_inbox = OFFER_SLOTS;
+    let mut core = Core::new(config(463), &limits).expect("fixture core");
+    core.restoring_proofs
+        .insert(1, RestoringProof { attempt: PROOF_ATTEMPT, turn: 1, run_spent: 0, last_answer: None })
+        .unwrap();
+    let mut proof = RunProof::claimed(1, attempt, PROOF_ATTEMPT, offered, fleet::HostKind::Worker);
+    proof.accounts = Box::new([jig_domain_authority::AccountBinding { provider: 1, account: 1, source: 1 }]);
+    proof.placement = Some(Token::new(7));
+    proof.turn = Some(TurnProof { turn: 1, cumulative: 0, read });
+    proof.outstanding = ids.into();
+    core.restore_proof(proof, limits.tasks.result_bytes)
+}
+
+#[test]
+fn valid_unconsumed_offers_and_an_empty_consumed_set_restore() {
+    for (ids, offered, read) in [(&[11, 13][..], Some(13), Some(10)), (&[][..], Some(13), Some(13))] {
+        assert!(restore_offers(ids, offered, read, PROOF_ATTEMPT));
+    }
+}
+
+#[test]
+fn malformed_oversized_consumed_and_wrong_attempt_offers_do_not_restore() {
+    for (ids, offered, read, attempt) in [
+        (&[0][..], Some(13), None, PROOF_ATTEMPT),
+        (&[11, 11][..], Some(13), Some(10), PROOF_ATTEMPT),
+        (&[14][..], Some(13), Some(10), PROOF_ATTEMPT),
+        (&[10][..], Some(13), Some(10), PROOF_ATTEMPT),
+        (&[9][..], Some(13), Some(10), PROOF_ATTEMPT),
+        (&[11][..], None, None, PROOF_ATTEMPT),
+        (&[11][..], Some(13), Some(10), PROOF_ATTEMPT + 1),
+        (&[11, 12, 13][..], Some(13), Some(10), PROOF_ATTEMPT),
+        (&[][..], Some(0), None, PROOF_ATTEMPT),
+        (&[][..], Some(13), Some(0), PROOF_ATTEMPT),
+    ] {
+        assert!(!restore_offers(ids, offered, read, attempt));
+    }
+}

@@ -84,6 +84,7 @@ fn question_cycles(h: &mut Harness) {
             turn: u32::try_from(turn).unwrap().checked_add(1).unwrap(),
             read: Some(message),
             offered: Some(message),
+            outstanding: Box::new([]),
             cumulative: 0,
         });
     }
@@ -149,6 +150,7 @@ fn a_tasks_answer_names_the_line_in_the_delegates_activity() {
         turn: 1,
         read: Some(1),
         offered: Some(1),
+        outstanding: Box::new([]),
         cumulative: 0,
     });
     let activity = live(&h, 1).activity;
@@ -234,6 +236,7 @@ fn a_person_can_answer_after_the_run_reads_and_the_first_answer_closes_the_line(
         turn: 1,
         read: Some(1),
         offered: Some(1),
+        outstanding: Box::new([]),
         cumulative: 0,
     });
     assert!(live(&h, 1).inbox.is_empty());
@@ -257,6 +260,7 @@ fn a_person_can_answer_after_the_run_reads_and_the_first_answer_closes_the_line(
         turn: 2,
         read: Some(2),
         offered: Some(2),
+        outstanding: Box::new([]),
         cumulative: 0,
     });
     let out = word(&mut h, 1, Party::Person(9), 3, MessageKind::Answer { question: 1 });

@@ -17,6 +17,7 @@ fn a_claim_before_its_first_turn_reads_back() {
     run.credentials = Box::new([]);
     run.window = None;
     run.offered = None;
+    run.outstanding = Box::new([]);
     run.turn = None;
     run.terminal = None;
     core_round_trip(core::CoreRecord::RunProof(run));
@@ -155,4 +156,22 @@ fn each_configured_bound_terminal_reads_back_with_its_value() {
         terminal.end = tasks::End::Exceeded(tasks::Exceeded { bound, value: u64::MAX });
         core_round_trip(core::CoreRecord::Terminal(terminal));
     }
+}
+
+#[test]
+fn outstanding_offers_use_the_run_inbox_bound_on_write_and_read() {
+    let mut limits = call_limits();
+    limits.core.run_proof_outstanding = 2;
+    let mut proof = fixtures::run();
+    proof.outstanding = Box::new([13, 14]);
+    proof.offered = Some(14);
+    let row = core::CoreRecord::RunProof(proof.clone());
+    let bytes = codec::encode(&row, &limits).expect("exactly the run inbox bound");
+    assert_eq!(codec::decode(&bytes, &limits), Ok(row));
+    limits.core.run_proof_outstanding = 1;
+    assert_eq!(codec::decode(&bytes, &limits).expect_err("oversized saved offers").reason, skein_codec::Reason::Bound);
+    assert_eq!(
+        codec::encode(&core::CoreRecord::RunProof(proof), &limits).expect_err("oversized offers").reason,
+        skein_codec::Reason::Bound
+    );
 }

@@ -6,19 +6,7 @@ pub(crate) fn room(core: &Core, task: u64, most: u32) -> bool {
     if proof.terminal.is_some() {
         return false;
     }
-    let Some(offered) = proof.offered else { return true };
-    let mut after = match proof.turn {
-        Some(turn) => turn.read,
-        None => None,
-    };
-    for _ in 0..most {
-        let Some(word) = core.tasks.next_waiting(task, after) else { return true };
-        if word.number > offered {
-            return true;
-        }
-        after = Some(word.number);
-    }
-    false
+    proof.outstanding.len() < usize::try_from(most).expect("run inbox fits usize")
 }
 
 pub(crate) fn next(core: &mut Core, task: u64, most: u32) -> Option<Held> {

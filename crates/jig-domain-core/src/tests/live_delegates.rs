@@ -41,6 +41,7 @@ fn live_delegate_documents_keep_every_identity_and_the_owner_takeover_reservatio
             turn: 1,
             read: None,
             offered: None,
+            outstanding: Box::new([]),
             cumulative: 2,
         },
     );

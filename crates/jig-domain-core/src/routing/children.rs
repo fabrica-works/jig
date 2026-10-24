@@ -334,6 +334,14 @@ pub(super) fn tag_fleet(
                     && let Some(proof) = core.proofs.get_mut(&run.raw())
                     && proof.attempt == attempt.raw()
                 {
+                    let mut outstanding = skein_lib::List::with_capacity(env.limits.tasks.run_inbox);
+                    for &number in &proof.outstanding {
+                        outstanding.push(number).expect("bounded outstanding offers");
+                    }
+                    if !proof.outstanding.contains(&message.name.raw()) {
+                        outstanding.push(message.name.raw()).expect("relay reserved run inbox room");
+                    }
+                    proof.outstanding = outstanding.into_boxed();
                     proof.offered = Some(match proof.offered {
                         Some(previous) => previous.max(message.name.raw()),
                         None => message.name.raw(),

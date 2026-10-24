@@ -113,6 +113,7 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         }
     }
     core.proofs.get_mut(&1).unwrap().offered = Some(1);
+    core.proofs.get_mut(&1).unwrap().outstanding = Box::new([1]);
     records.extend(activity_decision(
         &mut core,
         &env,
@@ -290,6 +291,7 @@ fn cumulative_read_core() -> (Core, Env<Limits>) {
         );
     }
     core.proofs.get_mut(&1).unwrap().offered = Some(2);
+    core.proofs.get_mut(&1).unwrap().outstanding = Box::new([1, 2]);
     activity_decision(
         &mut core,
         &env,
@@ -363,6 +365,7 @@ fn answer_refusal_core() -> (Core, Env<Limits>) {
         },
     );
     core.proofs.get_mut(&1).unwrap().offered = Some(3);
+    core.proofs.get_mut(&1).unwrap().outstanding = Box::new([3]);
     (core, env)
 }
 

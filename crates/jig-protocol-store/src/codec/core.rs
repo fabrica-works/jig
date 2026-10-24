@@ -32,6 +32,7 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
         projection_goal_row_pending: domain.connectors,
         run_proof_accounts: tasks::MODELS,
         run_proof_credentials: domain.accounts.credentials,
+        run_proof_outstanding: domain.tasks.run_inbox,
         turn_record_transcript: wire::CEILINGS.turn_record_transcript,
 
         escalation_decision_reject_reason: domain.escalation_reason_bytes.max(domain.people.words),

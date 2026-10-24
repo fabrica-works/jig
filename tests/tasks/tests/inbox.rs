@@ -40,6 +40,7 @@ fn a_read_fence_takes_only_offered_words() {
         turn: 1,
         read: Some(2),
         offered: Some(1),
+        outstanding: Box::new([]),
         cumulative: 1,
     });
     assert!(matches!(&world.replies[&call], Reply::Refused(problem) if problem.why == Refusal::Read));
@@ -53,6 +54,7 @@ fn a_read_fence_takes_only_offered_words() {
         turn: 1,
         read: Some(1),
         offered: Some(1),
+        outstanding: Box::new([]),
         cumulative: 1,
     });
     assert_eq!(world.replies[&call], Reply::Turn(Accepted::New));
@@ -666,6 +668,7 @@ fn refusal_turn(world: &mut World, turn: u32, read: u64, offered: u64, refused: 
         read: Some(read),
         refused: refused.into(),
         offered: Some(offered),
+        outstanding: Box::new([]),
         cumulative: u64::from(turn),
     });
     world.replies[&call].clone()

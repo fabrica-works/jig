@@ -177,6 +177,7 @@ fn finished_chat() -> (Core, Limits, Box<[Record]>) {
             read: None,
             refused: Box::new([]),
             offered: None,
+            outstanding: Box::new([]),
             cumulative: 0,
         },
         tasks::Event::Turn {
@@ -187,6 +188,7 @@ fn finished_chat() -> (Core, Limits, Box<[Record]>) {
             read: None,
             refused: Box::new([]),
             offered: None,
+            outstanding: Box::new([]),
             cumulative: 0,
         },
         // The final turn is kept before its finish is admitted and closing settles.

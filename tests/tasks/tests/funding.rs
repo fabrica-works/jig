@@ -20,6 +20,7 @@ fn turn(world: &mut World, task: u64, attempt: u64, turn: u32, read: Option<u64>
         turn,
         read,
         offered: None,
+        outstanding: Box::new([]),
         cumulative,
     })
 }

@@ -195,6 +195,7 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
             turn: 1,
             read: None,
             offered: None,
+            outstanding: Box::new([]),
             cumulative: 1,
         },
     );

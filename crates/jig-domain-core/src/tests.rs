@@ -590,6 +590,7 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
                 window: None,
                 host: fleet::HostKind::Engine,
                 offered: None,
+                outstanding: Box::new([]),
                 turn: Some(TurnProof { turn: 3, cumulative: 0, read: None }),
                 terminal: None,
             },
@@ -1221,6 +1222,7 @@ fn documents_question_words_are_whole_or_refused_and_answered_questions_end() {
             turn: 1,
             read: Some(60),
             offered: Some(60),
+            outstanding: Box::new([]),
             cumulative: 0,
         },
     );
@@ -1879,6 +1881,7 @@ fn watch_core() -> (Core, Limits) {
                 window: None,
                 host: fleet::HostKind::Engine,
                 offered: None,
+                outstanding: Box::new([]),
                 turn: None,
                 terminal: None,
             },

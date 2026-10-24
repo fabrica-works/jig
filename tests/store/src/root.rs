@@ -373,6 +373,7 @@ pub fn run_proof(task: u64) -> core::Record {
         window: Some((1, 1)),
         host: jig_domain_fleet::HostKind::Worker,
         offered: None,
+        outstanding: Box::new([]),
         turn: None,
         terminal: None,
     }))

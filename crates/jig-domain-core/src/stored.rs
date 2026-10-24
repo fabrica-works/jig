@@ -638,7 +638,7 @@ pub struct TurnProof {
 /// Claim reserves map room before child mutation and replaces this row. Ending
 /// erases it atomically; immutable transcript/terminal archives never enter the
 /// live map. Startup validates every row or stops, dropping none silently
-/// (domain/engine.md, sections 6 and 7.2).
+/// (domain/engine.md, sections 6 and 7.2; domain/tasks.md, section 9).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct RunProof {
     /// Positive task identity allocated by root; unique in the live proof table.
@@ -662,6 +662,9 @@ pub struct RunProof {
     pub host: jig_domain_fleet::HostKind,
     /// Highest inbox message offered to this attempt in an assignment or committed relay.
     pub offered: Option<u64>,
+    /// Exact offers to this attempt not yet read or refused, bounded by `run_inbox`
+    /// even after their entries disappear.
+    pub outstanding: Box<[u64]>,
     /// Latest accepted turn, or none before the first turn; no historical body is retained.
     pub turn: Option<TurnProof>,
     /// Accepted worker offer or root-translated unpriced terminal; present iff the
@@ -729,6 +732,7 @@ impl RunProof {
             window: None,
             host,
             offered,
+            outstanding: Box::new([]),
             turn: None,
             terminal: None,
         }

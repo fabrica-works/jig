@@ -272,8 +272,9 @@ pub const TURN_TEXT: &[u8] = b"abc";
 // The single row includes the tagged authority model selector and task owner facts;
 // its added-dependency and hold-bound headers add 32 inline bytes.
 // Ending authority adds eight bytes to its aligned task owner.
+// The owner's run proof lists its outstanding read fences, 48 bytes.
 // Its joined activity line remains past this exact single-row budget.
-pub const TURN_OVERLAP_BYTES: u64 = 2464;
+pub const TURN_OVERLAP_BYTES: u64 = 2512;
 #[must_use]
 pub fn turn_overlap_limits() -> jig_test_domain::Limits {
     let mut limits = owner_limits();

@@ -509,7 +509,10 @@ fn memory_below_the_components_sum_is_refused() {
         + 1_880
         // Settings reads: the inventory document and its scratch, revision and history loads
         // with their maps, the stored catalogue's effort names, and the settings holders' counts.
-        + 5_810_584;
+        + 5_810_584
+        // Run proofs' outstanding read fences (tasks.md 9): (4 proofs per task + 2) at
+        // 8 run-inbox ids, a routed payload's id list, and the wider inline RunProof.
+        + 1_490_224;
     // Regenerate this charge with JIG_MEMORY_WRITE=1 through heavy, then run
     // normally to check it. The unchanged terms above keep the act saving local.
     let charge_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/deployment_act_growth.txt");

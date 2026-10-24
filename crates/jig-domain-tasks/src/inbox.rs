@@ -573,10 +573,16 @@ pub(crate) fn proposal_decision(
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word, out);
 }
 
-pub(crate) fn readable(domain: &Domain, task: u64, read: Option<u64>) -> bool {
+pub(crate) fn readable(domain: &Domain, task: u64, read: Option<u64>, outstanding: &[u64]) -> bool {
     match read {
         None => true,
         Some(number) => {
+            if number == 0 {
+                return false;
+            }
+            if outstanding.contains(&number) {
+                return true;
+            }
             let task_record = record(domain, task).expect("readable task live");
             for word in &task_record.inbox {
                 if word.number == number {

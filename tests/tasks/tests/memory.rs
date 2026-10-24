@@ -175,6 +175,7 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
                 turn: 1,
                 read: None,
                 offered: None,
+                outstanding: Box::new([]),
                 cumulative: 7,
             });
             for turn in 2..=l.inbox_messages {
@@ -187,6 +188,7 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
                     turn,
                     read: None,
                     offered: None,
+                    outstanding: Box::new([]),
                     cumulative: 7,
                 });
                 assert!(!m.refused);
@@ -355,6 +357,7 @@ fn saturated_finite_sources_and_oversized_refusals_fit_without_input_copies() {
         turn: 1,
         read: Some(1),
         offered: None,
+        outstanding: Box::new([]),
         cumulative: 5,
     });
     assert!(m.refused);

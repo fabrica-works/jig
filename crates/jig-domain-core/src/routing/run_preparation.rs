@@ -233,10 +233,14 @@ fn start_messages(inbox: Box<[tasks::Word]>, most: u32) -> Box<[tasks::Word]> {
 
 fn start_proof(_core: &Core, task: u64, attempt: u64, conversation: u64, messages: &[tasks::Word]) -> RunProof {
     let mut offered = None;
+    let mut outstanding = List::with_capacity(u32::try_from(messages.len()).expect("bounded start inbox"));
     for word in messages {
         offered = Some(word.number);
+        outstanding.push(word.number).expect("one id per assigned word");
     }
-    RunProof::claimed(task, attempt, conversation, offered, jig_domain_fleet::HostKind::Worker)
+    let mut proof = RunProof::claimed(task, attempt, conversation, offered, jig_domain_fleet::HostKind::Worker);
+    proof.outstanding = outstanding.into_boxed();
+    proof
 }
 
 fn wait_for_account(core: &mut Core, work: &mut Queue<Event>, context: Box<tasks::RunContext>) -> Requests {

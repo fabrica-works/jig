@@ -124,6 +124,7 @@ pub(super) fn encode_run_proof(source: &domain::RunProof, limits: &Limits) -> Re
         window,
         host,
         offered,
+        outstanding,
         turn,
         terminal,
     } = source;
@@ -144,6 +145,7 @@ pub(super) fn encode_run_proof(source: &domain::RunProof, limits: &Limits) -> Re
             window: encode_window(*window, limits)?,
             host: super::encode_host_kind(host, limits),
             offered: *offered,
+            outstanding: encode_outstanding(outstanding, limits)?,
             turn: match turn {
                 Some(value) => Some(encode_turn_proof(value, limits)?),
                 None => None,
@@ -169,6 +171,7 @@ pub(super) fn decode_run_proof(source: wire::RunProof, limits: &Limits) -> Resul
         window,
         host,
         offered,
+        outstanding,
         turn,
         terminal,
     } = source.into_parts();
@@ -193,6 +196,7 @@ pub(super) fn decode_run_proof(source: wire::RunProof, limits: &Limits) -> Resul
         },
         host: super::decode_host_kind(host, limits),
         offered,
+        outstanding: decode_outstanding(outstanding),
         turn: match turn {
             Some(value) => {
                 let result = decode_turn_proof(value, limits);
@@ -376,6 +380,28 @@ fn decode_accounts(values: List<wire::AccountBinding>) -> Box<[jig_domain_author
     for value in values.into_boxed() {
         let wire::AccountBindingParts { provider, account, source } = value.into_parts();
         result.push(jig_domain_authority::AccountBinding { provider, account, source }).expect("same binding count");
+    }
+    result.into_boxed()
+}
+
+fn encode_outstanding(values: &[u64], limits: &Limits) -> Result<List<wire::Number>, wire::Problem> {
+    let count = match u32::try_from(values.len()) {
+        Ok(count) => count,
+        Err(error) => return Err(too_large(error)),
+    };
+    if count > limits.core.run_proof_outstanding {
+        return Err(super::problem(skein_codec::Reason::Bound));
+    }
+    let mut result = List::with_capacity(count);
+    for &value in values {
+        result.push(wire::Number::new(&limits.core, wire::NumberParts { value })?).expect("same offer count");
+    }
+    Ok(result)
+}
+fn decode_outstanding(values: List<wire::Number>) -> Box<[u64]> {
+    let mut result = List::with_capacity(values.len());
+    for value in values.into_boxed() {
+        result.push(value.into_parts().value).expect("same offer count");
     }
     result.into_boxed()
 }

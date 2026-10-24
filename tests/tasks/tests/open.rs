@@ -34,6 +34,7 @@ fn commit_turn(w: &mut World, attempt: u64, read: Option<u64>) {
         read,
         refused: Box::new([]),
         offered: read,
+        outstanding: Box::new([]),
         cumulative: 0,
     });
     assert_eq!(w.replies[&call.raw()], Reply::Turn(Accepted::New));

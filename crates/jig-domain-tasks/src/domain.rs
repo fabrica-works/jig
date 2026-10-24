@@ -682,9 +682,20 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::writers::effect_in_flight(domain, env, reply_to, task, resource, entry, out);
         }
         Event::EffectSettled { resource, entry } => crate::writers::effect_settled(domain, env, &resource, entry, out),
-        Event::Turn { reply_to, task, attempt, turn, read, refused, offered, cumulative } => {
+        Event::Turn { reply_to, task, attempt, turn, read, refused, offered, outstanding, cumulative } => {
             crate::admission::turn(
-                domain, env, reply_to, task, attempt, turn, read, &refused, offered, cumulative, out,
+                domain,
+                env,
+                reply_to,
+                task,
+                attempt,
+                turn,
+                read,
+                &refused,
+                offered,
+                &outstanding,
+                cumulative,
+                out,
             );
         }
         Event::Started { task, attempt } => crate::run::started(domain, env, task, attempt, out),

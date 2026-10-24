@@ -341,6 +341,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         limits.tasks.tasks.checked_mul(3)?,
         bytes(limits.accounts.credentials, sizeof(size_of::<u32>())?)?,
     )?)?;
+    // Live and replacement proofs, persisted copies, turn evidence and rebuilding scratch.
+    total = total.checked_add(bytes(
+        limits.tasks.tasks.checked_mul(4)?.checked_add(2)?,
+        List::<u64>::worst_case(limits.tasks.run_inbox)?,
+    )?)?;
     let grants = bytes(limits.fleet.grants, sizeof(size_of::<fleet::Grant>())?)?
         .checked_add(bytes(limits.fleet.grants, sizeof(size_of::<fleet::GrantName>())?)?)?;
     total = total.checked_add(bytes(limits.tasks.tasks.checked_mul(2)?, grants)?)?;
@@ -482,6 +487,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(sizeof(size_of::<tasks::Proposal>())?)?
         .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?
         .checked_add(context)?
+        .checked_add(List::<u64>::worst_case(task.run_inbox)?)?
         .checked_add(u64::from(task.message_bytes.max(task.result_bytes)).checked_mul(field_size.checked_add(1)?)?)?
         .checked_add(limits.policy_bytes)?
         .checked_add(u64::try_from(people::NAME_BYTES).ok()?)?

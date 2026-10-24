@@ -68,6 +68,7 @@ fn turn_commit(task: u64, turn: u32, bytes: &[u8]) -> Box<[root::Write]> {
             window: Some((1, 1)),
             host: HostKind::Worker,
             offered: None,
+            outstanding: Box::new([]),
             turn: Some(core::TurnProof { turn, cumulative: 0, read: None }),
             terminal: None,
         })),

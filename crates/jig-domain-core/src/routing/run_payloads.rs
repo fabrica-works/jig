@@ -118,7 +118,7 @@ pub(super) fn route_turn_payload(
         Some(turn) => turn.read,
         None => None,
     };
-    if read < last_read {
+    if read < last_read || read > last_read && !proof.outstanding.contains(&read.expect("new read is present")) {
         let mut out = Queue::with_capacity(2);
         out.push(Request::Now(Box::new(crate::Now::RefusedPayload {
             request: body,
@@ -142,6 +142,7 @@ pub(super) fn route_turn_payload(
         read,
         refused,
         offered,
+        outstanding: proof.outstanding.clone(),
         cumulative,
     }));
     let mut out = Queue::with_capacity(1);

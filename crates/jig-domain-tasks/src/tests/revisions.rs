@@ -159,7 +159,7 @@ impl Harness {
         self.domain.task(number).expect("task live").revisions
     }
 
-    fn amend(&mut self, number: u64, amendment: Amendment) {
+    pub(super) fn amend(&mut self, number: u64, amendment: Amendment) {
         let message = self.domain.task(number).unwrap().last_message.checked_add(1).expect("test message room");
         let out = self.send(Event::Amend {
             places: Box::new([]),
@@ -221,7 +221,7 @@ fn spec(words: &[u8]) -> Spec {
     Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }
 }
 
-fn amendment() -> Amendment {
+pub(super) fn amendment() -> Amendment {
     Amendment {
         tracked: None,
         addressed: None,
@@ -429,6 +429,7 @@ fn activity_keeps_whole_words_after_a_committed_turn_takes_them() {
         turn: 1,
         read: Some(1),
         offered: Some(1),
+        outstanding: Box::new([]),
         cumulative: 1,
     });
     assert!(test.domain.task(1).unwrap().inbox.is_empty());

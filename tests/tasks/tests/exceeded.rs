@@ -86,6 +86,7 @@ fn a_bound_hold_clears_an_earlier_retry_notice_and_keeps_committed_work() {
         read: Some(MESSAGE),
         refused: Box::new([]),
         offered: Some(MESSAGE),
+        outstanding: Box::new([]),
         cumulative: SPENT,
     });
     let replies = w.record(TASK).replies.clone();

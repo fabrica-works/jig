@@ -276,6 +276,7 @@ pub type Delegating = (CallKey, Box<[tasks::Stub]>, Option<people::Given>);
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
 pub struct Core {
     room_max: skein_lib::JournalRoom,
+    run_inbox: u32,
     pub(crate) run_now: skein_lib::Time,
     pub(crate) run_wall: Wall,
     /// Last reported store map bytes (protocol/store.md, 11.2).
@@ -622,6 +623,7 @@ impl Core {
         let room_max = room_max(limits).expect("validated immutable core limits");
         Ok(Core {
             room_max,
+            run_inbox: limits.tasks.run_inbox,
             fill: 0,
             workers_in_process: config.workers_in_process,
             stopping: false,
@@ -893,6 +895,7 @@ impl Core {
             > usize::try_from(self.accounts.credential_limit()).expect("u32 credential limit fits usize")
             || proof.attempt != expected.attempt
             || turn != expected.turn
+            || proof.outstanding.len() > usize::try_from(self.run_inbox).expect("run inbox fits usize")
             || !valid_proof(&proof, &expected, result_bytes)
         {
             return false;
@@ -905,6 +908,9 @@ fn valid_proof(proof: &RunProof, expected: &RestoringProof, result_bytes: u32) -
     if proof.task == 0 || proof.attempt == 0 || proof.conversation == 0 || proof.conversation > proof.attempt {
         return false;
     }
+    if proof.offered == Some(0) {
+        return false;
+    }
     let last_turn = match proof.turn {
         Some(turn) => turn.turn,
         None => 0,
@@ -914,11 +920,25 @@ fn valid_proof(proof: &RunProof, expected: &RestoringProof, result_bytes: u32) -
     {
         return false;
     }
+    let last_read = match proof.turn {
+        Some(turn) => turn.read,
+        None => None,
+    };
+    for (at, &number) in proof.outstanding.iter().enumerate() {
+        if number == 0 || Some(number) > proof.offered || Some(number) <= last_read {
+            return false;
+        }
+        for earlier in proof.outstanding.iter().take(at) {
+            if *earlier == number {
+                return false;
+            }
+        }
+    }
     let spent = match proof.turn {
         Some(turn) => {
             let read_valid = match turn.read {
                 Some(number) => match proof.offered {
-                    Some(high) => number <= high,
+                    Some(high) => number != 0 && number <= high,
                     None => false,
                 },
                 None => true,

@@ -1265,6 +1265,7 @@ fn story_run(seed: u64, w: &mut World, choices: Option<Story>) {
         turn: 1,
         read: None,
         offered: None,
+        outstanding: Box::new([]),
         cumulative: 5,
     });
     // Defaults remain eager draws at their original positions: an ordinary

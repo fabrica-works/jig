@@ -1561,6 +1561,8 @@ pub enum Event {
         refused: Box<[u64]>,
         /// Highest message this exact run was offered by its assignment or committed relay.
         offered: Option<u64>,
+        /// Exact unconsumed offers authenticated by root for this attempt, at most `run_inbox`.
+        outstanding: Box<[u64]>,
         /// Whole priced attempt expense; tasks posts only the checked delta above `run_spent`
         /// from this attempt's reserved run allowance.
         cumulative: u64,
