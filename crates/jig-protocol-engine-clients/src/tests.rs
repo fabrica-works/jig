@@ -51,3 +51,6 @@ mod programs;
 
 #[path = "tests/settings.rs"]
 mod settings;
+
+#[path = "tests/settings_change.rs"]
+mod settings_change;

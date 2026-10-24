@@ -157,6 +157,7 @@ pub(crate) fn request(
         | documents::Subject::Accounts { .. }
         | documents::Subject::Query { .. }
         | documents::Subject::Run { .. }
+        | documents::Subject::Settings
         | documents::Subject::Deployment
         | documents::Subject::Proposal { .. }
         | documents::Subject::Escalation { .. }

@@ -331,6 +331,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .checked_add(u64::try_from(size_of::<crate::TaskRecord>()).ok()?)?,
             )?,
         )?
+        // Live agent count, including alignment room.
+        .checked_add(u64::try_from(size_of::<u64>()).ok()?)?
         // Each charter and its models, and each configured model's count of efforts.
         .checked_add(u64::from(limits.charters).checked_mul(
             u64::try_from(size_of::<crate::CharterModels>()).ok()?.checked_add(u64::from(crate::MODELS))?,

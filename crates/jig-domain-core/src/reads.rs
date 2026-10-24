@@ -14,10 +14,12 @@
 //! | loading | missing transport range | retired | held gone |
 //! | retired | late duplicate terminal | retired | nothing |
 
+pub mod settings;
 mod vocabulary;
 pub use vocabulary::{
     Answer, Cursor, EndedGroup, Filter, Group, Historical, Loaded, Page, PageRow, PageTurn, Past, Position, Range,
-    Read, Row, Scope, TaskPage, TurnFailure, UnjoinedTurn, Why,
+    Read, RevisionAnswer, RevisionEdit, RevisionItemHead, RevisionRow, RevisionsPage, Row, Scope, SettingDocument,
+    TaskPage, TurnFailure, UnjoinedTurn, Why,
 };
 pub(crate) mod activity;
 mod answers;
@@ -41,6 +43,15 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
     use jig_domain_people::Proposer;
     use jig_domain_tasks::{Funder, Key as TaskKey};
     match scope {
+        Scope::SettingsHistory { first, last, newest, .. } => match key {
+            Key::Core(crate::CoreKey::Settings(crate::settings::Key::Held(n))) => {
+                n == newest && n >= first && n <= last
+            }
+            Key::Core(crate::CoreKey::Settings(crate::settings::Key::History(n))) => {
+                n != newest && n >= first && n <= last
+            }
+            Key::Core(_) | Key::Tasks(_) | Key::People(_) | Key::Notes(_) | Key::Accounts(_) => false,
+        },
         Scope::Task { task } | Scope::PersonTask { task } | Scope::Result { task } => {
             key == &Key::Tasks(TaskKey::Live(*task)) || key == &Key::Tasks(TaskKey::Ended(*task))
         }
@@ -132,7 +143,14 @@ pub(crate) fn scope(read: &Read) -> Option<Scope> {
             Some(Scope::ScopedNotes { scope: scope.clone(), description: description.clone() })
         }
         Read::Spend { project, .. } => Some(Scope::Spend { project: *project }),
-        Read::Frame | Read::Project { .. } | Read::Deployment | Read::Application { .. } => None,
+        Read::Frame
+        | Read::Project { .. }
+        | Read::Settings
+        | Read::Setting { .. }
+        | Read::Revision { .. }
+        | Read::Revisions { .. }
+        | Read::Deployment
+        | Read::Application { .. } => None,
     }
 }
 
@@ -156,6 +174,10 @@ fn cursor(read: &Read) -> Option<&Cursor> {
         | Read::Reply { .. }
         | Read::Turn { .. }
         | Read::Project { .. }
+        | Read::Settings
+        | Read::Setting { .. }
+        | Read::Revision { .. }
+        | Read::Revisions { .. }
         | Read::Deployment
         | Read::Application { .. } => None,
     }
@@ -163,6 +185,7 @@ fn cursor(read: &Read) -> Option<&Cursor> {
 
 fn subject(read: &Read, party: u64) -> Option<Subject> {
     match read {
+        Read::Settings => Some(Subject::Settings),
         Read::Frame => Some(Subject::Frame { party }),
         Read::Task { task } => Some(Subject::Task { task: *task }),
         Read::Proposal { proposer, proposal } => Some(Subject::Proposal { proposer: *proposer, number: *proposal }),
@@ -174,7 +197,10 @@ fn subject(read: &Read, party: u64) -> Option<Subject> {
         Read::Deployment => Some(Subject::Deployment),
         Read::Inbox { .. } => Some(Subject::Inbox { party }),
         Read::Tasks { query, .. } => Some(Subject::Query { query: *query }),
-        Read::Application { .. }
+        Read::Setting { .. }
+        | Read::Revision { .. }
+        | Read::Revisions { .. }
+        | Read::Application { .. }
         | Read::EndedDelegates { .. }
         | Read::History { .. }
         | Read::Activity { .. }
@@ -189,7 +215,8 @@ fn subject(read: &Read, party: u64) -> Option<Subject> {
 fn backwards(scope: &Scope) -> bool {
     match scope {
         Scope::Activity { .. } | Scope::Escalation { .. } | Scope::Proposal { .. } => true,
-        Scope::Task { .. }
+        Scope::SettingsHistory { .. }
+        | Scope::Task { .. }
         | Scope::Question { .. }
         | Scope::PersonTask { .. }
         | Scope::Result { .. }
@@ -236,6 +263,10 @@ fn refused_application(reply: ReplyTo, read: &Read, why: Why) -> Requests {
         | Read::ScopedNotes { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
+        | Read::Settings
+        | Read::Setting { .. }
+        | Read::Revision { .. }
+        | Read::Revisions { .. }
         | Read::Deployment => terminal(reply, Answer::None(why)),
     }
 }
@@ -279,9 +310,38 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
         | Read::ScopedNotes { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
+        | Read::Settings
+        | Read::Setting { .. }
+        | Read::Revision { .. }
+        | Read::Revisions { .. }
         | Read::Deployment => {}
     }
-    start_jig(core, env, reply, sign_in, party, read)
+    match read {
+        Read::Setting { setting, revision } => settings::setting(core, reply, party, setting, revision),
+        Read::Revision { number } => settings::revision(core, env, reply, sign_in, party, number),
+        Read::Revisions { before } => settings::revisions(core, env, reply, sign_in, party, before),
+        read @ (Read::Settings
+        | Read::Tasks { .. }
+        | Read::Application { .. }
+        | Read::Frame
+        | Read::Task { .. }
+        | Read::Proposal { .. }
+        | Read::Escalation { .. }
+        | Read::Question { .. }
+        | Read::PersonTask { .. }
+        | Read::Result { .. }
+        | Read::Reply { .. }
+        | Read::Turn { .. }
+        | Read::EndedDelegates { .. }
+        | Read::History { .. }
+        | Read::Activity { .. }
+        | Read::Inbox { .. }
+        | Read::Project { .. }
+        | Read::Notes { .. }
+        | Read::ScopedNotes { .. }
+        | Read::Spend { .. }
+        | Read::Deployment) => start_jig(core, env, reply, sign_in, party, read),
+    }
 }
 
 fn bounded_query(read: &Read, limits: &Limits) -> bool {
@@ -312,6 +372,10 @@ fn bounded_query(read: &Read, limits: &Limits) -> bool {
         | Read::Project { .. }
         | Read::Notes { .. }
         | Read::Spend { .. }
+        | Read::Settings
+        | Read::Setting { .. }
+        | Read::Revision { .. }
+        | Read::Revisions { .. }
         | Read::Deployment
         | Read::Application { .. } => true,
     }
@@ -530,7 +594,8 @@ pub fn answer_worst_case(limits: &Limits) -> Option<u64> {
             .checked_add(limits.load_bytes.checked_mul(2)?)?
             .checked_add(List::<PageRow>::worst_case(limits.documents.rows)?)?
             .checked_add(u64::try_from(size_of::<Page>()).ok()?)?
-            .checked_add(query_worst_case(limits)?)?,
+            .checked_add(query_worst_case(limits)?)?
+            .checked_add(settings::load_bytes(limits, limits.documents.rows)?.checked_mul(2)?)?,
     )
 }
 
@@ -553,11 +618,37 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         // in the held output's answer bound.
         .checked_add(u64::from(limits.load_slots).checked_add(3)?.checked_mul(query_worst_case(limits)?)?)?
         .checked_add(u64::from(limits.load_slots).checked_mul(u64::try_from(size_of::<Position>()).ok()?)?)?
-        .checked_add(limits.load_bytes)?
+        .checked_add(limits.load_bytes.max(settings::load_bytes(limits, limits.documents.rows)?))?
+        .checked_add(skein_lib::Map::<u32, crate::settings::Revision>::worst_case(limits.documents.rows)?)?
+        .checked_add(skein_lib::Map::<crate::settings::Setting, ()>::worst_case(
+            crate::settings::capacity(limits)?.checked_mul(2)?,
+        )?)?
         // The incoming failure carrier owns its task within load_bytes.
         .checked_add(u64::try_from(size_of::<Loaded>()).ok()?)?
         .checked_add(u64::from(limits.load_slots).checked_mul(documents::document_with_context_worst_case(limits)?)?)?
         // Reverse live reads retain one bounded tail while making producer pages.
         .checked_add(Queue::<PageRow>::worst_case(limits.documents.rows)?)?
         .checked_add(answer_worst_case(limits)?)
+}
+
+pub(super) fn load_settings(
+    core: &mut Core,
+    env: &Env<Limits>,
+    reply: ReplyTo,
+    sign_in: u64,
+    range: Range,
+) -> Requests {
+    if core.reads.len() >= env.limits.load_slots {
+        return terminal(reply, Answer::None(Why::Busy));
+    }
+    let emitted = range.clone();
+    let pending = Pending { reply: Some(reply), sign_in, party: range.party, range, tasks: None };
+    let load = match core.reads.insert(pending) {
+        Ok(load) => load.token(),
+        Err(pending) => return terminal(pending.reply.expect("new read reply"), Answer::None(Why::Busy)),
+    };
+    let mut out = Queue::with_capacity(2);
+    out.push(Request::Held(Box::new(Held::ReadLoad { load, range: Box::new(emitted) })));
+    out.push(Request::Decided);
+    Requests::Out(out)
 }

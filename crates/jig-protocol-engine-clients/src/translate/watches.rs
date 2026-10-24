@@ -29,8 +29,8 @@ pub(crate) fn watch(watcher: Token, sign_in: u64, value: w::Subject, rows: u32) 
         }
         w::Subject::Accounts => (d::Watched::Accounts, rows),
         w::Subject::Deployment => (d::Watched::Deployment, rows),
-        // task C
-        w::Subject::Settings | w::Subject::Run(_) => return None,
+        w::Subject::Settings => (d::Watched::Settings, rows),
+        w::Subject::Run(_) => return None,
     };
     Some(core::Event::Watch { watcher, sign_in, subject, window: d::Window { rows, after: None } })
 }
@@ -120,6 +120,7 @@ pub(crate) fn delivery(
         d::Document::Lines(value) => w::DeliveryValue::Tasks(super::queries::lines(value, limits)?),
         d::Document::Run(value) => w::DeliveryValue::RunState(live::run(value, limits)?),
         d::Document::Accounts(value) => w::DeliveryValue::OwnerAccounts(super::accounts::document(value, limits)?),
+        d::Document::Settings(value) => w::DeliveryValue::Settings(super::settings::document(value, limits)?),
         d::Document::Deployment(value) => w::DeliveryValue::OwnerDeployment(deployment::document(value, limits)?),
         d::Document::Proposal(value) => w::DeliveryValue::OwnerProposal(objects::proposal(models, value, limits)?),
         d::Document::Escalation(_)

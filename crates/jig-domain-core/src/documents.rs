@@ -33,6 +33,8 @@ mod accounts;
 pub use accounts::{AccountLine, Accounts, LastEnd, SignInLine, SourceLine};
 pub use jig_domain_accounts::Use;
 mod deployment;
+mod settings;
+pub use settings::{Follows, HeldRevision, SettingLine, Settings, SettingsProposal};
 mod programs;
 pub use deployment::{
     Account, AccountState, Capacity, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun, ProjectCapacity,
@@ -130,40 +132,77 @@ pub use jig_domain_people::Proposer;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Subject {
     /// A connector-owned subject within the client's stated role scope.
-    Application { scope: ApplicationScope, connector: u16, subject: skein_lib::Token },
+    Application {
+        scope: ApplicationScope,
+        connector: u16,
+        subject: skein_lib::Token,
+    },
     /// The authenticated party's frame.
-    Frame { party: u64 },
+    Frame {
+        party: u64,
+    },
     /// A task's overview and controls.
-    Task { task: u64 },
+    Task {
+        task: u64,
+    },
     /// A task's live requester subtree.
-    Tree { task: u64 },
+    Tree {
+        task: u64,
+    },
     /// Each named task's compact live status.
-    Chips { tasks: List<u64> },
+    Chips {
+        tasks: List<u64>,
+    },
     /// The party's waiting objects and unread updates.
-    Inbox { party: u64 },
+    Inbox {
+        party: u64,
+    },
     /// The party's accounts.
-    Accounts { party: u64 },
+    Accounts {
+        party: u64,
+    },
     /// Filtered live tasks in one project, newest change first.
     /// A fixed task query, independent of any application shape.
-    Query { query: TaskQuery },
+    Query {
+        query: TaskQuery,
+    },
     /// A task's current attempt.
-    Run { task: u64 },
+    Run {
+        task: u64,
+    },
     /// Hosts, accounts and capacity.
     Deployment,
+    Settings,
     /// An immutable pending proposal.
-    Proposal { proposer: Proposer, number: u64 },
+    Proposal {
+        proposer: Proposer,
+        number: u64,
+    },
     /// A held task's escalation.
-    Escalation { task: u64 },
+    Escalation {
+        task: u64,
+    },
     /// An unanswered question.
-    Question { task: u64, message: u64 },
+    Question {
+        task: u64,
+        message: u64,
+    },
     /// A task addressed to a person or role.
-    PersonTask { task: u64 },
+    PersonTask {
+        task: u64,
+    },
     /// A result still named by the live engine.
-    Result { task: u64 },
+    Result {
+        task: u64,
+    },
     /// A project's resources, policy and funding.
-    Project { project: u32 },
+    Project {
+        project: u32,
+    },
     /// A note retained by its owning child.
-    Note { note: u64 },
+    Note {
+        note: u64,
+    },
 }
 
 /// The subjects a watch may name (`protocol/client.md`, section 7).
@@ -180,6 +219,7 @@ pub enum Watched {
     Query { query: TaskQuery },
     Run { task: u64 },
     Deployment,
+    Settings,
 }
 
 /// Why no live document is available.
@@ -332,6 +372,7 @@ pub enum Document {
     Accounts(Box<Accounts>),
     /// Fleet placement, accounts and finite capacities.
     Deployment(Box<Deployment>),
+    Settings(Box<Settings>),
 }
 
 /// Make the current visible document without changing state or emitting effects.
@@ -390,6 +431,7 @@ pub fn make(
         Subject::Accounts { party: owner } => {
             Ok(Document::Accounts(Box::new(accounts::make(core, limits, party, *owner, window)?)))
         }
+        Subject::Settings => Ok(Document::Settings(Box::new(settings::make(core, party)?))),
         Subject::Deployment => Ok(Document::Deployment(Box::new(deployment::deployment(core, limits, party, None)?))),
         Subject::Proposal { proposer, number } => {
             Ok(Document::Proposal(Box::new(objects::proposal(core, limits, party, *proposer, *number, decision)?)))
@@ -457,6 +499,7 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
 #[must_use]
 pub fn document_with_context_worst_case(limits: &Limits) -> Option<u64> {
     document_worst_case(&limits.documents)?
+        .checked_add(settings::worst_case(limits)?)?
         .checked_add(inbox_selection_worst_case(limits.documents.rows, limits.tasks.depth)?)?
         .checked_add(u64::from(limits.documents.lines).checked_mul(crate::templates::list_worst_case(limits)?)?)
 }
@@ -468,6 +511,7 @@ pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?;
     Some(
         deployment::scratch_worst_case(limits)?
+            .max(settings::scratch_worst_case(limits)?)
             .max(catalogue::scratch_worst_case(limits)?)
             .max(List::<jig_domain_accounts::Pending>::worst_case(limits.accounts.sign_ins)?)
             .max(List::<crate::Template>::worst_case(limits.templates)?)

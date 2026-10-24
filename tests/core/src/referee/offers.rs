@@ -129,6 +129,7 @@ impl Referee {
             | Document::Project(_)
             | Document::Note(_)
             | Document::Inbox(_)
+            | Document::Settings(_)
             | Document::Deployment(_) => None,
         };
         self.documents.insert(number, Received { party, subject, at: self.made, offers, frame, task });
@@ -225,6 +226,7 @@ fn offers(value: &Document) -> Option<&List<Offered>> {
         | Document::Tree(_)
         | Document::Lines(_)
         | Document::Inbox(_)
+        | Document::Settings(_)
         | Document::Deployment(_) => return None,
     })
 }
@@ -315,6 +317,10 @@ fn read_subject(read: &core::reads::Read) -> Option<Subject> {
         | core::reads::Read::Tasks { .. }
         | core::reads::Read::Notes { .. }
         | core::reads::Read::ScopedNotes { .. }
+        | core::reads::Read::Settings
+        | core::reads::Read::Setting { .. }
+        | core::reads::Read::Revision { .. }
+        | core::reads::Read::Revisions { .. }
         | core::reads::Read::Spend { .. } => None,
     }
 }

@@ -217,6 +217,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<skein_lib::Token, crate::ended_marks::Loaded>::worst_case(limits.people.pending)?)?
         .checked_add(crate::effect_worst_case(limits)?)?
         .checked_add(crate::conversation_worst_case(limits)?)?
+        // Last reported settings holder count, including alignment room.
+        .checked_add(u64::try_from(size_of::<u64>()).ok()?)?
         .checked_add(crate::reads::worst_case(limits)?)?
         .checked_add(crate::documents::document_with_context_worst_case(limits)?)?
         .checked_add(crate::documents::document_scratch_worst_case(limits)?)?

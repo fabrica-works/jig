@@ -62,6 +62,8 @@ pub struct Filter {
 /// Identity of a store query, independent of its continuation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Scope {
+    /// Dense inclusive revision interval; held newest and tag-9 predecessors.
+    SettingsHistory { first: u32, last: u32, newest: u32, whole: bool },
     /// A task query's live group and its indexed ended group.
     Tasks { query: documents::TaskQuery },
     /// One retained task.
@@ -122,8 +124,23 @@ pub enum Cursor {
     reason = "the read carries two independent inline owner cursors, priced in the read bounds"
 )]
 pub enum Read {
+    Settings,
+    Setting {
+        setting: crate::settings::Setting,
+        revision: u32,
+    },
+    Revision {
+        number: u32,
+    },
+    Revisions {
+        before: Option<u32>,
+    },
     /// A task query's independent live and ended groups.
-    Tasks { query: documents::TaskQuery, live: Option<Cursor>, ended: Option<Cursor> },
+    Tasks {
+        query: documents::TaskQuery,
+        live: Option<Cursor>,
+        ended: Option<Cursor>,
+    },
     /// A connector-owned document within the client's stated role scope.
     Application {
         scope: jig_domain_people::ApplicationScope,
@@ -134,37 +151,84 @@ pub enum Read {
     /// The authenticated party's frame.
     Frame,
     /// A task overview, live or ended.
-    Task { task: u64 },
+    Task {
+        task: u64,
+    },
     /// An immutable proposal.
-    Proposal { proposer: Proposer, proposal: u64 },
+    Proposal {
+        proposer: Proposer,
+        proposal: u64,
+    },
     /// A held task and its kept decision.
-    Escalation { task: u64 },
+    Escalation {
+        task: u64,
+    },
     /// Whole original question and any kept answer.
-    Question { task: u64, message: u64 },
+    Question {
+        task: u64,
+        message: u64,
+    },
     /// A person form, live or ended.
-    PersonTask { task: u64 },
+    PersonTask {
+        task: u64,
+    },
     /// One result.
-    Result { task: u64 },
+    Result {
+        task: u64,
+    },
     /// Whole outward words at the exact child activity key.
-    Reply { task: u64, activity: u64 },
+    Reply {
+        task: u64,
+        activity: u64,
+    },
     /// One committed opaque turn.
-    Turn { task: u64, attempt: u64, turn: u32 },
+    Turn {
+        task: u64,
+        attempt: u64,
+        turn: u32,
+    },
     /// Ended direct delegates.
-    EndedDelegates { task: u64, from: Option<Cursor> },
+    EndedDelegates {
+        task: u64,
+        from: Option<Cursor>,
+    },
     /// Task or subtree history.
-    History { task: u64, subtree: bool, from: Option<Cursor> },
+    History {
+        task: u64,
+        subtree: bool,
+        from: Option<Cursor>,
+    },
     /// Activity from its end, in decreasing committed position.
-    Activity { task: u64, before: Option<Cursor> },
+    Activity {
+        task: u64,
+        before: Option<Cursor>,
+    },
     /// One filtered inbox group.
-    Inbox { group: Group, filter: Filter, from: Option<Cursor> },
+    Inbox {
+        group: Group,
+        filter: Filter,
+        from: Option<Cursor>,
+    },
     /// A project's current resources, policy and funding.
-    Project { project: u32 },
+    Project {
+        project: u32,
+    },
     /// Project notes from their owning child's rows.
-    Notes { project: u32, from: Option<Cursor> },
+    Notes {
+        project: u32,
+        from: Option<Cursor>,
+    },
     /// Notes in one exact owner scope, optionally searched by description.
-    ScopedNotes { scope: notes::Scope, description: Option<Box<[u8]>>, from: Option<Cursor> },
+    ScopedNotes {
+        scope: notes::Scope,
+        description: Option<Box<[u8]>>,
+        from: Option<Cursor>,
+    },
     /// Historical period spending.
-    Spend { project: u32, from: Option<Cursor> },
+    Spend {
+        project: u32,
+        from: Option<Cursor>,
+    },
     /// Deployment state.
     Deployment,
 }
@@ -344,6 +408,9 @@ pub enum EndedGroup {
 /// Exactly one terminal, held until its preceding decisions are durable.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Setting(Box<SettingDocument>),
+    Revision(Box<RevisionAnswer>),
+    Revisions(Box<RevisionsPage>),
     /// A task query's two groups.
     Tasks(Box<TaskPage>),
     /// A current document.
@@ -504,4 +571,42 @@ pub(crate) fn row_bytes(row: &Row) -> Option<u64> {
         total = total.checked_add(tasks::task_bytes(linked)?)?;
     }
     Some(total)
+}
+
+/// Whole newest value, read separately from the inventory.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SettingDocument {
+    pub setting: crate::settings::Setting,
+    pub revision: u32,
+    pub value: crate::settings::Value,
+}
+/// Revision values leave through the protocol's single-value byte admission.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum RevisionAnswer {
+    Revision { revision: crate::settings::Revision, value_bytes: u64 },
+    Forgotten { oldest: u32 },
+    Unknown,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum RevisionEdit {
+    Set,
+    Removed,
+    Reset,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct RevisionItemHead {
+    pub setting: crate::settings::Setting,
+    pub edit: RevisionEdit,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct RevisionRow {
+    pub head: crate::settings::Head,
+    pub items: List<RevisionItemHead>,
+    pub more: u32,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct RevisionsPage {
+    pub rows: List<RevisionRow>,
+    pub next: Option<u32>,
+    pub forgotten: bool,
 }

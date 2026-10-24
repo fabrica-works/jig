@@ -49,8 +49,8 @@ pub(crate) fn store_limits() -> jig_test_service::limits::Limits {
     *LIMITS.get_or_init(profile)
 }
 /// The deployment's configured model names, by which the store keeps a role's models.
-pub(crate) fn store_names() -> &'static [Box<[u8]>] {
-    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
+pub(crate) fn store_names() -> &'static [jig_domain_core::settings::ModelName] {
+    static NAMES: std::sync::OnceLock<Box<[jig_domain_core::settings::ModelName]>> = std::sync::OnceLock::new();
     NAMES.get_or_init(|| jig_protocol_store::codec::names(&engine().llm.models))
 }
 fn profile() -> jig_test_service::limits::Limits {

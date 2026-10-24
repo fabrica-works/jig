@@ -35,9 +35,11 @@ pub fn read_with_codec(
 ) -> Result<Incoming, Invalid> {
     let route = transport.reply(to).ok_or(Invalid::MissingRoute)?;
     let Reply::Read { client, read, what } = route else { return Err(Invalid::OwnerRoute) };
-    let client = *client;
-    let read = *read;
+    let (client, read) = (*client, *read);
     let result = match answer {
+        reads::Answer::Setting(_) | reads::Answer::Revision(_) | reads::Answer::Revisions(_) => {
+            return Err(Invalid::PendingValue);
+        }
         reads::Answer::Tasks(page) => task_page(what, page, limits)?,
         reads::Answer::None(why) => client::ReadResult::None(missing(*why)),
         reads::Answer::Page(value) => {
@@ -113,6 +115,7 @@ pub fn read_with_codec(
             | documents::Document::Lines(_)
             | documents::Document::Note(_)
             | documents::Document::Accounts(_)
+            | documents::Document::Settings(_)
             | documents::Document::Inbox(_) => return Err(Invalid::PendingValue),
         },
         reads::Answer::Historical(value) => {

@@ -92,7 +92,9 @@ fn largest(
             .max(
                 core::settings::revision_worst_case(domain)?.checked_add(16)?.checked_add(
                     u64::from(jig_domain_tasks::MODELS)
-                        .checked_mul(u64::from(core::MODEL_NAME_BYTES).checked_add(4)?)?
+                        .checked_mul(u64::from(core::MODEL_NAME_BYTES).checked_add(4)?.checked_add(4)?.checked_add(
+                            u64::from(core::EFFORTS).checked_mul(u64::from(core::EFFORT_BYTES).checked_add(4)?)?,
+                        )?)?
                         .checked_add(4)?,
                 )?,
             )

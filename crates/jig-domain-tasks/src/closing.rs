@@ -342,6 +342,10 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     let id = domain.names.remove(&number).expect("ending name exists");
     crate::holds::release(domain, number);
     crate::refs::end(domain, env, number, out);
+    match ended.executor {
+        Executor::Agent { .. } => domain.live_agents = domain.live_agents.checked_sub(1).expect("live agent removed"),
+        Executor::Person(_) | Executor::Procedure { .. } => {}
+    }
     domain.tasks.retire(id);
     domain.alarms.cancel(number);
     domain.grace_alarms.cancel(number);

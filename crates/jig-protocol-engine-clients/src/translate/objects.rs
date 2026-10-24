@@ -115,6 +115,7 @@ pub fn document(
             d::Document::PersonTask(value) => w::ReadValue::OwnerPersonTask(person_task(models, value, limits)?),
             d::Document::Result(value) => w::ReadValue::Result(result(models, value, limits)?),
             d::Document::Project(value) => w::ReadValue::OwnerProject(project(models, value, limits)?),
+            d::Document::Settings(value) => w::ReadValue::Settings(super::settings::document(value, limits)?),
             d::Document::Deployment(value) => w::ReadValue::OwnerDeployment(deployment::document(value, limits)?),
             d::Document::Chips(_)
             | d::Document::Run(_)
@@ -136,7 +137,12 @@ pub fn document(
             | reads::Past::PersonTask { .. }
             | reads::Past::Reply(_) => w::ReadValue::Historical(Box::new(historical(value, models, limits)?)),
         },
-        reads::Answer::Tasks(_) | reads::Answer::Page(_) | reads::Answer::None(_) => {
+        reads::Answer::Setting(_)
+        | reads::Answer::Revision(_)
+        | reads::Answer::Revisions(_)
+        | reads::Answer::Tasks(_)
+        | reads::Answer::Page(_)
+        | reads::Answer::None(_) => {
             return Err(w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag });
         }
     })

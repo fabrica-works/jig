@@ -57,7 +57,7 @@ pub struct Store {
     application: sizes::Application,
     codec: codec::Limits,
     /// The configured models' names, which the people family keeps a role's models by.
-    names: Box<[Box<[u8]>]>,
+    names: Box<[jig_domain_core::settings::ModelName]>,
     stores: Stores,
     phase: Phase,
     directory: directory::Directory,
@@ -176,7 +176,8 @@ fn question_restore_worst_case(limits: &Limits) -> Option<u64> {
 
 /// At most one configured model per `Models` bit, each name within its bound.
 fn names_worst_case() -> Option<u64> {
-    skein_lib::List::<Box<[u8]>>::worst_case(u64::BITS)?
+    jig_domain_core::settings::model_names_worst_case()?
+        .checked_add(skein_lib::List::<Box<[u8]>>::worst_case(u64::BITS)?)?
         .checked_add(u64::from(u64::BITS).checked_mul(u64::from(jig_domain_core::MODEL_NAME_BYTES))?)
 }
 

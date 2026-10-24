@@ -47,6 +47,7 @@ disallowed_methods = "allow"
 disallowed_macros = "allow"
 
 [dev-dependencies]
+jig-protocol-engine-clients.workspace = true
 jig-client-domain.workspace = true
 jig-client-protocol-wire.workspace = true
 jig-client-protocol-link.workspace = true

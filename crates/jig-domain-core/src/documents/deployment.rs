@@ -533,7 +533,8 @@ pub fn make_with_clock(
             }
             Ok(super::Document::Deployment(Box::new(deployment(core, limits, party, Some(clock))?)))
         }
-        super::Subject::Frame { .. }
+        super::Subject::Settings
+        | super::Subject::Frame { .. }
         | super::Subject::Task { .. }
         | super::Subject::Tree { .. }
         | super::Subject::Chips { .. }

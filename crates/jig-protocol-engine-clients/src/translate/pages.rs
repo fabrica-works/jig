@@ -44,6 +44,10 @@ pub fn page(
         | reads::Read::Reply { .. }
         | reads::Read::Turn { .. }
         | reads::Read::Project { .. }
+        | reads::Read::Settings
+        | reads::Read::Setting { .. }
+        | reads::Read::Revision { .. }
+        | reads::Read::Revisions { .. }
         | reads::Read::Deployment => return Err(invalid),
     })
 }
@@ -78,6 +82,10 @@ fn check_edges(read: &reads::Read, page: &reads::Page) -> Result<(), w::Problem>
                     | reads::Read::Reply { .. }
                     | reads::Read::Turn { .. }
                     | reads::Read::Project { .. }
+                    | reads::Read::Settings
+                    | reads::Read::Setting { .. }
+                    | reads::Read::Revision { .. }
+                    | reads::Read::Revisions { .. }
                     | reads::Read::Deployment => return Err(invalid),
                 };
                 *scope == expected

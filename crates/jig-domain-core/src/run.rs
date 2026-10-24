@@ -319,7 +319,7 @@ pub struct RestoringProof {
 }
 
 /// One configured model and its deployment-unit prices (domain/agent.md, 4.6).
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Model {
     pub dialect: u32,
     pub endpoint: u32,
@@ -355,7 +355,7 @@ pub const EFFORT_BYTES: u32 = 32;
 pub use jig_domain_people::{MODEL_DESCRIPTION_BYTES, MODEL_NAME_BYTES};
 
 /// Root-owned charter policy, independent of Smith's run vocabulary.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent charter grants and run behavior")]
 pub struct RunPolicy {
     pub instructions: Box<[u8]>,

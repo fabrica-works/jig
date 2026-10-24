@@ -173,7 +173,7 @@ fn check_set(
     }
     Ok(())
 }
-pub(super) fn shape(setting: Setting, value: &Value, limits: &Limits) -> Result<(), Failure> {
+pub(crate) fn shape(setting: Setting, value: &Value, limits: &Limits) -> Result<(), Failure> {
     let valid = match value {
         Value::Charter(value) => {
             setting == Setting::Charter(value.number)
@@ -195,6 +195,7 @@ pub(super) fn shape(setting: Setting, value: &Value, limits: &Limits) -> Result<
                 Setting::Charter(_) | Setting::Template(_) | Setting::Rules => false,
             };
             numbered
+                && value.permissions.len() <= usize::try_from(limits.settings.permissions).expect("permission bound")
                 && value.templates.len() <= usize::try_from(limits.templates).expect("template override bound")
                 && match crate::policy::snapshot(&value.policy, &value.permissions, &value.templates) {
                     Some(value) => match people::policy_bytes(&value) {
@@ -223,7 +224,9 @@ fn charter_fault(charter: &crate::Charter, settings: &Settings, limits: &Limits)
             }
         }
     }
-    if policy.alternatives.len() > usize::try_from(tasks::MODELS).expect("models bound") {
+    if policy.alternatives.len()
+        > usize::try_from(limits.settings.alternatives.min(tasks::MODELS)).expect("models bound")
+    {
         return Some(Fault::Count);
     }
     if policy.turns <= policy.reserve_turns || policy.time <= policy.reserve_time {

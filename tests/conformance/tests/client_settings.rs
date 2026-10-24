@@ -130,3 +130,78 @@ fn settings_contract_fixtures_keep_the_ask_answers_documents_and_selectors() {
     let bytes = encoded!(&w::ReadValue::Revisions(translate::settings::wire_revisions_page(&page, t).expect("page")));
     assert_eq!(translate::reads::value(&bytes, &limits), Ok(c::ReadValue::Revisions(Box::new(page))));
 }
+
+#[test]
+fn engine_settings_reads_and_deliveries_decode_at_the_client_end() {
+    use jig_domain_core::{documents as d, reads, settings as s};
+    use jig_protocol_engine_clients::translate::settings as engine;
+    let limits = Limits::new(jig_client_world::test::limits().client.domain, 4).expect("client limits");
+    let t = &limits.wire;
+    let head = s::Head {
+        number: 6,
+        against: 5,
+        at: skein_lib::Wall::EPOCH,
+        by: s::Decider::Release,
+        proposal: None,
+        moved: false,
+    };
+    let mut settings = List::with_capacity(1);
+    settings
+        .push(d::SettingLine { setting: s::Setting::Rules, name: None, follows: d::Follows::Default, last: 6 })
+        .expect("rules line");
+    let mut holding = List::with_capacity(1);
+    holding.push(d::HeldRevision { head: head.clone(), holders: 2 }).expect("held newest");
+    let source = d::Settings { newest: 6, settings, held: holding, pending: List::with_capacity(0) };
+    let wire = engine::document(&source, t).expect("engine inventory");
+    let bytes = encoded!(&w::ReadValue::Settings(wire.clone()));
+    let c::ReadValue::Settings(document) = translate::reads::value(&bytes, &limits).expect("client inventory") else {
+        panic!("settings inventory")
+    };
+    assert_eq!(document.newest, 6);
+    assert_eq!(document.held.get(0).expect("held revision").holders, 2);
+    assert_eq!(document.settings.get(0).expect("rules line").last, 6);
+    let bytes = encoded!(&w::DeliveryValue::Settings(wire));
+    assert_eq!(translate::watches::delivery(&bytes, &limits), Ok(c::Delivery::Settings(document)));
+
+    let mut config = jig_core_world::world::config(9371);
+    config.core.defaults.rules.ceiling.models = jig_domain_authority::Models::ALL;
+    let spend = config.core.defaults.rules.period_spend;
+    let source = reads::SettingDocument {
+        setting: s::Setting::Rules,
+        revision: 6,
+        value: s::Value::Rules(Box::new(config.core.defaults.rules)),
+    };
+    let wire = engine::setting_document(&source, &[], t).expect("engine whole setting");
+    let bytes = encoded!(&w::ReadValue::Setting(wire));
+    let c::ReadValue::Setting(document) = translate::reads::value(&bytes, &limits).expect("client whole setting")
+    else {
+        panic!("setting")
+    };
+    let c::SettingValue::Rules(rules) = document.value else { panic!("rules") };
+    assert_eq!(rules.period_spend, spend);
+
+    for (source, expected) in [
+        (reads::RevisionAnswer::Unknown, c::RevisionAnswer::Unknown),
+        (
+            reads::RevisionAnswer::Forgotten { oldest: 4 },
+            c::RevisionAnswer::Forgotten(c::RevisionForgotten { oldest: 4 }),
+        ),
+    ] {
+        let wire = w::ReadRevisionAnswer::new(
+            t,
+            w::ReadRevisionAnswerParts { value: engine::revision(&source, &[], t).expect("engine revision answer") },
+        )
+        .expect("revision answer");
+        let bytes = encoded!(&w::ReadValue::Revision(wire));
+        assert_eq!(translate::reads::value(&bytes, &limits), Ok(c::ReadValue::Revision(Box::new(expected))));
+    }
+    let mut rows = List::with_capacity(1);
+    rows.push(reads::RevisionRow { head, items: List::with_capacity(0), more: 3 }).expect("revision row");
+    let page = reads::RevisionsPage { rows, next: Some(6), forgotten: false };
+    let bytes = encoded!(&w::ReadValue::Revisions(engine::revisions(&page, t).expect("engine page")));
+    let c::ReadValue::Revisions(page) = translate::reads::value(&bytes, &limits).expect("client page") else {
+        panic!("revisions page")
+    };
+    assert_eq!(page.next, Some(6));
+    assert_eq!(page.rows.get(0).expect("revision row").more, 3);
+}

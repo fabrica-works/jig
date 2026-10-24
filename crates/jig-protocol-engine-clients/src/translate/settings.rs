@@ -1,351 +1,374 @@
-//! Whole settings asks into core values (client/domain/contract.md, 3.2).
-#![expect(clippy::manual_map, reason = "step code translates optional values with matches")]
-use super::{Untranslatable, asks, operations, w};
+//! Settings' whole values and bounded history on client wire 19 (contract.md, 6).
+use super::{me, objects, owner, w};
 use alloc::boxed::Box;
 use jig_domain_authority as a;
-use jig_domain_core::{self as c, settings as s};
-use jig_domain_people as p;
+use jig_domain_core::{self as core, documents as d, reads, settings as s};
 use jig_domain_tasks as t;
-use skein_lib::{List, Reader};
-fn bad() -> Untranslatable {
-    Untranslatable { path: w::Path::ChangeSettingsItems }
-}
-pub(crate) fn change(
-    value: w::ChangeSettings,
-    models: &[crate::Model],
-    limits: &w::Limits,
-) -> Result<s::Change, Untranslatable> {
-    let v = value.into_parts();
-    let count = asks::count(&v.items, w::Path::ChangeSettingsItems)?;
-    let mut items = List::with_capacity(count);
-    let mut reader = Reader::new(&v.items);
-    for _ in 0..count {
-        let bytes = asks::item(&mut reader, w::Path::ChangeSettingsItems)?;
-        let mut piece = Reader::new(&bytes);
-        let item = match w::SettingItem::decode(limits, &mut piece) {
-            Ok(value) => value,
-            Err(problem) => return Err(map_problem(problem)),
-        };
-        if !piece.is_empty() {
-            return Err(bad());
-        }
-        let item = item.into_parts();
-        items
-            .push(s::Item {
-                setting: setting(item.setting),
-                edit: match item.edit {
-                    w::SettingEdit::Removed => s::Edit::Removed,
-                    w::SettingEdit::Reset => s::Edit::Reset,
-                    w::SettingEdit::Set(value) => {
-                        s::Edit::Set(setting_value(value.into_parts().value, models, limits)?)
-                    }
-                },
-            })
-            .expect("counted pieces");
-    }
-    Ok(s::Change {
-        against: v.against,
-        items: items.into_boxed(),
-        running: match v.running {
-            w::Running::Stays => s::Running::Stays,
-            w::Running::Moves => s::Running::Moves,
-        },
-    })
-}
-fn map_problem(problem: w::Problem) -> Untranslatable {
-    Untranslatable { path: problem.path }
-}
-fn setting(value: w::Setting) -> s::Setting {
+use skein_lib::{List, Writer};
+
+mod change;
+pub(crate) use change::change;
+
+#[must_use]
+pub fn setting(value: &w::Setting) -> s::Setting {
     match value {
-        w::Setting::Charter(value) => s::Setting::Charter(value.number()),
-        w::Setting::Template(value) => s::Setting::Template(value.number()),
-        w::Setting::Policy(value) => s::Setting::Policy(value.number()),
+        w::Setting::Charter(v) => s::Setting::Charter(v.number()),
+        w::Setting::Template(v) => s::Setting::Template(v.number()),
+        w::Setting::Policy(v) => s::Setting::Policy(v.number()),
         w::Setting::Rules => s::Setting::Rules,
     }
 }
-fn setting_value(
-    value: w::SettingValue,
-    models: &[crate::Model],
-    limits: &w::Limits,
-) -> Result<s::Value, Untranslatable> {
+pub fn name(value: s::Setting, limits: &w::Limits) -> Result<w::Setting, w::Problem> {
     Ok(match value {
-        w::SettingValue::Charter(value) => s::Value::Charter(Box::new(charter(*value))),
-        w::SettingValue::Template(value) => s::Value::Template(Box::new(template(*value, models, limits)?)),
-        w::SettingValue::Policy(value) => s::Value::Policy(Box::new(policy(*value, models, limits)?)),
-        w::SettingValue::Rules(value) => s::Value::Rules(Box::new(rules(*value, models, limits)?)),
+        s::Setting::Charter(number) => {
+            w::Setting::Charter(w::SettingNumber::new(limits, w::SettingNumberParts { number })?)
+        }
+        s::Setting::Template(number) => {
+            w::Setting::Template(w::SettingNumber::new(limits, w::SettingNumberParts { number })?)
+        }
+        s::Setting::Policy(number) => {
+            w::Setting::Policy(w::SettingNumber::new(limits, w::SettingNumberParts { number })?)
+        }
+        s::Setting::Rules => w::Setting::Rules,
     })
 }
-fn model(value: w::SettingModel) -> c::Model {
-    let v = value.into_parts();
-    c::Model {
-        dialect: v.dialect,
-        endpoint: v.endpoint,
-        program: v.program,
-        name: v.name,
-        window: v.window,
-        output: v.output,
-        input_price: v.input_price,
-        cached_price: v.cached_price,
-        cache_write_price: v.cache_write_price,
-        output_price: v.output_price,
-        price_unit: v.price_unit,
-        efforts: v.efforts.into_boxed(),
-        effort: v.effort,
-    }
+pub fn head(value: &s::Head, limits: &w::Limits) -> Result<w::RevisionHead, w::Problem> {
+    w::RevisionHead::new(
+        limits,
+        w::RevisionHeadParts {
+            number: value.number,
+            against: value.against,
+            at: value.at.as_nanos(),
+            by: match value.by {
+                s::Decider::FirstStart => w::RevisionDecider::FirstStart,
+                s::Decider::Release => w::RevisionDecider::Release,
+                s::Decider::Party(number) => {
+                    w::RevisionDecider::Party(w::RevisionParty::new(limits, w::RevisionPartyParts { number })?)
+                }
+            },
+            proposal: match value.proposal {
+                Some((proposer, number)) => {
+                    Some(super::task::proposal(&d::ProposalRef { proposer, number: u64::from(number) }, limits)?)
+                }
+                None => None,
+            },
+            moved: value.moved,
+        },
+    )
 }
-fn charter(value: w::Charter) -> c::Charter {
-    let resume = value.resume();
-    let inspect = value.inspect();
-    let modify = value.modify();
-    let shell = value.shell();
-    let agents = value.agents();
-    let v = value.into_parts();
-    let mut alternatives = List::with_capacity(v.alternatives.len());
-    for value in v.alternatives.into_boxed() {
-        alternatives.push(model(value)).expect("same count");
+pub fn document(value: &d::Settings, limits: &w::Limits) -> Result<w::SettingsDocument, w::Problem> {
+    let mut settings = List::with_capacity(value.settings.len());
+    for line in &value.settings {
+        settings
+            .push(w::SettingLine::new(
+                limits,
+                w::SettingLineParts {
+                    setting: name(line.setting, limits)?,
+                    name: match &line.name {
+                        Some(value) => Some(owner::text(value, limits)?),
+                        None => None,
+                    },
+                    follows: match line.follows {
+                        d::Follows::Default => w::SettingFollows::Default,
+                        d::Follows::Change => w::SettingFollows::Change,
+                    },
+                    last: line.last,
+                },
+            )?)
+            .expect("settings line count");
     }
-    c::Charter {
-        number: v.number,
-        hosts: match v.hosts {
-            w::SettingHosts::Workers => jig_domain_fleet::Kinds::Workers,
-            w::SettingHosts::Engine => jig_domain_fleet::Kinds::Engine,
-            w::SettingHosts::Both => jig_domain_fleet::Kinds::Both,
-        },
-        spend: v.spend,
-        policy: c::RunPolicy {
-            instructions: v.instructions,
-            waiting: v.waiting,
-            resume,
-            turns: v.turns,
-            time: v.time,
-            reserve_turns: v.reserve_turns,
-            reserve_time: v.reserve_time,
-            model: model(v.model),
-            alternatives: alternatives.into_boxed(),
-            inspect,
-            modify,
-            shell,
-            agents,
-            call_timeout: v.call_timeout,
-        },
+    let mut held = List::with_capacity(value.held.len());
+    for row in &value.held {
+        held.push(w::HeldRevision::new(
+            limits,
+            w::HeldRevisionParts { head: head(&row.head, limits)?, holders: row.holders },
+        )?)
+        .expect("held count");
     }
+    let mut pending = List::with_capacity(value.pending.len());
+    for row in &value.pending {
+        let proposer =
+            super::task::proposal(&d::ProposalRef { proposer: row.proposer, number: u64::from(row.number) }, limits)?
+                .into_parts()
+                .proposer;
+        pending
+            .push(w::SettingsProposal::new(limits, w::SettingsProposalParts { proposer, number: row.number })?)
+            .expect("proposal count");
+    }
+    w::SettingsDocument::new(limits, w::SettingsDocumentParts { newest: value.newest, settings, held, pending })
+}
+fn model(value: &core::Model, limits: &w::Limits) -> Result<w::SettingModel, w::Problem> {
+    let mut efforts = List::with_capacity(super::count(value.efforts.len())?);
+    for effort in &value.efforts {
+        efforts.push(effort.clone()).expect("effort count");
+    }
+    w::SettingModel::new(
+        limits,
+        w::SettingModelParts {
+            dialect: value.dialect,
+            endpoint: value.endpoint,
+            program: value.program.clone(),
+            name: value.name.clone(),
+            window: value.window,
+            output: value.output,
+            input_price: value.input_price,
+            cached_price: value.cached_price,
+            cache_write_price: value.cache_write_price,
+            output_price: value.output_price,
+            price_unit: value.price_unit,
+            efforts,
+            effort: value.effort.clone(),
+        },
+    )
+}
+fn charter(value: &core::Charter, limits: &w::Limits) -> Result<w::Charter, w::Problem> {
+    let policy = &value.policy;
+    let mut alternatives = List::with_capacity(super::count(policy.alternatives.len())?);
+    for row in &policy.alternatives {
+        alternatives.push(model(row, limits)?).expect("model count");
+    }
+    w::Charter::new(
+        limits,
+        w::CharterParts {
+            skein_bools: [policy.resume, policy.inspect, policy.modify, policy.shell, policy.agents],
+            number: value.number,
+            instructions: policy.instructions.clone(),
+            waiting: policy.waiting,
+            turns: policy.turns,
+            time: policy.time,
+            reserve_turns: policy.reserve_turns,
+            reserve_time: policy.reserve_time,
+            model: model(&policy.model, limits)?,
+            alternatives,
+            call_timeout: policy.call_timeout,
+            hosts: match value.hosts {
+                jig_domain_fleet::Kinds::Workers => w::SettingHosts::Workers,
+                jig_domain_fleet::Kinds::Engine => w::SettingHosts::Engine,
+                jig_domain_fleet::Kinds::Both => w::SettingHosts::Both,
+            },
+            spend: value.spend,
+        },
+    )
 }
 fn authority(
-    value: w::OwnerAuthority,
+    value: &a::Authority,
     models: &[crate::Model],
     limits: &w::Limits,
-) -> Result<a::Authority, Untranslatable> {
-    let mut names = List::with_capacity(p::MODELS);
-    let mut value = asks::authority(value, limits, &mut names)?;
-    if let Some(selected) = value.models
-        && !selected.is_all()
-    {
-        let mut mask = 0_u64;
-        for (at, name) in names.as_slice().iter().enumerate() {
-            if selected.bits() & (1_u64.checked_shl(u32::try_from(at).expect("bounded model index")).unwrap_or(0)) == 0
-            {
-                continue;
-            }
-            let mut found = false;
-            for (to, model) in models.iter().enumerate() {
-                if model.name == *name {
-                    mask |= 1_u64.checked_shl(u32::try_from(to).expect("bounded model index")).unwrap_or(0);
-                    found = true;
-                    break;
-                }
-            }
-            if !found {
-                return Err(bad());
-            }
-        }
-        value.models = Some(p::Models::Named(mask));
-    }
-    c::authority_to_authority(value).ok_or(bad())
+) -> Result<w::OwnerAuthority, w::Problem> {
+    objects::goal::authority(models, &core::task_authority(value), limits)
 }
-fn requirements(values: List<w::PolicyRequirement>) -> Box<[a::Requirement]> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result.push(c::requirement_to_authority(asks::requirement(value))).expect("same count");
+fn pattern(value: &a::Pattern, limits: &w::Limits) -> Result<w::OwnerPattern, w::Problem> {
+    objects::goal::pattern(
+        &t::Pattern {
+            segments: value.segments.clone(),
+            last: match &value.last {
+                a::Last::Exact(v) => t::Last::Exact(v.clone()),
+                a::Last::Open(v) => t::Last::Open(v.clone()),
+            },
+        },
+        limits,
+    )
+}
+fn grant(value: &a::Grant, limits: &w::Limits) -> Result<w::OwnerGrant, w::Problem> {
+    w::OwnerGrant::new(
+        limits,
+        w::OwnerGrantParts { connector: value.connector, kind: value.kind, pattern: pattern(&value.pattern, limits)? },
+    )
+}
+fn requirements(values: &[a::Requirement], limits: &w::Limits) -> Result<List<w::PolicyRequirement>, w::Problem> {
+    let mut rows = List::with_capacity(super::count(values.len())?);
+    for v in values {
+        rows.push(w::PolicyRequirement::new(
+            limits,
+            w::PolicyRequirementParts {
+                connector: v.connector,
+                kind: v.kind,
+                pattern: pattern(&v.pattern, limits)?,
+                judge: w::PolicyJudge::new(
+                    limits,
+                    w::PolicyJudgeParts {
+                        connector: v.judge.connector,
+                        requirement: v.judge.requirement,
+                        parameters: v.judge.parameters,
+                    },
+                )?,
+                guard: match v.guard {
+                    a::Guard::Guarded => w::PolicyGuard::Guarded,
+                    a::Guard::Observed { freshness } => w::PolicyGuard::Observed(w::PolicyGuardObserved::new(
+                        limits,
+                        w::PolicyGuardObservedParts { freshness },
+                    )?),
+                },
+                must_be_guarded: v.must_be_guarded,
+            },
+        )?)
+        .expect("requirement count");
     }
-    result.into_boxed()
+    Ok(rows)
 }
 fn policy(
-    value: w::SettingPolicy,
+    value: &core::ConfiguredPolicy,
     models: &[crate::Model],
     limits: &w::Limits,
-) -> Result<c::ConfiguredPolicy, Untranslatable> {
-    let v = value.into_parts();
-    let mut roles = List::with_capacity(v.roles.len());
-    for value in v.roles.into_boxed() {
-        let v = value.into_parts();
+) -> Result<w::SettingPolicy, w::Problem> {
+    let p = &value.policy;
+    let mut projections = List::with_capacity(super::count(p.projections.len())?);
+    for v in &p.projections {
+        projections.push(grant(v, limits)?).expect("projection count");
+    }
+    let mut roles = List::with_capacity(super::count(p.roles.len())?);
+    for v in &p.roles {
         roles
-            .push(a::Role {
-                number: v.number,
-                authority: authority(v.authority, models, limits)?,
-                period_spend: v.period_spend,
-                requests: a::Requests(v.requests),
-                decides: a::Proposals(v.decides),
-            })
-            .expect("same count");
+            .push(w::PolicyEditRole::new(
+                limits,
+                w::PolicyEditRoleParts {
+                    number: v.number,
+                    authority: authority(&v.authority, models, limits)?,
+                    period_spend: v.period_spend,
+                    requests: v.requests.0,
+                    decides: v.decides.0,
+                },
+            )?)
+            .expect("role count");
     }
-    let mut grants = List::with_capacity(v.projections.len());
-    for value in v.projections.into_boxed() {
-        grants.push(asks::grant(value)).expect("same count");
-    }
-    let mut permissions = List::with_capacity(v.permissions.len());
-    for value in v.permissions.into_boxed() {
+    let mut permissions = List::with_capacity(super::count(value.permissions.len())?);
+    for v in &value.permissions {
         permissions
-            .push(p::PermissionRole {
-                connector: value.connector(),
-                permission: value.permission(),
-                role: value.role(),
-            })
-            .expect("same count");
+            .push(w::PolicyPermission::new(
+                limits,
+                w::PolicyPermissionParts { connector: v.connector, permission: v.permission, role: v.role },
+            )?)
+            .expect("permission count");
     }
-    let overrides = operations::overrides(v.templates);
-    Ok(c::ConfiguredPolicy {
-        policy: a::Policy {
-            escalation_role: v.escalation_role,
-            ceiling: authority(v.ceiling, models, limits)?,
-            projections: c::grants_to_authority(grants.into_boxed()).ok_or(bad())?,
-            period_spend: v.period_spend,
-            roles: roles.into_boxed(),
-            requirements: requirements(v.requirements),
+    let mut overrides = List::with_capacity(super::count(value.templates.len())?);
+    for v in &value.templates {
+        overrides.push(v.clone()).expect("template override count");
+    }
+    w::SettingPolicy::new(
+        limits,
+        w::SettingPolicyParts {
+            escalation_role: p.escalation_role,
+            ceiling: authority(&p.ceiling, models, limits)?,
+            projections,
+            period_spend: p.period_spend,
+            roles,
+            requirements: requirements(&p.requirements, limits)?,
+            permissions,
+            templates: me::overrides(&overrides, limits)?,
         },
-        permissions: permissions.into_boxed(),
-        templates: overrides,
-    })
+    )
 }
-fn rules(value: w::Rules, models: &[crate::Model], limits: &w::Limits) -> Result<a::Rules, Untranslatable> {
-    let v = value.into_parts();
-    let mut implies = List::with_capacity(v.implies.len());
-    for value in v.implies.into_boxed() {
+fn rules(value: &a::Rules, models: &[crate::Model], limits: &w::Limits) -> Result<w::Rules, w::Problem> {
+    let mut implies = List::with_capacity(super::count(value.implies.entries().len())?);
+    for v in value.implies.entries() {
         implies
-            .push(a::Implication { connector: value.connector(), kind: value.kind(), implies: value.implies() })
-            .expect("same count");
+            .push(w::OwnerKindImplication::new(
+                limits,
+                w::OwnerKindImplicationParts { connector: v.connector, kind: v.kind, implies: v.implies },
+            )?)
+            .expect("implication count");
     }
-    let count = implies.len();
-    Ok(a::Rules {
-        ceiling: authority(v.ceiling, models, limits)?,
-        period_spend: v.period_spend,
-        minimum_run_spend: v.minimum_run_spend,
-        maximum_run_spend: v.maximum_run_spend,
-        implies: a::Implies::new(implies.into_boxed(), count).ok_or(bad())?,
-        requirements: requirements(v.requirements),
-    })
-}
-fn template(value: w::Template, models: &[crate::Model], limits: &w::Limits) -> Result<c::Template, Untranslatable> {
-    let v = value.into_parts();
-    if v.name.cut() {
-        return Err(bad());
-    }
-    let flags = v.flags.into_parts();
-    let llm = match super::llm::people(v.llm, models, w::Path::TemplateLlm)? {
-        Some(value) => {
-            let mut subagents = List::with_capacity(u32::try_from(value.subagents.len()).expect("bounded models"));
-            for value in value.subagents {
-                subagents.push(t::ModelEffort { model: value.model, effort: value.effort }).expect("same count");
-            }
-            Some(t::LlmChoice {
-                account: value.account,
-                main: t::ModelEffort { model: value.main.model, effort: value.main.effort },
-                subagents: subagents.into_boxed(),
-            })
-        }
-        None => None,
-    };
-    Ok(c::Template {
-        number: v.number,
-        name: v.name.into_parts().bytes,
-        executor: operations::executor(v.executor),
-        contract: contract(v.contract, limits)?,
-        shallower: v.shallower,
-        budget: operations::budget(v.budget),
-        deadline: operations::deadline(v.deadline),
-        tracked: v.tracked,
-        flags: t::Flags {
-            conversation: flags.conversation,
-            listed: flags.listed,
-            retention: match flags.retention {
-                w::Retention::Kept => t::Retention::Kept,
-                w::Retention::ForgottenOnceRead => t::Retention::ForgottenOnceRead,
-            },
-            ended_by: match flags.ended_by {
-                w::EndedBy::Result => t::EndedBy::Result,
-                w::EndedBy::Requester => t::EndedBy::Requester,
-            },
+    w::Rules::new(
+        limits,
+        w::RulesParts {
+            ceiling: authority(&value.ceiling, models, limits)?,
+            period_spend: value.period_spend,
+            minimum_run_spend: value.minimum_run_spend,
+            maximum_run_spend: value.maximum_run_spend,
+            implies,
+            requirements: requirements(&value.requirements, limits)?,
         },
-        label: v.label,
-        grace: match v.grace {
-            Some(value) => Some(value),
-            None => None,
-        },
-        llm,
-    })
+    )
 }
-fn contract(value: w::TaskContractDocument, limits: &w::Limits) -> Result<t::Contract, Untranslatable> {
+pub fn value(value: &s::Value, models: &[crate::Model], limits: &w::Limits) -> Result<w::SettingValue, w::Problem> {
     Ok(match value {
-        w::TaskContractDocument::Report(value) => t::Contract::Report { words: value.words() },
-        w::TaskContractDocument::Change(value) => {
-            t::Contract::Change { connector: value.connector(), kind: value.kind(), words: value.words() }
-        }
-        w::TaskContractDocument::Approval(value) => {
-            let v = value.into_parts();
-            t::Contract::Approval { state: v.state, part: part(v.part) }
-        }
-        w::TaskContractDocument::Verdict(value) => {
-            if value.cut() {
-                return Err(bad());
-            }
-            let path = w::Path::TaskContractDocumentVerdictChoices;
-            let count = asks::count(value.choices(), path)?;
-            let mut choices = List::with_capacity(count);
-            let mut reader = Reader::new(value.choices());
-            for _ in 0..count {
-                let bytes = asks::item(&mut reader, path)?;
-                let mut piece = Reader::new(&bytes);
-                let v = match w::VerdictChoice::decode(limits, &mut piece) {
-                    Ok(value) => value.into_parts(),
-                    Err(problem) => return Err(map_problem(problem)),
+        s::Value::Charter(v) => w::SettingValue::Charter(Box::new(charter(v, limits)?)),
+        s::Value::Template(v) => w::SettingValue::Template(Box::new(me::template(v, models, limits)?)),
+        s::Value::Policy(v) => w::SettingValue::Policy(Box::new(policy(v, models, limits)?)),
+        s::Value::Rules(v) => w::SettingValue::Rules(Box::new(rules(v, models, limits)?)),
+    })
+}
+pub fn setting_document(
+    v: &reads::SettingDocument,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<w::SettingDocument, w::Problem> {
+    w::SettingDocument::new(
+        limits,
+        w::SettingDocumentParts {
+            setting: name(v.setting, limits)?,
+            revision: v.revision,
+            value: value(&v.value, models, limits)?,
+        },
+    )
+}
+pub fn revision(
+    v: &reads::RevisionAnswer,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<w::RevisionAnswer, w::Problem> {
+    Ok(match v {
+        reads::RevisionAnswer::Unknown => w::RevisionAnswer::Unknown,
+        reads::RevisionAnswer::Forgotten { oldest } => w::RevisionAnswer::Forgotten(w::RevisionForgotten::new(
+            limits,
+            w::RevisionForgottenParts { oldest: *oldest },
+        )?),
+        reads::RevisionAnswer::Revision { revision, value_bytes } => {
+            let mut pieces = List::with_capacity(super::count(revision.items.len())?);
+            for item in &revision.items {
+                let edit = match &item.edit {
+                    s::Edit::Set(v) => {
+                        let value = value(v, models, limits)?;
+                        let bytes = u64::from(value.measure());
+                        if bytes > (*value_bytes).min(u64::from(limits.owned_record)) {
+                            w::RevisionEdit::TooLarge(w::Size::new(limits, w::SizeParts { bytes })?)
+                        } else {
+                            w::RevisionEdit::Set(w::SettingSet::new(limits, w::SettingSetParts { value })?)
+                        }
+                    }
+                    s::Edit::Removed => w::RevisionEdit::Removed,
+                    s::Edit::Reset => w::RevisionEdit::Reset,
                 };
-                if !piece.is_empty() {
-                    return Err(bad());
-                }
-                let mut fields = List::with_capacity(v.fields.len());
-                for field in v.fields.into_boxed() {
-                    let f = field.into_parts();
-                    fields.push(t::FieldRule { name: f.name, max: f.max }).expect("same count");
-                }
-                choices
-                    .push(t::Verdict {
-                        code: v.code,
-                        words: v.words,
-                        followups: v.followups,
-                        fields: fields.into_boxed(),
-                    })
-                    .expect("same count");
+                let item =
+                    w::RevisionItem::new(limits, w::RevisionItemParts { setting: name(item.setting, limits)?, edit })?;
+                let mut out = Writer::new(usize::try_from(item.measure()).expect("measured item"));
+                item.encode(&mut out).expect("measured item");
+                pieces.push(out.finish()).expect("item count");
             }
-            t::Contract::Verdict { choices: choices.into_boxed() }
+            w::RevisionAnswer::Revision(w::RevisionDocument::new(
+                limits,
+                w::RevisionDocumentParts {
+                    head: head(&revision.head, limits)?,
+                    items: super::pieces(&pieces, limits.revision_document_items, w::Path::RevisionDocumentItems)?,
+                },
+            )?)
         }
     })
 }
-
-fn part(value: w::OwnerPart) -> t::Part {
-    let v = value.into_parts();
-    t::Part {
-        connector: v.connector,
-        kind: match v.kind {
-            w::OwnerPartKind::Resource => t::PartKind::Resource,
-            w::OwnerPartKind::Pool => t::PartKind::Pool,
-            w::OwnerPartKind::Result => t::PartKind::Result,
-            w::OwnerPartKind::Procedure => t::PartKind::Procedure,
-            w::OwnerPartKind::Effect => t::PartKind::Effect,
-            w::OwnerPartKind::Outbox => t::PartKind::Outbox,
-            w::OwnerPartKind::Hold => t::PartKind::Hold,
-        },
-        key: match v.key {
-            w::OwnerPartKey::Number(value) => t::PartKey::Number(value.value()),
-            w::OwnerPartKey::Path(value) => t::PartKey::Path(value.into_parts().value),
-        },
+pub fn revisions(v: &reads::RevisionsPage, limits: &w::Limits) -> Result<w::RevisionsPage, w::Problem> {
+    let mut rows = List::with_capacity(v.rows.len());
+    for row in &v.rows {
+        let mut items = List::with_capacity(row.items.len());
+        for item in &row.items {
+            items
+                .push(w::RevisionItemHead::new(
+                    limits,
+                    w::RevisionItemHeadParts {
+                        setting: name(item.setting, limits)?,
+                        edit: match item.edit {
+                            reads::RevisionEdit::Set => w::RevisionItemEdit::Set,
+                            reads::RevisionEdit::Removed => w::RevisionItemEdit::Removed,
+                            reads::RevisionEdit::Reset => w::RevisionItemEdit::Reset,
+                        },
+                    },
+                )?)
+                .expect("preview count");
+        }
+        rows.push(w::RevisionRow::new(
+            limits,
+            w::RevisionRowParts { head: head(&row.head, limits)?, items, more: row.more },
+        )?)
+        .expect("page count");
     }
+    w::RevisionsPage::new(limits, w::RevisionsPageParts { rows, next: v.next, forgotten: v.forgotten })
 }

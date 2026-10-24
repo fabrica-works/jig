@@ -122,7 +122,7 @@ use jig_domain_views as views;
 use skein_lib::{List, Map, Queue, Token, Wall};
 
 /// Policy copied into a later project (configuration.md, 3; core.md, 6.1).
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConfiguredPolicy {
     pub policy: authority::Policy,
     pub permissions: Box<[people::PermissionRole]>,
@@ -291,6 +291,7 @@ pub struct Core {
     pub(crate) keys: Map<Token, Carried>,
     pub(crate) application_input: Option<routing::application_routes::Input>,
     pub(crate) task_capacity_mark: u64,
+    pub(crate) settings_holders: u32,
     pub(crate) applications: Map<Token, routing::application_routes::Flight>,
     pub(crate) restart: restart::Restart,
     pub(crate) restart_attempts: u32,
@@ -641,6 +642,7 @@ impl Core {
             keys: Map::with_capacity(limits.people.pending),
             application_input: None,
             task_capacity_mark: 0,
+            settings_holders: 0,
             applications: Map::with_capacity(limits.people.pending),
             restart: restart::Restart::Cold,
             restart_attempts: limits.fleet.attempts,

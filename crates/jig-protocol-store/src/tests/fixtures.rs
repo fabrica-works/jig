@@ -613,7 +613,7 @@ pub fn people_asks() -> Box<[people::Ask]> {
 }
 
 pub const CORE_LIMITS: core::Limits = core::Limits {
-    settings: core::settings::Limits { history: 64 },
+    settings: core::settings::Limits { history: 64, alternatives: 16, permissions: 32 },
     templates: 8,
     fill_mark: 1000,
     documents: core::documents::DocumentLimits {

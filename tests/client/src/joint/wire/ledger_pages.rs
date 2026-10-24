@@ -129,6 +129,7 @@ pub(crate) mod tests {
             | reads::Scope::Inbox { .. }
             | reads::Scope::Tasks { .. }
             | reads::Scope::Notes { .. }
+            | reads::Scope::SettingsHistory { .. }
             | reads::Scope::ScopedNotes { .. } => panic!("one of the two historical scopes"),
         };
         reads::Page {

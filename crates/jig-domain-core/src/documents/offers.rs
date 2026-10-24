@@ -166,6 +166,7 @@ pub(super) fn subject(
         | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::PersonTask { .. }
         | Subject::Note { .. }
@@ -330,6 +331,7 @@ fn effect(core: &Core, limits: &Limits, act: Act, subject: &Subject) -> Option<a
         | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::Proposal { .. }
         | Subject::Question { .. }

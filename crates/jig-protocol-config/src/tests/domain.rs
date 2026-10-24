@@ -506,7 +506,10 @@ fn memory_below_the_components_sum_is_refused() {
         // Stored settings' two sets, restore transients and fleet catalogue evidence.
         + 2_010_752
         // Owner settings changes retain a bounded input and decision scratch.
-        + 1_880;
+        + 1_880
+        // Settings reads: the inventory document and its scratch, revision and history loads
+        // with their maps, the stored catalogue's effort names, and the settings holders' counts.
+        + 5_810_584;
     // Regenerate this charge with JIG_MEMORY_WRITE=1 through heavy, then run
     // normally to check it. The unchanged terms above keep the act saving local.
     let charge_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/deployment_act_growth.txt");

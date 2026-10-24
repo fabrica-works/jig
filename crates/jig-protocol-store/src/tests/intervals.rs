@@ -107,11 +107,12 @@ fn each_fixed_scope_holds_the_keys_it_admits_and_no_others() {
     }
 }
 
-fn fixed_scopes() -> [jig_domain_core::reads::Scope; 13] {
+fn fixed_scopes() -> [jig_domain_core::reads::Scope; 14] {
     use jig_domain_core::reads::Scope;
     [
         Scope::Proposal { proposer: jig_domain_people::Proposer::Party(1), proposal: 1 },
         Scope::Proposal { proposer: jig_domain_people::Proposer::Party(2), proposal: 1 },
+        Scope::SettingsHistory { first: 1, last: 3, newest: 3, whole: false },
         Scope::Spend { project: 1 },
         Scope::EndedDelegates { task: 1 },
         Scope::Task { task: 1 },

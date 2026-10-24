@@ -42,6 +42,7 @@ pub struct Domain {
     pub(crate) circle_changes: crate::waits::CircleChanges,
     pub(crate) tasks: Slab<Task>,
     pub(crate) names: Map<u64, Id<Task>>,
+    pub(crate) live_agents: u32,
     pub(crate) stubs: Map<u64, crate::Stub>,
     pub(crate) alarms: Deadlines<u64>,
     pub(crate) grace_alarms: Deadlines<u64>,
@@ -94,6 +95,12 @@ pub fn view_phase(phase: &Phase) -> u32 {
 }
 
 impl Domain {
+    /// Live agent tasks holding the newest settings in M3 (engine.md, 17.3).
+    #[must_use]
+    pub const fn live_agent_tasks(&self) -> u32 {
+        self.live_agents
+    }
+
     /// Earliest armed monotonic task deadline; observing it expires nothing.
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
@@ -207,6 +214,7 @@ impl Domain {
             circle_changes: crate::waits::CircleChanges::new(limits),
             tasks: Slab::with_capacity(limits.tasks),
             names: Map::with_capacity(limits.tasks),
+            live_agents: 0,
             stubs: Map::with_capacity(crate::limits::stub_capacity(limits).expect("valid stub bound")),
             alarms: Deadlines::with_capacity(limits.tasks),
             grace_alarms: Deadlines::with_capacity(limits.tasks),
@@ -1352,6 +1360,12 @@ pub(crate) fn make_admitted(
             observed_hold: None,
             observed_phase: None,
         };
+        match task.record.executor {
+            crate::Executor::Agent { .. } => {
+                domain.live_agents = domain.live_agents.checked_add(1).expect("bounded live agents");
+            }
+            crate::Executor::Person(_) | crate::Executor::Procedure { .. } => {}
+        }
         let id = domain.tasks.insert(task).expect("batch slab room admitted");
         let indexed = domain.names.insert(number, id);
         assert!(indexed == Ok(None), "batch names admitted");

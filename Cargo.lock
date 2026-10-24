@@ -692,6 +692,7 @@ dependencies = [
  "jig-domain-tasks",
  "jig-fake-parties",
  "jig-fake-workers",
+ "jig-protocol-engine-clients",
  "jig-test-connector",
  "jig-test-connector-world",
  "jig-test-domain",
@@ -706,6 +707,7 @@ dependencies = [
 name = "jig-core-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-protocol-wire",
  "jig-client-test-records",
  "jig-conformance",
  "jig-domain-accounts",
@@ -721,6 +723,7 @@ dependencies = [
  "jig-fake-workers",
  "jig-protocol-charter",
  "jig-protocol-config",
+ "jig-protocol-engine-clients",
  "jig-protocol-tools",
  "jig-test-connector",
  "jig-test-connector-world",

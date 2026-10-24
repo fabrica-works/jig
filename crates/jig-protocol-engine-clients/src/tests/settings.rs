@@ -1,165 +1,305 @@
-//! Settings cross the clients' component as one value and one keyed digest.
-use super::fixtures::{self as f, Exchange};
-use crate::{Request, translate};
+use super::fixtures as f;
+use crate::translate::settings as translate;
 use jig_client_protocol_wire::v19 as w;
-use jig_domain_core::{self as core, settings as s};
-use jig_domain_people as p;
-use skein_lib::List;
+use jig_domain_core::{documents as d, reads, settings as s};
+use skein_lib::{List, Reader, Wall};
 
-fn ask() -> w::Ask {
-    w::Ask::ChangeSettings(
-        jig_client_protocol_link::translate::settings::wire_change_settings(
-            &jig_client_test_records::settings::settings_change(),
-            &f::wire(),
-        )
-        .expect("settings fixture"),
-    )
+fn head() -> s::Head {
+    s::Head { number: 6, against: 5, at: Wall::EPOCH, by: s::Decider::Release, proposal: None, moved: false }
+}
+fn settings() -> d::Settings {
+    let mut held = List::with_capacity(1);
+    held.push(d::HeldRevision { head: head(), holders: 2 }).unwrap();
+    let mut settings = List::with_capacity(1);
+    settings
+        .push(d::SettingLine {
+            setting: s::Setting::Template(1),
+            name: Some(d::Text { bytes: Box::from(b"chat".as_slice()), cut: false }),
+            follows: d::Follows::Default,
+            last: 6,
+        })
+        .unwrap();
+    d::Settings { newest: 6, settings, held, pending: List::with_capacity(0) }
+}
+fn returned(answer: reads::Answer, request: w::Read) -> w::ReadValue {
+    let mut exchange = f::read_exchange();
+    let (owner, reply, _) = exchange.read(&request);
+    exchange.release_read(reply, answer);
+    let w::ReadAnswer::Value(value) = exchange.read_answer(owner) else { panic!("value answer") };
+    let value = value.into_parts();
+    w::ReadValue::decode(&f::wire(), &mut Reader::new(&value.record)).unwrap()
 }
 #[test]
-fn all_four_whole_values_translate_and_the_component_passes_the_exact_asks_digest() {
-    let mut env = f::env();
-    env.limits.message_bytes = 8192;
-    env.limits.wire.keyed_request = 8192;
-    let mut exchange = Exchange::with_env(env);
-    exchange.component.settings.models[0].name = Box::from(b"model".as_slice());
-    let wire = ask();
-    let encoded = f::encode_ask(&wire);
-    let expected_digest = crate::sign_in::digest(&encoded).expose().try_into().expect("settings fixture");
-    let expected = p::Ask::ChangeSettings { against: 5, digest: expected_digest };
-    assert_eq!(translate::asks::ask(wire, &exchange.component.settings.models, &f::wire()), Ok(expected));
-    let keyed = w::Keyed::new(
-        &exchange.env.limits.wire,
-        w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 19, request: encoded, value: None },
-    )
-    .expect("settings envelope");
-    let mut writer = skein_lib::Writer::new(usize::try_from(keyed.measure()).expect("settings measure"));
-    keyed.encode(&mut writer).expect("settings envelope");
-    exchange.send(crate::Message::Request(writer.finish()));
-    exchange.authenticate();
-    let Some(Request::Core(event)) = exchange.out.pop() else { panic!("core entrance") };
-    let core::Event::ChangeSettings { sign_in, key, digest, change, .. } = *event else { panic!("settings entrance") };
-    assert_eq!((sign_in, key, digest), (41, [5; 16], expected_digest));
-    assert_eq!(change.against, 5);
-    assert_eq!(change.running, s::Running::Moves);
-    assert_eq!(change.items.len(), 4);
-    let s::Edit::Set(s::Value::Charter(charter)) = &change.items[0].edit else { panic!("charter") };
-    assert_eq!(change.items[0].setting, s::Setting::Charter(2));
-    assert_eq!(charter.policy.instructions.as_ref(), "instructions λ".as_bytes());
-    assert_eq!(charter.policy.model.effort.as_deref(), Some(b"high".as_slice()));
-    assert_eq!(charter.policy.model.cache_write_price, Some(5));
-    assert_eq!(charter.policy.alternatives[0].name.as_ref(), b"other");
-    let s::Edit::Set(s::Value::Template(template)) = &change.items[1].edit else { panic!("template") };
-    assert_eq!(template.grace, Some(skein_lib::Duration::from_secs(18)));
-    assert_eq!(
-        template.llm.as_ref().expect("settings fixture").main,
-        jig_domain_tasks::ModelEffort { model: 0, effort: Some(1) }
-    );
-    assert_eq!(template.llm.as_ref().expect("settings fixture").account, Some(21));
-    assert!(template.flags.conversation);
-    let s::Edit::Set(s::Value::Policy(policy)) = &change.items[2].edit else { panic!("policy") };
-    assert_eq!(policy.policy.period_spend, 101);
-    assert_eq!(policy.policy.requirements[0].judge.parameters, 6);
-    assert_eq!(policy.permissions[0].permission, 11);
-    assert_eq!(policy.templates[0].priority, Some(5));
-    let s::Edit::Set(s::Value::Rules(rules)) = &change.items[3].edit else { panic!("rules") };
-    assert_eq!(rules.implies.entries()[0].implies, 3);
-    assert_eq!(rules.maximum_run_spend, 90);
-    assert!(exchange.out.is_empty());
-}
-#[test]
-fn resets_and_removals_translate_and_bad_pieces_reach_no_core() {
-    let limits = f::wire();
-    let mut rows = List::with_capacity(2);
-    for edit in [w::SettingEdit::Reset, w::SettingEdit::Removed] {
-        let item = w::SettingItem::new(&limits, w::SettingItemParts { setting: w::Setting::Rules, edit })
-            .expect("settings fixture");
-        let mut writer = skein_lib::Writer::new(usize::try_from(item.measure()).expect("settings fixture"));
-        item.encode(&mut writer).expect("settings fixture");
-        rows.push(writer.finish()).expect("settings fixture");
-    }
-    let request = w::ChangeSettings::new(
-        &limits,
-        w::ChangeSettingsParts { against: 3, items: f::pieces(rows.as_slice()), running: w::Running::Stays },
-    )
-    .expect("settings fixture");
-    let change = translate::settings::change(request, &f::models(), &limits).expect("settings fixture");
-    assert_eq!(
-        change.items.as_ref(),
-        &[
-            s::Item { setting: s::Setting::Rules, edit: s::Edit::Reset },
-            s::Item { setting: s::Setting::Rules, edit: s::Edit::Removed }
-        ]
-    );
-    for items in [Box::<[u8]>::from([0]), f::pieces(&[Box::new([255])])] {
-        let wire = w::Ask::ChangeSettings(
-            w::ChangeSettings::new(&limits, w::ChangeSettingsParts { against: 1, items, running: w::Running::Stays })
-                .expect("settings fixture"),
-        );
-        let mut exchange = Exchange::new();
-        let owner = exchange.send(crate::Message::Request(f::keyed(w::Owner::Jig, 19, f::encode_ask(&wire))));
-        exchange.authenticate();
-        assert!(exchange.out.is_empty());
-        assert_eq!(exchange.response(owner).0, 400);
-    }
-}
-#[test]
-fn settings_answers_and_each_fault_keep_their_facts() {
-    let limits = f::wire();
-    let answer = f::translated(&p::Reply::Outcome(p::Outcome::SettingsChanged { revision: 8 }), &limits);
-    let w::Final::Done(value) = answer else { panic!("done settings") };
-    let w::Outcome::SettingsChanged(value) = value.outcome() else { panic!("settings changed") };
-    assert_eq!(value.revision(), 8);
-    for why in [
-        p::Refusal::Stale { newest: 8 },
-        p::Refusal::Full { revision: 8, tasks: Box::new([3, 5]), more: 2 },
-        p::Refusal::NotWellFormed { at: 0, why: p::Malformed::SettingsUnchanged },
+fn settings_reads_enter_the_core_in_its_vocabulary() {
+    let wire = f::wire();
+    for (request, expected) in [
+        (w::Read::Settings, reads::Read::Settings),
+        (
+            w::Read::Setting(
+                w::ReadSetting::new(&wire, w::ReadSettingParts { setting: w::Setting::Rules, revision: 6 }).unwrap(),
+            ),
+            reads::Read::Setting { setting: s::Setting::Rules, revision: 6 },
+        ),
+        (
+            w::Read::Revision(w::ReadRevision::new(&wire, w::ReadRevisionParts { number: 5 }).unwrap()),
+            reads::Read::Revision { number: 5 },
+        ),
+        (
+            w::Read::Revisions(w::ReadRevisions::new(&wire, w::ReadRevisionsParts { before: Some(5) }).unwrap()),
+            reads::Read::Revisions { before: Some(5) },
+        ),
     ] {
-        let value = translate::refusals::refusal(why.clone(), &limits).expect("settings fixture");
-        match (why, value) {
-            (p::Refusal::Stale { newest }, w::Refusal::Stale(value)) => assert_eq!(value.newest(), newest),
-            (p::Refusal::Full { revision, tasks, more }, w::Refusal::Full(value)) => {
-                assert_eq!(value.revision(), revision);
-                assert_eq!(value.tasks().as_slice(), tasks.as_ref());
-                assert_eq!(value.more(), more);
+        let mut exchange = f::read_exchange();
+        let (_, _, actual) = exchange.read(&request);
+        assert_eq!(actual, expected);
+    }
+}
+#[test]
+fn inventory_reads_and_watch_deliveries_carry_the_same_facts() {
+    let document = settings();
+    let expected = translate::document(&document, &f::wire()).unwrap();
+    assert_eq!(
+        returned(
+            reads::Answer::Document(Box::new(d::Document::Settings(Box::new(document.clone())))),
+            w::Read::Settings
+        ),
+        w::ReadValue::Settings(expected.clone())
+    );
+    assert_eq!(
+        crate::translate::watches::delivery(
+            &d::Document::Settings(Box::new(document)),
+            0,
+            32,
+            &f::models(),
+            &f::wire()
+        )
+        .unwrap(),
+        w::DeliveryValue::Settings(expected)
+    );
+}
+#[test]
+fn settings_watch_subject_enters_the_core() {
+    let event = crate::translate::watches::watch(skein_lib::Token::new(1), 2, w::Subject::Settings, 3).unwrap();
+    let jig_domain_core::Event::Watch { subject, .. } = event else { panic!("watch") };
+    assert_eq!(subject, d::Watched::Settings);
+}
+#[test]
+fn forgotten_and_unknown_revision_answers_keep_their_distinction() {
+    for (answer, expected) in [
+        (reads::RevisionAnswer::Unknown, w::RevisionAnswer::Unknown),
+        (
+            reads::RevisionAnswer::Forgotten { oldest: 4 },
+            w::RevisionAnswer::Forgotten(
+                w::RevisionForgotten::new(&f::wire(), w::RevisionForgottenParts { oldest: 4 }).unwrap(),
+            ),
+        ),
+    ] {
+        assert_eq!(translate::revision(&answer, &f::models(), &f::wire()).unwrap(), expected);
+    }
+}
+#[test]
+fn the_inventory_at_profile_bounds_fits_one_wire_document() {
+    // The standard profile has 8 charters, 16 templates and 8 policies plus rules.
+    // Each map can name a whole set. Names belong to templates, up to 8192 bytes.
+    const INVENTORY: u32 = 66;
+    const NAMED: u32 = 32;
+    const NAME_BYTES: usize = 8192;
+    let mut document = settings();
+    document.settings = List::with_capacity(INVENTORY);
+    for number in 0..INVENTORY {
+        document
+            .settings
+            .push(d::SettingLine {
+                setting: s::Setting::Template(number),
+                name: if number < NAMED {
+                    Some(d::Text { bytes: Box::from([b'x'; NAME_BYTES].as_slice()), cut: false })
+                } else {
+                    None
+                },
+                follows: d::Follows::Default,
+                last: 6,
+            })
+            .unwrap();
+    }
+    let value = translate::document(&document, &w::CEILINGS).unwrap();
+    assert!(value.measure() < w::CEILINGS.owned_record);
+    assert!(document.settings.len() > w::CEILINGS.revisions_page_rows);
+    let mut client = f::client_limits().client;
+    client.document_bytes = u64::from(w::CEILINGS.owned_record);
+    client.text = u32::try_from(NAME_BYTES).unwrap();
+    client.turn_text = client.text;
+    client.turn_bytes = client.text;
+    let limits = jig_client_protocol_link::Limits::new(client, 4).unwrap();
+    let bytes = encoded_value(&w::ReadValue::Settings(value));
+    let _value = jig_client_protocol_link::translate::reads::value(&bytes, &limits).unwrap();
+}
+
+fn authority() -> jig_domain_authority::Authority {
+    use jig_domain_authority as a;
+    a::Authority {
+        tools: a::Tools(1),
+        models: a::Models::ALL,
+        grants: Box::new([]),
+        delegation: a::Delegation { kinds: Box::new([a::Executor::Charter(1)]), tasks: 2, depth: 1 },
+        budget: a::Budget { spend: 100, deadline: None },
+        notes: a::Scopes(0),
+        note_resources: Box::new([]),
+    }
+}
+fn charter() -> jig_domain_core::Charter {
+    use jig_domain_core as core;
+    use skein_lib::Duration;
+    core::Charter {
+        number: 1,
+        hosts: jig_domain_fleet::Kinds::Both,
+        spend: 100,
+        policy: core::RunPolicy {
+            instructions: Box::from("instructions λ".as_bytes()),
+            waiting: Duration::from_secs(2),
+            resume: true,
+            turns: 4,
+            time: Duration::from_secs(30),
+            reserve_turns: 1,
+            reserve_time: Duration::from_secs(5),
+            model: core::Model {
+                dialect: 3,
+                endpoint: 4,
+                program: Some(Box::from(b"program".as_slice())),
+                name: Box::from(b"careful".as_slice()),
+                window: 8192,
+                output: 1024,
+                input_price: 1,
+                cached_price: 2,
+                cache_write_price: Some(3),
+                output_price: 4,
+                price_unit: 1000,
+                efforts: Box::new([Box::from(b"high".as_slice())]),
+                effort: Some(Box::from(b"high".as_slice())),
+            },
+            alternatives: Box::new([]),
+            inspect: true,
+            modify: false,
+            shell: true,
+            agents: false,
+            call_timeout: Duration::from_secs(1),
+        },
+    }
+}
+fn values() -> [s::Value; 4] {
+    use jig_domain_authority as a;
+    [
+        s::Value::Charter(Box::new(charter())),
+        s::Value::Template(Box::new(f::template())),
+        s::Value::Policy(Box::new(jig_domain_core::ConfiguredPolicy {
+            policy: a::Policy {
+                escalation_role: Some(1),
+                ceiling: authority(),
+                projections: Box::new([]),
+                period_spend: 100,
+                roles: Box::new([a::Role {
+                    number: 1,
+                    authority: authority(),
+                    period_spend: 100,
+                    requests: a::Requests::ALL,
+                    decides: a::Proposals::ALL,
+                }]),
+                requirements: Box::new([]),
+            },
+            permissions: Box::new([jig_domain_people::PermissionRole { connector: 1, permission: 2, role: 1 }]),
+            templates: Box::new([]),
+        })),
+        s::Value::Rules(Box::new(a::Rules {
+            ceiling: authority(),
+            period_spend: 100,
+            minimum_run_spend: 1,
+            maximum_run_spend: 100,
+            implies: a::Implies::new(Box::new([]), 0).unwrap(),
+            requirements: Box::new([]),
+        })),
+    ]
+}
+fn encoded_value(value: &w::ReadValue) -> Box<[u8]> {
+    let mut out = skein_lib::Writer::new(usize::try_from(value.measure()).unwrap());
+    value.encode(&mut out).unwrap();
+    out.finish()
+}
+#[test]
+fn whole_setting_kinds_reach_the_clients_as_their_values() {
+    use jig_client_domain::contract as c;
+    let names = [s::Setting::Charter(1), s::Setting::Template(1), s::Setting::Policy(1), s::Setting::Rules];
+    for (name, value) in names.into_iter().zip(values()) {
+        let document = reads::SettingDocument { setting: name, revision: 6, value };
+        let wire = translate::setting_document(&document, &f::models(), &w::CEILINGS).unwrap();
+        let restored =
+            jig_client_protocol_link::translate::settings::restore_setting_document(&wire, &f::client_limits())
+                .unwrap();
+        assert_eq!(restored.revision, 6);
+        match (&document.value, restored.value) {
+            (s::Value::Charter(source), c::SettingValue::Charter(value)) => {
+                assert_eq!(value.instructions.bytes(), source.policy.instructions.as_ref());
+                assert_eq!(value.model.name.bytes(), source.policy.model.name.as_ref());
+                assert_eq!(value.hosts, c::SettingHosts::Both);
             }
-            (p::Refusal::NotWellFormed { .. }, w::Refusal::Malformed(value)) => {
-                assert_eq!(value.why(), &w::Malformed::SettingsUnchanged);
+            (s::Value::Template(source), c::SettingValue::Template(value)) => {
+                assert_eq!(value.name.bytes.bytes(), source.name.as_ref());
             }
-            value => panic!("settings refusal {value:?}"),
+            (s::Value::Policy(source), c::SettingValue::Policy(value)) => {
+                assert_eq!(value.roles.len(), u32::try_from(source.policy.roles.len()).unwrap());
+                assert_eq!(value.permissions.get(0).unwrap().permission, 2);
+            }
+            (s::Value::Rules(source), c::SettingValue::Rules(value)) => {
+                assert_eq!(value.maximum_run_spend, source.maximum_run_spend);
+            }
+            _ => panic!("setting kind survives translation"),
         }
     }
-    for setting in [p::Setting::Charter(1), p::Setting::Template(2), p::Setting::Policy(3), p::Setting::Rules] {
-        for fault in [
-            p::SettingFault::Shape,
-            p::SettingFault::Count,
-            p::SettingFault::Reference,
-            p::SettingFault::Rules,
-            p::SettingFault::Budget,
-            p::SettingFault::Grace,
-            p::SettingFault::Owner,
-        ] {
-            let value = translate::refusals::refusal(
-                p::Refusal::NotWellFormed { at: 0, why: p::Malformed::Settings { setting, fault } },
-                &limits,
-            )
-            .expect("settings fixture");
-            let w::Refusal::Malformed(value) = value else { panic!("malformed settings") };
-            let w::Malformed::Settings(facts) = value.why() else { panic!("settings facts") };
-            assert_eq!(
-                facts.setting(),
-                &match setting {
-                    p::Setting::Charter(number) => w::Setting::Charter(
-                        w::SettingNumber::new(&limits, w::SettingNumberParts { number }).expect("number")
-                    ),
-                    p::Setting::Template(number) => w::Setting::Template(
-                        w::SettingNumber::new(&limits, w::SettingNumberParts { number }).expect("number")
-                    ),
-                    p::Setting::Policy(number) => w::Setting::Policy(
-                        w::SettingNumber::new(&limits, w::SettingNumberParts { number }).expect("number")
-                    ),
-                    p::Setting::Rules => w::Setting::Rules,
-                }
-            );
+}
+#[test]
+fn revision_values_past_the_single_read_budget_name_their_encoded_size() {
+    use jig_client_domain::contract as c;
+    let source = s::Value::Charter(Box::new(charter()));
+    let bytes = u64::from(translate::value(&source, &f::models(), &w::CEILINGS).unwrap().measure());
+    let revision = s::Revision {
+        head: head(),
+        items: Box::new([
+            s::Item { setting: s::Setting::Charter(1), edit: s::Edit::Set(source) },
+            s::Item { setting: s::Setting::Template(2), edit: s::Edit::Removed },
+            s::Item { setting: s::Setting::Policy(3), edit: s::Edit::Reset },
+        ]),
+    };
+    for (budget, large) in [(bytes, false), (bytes - 1, true)] {
+        let answer = reads::RevisionAnswer::Revision { revision: revision.clone(), value_bytes: budget };
+        let wire = translate::revision(&answer, &f::models(), &w::CEILINGS).unwrap();
+        let restored =
+            jig_client_protocol_link::translate::settings::restore_revision_answer(&wire, &f::client_limits()).unwrap();
+        let c::RevisionAnswer::Revision(document) = restored else { panic!("revision") };
+        assert_eq!(document.head.number, 6);
+        assert_eq!(document.items.len(), 3);
+        assert_eq!(document.items.get(1).unwrap().edit, c::RevisionEdit::Removed);
+        assert_eq!(document.items.get(2).unwrap().edit, c::RevisionEdit::Reset);
+        match &document.items.get(0).unwrap().edit {
+            c::RevisionEdit::TooLarge(value) => {
+                assert!(large);
+                assert_eq!(value.bytes, bytes);
+            }
+            c::RevisionEdit::Set(_) => assert!(!large),
+            c::RevisionEdit::Removed | c::RevisionEdit::Reset => panic!("set or size"),
         }
     }
+}
+#[test]
+fn revision_page_heads_and_cursors_reach_the_client_without_values() {
+    use jig_client_domain::contract as c;
+    let mut items = List::with_capacity(1);
+    items.push(reads::RevisionItemHead { setting: s::Setting::Rules, edit: reads::RevisionEdit::Set }).unwrap();
+    let mut rows = List::with_capacity(1);
+    rows.push(reads::RevisionRow { head: head(), items, more: 3 }).unwrap();
+    let page = reads::RevisionsPage { rows, next: Some(6), forgotten: false };
+    let wire = translate::revisions(&page, &w::CEILINGS).unwrap();
+    let bytes = encoded_value(&w::ReadValue::Revisions(wire));
+    let client = jig_client_protocol_link::translate::reads::value(&bytes, &f::client_limits()).unwrap();
+    let c::ReadValue::Revisions(page) = client else { panic!("revision page") };
+    assert_eq!(page.next, Some(6));
+    assert_eq!(page.rows.get(0).unwrap().more, 3);
+    assert_eq!(page.rows.get(0).unwrap().items.get(0).unwrap().edit, c::RevisionItemEdit::Set);
 }

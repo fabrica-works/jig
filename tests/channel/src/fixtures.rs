@@ -120,8 +120,12 @@ pub const WORKER_DOCUMENT: &[u8] = br#"{
 
 #[must_use]
 pub fn engine_document() -> Vec<u8> {
+    document(ENGINE)
+}
+
+fn document(engine: &[u8]) -> Vec<u8> {
     let mut document = b"{\"engine\":".to_vec();
-    document.extend_from_slice(ENGINE);
+    document.extend_from_slice(engine);
     document.extend_from_slice(
         br#", "application":{"server":{"listener":{"socket":"127.0.0.1:7100"}},"credential":"app.secret","connectors":[
         {"prefix":["one"],"resources":[]},{"prefix":["two"],"resources":[]}]},
@@ -493,12 +497,16 @@ pub(crate) fn engine_message_document() -> Vec<u8> {
 }
 
 fn engine_configuration() -> jig_protocol_config::Engine {
+    configuration(ENGINE)
+}
+
+fn configuration(text: &[u8]) -> jig_protocol_config::Engine {
     let bounds = jig_protocol_config::DocumentLimits {
-        bytes: u32::try_from(ENGINE.len()).expect("fixture document size"),
-        tokens: u32::try_from(ENGINE.len()).expect("fixture document size"),
+        bytes: u32::try_from(text.len()).expect("fixture document size"),
+        tokens: u32::try_from(text.len()).expect("fixture document size"),
         depth: 32,
     };
-    let document = jig_protocol_config::document(ENGINE, &bounds).expect("fixture document");
+    let document = jig_protocol_config::document(text, &bounds).expect("fixture document");
     jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working()).expect("fixture engine")
 }
 
@@ -513,8 +521,8 @@ pub fn store_limits() -> jig_test_service::limits::Limits {
 
 /// The fixture's configured model names, by which the store keeps a role's models.
 #[must_use]
-pub fn store_names() -> &'static [Box<[u8]>] {
-    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
+pub fn store_names() -> &'static [jig_domain_core::settings::ModelName] {
+    static NAMES: std::sync::OnceLock<Box<[jig_domain_core::settings::ModelName]>> = std::sync::OnceLock::new();
     NAMES.get_or_init(|| jig_protocol_store::codec::names(&engine_configuration().llm.models))
 }
 
@@ -585,14 +593,18 @@ pub fn chat(store: &crate::world::Store, project: u32, words: &[u8]) -> jig_doma
 
 /// Two numbered providers share an endpoint but require distinct real source grants.
 pub(crate) fn providers_document() -> Vec<u8> {
-    String::from_utf8(engine_document()).expect("bounded fixture value")
+    document(&providers_engine())
+}
+
+fn providers_engine() -> Vec<u8> {
+    String::from_utf8(ENGINE.to_vec()).expect("bounded fixture value")
         .replace(r#""providers":[{"name":"fake-provider","number":1,"models":["fake"],"sources":{"keys":true}}]"#,
                  r#""providers":[{"name":"fake-provider","number":1,"models":["fake"],"sources":{"keys":true}},{"name":"other","number":2,"models":["other"],"sources":{"keys":true}}]"#)
         .replace("\"unit\": 1000000}\n}]", "\"unit\": 1000000}\n},{\"name\":\"other\",\"endpoint\":\"fake\",\"window\":1048576,\"output\":512,\"prices\":{\"input\":1,\"cached\":1,\"output\":1,\"unit\":1000000}}]")
         .replace(r#""alternatives": []"#, r#""alternatives": ["other"]"#).into_bytes()
 }
 
-pub(crate) fn providers_store_names() -> &'static [Box<[u8]>] {
-    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
-    NAMES.get_or_init(|| Box::new([b"fake".as_slice().into(), b"other".as_slice().into()]))
+pub(crate) fn providers_store_names() -> &'static [jig_domain_core::settings::ModelName] {
+    static NAMES: std::sync::OnceLock<Box<[jig_domain_core::settings::ModelName]>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| jig_protocol_store::codec::names(&configuration(&providers_engine()).llm.models))
 }
