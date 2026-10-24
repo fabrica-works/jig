@@ -104,6 +104,9 @@ pub fn up(event: driver::Event, now: Time, required: &[u8]) -> Up {
             driver::Asked::HandIn => unreachable!("the layer checks each handed-in record before handing it in"),
         },
         driver::Event::Closed => Up::Child(accounts::FromComponent::Closed),
+        driver::Event::Taken { account: _ } => {
+            unreachable!("the engine hands in no redirected before chatgpt-paste M3 task C")
+        }
         driver::Event::Visit { account, url } => {
             if url.len() > usize::try_from(accounts::ADDRESS).expect("address bound") {
                 Up::SignInFailed { source: account, failure: accounts::Failure::Misconfigured }
@@ -171,6 +174,7 @@ fn refused(why: driver::Refusal) -> accounts::Failure {
         | driver::Refusal::Unusable(_)
         | driver::Refusal::NotWaiting
         | driver::Refusal::Redirect
+        | driver::Refusal::State
         | driver::Refusal::Account
         | driver::Refusal::Source
         | driver::Refusal::NotAccessOnly

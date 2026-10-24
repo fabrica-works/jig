@@ -1173,6 +1173,7 @@ fn event_account(event: &driver::Event) -> Option<u32> {
         | driver::Event::Failed { account, .. }
         | driver::Event::Refused { account, .. }
         | driver::Event::Visit { account, .. }
+        | driver::Event::Taken { account }
         | driver::Event::SignedIn { account, .. }
         | driver::Event::Keep { account, .. }
         | driver::Event::Removed { account }
