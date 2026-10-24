@@ -16,6 +16,8 @@ pub struct Judge {
     wake: Option<Time>,
     deadline: Option<Time>,
     rejected: bool,
+    pasted: u8,
+    restarted: Option<()>,
     closing: bool,
     shutdown: bool,
     passed: Option<()>,
@@ -23,7 +25,17 @@ pub struct Judge {
 impl Judge {
     #[must_use]
     pub fn new(story: Story) -> Self {
-        Self { story, wake: None, deadline: None, rejected: false, closing: false, shutdown: false, passed: None }
+        Self {
+            story,
+            wake: None,
+            deadline: None,
+            rejected: false,
+            pasted: 0,
+            restarted: None,
+            closing: false,
+            shutdown: false,
+            passed: None,
+        }
     }
 }
 impl Referee<Process> for Judge {
@@ -37,6 +49,16 @@ impl Referee<Process> for Judge {
             Process::Owner(owner) => owner.visit().map(Box::<[u8]>::from),
             Process::Issuer(_) | Process::Visitor(_) => None,
         });
+        let pasting = matches!(self.story, Story::PastedAddress | Story::PastedState | Story::SignInAgain);
+        let can_visit = self.story != Story::SignInAgain || self.restarted.is_some();
+        let mut redirect = [0_u8; 1024];
+        let redirect_len = processes.iter().find_map(|process| match process {
+            Process::Visitor(visitor) => visitor.redirect().map(|uri| {
+                redirect[..uri.len()].copy_from_slice(uri);
+                uri.len()
+            }),
+            Process::Owner(_) | Process::Issuer(_) => None,
+        });
         let close_exchange = self.story == Story::ClosedExchange && crate::world::exchange_seen(processes);
         let answered = visit_answered(processes);
         let settled = processes.iter().any(|process| matches!(process, Process::Owner(owner) if owner.is_empty()))
@@ -45,6 +67,35 @@ impl Referee<Process> for Judge {
             match process {
                 Process::Owner(owner) => {
                     owner.address = address;
+                    if self.story == Story::SignInAgain && self.restarted.is_none() && visit.is_some() {
+                        owner.sign_in_again();
+                        self.restarted = Some(());
+                    }
+                    let retry = self.story == Story::PastedState
+                        && self.pasted == 1
+                        && owner.account_answers().iter().any(|answer| {
+                            matches!(
+                                answer,
+                                jig_domain_accounts::Answer::Refused {
+                                    refusal: jig_domain_accounts::Refusal::SignInRedirect {
+                                        why: jig_domain_accounts::SignInRedirectWhy::State
+                                    }
+                                }
+                            )
+                        });
+                    if pasting
+                        && let Some(len) = redirect_len
+                        && (self.pasted == 0 || retry)
+                    {
+                        if retry {
+                            assert!(
+                                owner.account_sign_in_ended().is_empty(),
+                                "a refused paste leaves the sign-in waiting"
+                            );
+                        }
+                        owner.hand_paste(&redirect[..len], self.story == Story::PastedState && self.pasted == 0);
+                        self.pasted += 1;
+                    }
                     if fixtures::rejects(self.story) && owner.child_heard().len() == 1 && !self.rejected {
                         owner.reject();
                         self.rejected = true;
@@ -61,8 +112,12 @@ impl Referee<Process> for Judge {
                 Process::Issuer(_) => (),
                 Process::Visitor(visitor) => {
                     if let Some(url) = &visit
+                        && can_visit
                         && !visitor.handed()
                     {
+                        if pasting {
+                            visitor.stop_at_redirect();
+                        }
                         visitor.hand(url);
                     }
                 }
@@ -111,8 +166,17 @@ impl Referee<Process> for Judge {
             assert_eq!(owner.child_heard(), expected);
             no_value_outside_the_store(owner);
         }
-        self.wake = ((owner.unstarted()
-            && processes.iter().any(|process| matches!(process, Process::Issuer(peer) if peer.address().is_some())))
+        let paste_ready = matches!(self.story, Story::PastedAddress | Story::PastedState | Story::SignInAgain)
+            && processes
+                .iter()
+                .any(|process| matches!(process, Process::Visitor(visitor) if visitor.redirect().is_some()))
+            && (self.pasted == 0
+                || (self.story == Story::PastedState && self.pasted == 1 && owner.account_answers().len() >= 2));
+        self.wake = (paste_ready
+            || (owner.unstarted()
+                && processes
+                    .iter()
+                    .any(|process| matches!(process, Process::Issuer(peer) if peer.address().is_some())))
             || (owner.is_empty() && !self.shutdown)
             || (ends(self.story, owner, crate::world::exchange_seen(processes), visit_answered(processes))
                 && !self.closing)
@@ -139,12 +203,12 @@ impl Referee<Process> for Judge {
 /// child heard what it wanted.
 fn ends(story: Story, owner: &Owner, exchange_seen: bool, _answered: bool) -> bool {
     match story {
-        Story::SignIn | Story::AccountSignInVaryingPort => {
+        Story::SignIn | Story::PastedAddress | Story::PastedState | Story::SignInAgain | Story::AccountSignInVaryingPort => {
             !owner.child_heard().is_empty()
                 || owner
                     .account_sign_in_ended()
                     .iter()
-                    .any(|end| matches!(end.end, jig_domain_accounts::End::Failed { .. }))
+                    .any(|end| matches!(end.end, jig_domain_accounts::End::Failed { failure } if failure != jig_domain_accounts::Failure::Cancelled))
         }
         Story::AccountSignInMissingScope => !owner.account_sign_in_ended().is_empty() && owner.account_removed(),
         Story::AccountSignInFull => !owner.account_sign_in_ended().is_empty(),

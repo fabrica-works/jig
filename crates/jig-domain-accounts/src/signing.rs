@@ -25,6 +25,8 @@ pub(crate) struct UnderWay {
     provider: u32,
     visited: bool,
     by: u64,
+    finish: Option<Token>,
+    taken: bool,
 }
 
 impl UnderWay {
@@ -43,13 +45,25 @@ pub(crate) fn sign_in(
     provider: u32,
     out: &mut Queue<Request>,
 ) {
+    // Remove the cancelled flight now: its delayed component terminal is stale, and its
+    // place in the shared sign-ins bound is available to its replacement immediately.
+    let mut previous = None;
+    for (source, pending) in &domain.signing {
+        if pending.by == by && pending.provider == provider && pending.holder == holder && !pending.taken {
+            previous = Some(*source);
+        }
+    }
+    if let Some(source) = previous {
+        out.push(Request::Signing(Signing::CancelSignIn { source }));
+        failed(domain, source, Failure::Cancelled, out);
+    }
     if let Err(refusal) = startable(domain, &env.limits, holder, provider) {
         out.push(Request::Answer { request, answer: Answer::Refused { refusal } });
         return;
     }
     let source = domain.take();
     domain.counted(out);
-    let entry = UnderWay { request, holder, provider, visited: false, by };
+    let entry = UnderWay { request, holder, provider, visited: false, by, finish: None, taken: false };
     assert!(domain.signing.insert(source, entry) == Ok(None), "a new number, within the sign-ins' bound");
     out.push(Request::Signing(Signing::SignIn { source, provider }));
 }
@@ -64,8 +78,58 @@ pub(crate) fn visited(domain: &mut Domain, source: u32, address: Box<[u8]>, out:
     out.push(Request::Answer { request: under_way.request, answer: Answer::Started { source, address } });
 }
 
+/// Admit only the starter's waiting sign-in, with one finish outstanding.
+pub(crate) fn finish(
+    domain: &mut Domain,
+    request: Token,
+    source: u32,
+    carried: u64,
+    by: u64,
+    out: &mut Queue<Request>,
+) {
+    if let Some(pending) = domain.signing.get_mut(&source)
+        && pending.by == by
+        && pending.visited
+        && !pending.taken
+        && pending.finish.is_none()
+    {
+        pending.finish = Some(request);
+        out.push(Request::Signing(Signing::Redirected { source, carried }));
+        return;
+    }
+    crate::changes::refuse(request, Refusal::SignInRedirect { why: crate::SignInRedirectWhy::NotWaiting }, out);
+}
+
+/// Taken ends the finish, while the sign-in awaits its own terminal.
+pub(crate) fn finishing(domain: &mut Domain, source: u32, out: &mut Queue<Request>) {
+    let Some(pending) = domain.signing.get_mut(&source) else { return };
+    pending.taken = true;
+    if let Some(request) = pending.finish.take() {
+        out.push(Request::Answer { request, answer: Answer::Finishing { source } });
+    }
+}
+
+pub(crate) fn finish_refused(
+    domain: &mut Domain,
+    source: u32,
+    why: crate::SignInRedirectWhy,
+    out: &mut Queue<Request>,
+) {
+    let Some(pending) = domain.signing.get_mut(&source) else { return };
+    if let Some(request) = pending.finish.take() {
+        crate::changes::refuse(request, Refusal::SignInRedirect { why }, out);
+    }
+}
+
+fn finish_ended(pending: &UnderWay, out: &mut Queue<Request>) {
+    if let Some(request) = pending.finish {
+        crate::changes::refuse(request, Refusal::SignInRedirect { why: crate::SignInRedirectWhy::NotWaiting }, out);
+    }
+}
+
 /// An account sign-in that ended before a visit still owes its party an answer.
 fn not_started(under_way: &UnderWay, out: &mut Queue<Request>) {
+    finish_ended(under_way, out);
     if !under_way.visited {
         out.push(Request::Answer {
             request: under_way.request,
@@ -77,6 +141,7 @@ fn not_started(under_way: &UnderWay, out: &mut Queue<Request>) {
 /// Close answers account sign-ins still waiting for their visit, before forgetting them.
 pub(crate) fn close(domain: &mut Domain, out: &mut Queue<Request>) {
     for (source, under_way) in &domain.signing {
+        finish_ended(under_way, out);
         out.push(Request::Signing(Signing::CancelSignIn { source: *source }));
         if !under_way.visited {
             out.push(Request::Answer {

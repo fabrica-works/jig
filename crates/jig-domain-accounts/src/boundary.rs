@@ -1,4 +1,4 @@
-use crate::{Holder, Key, Kind, Refusal, Stored, Use};
+use crate::{Holder, Key, Kind, Refusal, SignInRedirectWhy, Stored, Use};
 use alloc::boxed::Box;
 use skein_lib::{Duration, Time, Token, Wall};
 
@@ -129,6 +129,15 @@ pub enum Event {
     Visited {
         source: u32,
         address: Box<[u8]>,
+    },
+    /// The driver took the pasted address (protocol/llm.md, 5.2).
+    Finishing {
+        source: u32,
+    },
+    /// The address was refused; the sign-in still waits.
+    FinishRefused {
+        source: u32,
+        why: SignInRedirectWhy,
     },
     SignedIn {
         source: u32,
@@ -270,6 +279,11 @@ pub enum Signing {
     SignIn {
         source: u32,
         provider: u32,
+    },
+    /// Hand the sign-in the address its person pasted, named by its held number (protocol/llm.md, 5.2).
+    Redirected {
+        source: u32,
+        carried: u64,
     },
     /// Cancel a sign-in under way, including at close (protocol/llm.md, 5.2).
     CancelSignIn {
@@ -458,6 +472,7 @@ pub enum Change {
     FinishSignIn {
         source: u32,
         carried: u64,
+        by: u64,
     },
     /// Move the account's signed-in source out (accounts.md, section 6).
     MoveOut {

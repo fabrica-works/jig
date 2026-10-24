@@ -89,11 +89,29 @@ impl World {
                     address: format!("https://issuer.test/visit/{source}").into_bytes().into_boxed_slice(),
                 };
                 self.events.push_back(root::Event::Core(core::Event::Account(visit)));
+                if self.wait_for_finish {
+                    return;
+                }
                 accounts::Event::SignedIn {
                     source,
                     subject: Box::from(SIGNED_IN),
                     display: Box::from(SIGNED_IN),
                     declined: false,
+                }
+            }
+            accounts::Signing::Redirected { source, carried } => {
+                self.finishes.push((source, carried));
+                if let Some(why) = self.finish_script.pop_front().expect("a scripted finish") {
+                    accounts::Event::FinishRefused { source, why }
+                } else {
+                    self.events
+                        .push_back(root::Event::Core(core::Event::Account(accounts::Event::Finishing { source })));
+                    accounts::Event::SignedIn {
+                        source,
+                        subject: Box::from(SIGNED_IN),
+                        display: Box::from(SIGNED_IN),
+                        declined: false,
+                    }
                 }
             }
             accounts::Signing::CancelSignIn { source } => {

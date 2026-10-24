@@ -6,7 +6,7 @@ use crate::world::{Installation, Story};
 use jig_domain_accounts as child;
 use jig_domain_core as core;
 use jig_protocol_accounts::{
-    installation, moves, party,
+    finishes, installation, moves, party,
     records::{self, Records},
     restart,
     table::Table,
@@ -106,6 +106,12 @@ pub struct Owner {
     below: store::Below,
     records: Records,
     moves: moves::Moves,
+    finishes: finishes::Finishes,
+    paste: [u8; 1024],
+    paste_len: usize,
+    paste_wrong: Option<()>,
+    sign_in_again_requested: Option<()>,
+    finish_carried: Option<u64>,
     move_out: Queue<moves::Next>,
     providers: Map<u32, driver::Account>,
     source_providers: Map<u32, u32>,
@@ -166,6 +172,11 @@ impl Owner {
         if story == Story::AccountSignInFull {
             limits.accounts = 1;
         }
+        if story == Story::SignInAgain {
+            // A cancelled listener counts until it settles (skein oauth.md 6.5): room beside the live sign-in.
+            limits.listeners = 2;
+            limits.io.sockets = 2 * limits.listeners + limits.exchanges;
+        }
         let child_limits = fixtures::child_limits();
         let account = ACCOUNT_CHAT;
         let store_limits = fixtures::store_limits();
@@ -204,6 +215,12 @@ impl Owner {
             },
             records: Records::new(limits.accounts),
             moves: moves::Moves::new(bytes::copy_of(fixtures::MOVE_APPLICATION), limits.accounts),
+            finishes: finishes::Finishes::new(limits.accounts),
+            paste: [0; 1024],
+            paste_len: 0,
+            paste_wrong: None,
+            sign_in_again_requested: None,
+            finish_carried: None,
             move_out: Queue::with_capacity(ROOM),
             providers: Map::with_capacity(1),
             source_providers: Map::with_capacity(limits.accounts),
@@ -750,7 +767,9 @@ impl Owner {
     /// The store's answers to replaces (store.md 9): the driver hears `Kept`,
     /// or a handed-in record is handed in, only once the record is durable.
     fn answers(&mut self, env: &Env<driver::Limits>) {
-        while let Some(event) = self.store_above.pop() {
+        // A batch may contain several erasures; their readbacks get their own answer queue.
+        let mut answers = std::mem::replace(&mut self.store_above, Queue::with_capacity(store::MAX_OUT_DOWN));
+        while let Some(event) = answers.pop() {
             let request = match event {
                 store::Event::Kept { owner } | store::Event::Stale { owner }
                     if owner.raw() & MOVE_ADOPT == MOVE_ADOPT =>
@@ -845,6 +864,63 @@ impl Owner {
             store::Secrets::Erase { owner: store::SecretOwner::Source, number: u64::from(source) },
         );
     }
+    pub(crate) fn hand_paste(&mut self, uri: &[u8], wrong: bool) {
+        self.paste[..uri.len()].copy_from_slice(uri);
+        self.paste_len = uri.len();
+        self.paste_wrong = wrong.then_some(());
+    }
+    pub(crate) fn sign_in_again(&mut self) {
+        self.sign_in_again_requested = Some(());
+    }
+    fn restart_sign_in(&mut self, now: Time, wall: Wall) {
+        self.visit = None;
+        self.child_event(
+            now,
+            wall,
+            child::Event::SignIn { request: Token::new(83), holder: child::Holder::Party(7), by: 7, provider: 1 },
+        );
+    }
+    fn paste(&mut self, env: &Env<driver::Limits>) {
+        if self.paste_len == 0 {
+            return;
+        }
+        let mut uri = bytes::copy_of(&self.paste[..self.paste_len]);
+        self.paste_len = 0;
+        if self.paste_wrong.take().is_some() {
+            let at = uri.windows(6).position(|part| part == b"state=").expect("fixture state") + 6;
+            uri[at] = if uri[at] == b'a' { b'b' } else { b'a' };
+        }
+        self.secrets(env.now, env.wall, GET, store::Secrets::Hold { value: Secret::new(uri) });
+        let Some(store::Event::Carried { number, .. }) = self.store_above.pop() else { panic!("held address") };
+        self.finish_carried = Some(number);
+        self.child_event(
+            env.now,
+            env.wall,
+            child::Event::Change {
+                request: Token::new(81),
+                holder: child::Holder::Party(7),
+                change: child::Change::FinishSignIn { source: self.account, carried: number, by: 7 },
+            },
+        );
+    }
+    fn finish_steps(&mut self, env: &Env<driver::Limits>, mut next: finishes::Next) {
+        loop {
+            match next {
+                finishes::Next::Get { exchange, carried } => {
+                    let value = self.secret_value(env, GET, store::SecretOwner::Application, carried);
+                    next = self.finishes.read(exchange, value).expect("pending finish read");
+                }
+                finishes::Next::Driver(request) => {
+                    self.driver(env, request);
+                    break;
+                }
+                finishes::Next::Child(event) => {
+                    self.child_event(env.now, env.wall, event);
+                    break;
+                }
+            }
+        }
+    }
     fn signing(&mut self, env: &Env<driver::Limits>, signing: translate::Down) {
         match signing {
             translate::Down::Restore { source, provider, kind: child::Kind::SignIn } if self.move_mode.is_some() => {
@@ -905,6 +981,10 @@ impl Owner {
                 }
             }
             translate::Down::SignIn { .. } => panic!("known account sign-in provider"),
+            translate::Down::Redirected { source, carried } => {
+                let next = self.finishes.redirected(source, carried);
+                self.finish_steps(env, next);
+            }
             translate::Down::CancelSignIn { source } => {
                 self.driver(env, driver::Request::Cancel { account: source });
             }
@@ -937,7 +1017,18 @@ impl Owner {
                     self.signing(env, translate::down_signing(signing));
                     self.move_steps(env);
                 }
-                child::Request::Answer { answer, .. } => {
+                child::Request::Answer { request, answer } => {
+                    if request == Token::new(81)
+                        && let Some(number) = self.finish_carried.take()
+                    {
+                        self.secrets(
+                            env.now,
+                            env.wall,
+                            GET,
+                            store::Secrets::Erase { owner: store::SecretOwner::Application, number },
+                        );
+                        assert!(matches!(self.store_above.pop(), Some(store::Event::Erased { .. })));
+                    }
                     if let child::Answer::MovingOut { source, .. } = &answer {
                         let file = self.moves.take(*source).expect("moving out carries the file");
                         assert!(self.moves.take(*source).is_none(), "file goes out once");
@@ -972,6 +1063,14 @@ impl Owner {
                     self.table.remove(source);
                     self.erase(env, source, None);
                     child::FromComponent::Failed { account: source, failure: child::Failure::SignInAgain }
+                }
+                Up::Finishing { source } => {
+                    self.child_event(env.now, env.wall, child::Event::Finishing { source });
+                    continue;
+                }
+                Up::FinishRefused { source, why } => {
+                    self.child_event(env.now, env.wall, child::Event::FinishRefused { source, why });
+                    continue;
                 }
                 Up::Visited { source, address } => {
                     self.trace.push(Trace::Visit { account: source });
@@ -1060,11 +1159,15 @@ impl Host for Owner {
         self.now = now;
         let env = Env { now, wall, limits: self.limits };
         let io_env = Env { now, wall, limits: self.limits.io };
+        self.paste(&env);
         if self.component.is_none() && self.address.is_some() {
             self.start(&env);
         }
         if self.component.is_none() {
             return;
+        }
+        if self.sign_in_again_requested.take().is_some() {
+            self.restart_sign_in(now, wall);
         }
         if self.account_sign_out_ready() {
             self.account_sign_out_asked = Some(());
@@ -1151,7 +1254,9 @@ impl Host for Owner {
         &mut self.submissions
     }
     fn work_pending(&self, now: Time) -> bool {
-        self.io.is_ready()
+        self.paste_len > 0
+            || self.sign_in_again_requested.is_some()
+            || self.io.is_ready()
             || self.account_sign_out_ready()
             || !self.events.is_empty()
             || !self.requests.is_empty()
@@ -1200,7 +1305,7 @@ impl Host for Owner {
         driver::worst_case(&self.limits).expect("driver bound")
             + io::worst_case(&self.limits.io).expect("io bound")
             + store::worst_case(&self.store_limits).expect("store bound")
-            + Queue::<store::Event>::worst_case(store::MAX_OUT_DOWN).expect("store answers bound")
+            + 2 * Queue::<store::Event>::worst_case(store::MAX_OUT_DOWN).expect("store answers and readbacks bound")
             + 3 * Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below).expect("store files bound")
             + records::worst_case(self.limits.accounts, &self.limits.client.document).expect("records bound")
             + moves::worst_case(self.limits.accounts, &self.limits.client.document).expect("moves bound")

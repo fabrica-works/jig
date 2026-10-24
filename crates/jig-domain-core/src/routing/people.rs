@@ -365,7 +365,7 @@ pub(super) fn tag_people(
                     },
                     people::Ask::AccountChange { holder, change } => {
                         let holder = super::account_requests::holder(holder, person);
-                        match super::key_routes::admitted(core, request, holder, change) {
+                        match super::key_routes::admitted(core, request, holder, Some(person), change) {
                             Ok(change) => {
                                 work.push(Event::Account(accounts::Event::Change { request, holder, change }));
                             }

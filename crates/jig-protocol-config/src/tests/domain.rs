@@ -357,6 +357,9 @@ fn memory_below_the_components_sum_is_refused() {
     // The 32 queued facts and deployment's 4 account facts add (32 + 4) * 16 = 576.
     // Inline container headers are unchanged; total growth is 528 + 576 = 1,104.
     const SOURCE_DEADLINE_GROWTH: u64 = 3 * 11 * (168 - 152) + (32 + 4) * (80 - 64);
+    // A sign-in under way keeps its finish out, an Option<Token> of 16 bytes (its `taken`
+    // flag fits the padding): small's 2 sign-ins fill one B-tree node of 11 slots.
+    const PASTED_FINISH_GROWTH: u64 = 11 * 16;
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
     // Worker program sources add 6,723,936 bytes: the hub's and the fleet's source records
@@ -485,6 +488,7 @@ fn memory_below_the_components_sum_is_refused() {
     let without_acts = BEFORE_FINISHING_OVER + wall_expiry_index + reconciliation_growth - ending_saving
         + SOURCE_DEADLINE_GROWTH
         + SIGN_IN_CANCEL_GROWTH
+        + PASTED_FINISH_GROWTH
         + ENDING_AUTHORITY_GROWTH
         + LIVE_ASK_GROWTH
         + FINISH_MESSAGE_GROWTH

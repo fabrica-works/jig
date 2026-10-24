@@ -1,3 +1,4 @@
+mod finishes;
 mod fixtures;
 mod installation;
 mod party;

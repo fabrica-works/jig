@@ -84,7 +84,7 @@ pub(super) fn route(
 }
 fn account(core: &mut Core, work: &mut Queue<Event>, request: Token, change: people::AccountChange) {
     let holder = accounts::Holder::Deployment;
-    match super::key_routes::admitted(core, request, holder, change) {
+    match super::key_routes::admitted(core, request, holder, None, change) {
         Ok(change) => work.push(Event::Account(accounts::Event::Change { request, holder, change })),
         Err(why) => refused(work, request, why),
     }

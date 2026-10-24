@@ -540,6 +540,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 crate::signing::visited(domain, source, address, out);
             }
         }
+        Event::Finishing { source } => crate::signing::finishing(domain, source, out),
+        Event::FinishRefused { source, why } => crate::signing::finish_refused(domain, source, why, out),
         Event::SignedIn { source, subject, display, declined } => {
             if domain.phase == Phase::Wanted {
                 crate::signing::signed_in(domain, env, source, subject, display, declined, out);

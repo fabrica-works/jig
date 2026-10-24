@@ -796,3 +796,102 @@ fn source_limit_wall_survives_a_corrected_accounts_watch_clock() {
     assert_eq!(line.state, core::documents::AccountState::Later { until: reset });
     assert_eq!(line.spent_until, reset);
 }
+
+#[test]
+fn a_sign_in_is_finished_by_its_starters_pasted_address() {
+    fn reply(world: &World) -> &people::Reply {
+        world
+            .client_peer
+            .as_ref()
+            .expect("client peer")
+            .delivered
+            .iter()
+            .rev()
+            .find_map(|(_, delivery)| {
+                let root::Delivery::Core(core::Held::PeopleReply { reply, .. }) = delivery else { return None };
+                Some(reply)
+            })
+            .expect("client reply")
+    }
+    let mut world = signing(210);
+    world.wait_for_finish = true;
+    world.finish_script.extend([Some(accounts::SignInRedirectWhy::State), None]);
+    let first = world.sign_in.expect("first sign-in");
+    let second = jig_core_world::fixtures::second_party(&mut world, b"paste-observer", people::Role::Observer);
+    world.sign_in = Some(first);
+    world.client_peer = Some(jig_core_world::client_peer::ClientPeer::default());
+    watch(&mut world, first, OWN_WATCH, core::documents::Watched::Accounts);
+    watch(&mut world, second, OTHER_WATCH, core::documents::Watched::Accounts);
+    take(&mut world, OWN_WATCH);
+    take(&mut world, OTHER_WATCH);
+    ask(&mut world, 70, people::Ask::AccountSignIn { holder: people::AccountHolder::Own, provider: PROVIDER });
+    let Some(people::Reply::Outcome(people::Outcome::AccountSignInStarted { source, .. })) =
+        Some(reply(&world).clone())
+    else {
+        panic!("sign-in waiting")
+    };
+    assert_eq!(accounts_document(&world, OWN_WATCH).signing.get(0).expect("pending").source, source);
+    take(&mut world, OWN_WATCH);
+    for (key, sign_in, expected) in [
+        (71, second, Some(people::SignInRedirectWhy::NotWaiting)),
+        (72, first, Some(people::SignInRedirectWhy::State)),
+        (73, first, None),
+    ] {
+        world.sign_in = Some(sign_in);
+        let number = (3_u64 << 62) + u64::from(key);
+        let before = world.client_peer.as_ref().expect("client peer").delivered.len();
+        carry(
+            &mut world,
+            key,
+            people::Ask::AccountChange {
+                holder: people::AccountHolder::Own,
+                change: people::AccountChange::FinishSignIn { source, digest: [key; 32] },
+            },
+            number,
+            key,
+        );
+        let outcome = match expected {
+            Some(why) => people::Outcome::Refused(people::Refusal::SignInRedirect { why }),
+            None => people::Outcome::AccountFinishing { source },
+        };
+        assert_eq!(reply(&world), &people::Reply::Outcome(outcome));
+        let deliveries = &world.client_peer.as_ref().expect("client peer").delivered;
+        let unused = deliveries[before..]
+            .iter()
+            .position(|(_, delivery)| {
+                matches!(delivery,
+            root::Delivery::Core(core::Held::CarriedUnused { number: value }) if *value == number)
+            })
+            .expect("unused carried number");
+        let answered = deliveries[before..]
+            .iter()
+            .position(|(_, delivery)| matches!(delivery, root::Delivery::Core(core::Held::PeopleReply { .. })))
+            .expect("answered finish");
+        assert!(unused < answered, "the clients component can erase before answering");
+        assert_eq!(
+            deliveries
+                .iter()
+                .filter(|(_, delivery)| matches!(delivery, root::Delivery::Core(core::Held::CarriedUnused { .. })))
+                .count(),
+            usize::from(key - 70)
+        );
+        if expected.is_some() {
+            assert!(accounts_document(&world, OWN_WATCH).last_end.is_none());
+            assert_eq!(accounts_document(&world, OWN_WATCH).signing.len(), 1);
+        }
+    }
+    assert_eq!(world.finishes, [(source, (3_u64 << 62) + 72), (source, (3_u64 << 62) + 73)]);
+    take(&mut world, OWN_WATCH);
+    let own = accounts_document(&world, OWN_WATCH);
+    assert!(own.signing.is_empty());
+    assert!(
+        matches!(own.last_end, Some(core::documents::LastEnd { source: ended, end: accounts::End::Made { .. } }) if ended == source)
+    );
+    assert_eq!(own.accounts.len(), 1);
+    let other = accounts_document(&world, OTHER_WATCH);
+    assert!(other.accounts.is_empty() && other.signing.is_empty() && other.last_end.is_none());
+    assert!(world.client_peer.as_ref().expect("peer").delivered.iter().all(|(_, delivery)| {
+        let root::Delivery::Core(core::Held::Delivery { watcher, document }) = delivery else { return true };
+        watcher.raw() != OTHER_WATCH || matches!(document.as_ref(), core::documents::Document::Accounts(doc) if doc.accounts.is_empty() && doc.signing.is_empty() && doc.last_end.is_none())
+    }));
+}

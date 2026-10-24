@@ -33,6 +33,13 @@ pub enum Up {
         subject: Box<[u8]>,
         display: Box<[u8]>,
     },
+    Finishing {
+        source: u32,
+    },
+    FinishRefused {
+        source: u32,
+        why: accounts::SignInRedirectWhy,
+    },
     SignInFailed {
         source: u32,
         failure: accounts::Failure,
@@ -97,16 +104,13 @@ pub fn up(event: driver::Event, now: Time, required: &[u8]) -> Up {
         },
         driver::Event::Refused { account, asked, why } => match asked {
             driver::Asked::Grant | driver::Asked::Want => failed(account, refused(why)),
-            driver::Asked::SignIn | driver::Asked::Add | driver::Asked::Redirected => {
-                Up::SignInFailed { source: account, failure: refused(why) }
-            }
+            driver::Asked::Redirected => Up::FinishRefused { source: account, why: redirect_refused(why) },
+            driver::Asked::SignIn | driver::Asked::Add => Up::SignInFailed { source: account, failure: refused(why) },
             driver::Asked::SignOut | driver::Asked::Remove => Up::SignedOut { source: account, confirmed: false },
             driver::Asked::HandIn => unreachable!("the layer checks each handed-in record before handing it in"),
         },
         driver::Event::Closed => Up::Child(accounts::FromComponent::Closed),
-        driver::Event::Taken { account: _ } => {
-            unreachable!("the engine hands in no redirected before chatgpt-paste M3 task C")
-        }
+        driver::Event::Taken { account } => Up::Finishing { source: account },
         driver::Event::Visit { account, url } => {
             if url.len() > usize::try_from(accounts::ADDRESS).expect("address bound") {
                 Up::SignInFailed { source: account, failure: accounts::Failure::Misconfigured }
@@ -221,6 +225,7 @@ pub enum Down {
     Keep { source: u32, carried: u64, replaces: bool },
     Forget { source: u32 },
     SignIn { source: u32, provider: u32 },
+    Redirected { source: u32, carried: u64 },
     CancelSignIn { source: u32 },
     SignOut { source: u32 },
 }
@@ -237,6 +242,7 @@ pub fn down_signing(signing: accounts::Signing) -> Down {
         accounts::Signing::Restore { source, provider, kind } => Down::Restore { source, provider, kind },
         accounts::Signing::Restored => Down::Restored,
         accounts::Signing::SignIn { source, provider } => Down::SignIn { source, provider },
+        accounts::Signing::Redirected { source, carried } => Down::Redirected { source, carried },
         accounts::Signing::CancelSignIn { source } => Down::CancelSignIn { source },
         accounts::Signing::SignOut { source } | accounts::Signing::Replaced { source, by: _ } => {
             Down::SignOut { source }
@@ -263,4 +269,23 @@ fn missing_index(required: &[u8], missing: &[u8]) -> Option<u32> {
         }
     }
     None
+}
+
+fn redirect_refused(why: driver::Refusal) -> accounts::SignInRedirectWhy {
+    match why {
+        driver::Refusal::State => accounts::SignInRedirectWhy::State,
+        driver::Refusal::Redirect => accounts::SignInRedirectWhy::Address,
+        driver::Refusal::Full { bound: _ } => accounts::SignInRedirectWhy::TooMany,
+        driver::Refusal::Closed
+        | driver::Refusal::Account
+        | driver::Refusal::Source
+        | driver::Refusal::Taken
+        | driver::Refusal::Unusable(_)
+        | driver::Refusal::NotWaiting
+        | driver::Refusal::NotAccessOnly
+        | driver::Refusal::Held
+        | driver::Refusal::Record(_)
+        | driver::Refusal::NoRecord
+        | driver::Refusal::Busy => accounts::SignInRedirectWhy::NotWaiting,
+    }
 }

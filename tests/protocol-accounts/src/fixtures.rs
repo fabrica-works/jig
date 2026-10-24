@@ -187,6 +187,9 @@ pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
         }
         Story::NoRecord
         | Story::SignIn
+        | Story::PastedAddress
+        | Story::PastedState
+        | Story::SignInAgain
         | Story::AccountSignInMissingScope
         | Story::AccountSignInVaryingPort
         | Story::AccountSignOut { .. }
@@ -218,6 +221,9 @@ pub fn wanted(story: crate::world::Story) -> usize {
     match story {
         // The visit's answer closes a sign-in's story.
         crate::world::Story::SignIn
+        | crate::world::Story::PastedAddress
+        | crate::world::Story::PastedState
+        | crate::world::Story::SignInAgain
         | crate::world::Story::AccountSignInMissingScope
         | crate::world::Story::AccountSignInVaryingPort
         | crate::world::Story::AccountSignOut { .. }
@@ -265,9 +271,16 @@ pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
             account: ACCOUNT_CHAT,
             failure: child::Failure::Unloaded { at: child::Place::File, why: child::Unread::Unreadable },
         }],
-        Story::Granted | Story::Closed | Story::ClosedExchange | Story::SignIn | Story::AccountSignInVaryingPort => {
+        Story::Granted
+        | Story::Closed
+        | Story::ClosedExchange
+        | Story::SignIn
+        | Story::PastedAddress
+        | Story::PastedState
+        | Story::AccountSignInVaryingPort => {
             vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]
         }
+        Story::SignInAgain => vec![Heard::Granted { account: 1, generation: 1 }],
         Story::AccountSignInMissingScope | Story::AccountSignInFull => vec![],
     }
 }
@@ -287,6 +300,9 @@ pub fn issuer_plans(story: crate::world::Story) -> Vec<fake::Plan> {
         }
         Story::Granted | Story::Refreshed | Story::Closed | Story::DamagedRecord => vec![rotate()],
         Story::SignIn
+        | Story::PastedAddress
+        | Story::PastedState
+        | Story::SignInAgain
         | Story::AccountSignInMissingScope
         | Story::AccountSignInVaryingPort
         | Story::AccountSignOut { .. }
@@ -316,6 +332,9 @@ pub fn account_sign_in(story: crate::world::Story) -> bool {
     matches!(
         story,
         crate::world::Story::SignIn
+            | crate::world::Story::PastedAddress
+            | crate::world::Story::PastedState
+            | crate::world::Story::SignInAgain
             | crate::world::Story::AccountSignInMissingScope
             | crate::world::Story::AccountSignInVaryingPort
             | crate::world::Story::AccountSignOut { .. }

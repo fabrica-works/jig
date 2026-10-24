@@ -5,29 +5,35 @@ use jig_domain_accounts as accounts;
 impl Story {
     #[must_use]
     pub fn account_sign_in(seed: u64, offered: bool) -> Self {
-        Self::account_sign_in_with_owner(seed, offered, 7)
+        Self::account_sign_in_with_owner(seed, offered, 7, false)
+    }
+    /// A second offered provider, 4, so that two sign-ins of one party replace neither.
+    #[must_use]
+    pub fn account_sign_in_two_providers(seed: u64) -> Self {
+        Self::account_sign_in_with_owner(seed, true, 7, true)
     }
     #[must_use]
     pub fn ordinary_account_party(seed: u64) -> Self {
         // The printed link authenticates subject 7; this deployment’s first owner is 8.
         const OTHER_FIRST_OWNER: u64 = 8;
-        Self::account_sign_in_with_owner(seed, true, OTHER_FIRST_OWNER)
+        Self::account_sign_in_with_owner(seed, true, OTHER_FIRST_OWNER, false)
     }
-    fn account_sign_in_with_owner(seed: u64, offered: bool, owner: u64) -> Self {
+    fn account_sign_in_with_owner(seed: u64, offered: bool, owner: u64, second: bool) -> Self {
         let mut config = jig_core_world::world::config(seed);
         for initial in &mut config.core.owners {
             initial.identity.subject = owner.to_be_bytes().into();
         }
-        config.core.settings.llm_providers = accounts::Providers {
-            providers: Box::new([accounts::Provider {
-                name: b"Fake".as_slice().into(),
-                signed_in_plan: true,
-                manage_usage: Some(b"https://usage.example/".as_slice().into()),
-                number: 3,
-                models: Box::new([config.core.settings.models[0].name.clone()]),
-                offers: accounts::Offers { sign_in: offered, key: false, programs: Box::new([]) },
-            }]),
+        let provider = |number| accounts::Provider {
+            name: b"Fake".as_slice().into(),
+            signed_in_plan: true,
+            manage_usage: Some(b"https://usage.example/".as_slice().into()),
+            number,
+            models: Box::new([config.core.settings.models[0].name.clone()]),
+            offers: accounts::Offers { sign_in: offered, key: false, programs: Box::new([]) },
         };
+        let providers: Box<[accounts::Provider]> =
+            if second { Box::new([provider(3), provider(4)]) } else { Box::new([provider(3)]) };
+        config.core.settings.llm_providers = accounts::Providers { providers };
         let mut limits = fixtures::owner_limits();
         limits.core.accounts.accounts = 2;
         limits.core.people.sign_ins = 3;

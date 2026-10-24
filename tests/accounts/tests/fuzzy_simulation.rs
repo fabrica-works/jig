@@ -189,6 +189,9 @@ fn change_response(world: &mut World, rng: &mut Rng, output: &Request, trace: &m
                 }
             })
         }
+        Request::Signing(Signing::Redirected { source, .. }) => {
+            Some(Event::FinishRefused { source, why: jig_domain_accounts::SignInRedirectWhy::NotWaiting })
+        }
         Request::Signing(Signing::SignOut { source }) => Some(Event::SignedOut { source, confirmed: rng.chance(70) }),
         Request::Signing(Signing::Withdraw { source, .. }) => {
             Some(Event::Withdrawn { source, readable: rng.chance(90) })

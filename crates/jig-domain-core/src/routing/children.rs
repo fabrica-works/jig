@@ -590,6 +590,8 @@ fn account_party(core: &Core, event: &accounts::Event) -> Option<u64> {
         | accounts::Event::Refused { .. }
         | accounts::Event::RunFailed { .. }
         | accounts::Event::Credential { .. }
+        | accounts::Event::Finishing { .. }
+        | accounts::Event::FinishRefused { .. }
         | accounts::Event::Visited { .. }
         | accounts::Event::SignedOut { .. }
         | accounts::Event::Close => None,

@@ -34,6 +34,7 @@ pub struct Visitor {
     handed: bool,
     status: Option<u16>,
     account_redirect: Option<Box<[u8]>>,
+    stop_at_redirect: bool,
 }
 impl std::fmt::Debug for Visitor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -61,6 +62,7 @@ impl Visitor {
             handed: false,
             status: None,
             account_redirect: None,
+            stop_at_redirect: false,
         }
     }
     /// Hands over `url` to visit, once: a plain `http://` URL with a
@@ -70,6 +72,13 @@ impl Visitor {
         self.handed = true;
         self.inbox.get_mut(..url.len()).expect("the URL fits the inbox").copy_from_slice(url);
         self.inbox_len = url.len();
+    }
+    pub fn stop_at_redirect(&mut self) {
+        self.stop_at_redirect = true;
+    }
+    #[must_use]
+    pub fn redirect(&self) -> Option<&[u8]> {
+        self.account_redirect.as_deref()
     }
     pub(crate) fn handed(&self) -> bool {
         self.handed
@@ -183,7 +192,9 @@ impl Host for Visitor {
                 io::Event::Closed { .. } => {
                     self.socket = None;
                     self.connected = false;
-                    if let Some(url) = self.account_redirect.take() {
+                    if !self.stop_at_redirect
+                        && let Some(url) = self.account_redirect.take()
+                    {
                         self.http = http::Client::new(&limits.http);
                         self.visit(&url);
                     }

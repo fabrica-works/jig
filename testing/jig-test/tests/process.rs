@@ -63,6 +63,7 @@ fn a_binary_told_to_stop_with_a_sign_in_under_way_ends_at_once() {
 
 // Reuse the account sign-in world's browser source; it remains a private test helper.
 use jig_protocol_accounts_world::fixtures;
+#[expect(dead_code, reason = "only the accounts world stops a browser at its redirect, to paste it")]
 #[path = "../../../tests/protocol-accounts/src/visitor.rs"]
 mod account_sign_in_visitor;
 

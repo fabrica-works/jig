@@ -61,6 +61,7 @@ pub(super) fn admitted(
     core: &mut Core,
     request: Token,
     holder: accounts::Holder,
+    by: Option<u64>,
     change: people::AccountChange,
 ) -> Result<accounts::Change, people::Refusal> {
     let change = match change {
@@ -71,9 +72,11 @@ pub(super) fn admitted(
             }
             accounts::Change::AddKey { provider, join, carried }
         }
-        people::AccountChange::FinishSignIn { source, .. } => {
-            accounts::Change::FinishSignIn { source, carried: take(core, request, true)? }
-        }
+        people::AccountChange::FinishSignIn { source, .. } => accounts::Change::FinishSignIn {
+            source,
+            carried: take(core, request, true)?,
+            by: by.ok_or(people::Refusal::NotOffered)?,
+        },
         people::AccountChange::MoveIn { .. } => accounts::Change::MoveIn { carried: take(core, request, false)? },
         people::AccountChange::ReplaceKey { source, .. } => {
             let carried = take(core, request, false)?;

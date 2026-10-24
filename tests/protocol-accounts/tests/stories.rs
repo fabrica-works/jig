@@ -172,3 +172,55 @@ fn a_full_driver_refuses_a_new_account_sign_in_later() {
     assert_eq!(owner.account_answers(), [accounts::Answer::Refused { refusal: accounts::Refusal::NotStarted }]);
     assert!(owner.visit().is_none());
 }
+
+#[test]
+fn a_pasted_address_signs_its_starter_in() {
+    let outcome = world::run(7, Story::PastedAddress);
+    let owner = world::owner(&outcome);
+    assert!(matches!(
+        owner.account_answers(),
+        [accounts::Answer::Started { source: 0, .. }, accounts::Answer::Finishing { source: 0 }]
+    ));
+    assert!(matches!(owner.account_sign_in_ended(), [accounts::Ended { end: accounts::End::Made { .. }, .. }]));
+    assert_eq!(world::visitor(&outcome).status(), Some(302));
+}
+#[test]
+fn a_pasted_address_of_another_sign_in_is_refused_and_the_sign_in_still_waits() {
+    let outcome = world::run(8, Story::PastedState);
+    let owner = world::owner(&outcome);
+    assert!(matches!(
+        owner.account_answers(),
+        [
+            accounts::Answer::Started { source: 0, .. },
+            accounts::Answer::Refused {
+                refusal: accounts::Refusal::SignInRedirect { why: accounts::SignInRedirectWhy::State }
+            },
+            accounts::Answer::Finishing { source: 0 }
+        ]
+    ));
+    assert!(matches!(owner.account_sign_in_ended(), [accounts::Ended { end: accounts::End::Made { .. }, .. }]));
+}
+#[test]
+fn a_new_sign_in_cancels_its_starters_waiting_one() {
+    let outcome = world::run(9, Story::SignInAgain);
+    let owner = world::owner(&outcome);
+    assert!(
+        matches!(
+            owner.account_sign_in_ended(),
+            [
+                accounts::Ended { source: 0, end: accounts::End::Failed { failure: accounts::Failure::Cancelled }, .. },
+                accounts::Ended { source: 1, end: accounts::End::Made { .. }, .. }
+            ]
+        ),
+        "{:?}",
+        owner.account_sign_in_ended()
+    );
+    assert!(matches!(
+        owner.account_answers(),
+        [
+            accounts::Answer::Started { source: 0, .. },
+            accounts::Answer::Started { source: 1, .. },
+            accounts::Answer::Finishing { source: 1 }
+        ]
+    ));
+}

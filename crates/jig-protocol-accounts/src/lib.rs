@@ -2,6 +2,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+pub mod finishes;
 pub mod installation;
 pub mod keys;
 pub mod moved;

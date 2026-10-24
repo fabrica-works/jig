@@ -176,3 +176,40 @@ fn each_scheme_names_the_form_it_is_granted_as() {
         assert_eq!(translate::form(&scheme), form);
     }
 }
+
+#[test]
+fn a_taken_paste_answers_the_finish_finishing() {
+    assert_eq!(
+        translate::up(driver::Event::Taken { account: ACCOUNT_CHAT }, fixtures::NOW, b""),
+        Up::Finishing { source: ACCOUNT_CHAT }
+    );
+}
+#[test]
+fn each_redirect_refusal_answers_the_finish_by_reason() {
+    use accounts::SignInRedirectWhy as Why;
+    for (why, expected) in [
+        (driver::Refusal::State, Why::State),
+        (driver::Refusal::Redirect, Why::Address),
+        (driver::Refusal::Full { bound: 4 }, Why::TooMany),
+        (driver::Refusal::Taken, Why::NotWaiting),
+        (driver::Refusal::Unusable(driver::Unusable::Limits), Why::NotWaiting),
+        (driver::Refusal::Busy, Why::NotWaiting),
+        (driver::Refusal::NotWaiting, Why::NotWaiting),
+        (driver::Refusal::Closed, Why::NotWaiting),
+        (driver::Refusal::Account, Why::NotWaiting),
+        (driver::Refusal::Source, Why::NotWaiting),
+        (driver::Refusal::NoRecord, Why::NotWaiting),
+        (driver::Refusal::NotAccessOnly, Why::NotWaiting),
+        (driver::Refusal::Held, Why::NotWaiting),
+        (driver::Refusal::Record(oauth::DecodeError::Malformed), Why::NotWaiting),
+    ] {
+        assert_eq!(
+            translate::up(
+                driver::Event::Refused { account: ACCOUNT_CHAT, asked: driver::Asked::Redirected, why },
+                fixtures::NOW,
+                b""
+            ),
+            Up::FinishRefused { source: ACCOUNT_CHAT, why: expected }
+        );
+    }
+}

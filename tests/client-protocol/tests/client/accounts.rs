@@ -44,10 +44,11 @@ fn a_sign_in_for_a_provider_with_none_is_not_offered() {
 }
 #[test]
 fn a_sign_in_beyond_the_sign_ins_bound_is_refused_naming_it() {
-    let mut story = Story::account_sign_in(fixtures::SEED, true);
+    // Another provider's, so that the second sign-in does not replace the first.
+    let mut story = Story::account_sign_in_two_providers(fixtures::SEED);
     story.hold_account_sign_in_burst();
     story.send(FIRST, ask());
-    story.send(SECOND, ask());
+    story.send(SECOND, Ask::Jig(Box::new(c::Ask::SignIn { holder: c::AccountHolder::Own, provider: 4 })));
     assert!(story.run_until(|s| s.account_sign_in_burst_len() == 2, WAIT));
     story.release_account_sign_in_burst();
     assert_eq!(

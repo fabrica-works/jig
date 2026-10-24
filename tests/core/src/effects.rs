@@ -51,6 +51,10 @@ pub struct World {
     renew_on_running: Option<accounts::FromComponent>,
     pub fail_account_before_workspace: bool,
     pub hold_accounts: bool,
+    /// Visit a sign-in, then wait for a scripted pasted address.
+    pub wait_for_finish: bool,
+    pub finish_script: VecDeque<Option<accounts::SignInRedirectWhy>>,
+    pub finishes: Vec<(u32, u64)>,
     /// Fail the next LLM key keep at the scripted accounts component.
     pub fail_llm_key_keep: Option<accounts::KeyFailure>,
     /// Refuse the next moved record as belonging to another application.
