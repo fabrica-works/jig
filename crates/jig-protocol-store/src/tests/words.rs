@@ -62,3 +62,23 @@ fn a_layout_refusal_names_its_family_and_says_to_move_the_generations() {
         assert_eq!(words, settings.replacen("whose settings", &["whose ", name].concat(), 1), "{family:?}");
     }
 }
+
+#[test]
+fn level_and_patch_refusals_say_the_designs_words() {
+    for (refusal, start) in [
+        (OpenRefusal::OlderBuild { why: Older::Unleveled }, "- `OlderBuild { why: Unleveled }`: \""),
+        (OpenRefusal::Ahead { owner: crate::Owner::Jig, found: Some(2), wanted: Some(1) }, "- `Ahead`: \""),
+        (
+            OpenRefusal::Patch {
+                owner: crate::Owner::Application,
+                patch: 2,
+                key: Box::new([]),
+                halt: skein_codec::patch::Halt::Order,
+            },
+            "- `Patch`: \"",
+        ),
+        (OpenRefusal::Set { owner: crate::Owner::Application, patch: 2 }, "- `Set`: \""),
+    ] {
+        says(refusal, start, "\"");
+    }
+}

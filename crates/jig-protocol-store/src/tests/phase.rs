@@ -51,8 +51,12 @@ fn baseline() -> Vec<Item> {
     baseline_with_proof(false)
 }
 fn baseline_with_proof(proof: bool) -> Vec<Item> {
+    baseline_with_sets(proof, crate::PatchSets::NONE)
+}
+fn baseline_with_sets(proof: bool, sets: crate::PatchSets) -> Vec<Item> {
     let mut disk = Disk::new(&[]);
     let mut store = disk.store_with_chunk(CHUNK);
+    store.patch_sets(sets);
     let events = disk.open(&mut store);
     assert!({ if let [Event::Opened { last: 0, .. }] = events.as_ref() { true } else { false } });
     let mut writes = vec![fixtures::header(1), Write::Put { key: Box::from(KEY), value: Box::from(VALUE) }];
@@ -73,8 +77,7 @@ fn read_row(disk: &mut Disk, store: &mut Store) {
 }
 fn patch(disk: &mut Disk) -> Store {
     let mut store = disk.store_with_chunk(CHUNK);
-    // No level triggers B0 yet: install what task B's checks will leave,
-    // before open reaches 10.1 step 7 (after checks, sweep and transcripts make).
+    // An empty plan exercises the phase's file ordering without fixture records.
     store.directory.patch = Some(Box::new(empty_pending()));
     let events = disk.open(&mut store);
     assert_opened(&events, store.directory.active.expect("switched").number);
@@ -85,7 +88,7 @@ fn a_patch_opens_the_copy_with_the_committed_row_and_keeps_the_previous_whole() 
     let mut disk = Disk::new(&baseline());
     let mut store = patch(&mut disk);
     assert_eq!(disk.bytes(b"active").as_ref(), b"2\n");
-    assert_eq!(disk.bytes(b"generations/2/manifest").as_ref(), b"2\n");
+    assert_manifest(&disk.bytes(b"generations/2/manifest"), 2, crate::format::NONE, crate::format::NONE, 2);
     let contents = disk.contents();
     // The maps are copied; each generation has its own manifest.
     for (path, kind, _, bytes) in contents
@@ -120,7 +123,7 @@ fn the_next_patch_drops_one_keeps_two_and_opens_three() {
     let mut disk = Disk::new(&first.items());
     let mut store = patch(&mut disk);
     assert_eq!(disk.bytes(b"active").as_ref(), b"3\n");
-    assert_eq!(disk.bytes(b"generations/3/manifest").as_ref(), b"3\n");
+    assert_manifest(&disk.bytes(b"generations/3/manifest"), 3, crate::format::NONE, crate::format::NONE, 3);
     let tree = disk.tree();
     assert!(!tree.iter().any(|(p, ..)| p.as_ref() == b"generations/1"));
     for generation in [2_u64, 3] {
@@ -173,6 +176,7 @@ enum Trace {
     Store(Box<[u8]>),
     Load(Box<[u8]>),
     Cut,
+    Remove(Box<[u8]>),
     Other,
 }
 fn trace(driver: usize, request: &file::Request) -> Trace {
@@ -185,6 +189,7 @@ fn trace(driver: usize, request: &file::Request) -> Trace {
         file::Request::Store { path, .. } => Trace::Store(path.clone()),
         file::Request::Load { path, .. } => Trace::Load(path.clone()),
         file::Request::Cut { .. } => Trace::Cut,
+        file::Request::Remove { name, .. } => Trace::Remove(name.clone()),
         _ => Trace::Other,
     }
 }
@@ -241,6 +246,7 @@ struct Harness {
     site_answer: SiteAnswer,
     site_commit_limit: Option<u32>,
     page_header: Option<u64>,
+    wall: skein_lib::Wall,
 }
 impl Harness {
     fn new(items: &[Item]) -> Self {
@@ -279,6 +285,7 @@ impl Harness {
             site_answer: SiteAnswer::Written,
             site_commit_limit: None,
             page_header: None,
+            wall: skein_lib::Wall::EPOCH,
         }
     }
     fn store(&self, patch: bool) -> Store {
@@ -296,11 +303,13 @@ impl Harness {
         store
     }
     fn open(&mut self, store: &mut Store) -> Box<[Event]> {
+        let mut env = fixtures::env();
+        env.wall = self.wall;
         let mut above = Queue::with_capacity(128);
         let mut below = fixtures::below();
         crate::down(
             store,
-            &fixtures::env(),
+            &env,
             Request::Open { owner: Token::new(1), root: self.root, installation: fixtures::INSTALLATION },
             &mut above,
             &mut below,
@@ -329,7 +338,7 @@ impl Harness {
                     };
                     crate::down(
                         store,
-                        &fixtures::env(),
+                        &env,
                         Request::Site {
                             owner: if self.site_answer == SiteAnswer::WrongOwner { Token::new(99) } else { owner },
                             patcher,
@@ -345,7 +354,7 @@ impl Harness {
             for event in retained {
                 above.push(event);
             }
-            crate::fire(store, &fixtures::env(), &mut above, &mut below);
+            crate::fire(store, &env, &mut above, &mut below);
 
             let next = below
                 .store
@@ -363,20 +372,7 @@ impl Harness {
             if stage == Stage::Walking
                 && let Some(last) = self.page_header
             {
-                let key = crate::keys::encode(
-                    &jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment),
-                    store.limits.store.key,
-                )
-                .expect("header key");
-                let bytes = fixtures::get_kv(store, &key).expect("page keeps header");
-                let record = crate::codec::decode(
-                    &jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment),
-                    &bytes,
-                    &store.codec,
-                    &store.names,
-                )
-                .expect("header decodes");
-                assert_eq!(record, fixtures::header_record(last), "page commits never write the header");
+                assert_page_rows(store, last);
             }
             if stage == Stage::Closing && self.source.is_none() {
                 self.source = Some(self.source_items(store.directory.active.expect("active read").number));
@@ -391,7 +387,7 @@ impl Harness {
                 2 => Io::Transcripts(arrived),
                 _ => unreachable!(),
             };
-            crate::up(store, &fixtures::env(), io, &mut above, &mut below);
+            crate::up(store, &env, io, &mut above, &mut below);
         }
         panic!("phase did not settle");
     }
@@ -656,9 +652,19 @@ fn fixture_key(prefix: u8, number: u32) -> Box<[u8]> {
     format!("{}/{number}", char::from(prefix)).into_bytes().into_boxed_slice()
 }
 fn fixture_baseline(bad: Option<(u32, u16, u32)>) -> Vec<Item> {
+    fixture_baseline_with_secret(bad, false)
+}
+fn fixture_baseline_with_secret(bad: Option<(u32, u16, u32)>, secret: bool) -> Vec<Item> {
     let mut disk = Disk::new(&[]);
     let mut store = disk.store_with_chunk(CHUNK);
+    store.patch_sets(BASE);
+    store.application.version = 0;
     assert_opened(&disk.open(&mut store), 0);
+    if secret {
+        let events = disk
+            .request(&mut store, Request::Secrets { owner: Token::new(2), request: fixtures::sign_in_secret(1, 7) });
+        let [Event::Kept { .. }] = events.as_ref() else { panic!("fixture secret committed: {events:?}") };
+    }
     let mut rows = vec![
         Write::Put { key: fixture_key(b'l', 0), value: label(1) },
         Write::Put { key: fixture_key(b'l', 1), value: label(1) },
@@ -693,27 +699,18 @@ fn fixture_baseline(bad: Option<(u32, u16, u32)>) -> Vec<Item> {
     assert_eq!(store.stores.store.last(), FIXTURE_LAST);
     disk.items()
 }
-fn fixture_pending(store: &Store, wanted: crate::patching::plan::Levels) -> Pending {
-    // Patch one alone represents a binary with only that patch landed.
-    const ONE: crate::PatchSets = crate::PatchSets {
-        sets: &[
-            crate::PatchSet { patches: &[app::PATCHES[0]], ..SETS.sets[0] },
-            crate::PatchSet { patches: &[], ..SETS.sets[1] },
-        ],
-    };
-    let found = levels(0, 0);
-    let sets = if wanted == levels(1, 0) { ONE } else { SETS };
-    let plan = crate::patching::plan::plan(&sets, &found, &wanted).expect("fixture plan");
-    let room = crate::patching::machines::Room { bytes: store.limits.store.value, nodes: 16 };
-    let machines = crate::patching::machines::make(&sets, &plan, &found, room).expect("fixture machines");
-    Pending { plan, machines, found }
-}
+// A binary with only the first application patch landed.
+const ONE: crate::PatchSets = crate::PatchSets {
+    sets: &[
+        crate::PatchSet { patches: &[app::PATCHES[0]], ..SETS.sets[0] },
+        crate::PatchSet { patches: &[], ..SETS.sets[1] },
+    ],
+};
 fn fixture_store(disk: &Harness, writes: u32, commit: u32, wanted: crate::patching::plan::Levels) -> Store {
     let mut store = disk.store(false);
     store.limits.journal.writes = writes;
     store.limits.store.commit = commit;
-    store.patch_sets(SETS);
-    store.directory.patch = Some(Box::new(fixture_pending(&store, wanted)));
+    store.patch_sets(if wanted == levels(1, 0) { ONE } else { SETS });
     store
 }
 fn patched(events: &[Event]) -> Vec<(crate::Owner, u32, crate::Counts)> {
@@ -793,13 +790,14 @@ fn assert_sealed(store: &mut Store, last: u64) {
     let skein_kv::Op::Put { value, .. } = expected else { panic!("header put") };
     assert_eq!(header, value);
     let key = crate::keys::encode_own(&crate::keys::Own::Format, store.limits.store.key).expect("format key");
-    assert_eq!(
-        fixtures::get_kv(store, &key).expect("format"),
-        crate::format::current(store.application.version, fixtures::DEPLOYMENT).encode().expect("format bytes")
-    );
+    let mut expected = crate::format::current(store.application.version, fixtures::DEPLOYMENT);
+    expected.levels = crate::format::recorded(crate::patching::plan::binary(&store.patch_sets));
+    assert_eq!(fixtures::get_kv(store, &key).expect("format"), expected.encode().expect("format bytes"));
+    let key = crate::keys::encode_own(&crate::keys::Own::Layouts, store.limits.store.key).expect("layouts key");
+    assert_eq!(fixtures::get_kv(store, &key), Some(store.layouts.encode()));
 }
 #[test]
-fn fixture_patches_walk_in_plan_order_answer_relative_keys_and_seal_both_rows() {
+fn fixture_patches_walk_in_plan_order_answer_relative_keys_and_seal_three_rows() {
     let mut disk = Harness::new(&fixture_baseline(None));
     let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
     disk.page_header = Some(FIXTURE_LAST);
@@ -818,10 +816,18 @@ fn fixture_patches_walk_in_plan_order_answer_relative_keys_and_seal_both_rows() 
     fixture_rows(&mut store, 2, 2);
     assert_sealed(&mut store, FIXTURE_LAST.checked_add(5).expect("last"));
     assert_eq!(disk.bytes(b"active").as_ref(), b"2\n");
+    assert_manifest(
+        &disk.bytes(b"generations/2/manifest"),
+        2,
+        levels(0, 0),
+        levels(2, 1),
+        FIXTURE_LAST.checked_add(5).expect("seal"),
+    );
     disk.assert_source_unchanged(1);
     // A plain restart reads the format and header from the durable seal too.
     let mut disk = disk.crash(29);
     let mut store = disk.store(false);
+    store.patch_sets(SETS);
     assert_opened(&disk.open(&mut store), FIXTURE_LAST.checked_add(5).expect("last"));
     fixture_rows(&mut store, 2, 2);
     assert_sealed(&mut store, FIXTURE_LAST.checked_add(5).expect("last"));
@@ -873,6 +879,8 @@ fn assert_abandoned(mut disk: Harness) {
     let source = disk.source_items(1);
     let mut disk = disk.crash(31);
     let mut store = disk.store(false);
+    store.patch_sets(BASE);
+    store.application.version = 0;
     assert_opened(&disk.open(&mut store), FIXTURE_LAST);
     assert!(!disk.items().iter().any(|item| item.path.starts_with(b"generations/2")));
     assert_eq!(disk.source_items(1), source);
@@ -882,7 +890,9 @@ fn a_shell_without_the_written_site_refuses_and_the_next_start_removes_the_copy(
     let mut disk = Harness::new(&fixture_baseline(None));
     disk.site_answer = SiteAnswer::NoSite;
     let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
-    assert_refused(&disk.open(&mut store), &store);
+    let events = disk.open(&mut store);
+    assert_eq!(patch_refusal(&events, 2, 0), &skein_codec::patch::Halt::NoSite(skein_codec::patch::Site::new(2, 0)));
+    assert_eq!(store.phase, Phase::Stopped);
     assert_eq!(disk.sites.len(), 1);
     assert_abandoned(disk);
 }
@@ -891,19 +901,34 @@ fn an_empty_shelf_refuses_before_any_put_of_its_page_commits() {
     let mut disk = Harness::new(&fixture_baseline(Some((1, 1, 0))));
     let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
     let events = disk.open(&mut store);
-    assert_refused(&events, &store);
+    assert_eq!(patch_refusal(&events, 2, 1), &skein_codec::patch::Halt::Refused(app::refusal::p0002::EMPTY));
+    assert_eq!(store.phase, Phase::Stopped);
     assert_eq!(disk.sites.len(), 2, "one successful record then Refused at the next site");
     let key = crate::keys::application(&fixture_key(b's', 0), store.limits.store.key).expect("key");
     assert_eq!(fixtures::get_kv(&mut store, &key).expect("uncommitted page"), shelf(1, 1, &label(2)));
     assert_eq!(patched(&events).len(), 2, "the failed patch never reports Patched");
-    assert_abandoned(disk);
+    disk.assert_source_unchanged(1);
+    assert_eq!(disk.bytes(b"active").as_ref(), b"1\n");
+    let mut retry = disk.crash(31);
+    let mut store = fixture_store(&retry, 8, fixtures::store_limits().store.commit, levels(2, 1));
+    let events = retry.open(&mut store);
+    assert_eq!(patch_refusal(&events, 2, 1), &skein_codec::patch::Halt::Refused(app::refusal::p0002::EMPTY));
+    assert!(
+        retry
+            .trace
+            .iter()
+            .any(|(stage, trace)| *stage == Stage::Other && *trace == Trace::Remove(Box::from(b"2".as_slice()))),
+        "the next start removes the abandoned copy"
+    );
+    assert_abandoned(retry);
 }
 #[test]
 fn a_shelf_at_another_version_stops_the_start_without_changing_the_active_generation() {
     let mut disk = Harness::new(&fixture_baseline(Some((1, 2, 2))));
     let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
     let events = disk.open(&mut store);
-    assert_refused(&events, &store);
+    let skein_codec::patch::Halt::Decode(_) = patch_refusal(&events, 1, 1) else { panic!("version halt: {events:?}") };
+    assert_eq!(store.phase, Phase::Stopped);
     assert!(disk.sites.is_empty(), "identity decoding refuses the version before patch two");
     assert_abandoned(disk);
 }
@@ -999,7 +1024,7 @@ fn the_store_prices_the_larger_peak_and_worst_case_prices_none() {
 
 #[test]
 fn a_plan_without_any_matching_records_reports_zero_counts_and_still_seals() {
-    let mut disk = Harness::new(&baseline());
+    let mut disk = Harness::new(&baseline_with_sets(false, BASE));
     let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
     let events = disk.open(&mut store);
     let zero = crate::Counts { records: 0, commits: 0 };
@@ -1054,4 +1079,87 @@ fn a_full_byte_page_defers_the_next_finished_record_without_repeating_its_site()
     assert_fixture_opened(&events, 5);
     assert_eq!(disk.sites.len(), usize::try_from(SHELVES).expect("shelves"));
     assert_eq!(fixture_rows(&mut store, 2, 2), expected);
+}
+
+fn assert_manifest(
+    bytes: &[u8],
+    generation: u64,
+    before: crate::patching::plan::Levels,
+    after: crate::patching::plan::Levels,
+    last: u64,
+) {
+    assert_eq!(
+        crate::codec::component::Manifest::decode(bytes),
+        Ok(crate::codec::component::Manifest {
+            generation,
+            from: generation.checked_sub(1),
+            before: crate::format::recorded(before),
+            after: crate::format::recorded(after),
+            store: last,
+            secrets: Some(0),
+            written: 0,
+        })
+    );
+}
+
+fn patch_refusal(events: &[Event], expected_patch: u32, number: u32) -> &skein_codec::patch::Halt {
+    let Some(Event::OpenRefused { owner: token, why: OpenRefusal::Patch { owner, patch, key, halt } }) = events.last()
+    else {
+        panic!("one patch refusal: {events:?}");
+    };
+    assert_eq!(*token, Token::new(1));
+    assert_eq!(*owner, crate::Owner::Application);
+    assert_eq!(*patch, expected_patch);
+    assert_eq!(key, &fixture_key(b's', number));
+    halt
+}
+
+#[test]
+fn a_patch_manifest_records_the_copys_secret_commit_and_write_clock() {
+    const WRITTEN: u64 = 73;
+    let mut disk = Harness::new(&fixture_baseline_with_secret(None, true));
+    disk.wall = skein_lib::Wall::from_nanos(WRITTEN);
+    let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
+    assert_fixture_opened(&disk.open(&mut store), 4);
+    assert_eq!(
+        crate::codec::component::Manifest::decode(&disk.bytes(b"generations/2/manifest")),
+        Ok(crate::codec::component::Manifest {
+            generation: 2,
+            from: Some(1),
+            before: crate::format::recorded(levels(0, 0)),
+            after: crate::format::recorded(levels(2, 1)),
+            store: 8,
+            secrets: Some(1),
+            written: WRITTEN,
+        })
+    );
+}
+
+fn assert_page_rows(store: &mut Store, last: u64) {
+    let key =
+        crate::keys::encode(&jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment), store.limits.store.key)
+            .expect("header key");
+    let bytes = fixtures::get_kv(store, &key).expect("page keeps header");
+    let record = crate::codec::decode(
+        &jig_domain_core::Key::Core(jig_domain_core::CoreKey::Deployment),
+        &bytes,
+        &store.codec,
+        &store.names,
+    )
+    .expect("header decodes");
+    assert_eq!(record, fixtures::header_record(last), "page commits never write the header");
+    let key = crate::keys::encode_own(&crate::keys::Own::Format, store.limits.store.key).expect("format key");
+    let mut expected = crate::format::current(0, fixtures::DEPLOYMENT);
+    expected.levels = crate::format::recorded(levels(0, 0));
+    assert_eq!(
+        fixtures::get_kv(store, &key),
+        Some(expected.encode().expect("format")),
+        "page commits never write the format"
+    );
+    let key = crate::keys::encode_own(&crate::keys::Own::Layouts, store.limits.store.key).expect("layouts key");
+    assert_eq!(
+        fixtures::get_kv(store, &key),
+        Some(crate::format::layouts().encode()),
+        "page commits never write layouts"
+    );
 }

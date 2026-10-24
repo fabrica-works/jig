@@ -423,7 +423,7 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
         Opening::LeftoverRemoving { root, removing } => leftover_removed(store, root, removing, arrived, above, below),
         Opening::LeftoverClose => leftover_closed(store, arrived, above, below),
         Opening::Making(kind) => made_generation(store, kind, arrived, above, below),
-        Opening::FirstSecrets => first_secrets_opened(store, arrived, above, below),
+        Opening::FirstSecrets => first_secrets_opened(store, env, arrived, above, below),
         Opening::FirstManifest(manifesting) => first_manifest_stored(store, manifesting, arrived, above, below),
         Opening::FirstActive => first_active_stored(store, arrived, above, below),
         Opening::CheckingOpen => checking_opened(store, arrived, above, below),
@@ -559,12 +559,26 @@ fn made_generation(store: &mut Store, kind: Making, arrived: Arrived, above: &mu
         }
     }
 }
-fn first_secrets_opened(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+fn first_secrets_opened(
+    store: &mut Store,
+    env: &Env<Limits>,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
     let Some(private) = opened(arrived) else {
         return refuse(store, above);
     };
     store.directory.private_root = Some(private);
-    let bytes = generations::manifest(generations::FIRST);
+    let bytes = generations::manifest(
+        generations::FIRST,
+        None,
+        crate::format::NONE,
+        crate::patching::plan::binary(&store.patch_sets),
+        0,
+        None,
+        env.wall,
+    );
     let manifesting = generations::store_manifest(deployment(store), generations::FIRST, bytes, below);
     store.directory.opening = Opening::FirstManifest(manifesting);
 }

@@ -3,6 +3,27 @@ use crate::component_v3 as wire;
 use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 
+/// Each owner's applied patch level (store.md 5.3).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Levels {
+    pub skein: Option<u32>,
+    pub smith: Option<u32>,
+    pub jig: Option<u32>,
+    pub application: Option<u32>,
+}
+impl Levels {
+    fn encoded(self) -> wire::Levels {
+        wire::Levels::new(
+            &wire::CEILINGS,
+            wire::LevelsParts { skein: self.skein, smith: self.smith, jig: self.jig, application: self.application },
+        )
+    }
+    fn decoded(row: wire::Levels) -> Self {
+        let wire::LevelsParts { skein, smith, jig, application } = row.into_parts();
+        Self { skein, smith, jig, application }
+    }
+}
+
 /// The component's format row.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Format {
@@ -15,6 +36,7 @@ pub struct Format {
     pub settings: u16,
     pub application: u32,
     pub deployment: [u8; 16],
+    pub levels: Levels,
 }
 
 impl Format {
@@ -32,6 +54,7 @@ impl Format {
                 settings: self.settings,
                 application: self.application,
                 deployment: self.deployment,
+                levels: self.levels.encoded(),
             },
         );
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded row fits usize"));
@@ -41,9 +64,30 @@ impl Format {
 
     /// Decode one row, refusing another version or trailing bytes.
     pub fn decode(bytes: &[u8]) -> Result<Self, wire::Problem> {
-        let wire::FormatParts { component, core, tasks, people, notes, accounts, settings, application, deployment } =
-            wire::Format::decode(&wire::CEILINGS, &mut Reader::new(bytes))?.into_parts();
-        Ok(Self { component, core, tasks, people, notes, accounts, settings, application, deployment })
+        let wire::FormatParts {
+            component,
+            core,
+            tasks,
+            people,
+            notes,
+            accounts,
+            settings,
+            application,
+            deployment,
+            levels,
+        } = wire::Format::decode(&wire::CEILINGS, &mut Reader::new(bytes))?.into_parts();
+        Ok(Self {
+            component,
+            core,
+            tasks,
+            people,
+            notes,
+            accounts,
+            settings,
+            application,
+            deployment,
+            levels: Levels::decoded(levels),
+        })
     }
 
     /// The component family's version a stored row begins with, read before
@@ -51,6 +95,51 @@ impl Format {
     #[must_use]
     pub fn version(bytes: &[u8]) -> Option<u16> {
         Reader::new(bytes).u16()
+    }
+}
+
+/// A generation's immutable manifest (store.md 2).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Manifest {
+    pub generation: u64,
+    pub from: Option<u64>,
+    pub before: Levels,
+    pub after: Levels,
+    pub store: u64,
+    pub secrets: Option<u64>,
+    pub written: u64,
+}
+impl Manifest {
+    #[must_use]
+    pub fn encode(&self) -> Box<[u8]> {
+        let row = wire::Manifest::new(
+            &wire::CEILINGS,
+            wire::ManifestParts {
+                generation: self.generation,
+                from: self.from,
+                before: self.before.encoded(),
+                after: self.after.encoded(),
+                store: self.store,
+                secrets: self.secrets,
+                written: self.written,
+            },
+        );
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded manifest fits usize"));
+        row.encode(&mut writer).expect("measured manifest room");
+        writer.finish()
+    }
+    pub fn decode(bytes: &[u8]) -> Result<Self, wire::Problem> {
+        let wire::ManifestParts { generation, from, before, after, store, secrets, written } =
+            wire::Manifest::decode(&wire::CEILINGS, &mut Reader::new(bytes))?.into_parts();
+        Ok(Self {
+            generation,
+            from,
+            before: Levels::decoded(before),
+            after: Levels::decoded(after),
+            store,
+            secrets,
+            written,
+        })
     }
 }
 

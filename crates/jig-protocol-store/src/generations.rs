@@ -47,9 +47,26 @@ pub(crate) fn number(name: &[u8]) -> Option<u64> {
     }
     Some(number)
 }
-/// the levels' task: the Manifest record (store.md 2)
-pub(crate) fn manifest(generation: u64) -> Box<[u8]> {
-    encode(generation)
+/// Immutable account of the generation, at the wall clock of its write (store.md 2).
+pub(crate) fn manifest(
+    generation: u64,
+    from: Option<u64>,
+    before: crate::patching::plan::Levels,
+    after: crate::patching::plan::Levels,
+    store: u64,
+    secrets: Option<u64>,
+    written: skein_lib::Wall,
+) -> Box<[u8]> {
+    crate::codec::component::Manifest {
+        generation,
+        from,
+        before: crate::format::recorded(before),
+        after: crate::format::recorded(after),
+        store,
+        secrets,
+        written: written.as_nanos(),
+    }
+    .encode()
 }
 pub(crate) fn encode(number: u64) -> Box<[u8]> {
     join(Decimal::of(number).as_bytes(), b"\n")

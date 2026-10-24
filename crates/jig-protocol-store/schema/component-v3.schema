@@ -1,5 +1,11 @@
 family jig-store-component 3
 
+record Levels {
+    skein: option u32
+    smith: option u32
+    jig: option u32
+    application: option u32
+}
 versioned record Format {
     component: u16
     core: u16
@@ -10,6 +16,16 @@ versioned record Format {
     settings: u16
     application: u32
     deployment: fixed 16
+    levels: Levels
+}
+versioned record Manifest {
+    generation: u64
+    from: option u64
+    before: Levels
+    after: Levels
+    store: u64
+    secrets: option u64
+    written: u64
 }
 versioned record Transcript { length: u64 window: u64 }
 versioned record Attempt { first: u64 }

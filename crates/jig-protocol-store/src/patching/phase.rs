@@ -13,6 +13,7 @@ pub(crate) use walking::Walking;
 pub(crate) struct Pending {
     pub plan: super::plan::Plan,
     pub machines: super::machines::Machines,
+    /// The row's levels before the walk, retained for the manifest.
     pub found: super::plan::Levels,
 }
 
@@ -26,7 +27,7 @@ pub(crate) enum Patching {
     Mapping { secrets: bool },
     Recovering { opened: u8 },
     Walking(Box<Walking>),
-    Sealing { number: u64 },
+    Sealing { number: u64, before: super::plan::Levels },
     Manifest(Manifesting),
     Leaving { closed: u8 },
     Switching(Switching),
@@ -160,9 +161,17 @@ fn opened_copy(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, b
         None => refuse(store, above),
     }
 }
-fn manifesting(store: &mut Store, _env: &Env<Limits>, below: &mut Below) {
+fn manifesting(store: &mut Store, env: &Env<Limits>, before: super::plan::Levels, below: &mut Below) {
     let number = active(store).checked_add(1).expect("begin checked the next generation");
-    let bytes = generations::manifest(number);
+    let bytes = generations::manifest(
+        number,
+        Some(active(store)),
+        before,
+        super::plan::binary(&store.patch_sets),
+        store.stores.store.last(),
+        Some(store.stores.secrets.last()),
+        env.wall,
+    );
     let manifesting = generations::store_manifest(root(store), number, bytes, below);
     state(store, Patching::Manifest(manifesting));
 }
@@ -273,9 +282,9 @@ pub(crate) fn event(
                     }
                     state(store, Patching::Walking(walking));
                 }
-                Patching::Sealing { number: expected } if number == expected => {
+                Patching::Sealing { number: expected, before } if number == expected => {
                     // resume has the environment required by the manifest's durable replace.
-                    state(store, Patching::Sealing { number: 0 });
+                    state(store, Patching::Sealing { number: 0, before });
                 }
                 Patching::Closing { .. }
                 | Patching::Dropping(_)
@@ -306,7 +315,7 @@ pub(crate) fn resume(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Eve
         match *phase {
             Patching::Recovering { opened: 3 } => opened_copy(store, env, above, below),
             Patching::Walking(_) => walking::resume(store, env, above, below),
-            Patching::Sealing { number: 0 } => manifesting(store, env, below),
+            Patching::Sealing { number: 0, before } => manifesting(store, env, before, below),
             Patching::Recovering { .. }
             | Patching::Mapping { .. }
             | Patching::Closing { .. }
@@ -416,8 +425,7 @@ fn opened_directory(
     }
 }
 
-/// The levels' task: `OpenRefusal::Patch { owner, patch, key, halt }`.
-/// Until then every walk halt refuses Failed and abandons the copy.
+/// A record's halt abandons the copy with its key and the step that refused it.
 pub(crate) fn site(
     store: &mut Store,
     env: &Env<Limits>,
@@ -436,8 +444,8 @@ pub(crate) fn site(
     let phase = take(store);
     match *phase {
         Patching::Walking(mut walking) => {
-            if !walking.answer(patcher, result) {
-                return refuse(store, above);
+            if let Err(why) = walking.answer(patcher, result) {
+                return open::refuse(store, store.directory.owner, why, above);
             }
             state(store, Patching::Walking(walking));
             resume(store, env, above, below);

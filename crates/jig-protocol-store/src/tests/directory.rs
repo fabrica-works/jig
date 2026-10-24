@@ -270,7 +270,7 @@ fn a_first_start_makes_generation_one_then_active_then_transcripts() {
     let mut store = disk.store();
     assert_opened(&disk.open(&mut store));
     assert_eq!(disk.bytes(b"active").as_ref(), b"1\n");
-    assert_eq!(disk.bytes(b"generations/1/manifest").as_ref(), b"1\n");
+    assert_eq!(crate::codec::component::Manifest::decode(&disk.bytes(b"generations/1/manifest")), Ok(first_manifest()));
     let tree = disk.tree();
     assert!(
         tree.iter().any(|(p, k, m)| p.as_ref() == b"generations/1/secrets" && *k == Kind::Directory && *m == 0o700)
@@ -299,7 +299,9 @@ fn a_first_start_makes_generation_one_then_active_then_transcripts() {
         .iter()
         .position(|(driver, r)| {
             if let Seen::Store { path, bytes, expected: file::Expect::Absent } = r {
-                *driver == 2 && path.as_ref() == b"generations/1/manifest" && bytes.as_ref() == b"1\n"
+                *driver == 2
+                    && path.as_ref() == b"generations/1/manifest"
+                    && crate::codec::component::Manifest::decode(bytes) == Ok(first_manifest())
             } else {
                 false
             }
@@ -461,7 +463,10 @@ fn a_leftover_manifest_or_its_temporary_is_removed_before_starting_afresh() {
         let mut disk = Disk::new(&items);
         let mut store = disk.store();
         assert_opened(&disk.open(&mut store));
-        assert_eq!(disk.bytes(b"generations/1/manifest").as_ref(), b"1\n");
+        assert_eq!(
+            crate::codec::component::Manifest::decode(&disk.bytes(b"generations/1/manifest")),
+            Ok(first_manifest())
+        );
         assert_eq!(disk.bytes(b"active").as_ref(), b"1\n");
         assert!(!has(&paths(&mut disk), b"generations/1/manifest.skein-0123456789abcdef"));
         let requests = disk.requests();
@@ -615,7 +620,11 @@ fn the_first_start_cut_at_each_operation_starts_again_whole() {
         let mut store = disk.store();
         assert_opened(&disk.open(&mut store));
         assert_eq!(disk.bytes(b"active").as_ref(), b"1\n", "cut {cut}");
-        assert_eq!(disk.bytes(b"generations/1/manifest").as_ref(), b"1\n", "cut {cut}");
+        assert_eq!(
+            crate::codec::component::Manifest::decode(&disk.bytes(b"generations/1/manifest")),
+            Ok(first_manifest()),
+            "cut {cut}"
+        );
         assert_eq!(
             paths(&mut disk)
                 .iter()
@@ -639,4 +648,47 @@ fn the_first_start_cut_at_each_operation_starts_again_whole() {
         };
         assert_eq!(*row, fixtures::header_record(1), "cut {cut} of {operations}");
     }
+}
+
+fn first_manifest() -> crate::codec::component::Manifest {
+    crate::codec::component::Manifest {
+        generation: 1,
+        from: None,
+        before: crate::format::recorded(crate::format::NONE),
+        after: crate::format::recorded(crate::format::NONE),
+        store: 0,
+        secrets: None,
+        written: 0,
+    }
+}
+
+#[test]
+fn the_first_manifest_records_the_binarys_levels_and_the_write_clock() {
+    const WRITTEN: u64 = 73;
+    let (mut store, mut below) = at_private();
+    store.patch_sets(super::patching::SETS);
+    let Some(file::Request::OpenPrivate { owner, .. }) = below.secrets.pop() else { panic!("first secrets") };
+    let mut env = fixtures::env();
+    env.wall = skein_lib::Wall::from_nanos(WRITTEN);
+    let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
+    crate::up(
+        &mut store,
+        &env,
+        Io::Secrets(Arrived {
+            event: file::Event::Opened { owner, file: Token::new(100), len: 0 },
+            fd: Some(Fd::new(4)),
+        }),
+        &mut above,
+        &mut below,
+    );
+    let Some(file::Request::Store { bytes, path, .. }) = below.transcripts.pop() else { panic!("first manifest") };
+    assert_eq!(path.as_ref(), b"generations/1/manifest");
+    assert_eq!(
+        crate::codec::component::Manifest::decode(&bytes),
+        Ok(crate::codec::component::Manifest {
+            after: crate::codec::component::Levels { skein: None, smith: None, jig: Some(1), application: Some(2) },
+            written: WRITTEN,
+            ..first_manifest()
+        })
+    );
 }

@@ -200,7 +200,6 @@ fn capacity(set: &PatchSet, family: usize, room: Room) -> Option<Capacity> {
     Some(Capacity { versions, patches, text, bytes: room.bytes, nodes: room.nodes })
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "the levels task constructs Pending during open"))]
 pub(crate) fn make(sets: &PatchSets, plan: &Plan, found: &Levels, room: Room) -> Result<Machines, Unplanned> {
     if plan.steps().is_empty() {
         return Ok(Machines { families: List::with_capacity(0), sets: *sets, room });

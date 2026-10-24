@@ -3,7 +3,6 @@
 //! walk, and the phase that runs them over a copy.
 pub(crate) mod machines;
 pub(crate) mod phase;
-#[cfg_attr(not(test), expect(dead_code, reason = "the levels task wires planning into open"))]
 pub(crate) mod plan;
 pub mod sets;
 pub(crate) mod walk;
