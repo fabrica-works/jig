@@ -6,16 +6,30 @@ pub use context::Context;
 use skein_codec::patch::{Build, Halt, Old, Site};
 use skein_codec::value::Node;
 
-pub const PATCHES: &[&str] = &[];
+pub const PATCHES: &[&str] = &[include_str!("0001.patch")];
 
 pub mod kept {
     pub mod fixture_note {
-        pub const TEXTS: &[&str] = &[include_str!("../schema/kept/fixture-note-v1.schema")];
+        pub const TEXTS: &[&str] = &[
+            include_str!("../schema/kept/fixture-note-v1.schema"),
+            include_str!("../schema/kept/fixture-note-v2.schema"),
+        ];
         pub mod v1 {
             pub mod note {
                 use skein_codec::schema::FieldIx;
                 pub const TEXT: FieldIx = FieldIx::new(0);
             }
+        }
+        pub mod v2 {
+            pub mod note {
+                use skein_codec::schema::FieldIx;
+                pub const TEXT: FieldIx = FieldIx::new(0);
+                pub const PINNED: FieldIx = FieldIx::new(1);
+            }
+        }
+        pub mod p0001 {
+            pub use super::v1 as old;
+            pub use super::v2 as new;
         }
     }
 }
@@ -37,5 +51,12 @@ mod tests {
     #[test]
     fn current() {
         skein_codegen::patch::current(owner()).map_err(|error| error.to_string()).expect("patches are current");
+    }
+
+    #[test]
+    fn p0001_goldens() {
+        skein_codegen::patch::goldens(owner(), 1, super::written)
+            .map_err(|error| error.to_string())
+            .expect("patch 0001 goldens");
     }
 }
