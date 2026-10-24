@@ -28,26 +28,28 @@ fn configuration() -> (root::Config, root::Limits) {
     let mut limits = world::limits();
     limits.core.authority.projects = PROJECT_ROOM;
     limits.core.people.projects = ROSTER_ROOM;
-    config.core.authority =
-        authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority).expect("project room");
+    config.core.defaults.rules = (authority::Domain::new(config.core.defaults.rules.clone(), limits.core.authority)
+        .expect("project room"))
+    .rules()
+    .clone();
     let seed = &config.core.seed_projects[0].policy;
     let mut policy = seed.policy.clone();
     policy.period_spend = 700;
-    config.core.policies = Map::with_capacity(1);
+    config.core.defaults.policies = Map::with_capacity(1);
     config
         .core
+        .defaults
         .policies
-        .insert(
-            POLICY,
-            core::ConfiguredPolicy { policy, permissions: seed.permissions.clone(), templates: seed.templates.clone() },
-        )
+        .insert(POLICY, core::ConfiguredPolicy { policy, permissions: Box::new([]), templates: seed.templates.clone() })
         .expect("one configured policy");
     jig_core_world::peers::journal(&mut limits);
     (config, limits)
 }
 fn start(mut config: root::Config, mut limits: root::Limits) -> (World, u64) {
-    config.core.authority = authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority)
-        .expect("configured authority room");
+    config.core.defaults.rules = (authority::Domain::new(config.core.defaults.rules.clone(), limits.core.authority)
+        .expect("configured authority room"))
+    .rules()
+    .clone();
     jig_core_world::peers::journal(&mut limits);
     let mut world = World::first_start(config, limits);
     world.client_peer = Some(ClientPeer::default());
@@ -234,7 +236,7 @@ fn a_restart_restores_a_made_project_whose_policy_configuration_no_longer_names(
     let (mut world, signed) = setup();
     made(&mut world, signed);
     let (mut config, _) = configuration();
-    config.core.policies = Map::with_capacity(0);
+    config.core.defaults.policies = Map::with_capacity(0);
     world.restart_with(config);
     let project = project(&mut world, signed);
     assert_eq!(project.policy.ceiling.ceiling.spend, 1000);

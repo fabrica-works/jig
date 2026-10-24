@@ -181,6 +181,8 @@ pub struct Call {
 /// parent -> fleet
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// Replace needs, retaining channels and their running attempts (engine.md, 17.2).
+    Needs(crate::Needs),
     /// Desired absence for issued names; names remain in Sources for reconnect checks.
     CleanupPrograms {
         names: Box<[crate::SourceName]>,

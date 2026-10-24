@@ -450,3 +450,30 @@ fn the_tail_has_its_own_profile_budget_and_override() {
     assert_eq!(parse(br#"{"profile":"small","overrides":{"core.brief_core_budgets.tail":90}}"#), Ok(expected));
     assert!(jig_domain_core::worst_case(&expected.core).unwrap() < before);
 }
+
+#[test]
+fn settings_history_is_positive_and_can_override_the_profile() {
+    assert_eq!(small().core.settings.history, 64);
+    assert_eq!(
+        parse(br#"{"profile":"small","overrides":{"core.settings.history":2}}"#).unwrap().core.settings.history,
+        2
+    );
+    problem(
+        br#"{"profile":"small","overrides":{"core.settings.history":0}}"#,
+        &[b"limits", b"overrides", b"core.settings.history"],
+        What::Override,
+    );
+}
+
+#[test]
+fn a_journal_too_small_for_settings_is_refused_before_start() {
+    let mut engine = super::fixtures::engine(super::fixtures::ENGINE_SMALL).unwrap();
+    engine.limits.journal.writes = 1;
+    let mut problems = Problems::empty();
+    crate::domain::whole(&engine, &mut problems);
+    let mut found = false;
+    for problem in problems.problems.as_slice() {
+        found |= problem.path == path(&[b"limits", b"journal.writes"]) && problem.what == What::Bound;
+    }
+    assert!(found, "the refusal names the journal write limit");
+}

@@ -183,6 +183,8 @@ pub struct CallRecord {
 /// its own child-family variant (domain/engine.md, 5.4).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum CoreRecord {
+    /// Settings have their own independently versioned store family.
+    Settings(crate::settings::Record),
     /// Bounded goal feed metadata, plan row or pending milestone.
     Projection(crate::ProjectionRecord),
     /// Deployment numbers.
@@ -206,6 +208,7 @@ impl CoreRecord {
     #[must_use]
     pub fn key(&self) -> CoreKey {
         match self {
+            Self::Settings(row) => CoreKey::Settings(row.key()),
             Self::Deployment(_) => CoreKey::Deployment,
             Self::Projection(row) => CoreKey::Projection(row.key()),
             Self::Call(row) => CoreKey::Call(row.key),
@@ -237,6 +240,8 @@ pub enum CoreKey {
     ProposalDecision { proposer: jig_domain_people::Proposer, proposal: u64 },
     /// One accepted held-chat race.
     EscalationDecision { task: u64, revision: u64 },
+    /// The settings live family and its on-demand history.
+    Settings(crate::settings::Key),
 }
 
 impl CoreKey {
@@ -245,7 +250,8 @@ impl CoreKey {
     pub const fn live(&self) -> bool {
         match self {
             Self::Projection(_) | Self::RunProof(_) | Self::Call(_) => true,
-            Self::Deployment
+            Self::Settings(_)
+            | Self::Deployment
             | Self::Turn { .. }
             | Self::Terminal { .. }
             | Self::ProposalDecision { .. }
@@ -361,6 +367,27 @@ impl Core {
             }
             tasks::Stored::Stub(stub) => stub.task <= deployment.tasks,
             tasks::Stored::Live(task) => {
+                let number = match task.executor {
+                    jig_domain_tasks::Executor::Agent { charter } => Some(charter),
+                    jig_domain_tasks::Executor::Procedure { .. } | jig_domain_tasks::Executor::Person(_) => None,
+                };
+                if let Some(number) = number {
+                    let valid = match self.charter(number) {
+                        Some(charter) => match &task.llm {
+                            Some(choice) => crate::llm::takes(&self.settings.models, &charter.policy, choice),
+                            None => true,
+                        },
+                        None => false,
+                    };
+                    if !valid {
+                        let _request = self.refuse_settings(crate::settings::Failure {
+                            setting: crate::settings::Setting::Charter(number),
+                            fault: crate::settings::Fault::Reference,
+                        });
+                        return false;
+                    }
+                }
+
                 if !supported_task(task, self)
                     || !supported_proposal(task, &deployment)
                     || task.number > deployment.tasks
@@ -413,6 +440,13 @@ impl Core {
     /// routes connector rows separately; it cannot alter this live decision.
     pub fn restore_core(&mut self, record: CoreRecord, limits: &Limits) -> Restored {
         match record {
+            CoreRecord::Settings(record) => {
+                if self.restore_setting(record, limits) {
+                    Restored::Live
+                } else {
+                    Restored::Rejected
+                }
+            }
             CoreRecord::Projection(row) => {
                 if crate::projections::restore(self, limits, row) {
                     Restored::Live

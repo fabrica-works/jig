@@ -163,7 +163,8 @@ fn proposal_row(row: Option<Record>) -> Option<core::ProposalDecisionRecord> {
     match row? {
         Record::Core(CoreRecord::ProposalDecision(row)) => Some(row),
         Record::Core(
-            CoreRecord::Deployment(_)
+            CoreRecord::Settings(_)
+            | CoreRecord::Deployment(_)
             | CoreRecord::Projection(_)
             | CoreRecord::RunProof(_)
             | CoreRecord::Call(_)
@@ -182,7 +183,8 @@ fn escalation_row(row: Option<Record>) -> Option<core::EscalationDecisionRecord>
     match row? {
         Record::Core(CoreRecord::EscalationDecision(row)) => Some(row),
         Record::Core(
-            CoreRecord::Deployment(_)
+            CoreRecord::Settings(_)
+            | CoreRecord::Deployment(_)
             | CoreRecord::Projection(_)
             | CoreRecord::RunProof(_)
             | CoreRecord::Call(_)

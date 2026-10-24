@@ -93,19 +93,22 @@ fn projects() -> (Session, Client, Time, Wall) {
     // Two seed projects and one made project, plus deployment roles.
     limits.core.authority.projects = 3;
     limits.core.people.projects = 4;
-    config.core.authority =
-        jig_domain_authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority)
-            .expect("project room");
+    config.core.defaults.rules =
+        (jig_domain_authority::Domain::new(config.core.defaults.rules.clone(), limits.core.authority)
+            .expect("project room"))
+        .rules()
+        .clone();
     let seed = &config.core.seed_projects[0].policy;
-    config.core.policies = skein_lib::Map::with_capacity(1);
+    config.core.defaults.policies = skein_lib::Map::with_capacity(1);
     config
         .core
+        .defaults
         .policies
         .insert(
             1,
             core::ConfiguredPolicy {
                 policy: seed.policy.clone(),
-                permissions: seed.permissions.clone(),
+                permissions: Box::new([]),
                 templates: seed.templates.clone(),
             },
         )

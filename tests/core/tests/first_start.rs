@@ -133,9 +133,11 @@ fn numbered_projects(people_projects: u32, second: u32) -> (root::Config, root::
     let connectors = jig_test_connector::MAX_OUT * 2;
     limits.journal.writes = room.writes + connectors;
     limits.journal.held = limits.journal.held.max(room.held + connectors);
-    configuration.core.authority =
-        authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
-            .expect("two policies");
+    configuration.core.defaults.rules =
+        (authority::Domain::new(configuration.core.defaults.rules.clone(), limits.core.authority)
+            .expect("two policies"))
+        .rules()
+        .clone();
     let projects = [(1, 1000), (second, 700)]
         .into_iter()
         .map(|(number, spend)| {

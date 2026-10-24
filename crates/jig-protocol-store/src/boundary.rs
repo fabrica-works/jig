@@ -37,6 +37,8 @@ pub enum Request {
 /// One write of a commit (store.md 6).
 #[derive(Debug)]
 pub enum Write {
+    /// Copy a held settings revision to history in this commit.
+    CopySettingsRevision(u32),
     /// jig's save: a put of its encoded key and record; a turn's save
     /// becomes a frame in its task's transcript and puts of its places.
     Save(core::Record),
@@ -195,6 +197,7 @@ pub enum Row {
 /// Whose format the format row disagrees on (store.md 5.3).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Family {
+    Settings,
     Component,
     Core,
     Tasks,

@@ -61,7 +61,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
             name: Box::from(&b"fake"[..]),
         }]),
     };
-    config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
+    config.core.defaults.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
     (
         Domain::new(config, &limits).expect("fixture core configuration"),
         Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
@@ -196,7 +196,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                         crate::Write::Save(
                             record @ crate::Record::Core(core::Record::Core(core::CoreRecord::Deployment(_))),
                         ) => header = Some(record),
-                        crate::Write::Save(_) | crate::Write::Erase(_) => {}
+                        crate::Write::Save(_) | crate::Write::Erase(_) | crate::Write::CopySettingsRevision(_) => {}
                     }
                 }
             }
@@ -237,6 +237,9 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                     if let Some(record) = header.take() {
                         step(&mut domain, &env, Event::Store(Store::Restore(record)));
                         assert!(take(&mut domain, &env).is_empty(), "header restore is an empty admitted decision");
+                        for row in jig_core_world::fixtures::initial_settings_current(&domain.core.current) {
+                            step(&mut domain, &env, Event::Store(Store::Restore(crate::Record::Core(row))));
+                        }
                     }
                     step(&mut domain, &env, Event::Store(Store::Restored(stage)));
                 }

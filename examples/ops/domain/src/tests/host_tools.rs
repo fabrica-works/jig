@@ -40,7 +40,7 @@ fn subscription_writes(mut writes: Queue<crate::Write>) {
                 call = true;
             }
             crate::Write::Save(crate::Record::Core(core::Record::Tasks(_))) => task = true,
-            crate::Write::Save(_) | crate::Write::Erase(_) => {}
+            crate::Write::Save(_) | crate::Write::Erase(_) | crate::Write::CopySettingsRevision(_) => {}
         }
     }
     assert!(call && task, "the same transaction owns the mutation and reply part");

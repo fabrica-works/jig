@@ -93,7 +93,7 @@ pub fn model_bounds(names: &[&[u8]]) -> jig_domain_fleet::Bounds {
 /// Fixed configured membership for the fleet worlds, independent of live channels.
 #[must_use]
 pub fn domain(limits: &jig_domain_fleet::Limits, needs: jig_domain_fleet::Needs) -> jig_domain_fleet::Domain {
-    let mut domain = jig_domain_fleet::Domain::new(limits, needs);
+    let mut domain = jig_domain_fleet::Domain::new(limits, needs, Box::new([]));
     let names =
         (0..limits.configured_workers).map(|index| format!("worker-{index}").into_bytes().into_boxed_slice()).collect();
     let names = jig_domain_fleet::Membership::new(names, limits.configured_workers, limits.worker_name_bytes)

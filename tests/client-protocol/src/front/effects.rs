@@ -73,17 +73,20 @@ impl Protocol {
 
 fn set_run_allowance(config: &mut root::Config) {
     use jig_domain_authority as authority;
-    let current = &config.core.authority;
-    let mut rules = current.rules().clone();
+    let current = &config.core.defaults.rules;
+    let mut rules = current.clone();
     rules.maximum_run_spend = RUN_ALLOWANCE;
     let policy = config.core.seed_projects[0].policy.policy.clone();
-    let mut domain = authority::Domain::new(rules, *current.limits()).expect("small run allowance");
+    let mut domain =
+        authority::Domain::new(rules, fixtures::owner_limits().core.authority).expect("small run allowance");
     let mut out = skein_lib::Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     config.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
-    config.core.authority =
-        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
+    config.core.defaults.rules = (jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
 }
 
 #[cfg(test)]

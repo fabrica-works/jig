@@ -10,7 +10,7 @@ use skein_lib::{Duration, ReplyTo, Token};
 
 #[must_use]
 pub fn research_charter() -> core::Charter {
-    let mut charter = crate::world::config(0).core.settings.charters[0].clone();
+    let mut charter = crate::world::config(0).core.defaults.charters[0].clone();
     charter.number = 2;
     charter.policy.instructions = b"Research the question.".as_slice().into();
     charter.policy.model.name = b"research".as_slice().into();
@@ -28,18 +28,19 @@ pub fn two_charters(seed: u64) -> (root::Config, root::Limits) {
     limits.core.accounts.accounts = 2;
     let kinds: Box<[authority::Executor]> =
         Box::new([authority::Executor::Charter(1), authority::Executor::Charter(2), authority::Executor::Procedure(1)]);
-    let mut rules = config.core.authority.rules().clone();
+    let mut rules = config.core.defaults.rules.clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
     let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
     policy.roles[0].authority.delegation.kinds.clone_from(&kinds);
 
-    config.core.authority = authority::Domain::new(rules, limits.core.authority).expect("charter policy");
+    config.core.defaults.rules =
+        (authority::Domain::new(rules, limits.core.authority).expect("charter policy")).rules().clone();
 
     config.core.seed_projects[0].policy.policy = policy;
     let research = research_charter();
     config.core.settings.models = Box::new([config.core.settings.models[0].clone(), research.policy.model.clone()]);
-    config.core.settings.charters = Box::new([config.core.settings.charters[0].clone(), research]);
+    config.core.defaults.charters = Box::new([config.core.defaults.charters[0].clone(), research]);
     config.core.settings.llm_providers.providers = Box::new([
         config.core.settings.llm_providers.providers[0].clone(),
         accounts::Provider {

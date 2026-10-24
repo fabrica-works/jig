@@ -14,3 +14,5 @@ mod reads;
 mod restore;
 mod secrets;
 mod transcripts;
+
+mod settings;

@@ -18,7 +18,9 @@ use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
-use skein_lib::{Decision, Env, Journal, JournalLimits, JournalRoom, Map, Queue, ReplyTo, Set, Time, Token, Wall};
+use skein_lib::{
+    Decision, Env, Journal, JournalLimits, JournalRoom, List, Map, Queue, ReplyTo, Set, Time, Token, Wall,
+};
 
 /// A store address owned by the core or one numbered connector.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -52,6 +54,8 @@ impl Record {
 /// One mutation in an atomic decision.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Write {
+    /// Copy the old settings revision into history atomically.
+    CopySettingsRevision(u32),
     /// Replace the row under its key.
     Save(Record),
     /// Remove the row under its key.
@@ -351,6 +355,15 @@ pub struct Domain {
 }
 
 impl Domain {
+    /// Borrow the core's settings; the testing root only translates this lookup.
+    #[must_use]
+    pub fn settings(&self) -> &core::settings::Current {
+        &self.core.current
+    }
+    #[must_use]
+    pub fn settings_failure(&self) -> Option<core::RestartRequest> {
+        self.core.settings_failure()
+    }
     /// Project each child's original elapsed deadline and the saved people
     /// wall expiry at the supplied clocks. The loop sends the owner's Timer.
     #[must_use]
@@ -505,10 +518,19 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
             domain.restart_active = true;
             match domain.core.restart_begin() {
                 core::RestartRequest::Step(step) => domain.restart_load = Some(step),
-                core::RestartRequest::Idle | core::RestartRequest::Refused { .. } => {}
+                core::RestartRequest::Idle
+                | core::RestartRequest::Settings { .. }
+                | core::RestartRequest::Refused { .. } => {}
             }
         }
         Event::RestartDone(step) => {
+            if step == core::RestartStep::LoadCore {
+                let restored_env = Env { now: env.now, wall: env.wall, limits: env.limits.core };
+                if domain.core.settings_restored(&restored_env) {
+                    let room = core::room_max(&env.limits.core).expect("validated core room").writes;
+                    decide(domain, env, Work::Core(core::Event::SettingsCommit { room }));
+                }
+            }
             let request = domain.core.restart_done(step);
             decide(domain, env, Work::Restart(request));
         }
@@ -697,7 +719,9 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
             }
             Work::Restart(request) => match request {
                 core::RestartRequest::Idle => {}
-                core::RestartRequest::Refused { .. } => domain.stopped_reported = false,
+                core::RestartRequest::Settings { .. } | core::RestartRequest::Refused { .. } => {
+                    domain.stopped_reported = false;
+                }
                 core::RestartRequest::Step(step) => match step {
                     core::RestartStep::AdoptRuns => {
                         work.push(Work::Core(core::Event::Tasks(tasks::Event::Restored)));
@@ -1061,6 +1085,17 @@ pub use census::inbox_census;
 /// supplies header, children, proofs, then calls; the core validates their links.
 #[must_use]
 pub fn restore_record(domain: &mut Domain, env: &Env<Limits>, record: Record) -> bool {
+    if domain.core.restart_step() == Some(core::RestartStep::LoadCore) {
+        let after_settings = match &record {
+            Record::Core(core::Record::Core(core::CoreRecord::Deployment(_) | core::CoreRecord::Settings(_))) => false,
+            Record::Core(_) | Record::Connector { .. } => true,
+        };
+        if after_settings
+            && !domain.core.settings_restored(&Env { now: env.now, wall: env.wall, limits: env.limits.core })
+        {
+            return false;
+        }
+    }
     if domain.core.restart_step() == Some(core::RestartStep::LoadInbox) {
         return if let Record::Core(row) = record {
             domain.core.restore_inbox_row(&env.limits.core, &row)
@@ -1218,4 +1253,99 @@ fn restore_connector(domain: &mut Domain, env: &Env<Limits>, number: u16, record
         }
     }
     true
+}
+
+/// Settings rows accompanying a deployment header in an explicitly seeded test store.
+#[must_use]
+pub fn initial_settings(defaults: &core::settings::Defaults) -> Box<[core::Record]> {
+    use core::settings as s;
+    let count = u32::try_from(defaults.charters.len())
+        .expect("fixture charters")
+        .checked_add(u32::try_from(defaults.templates.len()).expect("fixture templates"))
+        .expect("fixture settings count")
+        .checked_add(defaults.policies.len())
+        .expect("fixture settings count")
+        .checked_add(3)
+        .expect("fixture settings count");
+    let mut rows = List::with_capacity(count);
+    for charter in &defaults.charters {
+        rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Default {
+            setting: s::Setting::Charter(charter.number),
+            default: s::Default { value: s::Value::Charter(Box::new(charter.clone())), revision: 1 },
+        })))
+        .expect("fixture settings count");
+    }
+    for template in &defaults.templates {
+        rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Default {
+            setting: s::Setting::Template(template.number),
+            default: s::Default { value: s::Value::Template(Box::new(template.clone())), revision: 1 },
+        })))
+        .expect("fixture settings count");
+    }
+    for (&number, policy) in &defaults.policies {
+        rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Default {
+            setting: s::Setting::Policy(number),
+            default: s::Default { value: s::Value::Policy(Box::new(policy.clone())), revision: 1 },
+        })))
+        .expect("fixture settings count");
+    }
+    rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Default {
+        setting: s::Setting::Rules,
+        default: s::Default { value: s::Value::Rules(Box::new(defaults.rules.clone())), revision: 1 },
+    })))
+    .expect("fixture settings count");
+    rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Revision {
+        history: false,
+        revision: s::Revision {
+            head: s::Head {
+                number: 1,
+                against: 0,
+                at: Wall::EPOCH,
+                by: s::Decider::FirstStart,
+                proposal: None,
+                moved: false,
+            },
+            items: Box::new([]),
+        },
+    })))
+    .expect("fixture settings count");
+    rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Extent { oldest: 0 })))
+        .expect("fixture settings count");
+    rows.into_boxed()
+}
+
+/// The same fixture rows from an unmodified core's already loaded binary defaults.
+#[must_use]
+pub fn initial_settings_current(current: &core::settings::Current) -> Box<[core::Record]> {
+    use core::settings as s;
+    let names = current.offered();
+    let mut rows = List::with_capacity(names.len().checked_add(2).expect("fixture settings count"));
+    for &setting in &names {
+        rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Default {
+            setting,
+            default: s::Default {
+                value: current.value(setting).expect("offered fixture default").clone(),
+                revision: 1,
+            },
+        })))
+        .expect("fixture settings count");
+    }
+    rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Revision {
+        history: false,
+        revision: s::Revision {
+            head: s::Head {
+                number: 1,
+                against: 0,
+                at: Wall::EPOCH,
+                by: s::Decider::FirstStart,
+                proposal: None,
+                moved: false,
+            },
+            items: Box::new([]),
+        },
+    })))
+    .expect("fixture settings count");
+    rows.push(core::Record::Core(core::CoreRecord::Settings(s::Record::Extent { oldest: 0 })))
+        .expect("fixture settings count");
+    rows.into_boxed()
 }

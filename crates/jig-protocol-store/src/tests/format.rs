@@ -50,11 +50,12 @@ fn the_current_format_row_is_accepted() {
 fn another_family_is_refused_naming_the_first_difference() {
     let wanted = wanted();
     for (family, found) in [
-        (Family::Component, codec::component::Format { component: 3, core: 6, ..wanted }),
+        (Family::Component, codec::component::Format { component: 2, core: 6, ..wanted }),
         (Family::Core, codec::component::Format { core: 5, tasks: 4, ..wanted }),
         (Family::People, codec::component::Format { people: 10, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, accounts: 2, ..wanted }),
         (Family::Accounts, codec::component::Format { accounts: 1, application: 2, ..wanted }),
+        (Family::Settings, codec::component::Format { settings: 0, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
     ] {
         assert_eq!(
@@ -64,16 +65,17 @@ fn another_family_is_refused_naming_the_first_difference() {
                 found: match family {
                     Family::Core => 5,
                     Family::People => 10,
-                    Family::Component => 3,
+                    Family::Settings => 0,
                     Family::Accounts => 1,
-                    Family::Tasks | Family::Notes | Family::Application => 2,
+                    Family::Component | Family::Tasks | Family::Notes | Family::Application => 2,
                 },
                 wanted: match family {
                     Family::Core => 6,
                     Family::Tasks => 9,
                     Family::People => 13,
-                    Family::Component | Family::Accounts => 2,
-                    Family::Notes | Family::Application => 1,
+                    Family::Component => 3,
+                    Family::Accounts => 2,
+                    Family::Settings | Family::Notes | Family::Application => 1,
                 }
             })
         );

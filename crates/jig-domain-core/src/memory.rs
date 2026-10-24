@@ -93,7 +93,7 @@ fn sizeof(value: usize) -> Option<u64> {
     u64::try_from(value).ok()
 }
 
-fn task_carrier(limits: &Limits) -> Option<u64> {
+pub(crate) fn task_carrier(limits: &Limits) -> Option<u64> {
     let task = &limits.tasks;
     let names = bytes(
         task.holdings,
@@ -172,6 +172,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.accounts.program_hosts < limits.fleet.configured_workers.checked_add(1)?
         || limits.people.operations > limits.tasks.tasks
         || limits.accounts.program_names > limits.fleet.program_sources
+        || limits.settings.history == 0
         || limits.templates == 0
         || limits.resume_bytes == 0
         || limits.run_bytes == 0
@@ -235,12 +236,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(bytes(
             limits.views.watchers.checked_add(3)?,
             List::<people::TemplateOverride>::worst_case(limits.templates)?,
-        )?)?
-        .checked_add(bytes(
-            limits.templates,
-            sizeof(size_of::<crate::Template>())?
-                .checked_add(u64::from(limits.documents.text_bytes))?
-                .checked_add(task_carrier(limits)?)?,
         )?)?
         .checked_add(models_worst_case()?)?
         .checked_add(pending)?
@@ -440,8 +435,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         limits.authority.projects,
         limits.policy_bytes.checked_add(u64::try_from(people::NAME_BYTES).ok()?)?,
     )?)?;
-    total = total.checked_add(Map::<u32, crate::ConfiguredPolicy>::worst_case(limits.authority.projects)?)?;
-    total = total.checked_add(bytes(limits.authority.projects, limits.policy_bytes)?)?;
     total = total.checked_add(bytes(
         limits.people.initial_owners,
         sizeof(size_of::<people::InitialOwner>())?.checked_add(u64::from(limits.people.identity_bytes))?,
@@ -449,10 +442,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(Map::<people::IdentityKey, u64>::worst_case(limits.people.initial_owners)?)?;
     total = total.checked_add(bytes(limits.people.initial_owners, u64::from(limits.people.identity_bytes))?)?;
     total = total.checked_add(limits.policy_bytes.checked_mul(2)?)?;
-    total = total.checked_add(bytes(
-        task.charters,
-        u64::from(limits.run_bytes).checked_add(sizeof(size_of::<crate::Charter>())?)?,
-    )?)?;
+    total = total.checked_add(crate::settings::worst_case(limits)?)?;
+    // A decoded held revision is transient. At a release, the copied defaults
+    // and the new record's items coexist until they pass into the journal.
+    total = total.checked_add(crate::settings::revision_worst_case(limits)?.checked_mul(2)?)?;
     total = total.checked_add(bytes(
         limits.call_records,
         bytes(task.batch, sizeof(size_of::<u64>())?)?

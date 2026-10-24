@@ -138,9 +138,9 @@ fn a_format_row_of_another_component_version_refuses_naming_it() {
         panic!("format is a put");
     };
     let [high, low, ..] = &mut *value else { panic!("a version prefix") };
-    (*high, *low) = (0, 1);
+    (*high, *low) = (0, 2);
     let mut store = planted(&[skein_kv::Op::Put { key, value }, fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 1, wanted: 2 });
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 2, wanted: 3 });
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn a_header_behind_the_last_commit_refuses_naming_both_numbers() {
 #[test]
 fn a_header_without_its_format_row_refuses_as_format() {
     let mut store = header_without_format();
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 0, wanted: 2 });
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 0, wanted: 3 });
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn a_corrupt_format_stops_the_open() {
 #[test]
 fn a_stopped_open_answers_nothing_further() {
     let mut store = header_without_format();
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 0, wanted: 2 });
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 0, wanted: 3 });
     assert!(open(&mut store).is_empty());
 }
 

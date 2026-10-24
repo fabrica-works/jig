@@ -133,7 +133,8 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
         | Event::Holdings { .. }
         | Event::Account(_)
         | Event::View(_)
-        | Event::Notes(_)) => Ok(event),
+        | Event::Notes(_)
+        | Event::SettingsCommit { .. }) => Ok(event),
     }
 }
 fn people_gate(event: people::Event) -> Result<Event, Requests> {

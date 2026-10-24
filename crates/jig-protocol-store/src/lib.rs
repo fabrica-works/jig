@@ -131,6 +131,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(people_v13::Row::worst_case_heap(&codec.people)?)?
         .checked_add(notes_v1::Row::worst_case_heap(&codec.notes)?)?
         .checked_add(accounts_v2::Row::worst_case_heap(&accounts_v2::CEILINGS)?)?
+        .checked_add(settings_v1::Revision::worst_case_heap(&codec.settings)?)?
+        .checked_add(jig_domain_core::settings::revision_worst_case(&limits.core)?)?
         .checked_add(u64::try_from(size_of::<jig_domain_tasks::TaskRecord>()).ok()?)?
         .checked_mul(2)?;
     // One byte per encoded row bounds carrier counts. Count wire values and
@@ -254,3 +256,10 @@ pub use boundary::{
 
 #[cfg(test)]
 mod tests;
+
+#[rustfmt::skip]
+#[path = "generated/settings_v1.rs"]
+pub mod settings_v1;
+#[rustfmt::skip]
+#[path = "generated/component_v3.rs"]
+pub mod component_v3;

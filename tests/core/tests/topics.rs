@@ -19,7 +19,7 @@ fn topic_world(seed: u64, grant: bool) -> World {
         kind: 0,
         pattern: authority::Pattern { segments: Box::new([]), last: authority::Last::Open(Box::new([])) },
     };
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.grants = Box::new([read_grant.clone()]);
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.grants = Box::new([read_grant.clone()]);
@@ -29,8 +29,10 @@ fn topic_world(seed: u64, grant: bool) -> World {
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
     World::configured(seed, false, configuration, limits)
 }
 

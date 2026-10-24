@@ -131,10 +131,10 @@ fn the_shipped_profiles_hold_operations_per_request() {
 #[test]
 fn the_cores_config_takes_the_charters_and_projects() {
     let core = core_config(fixtures::ENGINE_SMALL);
-    assert_eq!(core.settings.charters.len(), 1);
+    assert_eq!(core.defaults.charters.len(), 1);
     assert_eq!(core.seed_projects.len(), 1);
     assert_eq!(core.seed_projects[0].number, 1);
-    assert_eq!(core.settings.charters[0].policy.instructions.as_ref(), b"Answer the question.");
+    assert_eq!(core.defaults.charters[0].policy.instructions.as_ref(), b"Answer the question.");
 }
 #[test]
 fn the_cores_policy_and_permissions_are_seeded_per_project() {
@@ -502,7 +502,9 @@ fn memory_below_the_components_sum_is_refused() {
         + 68_576
         // Account moves add bounded move/arrival tables, payloads and deadlines,
         // and enlarge the accounts output bound and the core's routed envelopes.
-        + 14_560_734;
+        + 14_560_734
+        // Stored settings' two sets, restore transients and fleet catalogue evidence.
+        + 2_010_752;
     // Regenerate this charge with JIG_MEMORY_WRITE=1 through heavy, then run
     // normally to check it. The unchanged terms above keep the act saving local.
     let charge_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/deployment_act_growth.txt");

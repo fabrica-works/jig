@@ -10,6 +10,7 @@ use skein_lib::List;
 #[must_use]
 pub fn restore(range: &RestoreRange) -> Box<[Range]> {
     Box::new([match range {
+        RestoreRange::Settings => Range::prefix(&[keys::JIG, 0, 8]),
         RestoreRange::Deployment => Range::prefix(&[keys::JIG, 0, 0]),
         // Issued names (4), then counter/accounts/sources (0 to 2); skip the installation (3).
         RestoreRange::Accounts => {

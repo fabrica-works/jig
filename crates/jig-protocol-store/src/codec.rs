@@ -5,6 +5,7 @@ pub mod core;
 pub mod notes;
 pub mod people;
 mod pieces;
+pub mod settings;
 pub mod tasks;
 use alloc::boxed::Box;
 use jig_domain_core as domain;
@@ -12,6 +13,7 @@ use jig_domain_core as domain;
 /// All store families' bounds, validated once by their owners.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
+    pub settings: crate::settings_v1::Limits,
     pub core: crate::core_v6::Limits,
     pub tasks: crate::tasks_v9::Limits,
     pub people: crate::people_v13::Limits,
@@ -21,10 +23,10 @@ pub struct Limits {
 #[must_use]
 pub fn limits(domain: &domain::Limits) -> Option<Limits> {
     let core::Limits { core, tasks, notes } = core::limits(domain)?;
-    Some(Limits { core, tasks, notes, people: people::limits(domain)? })
+    Some(Limits { core, tasks, notes, settings: settings::limits(domain)?, people: people::limits(domain)? })
 }
 
-/// The configured models' names in the configuration's order: the people family keeps a role's
+/// The configured models' names in the configuration's order: settings and the people family keep a role's
 /// models by name (protocol/store.md, 5.1).
 #[must_use]
 pub fn names(models: &[domain::Model]) -> Box<[Box<[u8]>]> {
@@ -39,6 +41,7 @@ pub fn names(models: &[domain::Model]) -> Box<[Box<[u8]>]> {
 #[must_use]
 pub fn encode(row: &domain::Record, limits: &Limits, names: &[Box<[u8]>]) -> Option<Box<[u8]>> {
     match row {
+        domain::Record::Core(domain::CoreRecord::Settings(row)) => settings::encode(row, &limits.settings, names).ok(),
         domain::Record::Core(row) => core::encode(row, &core_limits(limits)).ok(),
         domain::Record::Tasks(row) => tasks::encode(row, &limits.tasks, names).ok(),
         domain::Record::People(row) => people::encode(row, &limits.people, names).ok(),
@@ -52,6 +55,9 @@ pub fn encode(row: &domain::Record, limits: &Limits, names: &[Box<[u8]>]) -> Opt
 #[must_use]
 pub fn decode(key: &domain::Key, bytes: &[u8], limits: &Limits, names: &[Box<[u8]>]) -> Option<domain::Record> {
     match key {
+        domain::Key::Core(domain::CoreKey::Settings(key)) => Some(domain::Record::Core(domain::CoreRecord::Settings(
+            settings::decode(key, bytes, &limits.settings, names).ok()?,
+        ))),
         domain::Key::Core(_) => Some(domain::Record::Core(core::decode(bytes, &core_limits(limits)).ok()?)),
         domain::Key::Tasks(_) => Some(domain::Record::Tasks(tasks::decode(bytes, &limits.tasks, names).ok()?)),
         domain::Key::People(_) => Some(domain::Record::People(people::decode(bytes, &limits.people, names).ok()?)),

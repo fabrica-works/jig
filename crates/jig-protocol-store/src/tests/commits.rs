@@ -82,12 +82,13 @@ fn a_first_commit_puts_the_format_row_and_the_installation_with_its_header() {
     assert_eq!(
         format_row(&mut store),
         codec::component::Format {
-            component: 2,
+            component: 3,
             core: 6,
             tasks: 9,
             people: 13,
             notes: 1,
             accounts: 2,
+            settings: 1,
             application: 1,
             deployment: fixtures::DEPLOYMENT,
         },
@@ -276,4 +277,49 @@ fn a_key_written_twice_in_a_commit_is_one_put_the_last() {
 fn a_put_then_an_erase_of_one_key_is_one_erase() {
     let ops = pending_operations(Box::new([application_put(), Write::Remove { key: Box::new([41]) }]));
     assert_eq!(ops.as_ref(), &[skein_kv::Op::Erase { key: Box::new([2, 41]) }]);
+}
+
+#[test]
+fn archiving_a_settings_revision_copies_its_items_before_erasing_the_held_row() {
+    use jig_domain_core::settings as s;
+    let mut store = fixtures::opened();
+    let revision = s::Revision {
+        head: s::Head {
+            number: 1,
+            against: 0,
+            at: skein_lib::Wall::EPOCH,
+            by: s::Decider::FirstStart,
+            proposal: None,
+            moved: false,
+        },
+        items: Box::new([s::Item { setting: s::Setting::Template(7), edit: s::Edit::Removed }]),
+    };
+    assert_committed(
+        &commit(
+            &mut store,
+            1,
+            Box::new([
+                fixtures::header(1),
+                fixtures::save(Record::Core(CoreRecord::Settings(s::Record::Revision {
+                    history: false,
+                    revision: revision.clone(),
+                }))),
+            ]),
+        ),
+        1,
+    );
+    let held = Key::Core(CoreKey::Settings(s::Key::Held(1)));
+    assert_committed(
+        &commit(
+            &mut store,
+            2,
+            Box::new([fixtures::header(2), Write::CopySettingsRevision(1), Write::Erase(held.clone())]),
+        ),
+        2,
+    );
+    assert_eq!(jig_row(&mut store, &held), None);
+    assert_eq!(
+        jig_row(&mut store, &Key::Core(CoreKey::Settings(s::Key::History(1)))),
+        Some(Record::Core(CoreRecord::Settings(s::Record::Revision { history: true, revision })))
+    );
 }

@@ -79,7 +79,8 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, be
             }
         }
         Record::Core(
-            CoreRecord::Projection(_)
+            CoreRecord::Settings(_)
+            | CoreRecord::Projection(_)
             | CoreRecord::Call(_)
             | CoreRecord::RunProof(_)
             | CoreRecord::Turn(_)

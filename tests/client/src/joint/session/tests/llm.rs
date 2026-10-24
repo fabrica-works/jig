@@ -11,7 +11,7 @@ fn configuration() -> root::Config {
     alternate.name = Box::from(b"alternate".as_slice());
     let mut blocked = alternate.clone();
     blocked.name = Box::from(b"blocked".as_slice());
-    config.core.settings.charters[0].policy.alternatives = Box::new([alternate.clone(), blocked.clone()]);
+    config.core.defaults.charters[0].policy.alternatives = Box::new([alternate.clone(), blocked.clone()]);
     config.core.settings.models = Box::new([config.core.settings.models[0].clone(), alternate, blocked]);
     config.core.settings.llm_providers.providers[0].models = Box::new([
         Box::from(b"scripted".as_slice()),
@@ -29,8 +29,11 @@ fn install_policy(rules: authority::Rules, policy: authority::Policy, limits: au
 }
 
 fn ready(config: root::Config) -> (Session, Time, Wall) {
+    ready_with_limits(config, &jig_core_world::world::limits())
+}
+fn ready_with_limits(config: root::Config, limits: &root::Limits) -> (Session, Time, Wall) {
     let worker = Worker::new(1, 1, vec![Box::new([Script::Wait])]);
-    let (mut session, now, wall) = configured_session(config, Peers::new(vec![worker], Vec::new()));
+    let (mut session, now, wall) = session_with_limits(config, *limits, Peers::new(vec![worker], Vec::new()));
     session.bind(ClientId(0), 1, identity(), now, wall);
     session.poll(now, wall).expect("genuine authentication");
     (session, now, wall)
@@ -231,7 +234,7 @@ fn authority_refuses_the_chosen_model() {
 #[test]
 fn me_lists_allowed_models_in_configuration_order() {
     let mut config = configuration();
-    let mut rules = config.core.authority.rules().clone();
+    let mut rules = config.core.defaults.rules.clone();
     rules.ceiling.models = authority::Models::Named(0b011);
     let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.models = authority::Models::Named(0b011);
@@ -240,7 +243,8 @@ fn me_lists_allowed_models_in_configuration_order() {
     }
     config.core.seed_projects[0].policy.policy = policy.clone();
     let checked = install_policy(rules, policy, jig_core_world::world::limits().core.authority);
-    config.core.authority = authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
+    config.core.defaults.rules =
+        (authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules")).rules().clone();
     let (mut session, now, wall) = ready(config);
     let me = me(&mut session, now, wall);
     let models = &me.projects.get(0).expect("project membership").models;
@@ -325,14 +329,17 @@ fn task_authority_keeps_the_named_model() {
 #[test]
 fn authority_admits_a_named_model() {
     let mut config = configuration();
-    let rules = config.core.authority.rules().clone();
+    let rules = config.core.defaults.rules.clone();
     let policy = config.core.seed_projects[0].policy.policy.clone();
-    let mut limits = *config.core.authority.limits();
+    let mut limits = jig_core_world::world::limits().core.authority;
     limits.batch = 2;
     config.core.seed_projects[0].policy.policy = policy.clone();
     let checked = install_policy(rules, policy, limits);
-    config.core.authority = authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
-    let (mut session, now, wall) = ready(config);
+    config.core.defaults.rules =
+        (authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules")).rules().clone();
+    let mut owner_limits = jig_core_world::world::limits();
+    owner_limits.core.authority = limits;
+    let (mut session, now, wall) = ready_with_limits(config, &owner_limits);
     let me = me(&mut session, now, wall);
     let mut chosen = choice(None);
     chosen.main.model = text(b"blocked");

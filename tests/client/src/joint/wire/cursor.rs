@@ -612,6 +612,7 @@ fn take_key(r: &mut Reader<'_>) -> Option<Key> {
 
 fn put_core_key(w: &mut Writer, value: &CoreKey) -> Option<()> {
     match value {
+        CoreKey::Settings(_) => return None,
         CoreKey::Projection(value) => {
             w.byte(1)?;
             put_projection_key(w, value)?;

@@ -690,7 +690,8 @@ pub(super) fn route_fleet(
         | fleet::Event::Turn { .. }
         | fleet::Event::TurnKept { .. }
         | fleet::Event::TurnBusy { .. }
-        | fleet::Event::Observe { .. } => false,
+        | fleet::Event::Observe { .. }
+        | fleet::Event::Needs(_) => false,
     };
     if touched {
         core.touch_deployment();
@@ -774,7 +775,8 @@ fn host_shape(event: &fleet::Event) -> bool {
         | fleet::Event::Turn { .. }
         | fleet::Event::TurnKept { .. }
         | fleet::Event::TurnBusy { .. }
-        | fleet::Event::Observe { .. } => false,
+        | fleet::Event::Observe { .. }
+        | fleet::Event::Needs(_) => false,
     }
 }
 

@@ -12,7 +12,7 @@ impl World {
     }
     fn under(names: &[&[u8]], limits: fleet::Limits) -> Self {
         let mut world = Self {
-            domain: fleet::Domain::new(&limits, jig_fleet_world::fixtures::needs()),
+            domain: fleet::Domain::new(&limits, jig_fleet_world::fixtures::needs(), Box::new([])),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(fleet::max_out(&limits)),
         };

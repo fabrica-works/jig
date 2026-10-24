@@ -42,7 +42,7 @@ impl Core {
             return Err(people::Refusal::Role { held });
         }
         name_shape(&name)?;
-        let configured = self.policies.get(&number).ok_or(people::Refusal::Unknown)?;
+        let configured = self.current.policy(number).ok_or(people::Refusal::Unknown)?;
         if self.projects.len() >= limits.authority.projects
             || !self.people.project_room()
             || limits.people.holdings == 0

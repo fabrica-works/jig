@@ -278,7 +278,17 @@ fn a_fleet_full_to_its_limits_stays_within_its_worst_case() {
     // At its fullest, the fleet holds a fair share of the bound: it is not
     // padded beyond use.
     let fullest = fleet.meter.held();
-    assert!(fullest.saturating_mul(3) > fleet.bound, "{fullest} held of a worst case of {}", fleet.bound);
+    // This run fixture declares no catalogue; its fixed catalogue allowance is
+    // filled by deployments, independently of the run slots this story fills.
+    let catalogue = u64::from(jig_domain_fleet::CATALOGUE_MODELS)
+        * (u64::from(jig_domain_fleet::CATALOGUE_NAME_BYTES)
+            + u64::try_from(size_of::<Box<[u8]>>()).expect("box header size"));
+    let evidence = u64::from(LIMITS.workers)
+        * u64::from(jig_domain_fleet::CATALOGUE_MODELS)
+        * (u64::from(jig_domain_fleet::CATALOGUE_NAME_BYTES)
+            + u64::try_from(size_of::<jig_domain_fleet::ModelBound>()).expect("model bound header size"));
+    let run_bound = fleet.bound - catalogue - evidence;
+    assert!(fullest.saturating_mul(3) > run_bound, "{fullest} held of a run bound of {run_bound}");
     // One more is refused, at the entrance.
     let (run, attempt) = (fleet.name(), fleet.name());
     let workstream = run.raw();

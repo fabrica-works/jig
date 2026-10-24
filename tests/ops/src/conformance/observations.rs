@@ -86,7 +86,7 @@ pub fn resource(service: &infra::Service, connector: u16) -> r::Name {
 
 pub fn policy(seed: u64, environment_chat: bool) -> r::Policy {
     let (configuration, _) = super::config::root_for(seed, environment_chat);
-    let rules = configuration.core.authority.rules();
+    let rules = &configuration.core.defaults.rules;
     let ceiling = jig_core_world::observations::scope(&rules.ceiling);
     let mut policy = r::Policy {
         deployment: ceiling.clone(),

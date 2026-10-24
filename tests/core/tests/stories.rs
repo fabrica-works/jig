@@ -325,7 +325,7 @@ fn a_goal_cancelled_with_live_runs_and_an_effect_in_flight_closes_deepest_first(
         .flatten()
         .filter_map(|write| match write {
             root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => Some(row.number),
-            root::Write::Save(_) | root::Write::Erase(_) => None,
+            root::Write::Save(_) | root::Write::Erase(_) | root::Write::CopySettingsRevision(_) => None,
         })
         .collect();
     assert_eq!(ended, [grandchild, child]);
@@ -335,7 +335,7 @@ fn a_goal_cancelled_with_live_runs_and_an_effect_in_flight_closes_deepest_first(
 #[test]
 fn a_note_written_corrected_by_a_person_and_recalled_keeps_the_corrected_body() {
     let (mut configuration, limits) = fixture(121, false);
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.notes = authority::Scopes::PROJECT;
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.notes = authority::Scopes::PROJECT;
@@ -345,8 +345,10 @@ fn a_note_written_corrected_by_a_person_and_recalled_keeps_the_corrected_body() 
     authority::step(&mut checked, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
 
     let mut world = World::configured(121, false, configuration, limits);
     let key = world.call_key(1);
@@ -1045,7 +1047,7 @@ pub(crate) fn person_world_fixture(seed: u64) -> (root::Config, root::Limits) {
     limits.core.tasks.person_stall = skein_lib::Duration::from_secs(1);
     let kinds: Box<[authority::Executor]> = Box::new([authority::Executor::Charter(1), authority::Executor::Role(0)]);
 
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
@@ -1055,8 +1057,10 @@ pub(crate) fn person_world_fixture(seed: u64) -> (root::Config, root::Limits) {
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
     (configuration, limits)
 }
 
@@ -1191,7 +1195,7 @@ mod watches;
 
 fn amendment_world_fixture(seed: u64) -> (root::Config, root::Limits) {
     let (mut configuration, limits) = fixture(seed, false);
-    let rules = configuration.core.authority.rules().clone();
+    let rules = configuration.core.defaults.rules.clone();
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.roles[0].period_spend = 1000;
 
@@ -1201,9 +1205,11 @@ fn amendment_world_fixture(seed: u64) -> (root::Config, root::Limits) {
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy =
         authority_domain.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(authority_domain.rules().clone(), *authority_domain.limits())
-            .expect("checked rules");
+    configuration.core.defaults.rules =
+        (jig_domain_authority::Domain::new(authority_domain.rules().clone(), *authority_domain.limits())
+            .expect("checked rules"))
+        .rules()
+        .clone();
     (configuration, limits)
 }
 
@@ -1844,7 +1850,7 @@ fn procedure_configuration(seed: u64) -> (root::Config, root::Limits) {
     let kinds: Box<[authority::Executor]> =
         Box::new([authority::Executor::Charter(1), authority::Executor::Role(0), authority::Executor::Procedure(1)]);
 
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
@@ -1854,8 +1860,10 @@ fn procedure_configuration(seed: u64) -> (root::Config, root::Limits) {
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
     (configuration, limits)
 }
 

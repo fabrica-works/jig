@@ -220,8 +220,10 @@ pub fn two_projects(seed: u64) -> (root::Config, root::Limits) {
     limits.core.people.initial_owners = 2;
     crate::peers::journal(&mut limits);
     let policy = config.core.seed_projects[0].policy.policy.clone();
-    config.core.authority =
-        authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority).expect("two projects");
+    config.core.defaults.rules = (authority::Domain::new(config.core.defaults.rules.clone(), limits.core.authority)
+        .expect("two projects"))
+    .rules()
+    .clone();
     config.core.seed_projects = [1, 2]
         .into_iter()
         .map(|number| {
@@ -678,3 +680,5 @@ pub fn restore_project_policies(core: &mut core::Core, limits: &core::Limits, st
         }
     }
 }
+
+pub use jig_test_domain::initial_settings_current;

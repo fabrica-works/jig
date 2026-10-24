@@ -43,7 +43,7 @@ fn a_stored_override_of_a_dropped_template_is_restored_at_start() {
         },
     );
     let mut config = fixture(SEED, false).0;
-    config.core.settings.templates = Box::new([jig_core_world::fixtures::templates()[0].clone()]);
+    config.core.defaults.templates = Box::new([jig_core_world::fixtures::templates()[0].clone()]);
     world.restart_with(config);
     ask(&mut world, READ, reads::Read::Project { project: PROJECT });
     let reads::Answer::Document(document) = latest(&world) else { panic!("project document") };
@@ -63,7 +63,7 @@ fn a_policy_change_naming_a_dropped_template_is_refused() {
         },
     );
     let mut config = fixture(SEED, false).0;
-    config.core.settings.templates = Box::new([jig_core_world::fixtures::templates()[0].clone()]);
+    config.core.defaults.templates = Box::new([jig_core_world::fixtures::templates()[0].clone()]);
     world.restart_with(config);
     request(
         &mut world,

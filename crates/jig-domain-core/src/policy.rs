@@ -367,7 +367,14 @@ impl Core {
             }
             for (index, entry) in overrides.iter().enumerate() {
                 let mut known = false;
-                for template in &self.settings.templates {
+                for setting in &self.current.offered() {
+                    let number = match setting {
+                        crate::settings::Setting::Template(number) => *number,
+                        crate::settings::Setting::Charter(_)
+                        | crate::settings::Setting::Policy(_)
+                        | crate::settings::Setting::Rules => continue,
+                    };
+                    let template = self.current.template(number).expect("offered template");
                     known |= template.number == entry.template;
                 }
                 if !known {
@@ -396,7 +403,7 @@ impl Core {
         {
             return Err(people::Refusal::Unknown);
         }
-        if !crate::templates::valid(&self.settings, &templates) {
+        if !crate::templates::valid(&self.current, &self.settings, &templates) {
             return Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape });
         }
         let Some(snapshot) = snapshot(&policy, &permissions, &templates) else {
@@ -468,12 +475,12 @@ impl Core {
         }
         let mut templates: Box<[people::TemplateOverride]> = Box::new([]);
         if restore(&mut policy, &mut permissions, &mut templates, value, self.authority.limits().requirements).is_none()
-            || !crate::templates::valid(&self.settings, &templates)
+            || !crate::templates::valid(&self.current, &self.settings, &templates)
         {
             return false;
         }
         let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-        authority::step(&mut self.authority, authority::Event::Policy { project, policy }, &mut facts);
+        authority::step(&mut self.authority, authority::Event::Restore { project, policy }, &mut facts);
         match facts.pop().expect("policy restore terminal") {
             authority::PolicyFact::Added { .. } => {
                 self.projects.push(project).expect("preflighted project room");

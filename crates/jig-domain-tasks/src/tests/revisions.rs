@@ -937,3 +937,14 @@ mod compound;
 mod text;
 
 mod dependencies;
+
+#[test]
+fn replacing_charter_models_replaces_the_table_and_keeps_live_tasks() {
+    let mut h = Harness::new();
+    h.make(vec![task(1, &[])]);
+    let before = h.domain.task(1).unwrap().clone();
+    let charters = Box::new([crate::CharterModels { number: 7, models: Box::new([1]) }]);
+    h.send(Event::Charters { charters: charters.clone(), efforts: Box::new([0, 0]) });
+    assert_eq!(h.domain.charters(), charters.as_ref());
+    assert_eq!(h.domain.task(1), Some(&before));
+}

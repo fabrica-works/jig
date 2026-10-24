@@ -948,9 +948,8 @@ mod tests {
     ) -> (Session, Time, Wall) {
         let now = Time::from_nanos(17);
         let wall = Wall::from_nanos(1_000_000_000_000);
-        owner_limits.core.authority = *configuration.core.authority.limits();
         owner_limits.core.tasks.batch = owner_limits.core.tasks.batch.max(owner_limits.core.authority.batch);
-        for charter in &configuration.core.settings.charters {
+        for charter in &configuration.core.defaults.charters {
             let bytes = core::policy_owned_bytes(&charter.policy).expect("fixture run policy size");
             owner_limits.core.run_bytes =
                 owner_limits.core.run_bytes.max(u32::try_from(bytes).expect("fixture run bound"));

@@ -4,6 +4,7 @@ use jig_domain_people::Proposer;
 use skein_kv::{KeyReader, KeyWriter};
 pub(super) fn write(writer: &mut KeyWriter, key: &CoreKey) {
     match key {
+        CoreKey::Settings(key) => super::settings::write(writer, key),
         CoreKey::Deployment => {
             writer.tag(0);
         }
@@ -100,6 +101,8 @@ pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<CoreKey> {
             };
             CoreKey::ProposalDecision { proposer, proposal: reader.u64()? }
         }
+        8 => CoreKey::Settings(super::settings::read(reader, false)?),
+        9 => CoreKey::Settings(super::settings::read(reader, true)?),
         7 => CoreKey::EscalationDecision { task: reader.u64()?, revision: reader.u64()? },
         _ => return None,
     })

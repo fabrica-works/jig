@@ -482,11 +482,13 @@ fn a_conversations_attempts_name_one_first_attempt() {
 
 fn reserve_fixture(seed: u64, spend: u64) -> (root::Config, root::Limits) {
     let (mut config, limits) = jig_core_world::effects::fixture(seed, false);
-    config.core.settings.charters[0].policy.model.price_unit = 1_000;
-    let mut rules = config.core.authority.rules().clone();
+    config.core.defaults.charters[0].policy.model.price_unit = 1_000;
+    config.core.settings.models[0].price_unit = 1_000;
+    let mut rules = config.core.defaults.rules.clone();
     rules.maximum_run_spend = spend;
     let policy = config.core.seed_projects[0].policy.policy.clone();
-    config.core.authority = jig_domain_authority::Domain::new(rules, limits.core.authority).expect("authority bounds");
+    config.core.defaults.rules =
+        (jig_domain_authority::Domain::new(rules, limits.core.authority).expect("authority bounds")).rules().clone();
     config.core.seed_projects[0].policy.policy = policy;
     (config, limits)
 }

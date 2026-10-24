@@ -29,7 +29,7 @@ pub(super) fn action(
 #[test]
 fn a_note_written_corrected_by_a_person_and_recalled() {
     let mut world = configured(8517, vec![Box::new([Script::Wait])], |configuration, owner| {
-        let mut rules = configuration.core.authority.rules().clone();
+        let mut rules = configuration.core.defaults.rules.clone();
         rules.ceiling.notes = jig_domain_authority::Scopes::PROJECT;
         let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
         policy.ceiling.notes = jig_domain_authority::Scopes::PROJECT;
@@ -39,8 +39,10 @@ fn a_note_written_corrected_by_a_person_and_recalled() {
         jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
         assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
         configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
-        configuration.core.authority =
-            jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
+        configuration.core.defaults.rules =
+            (jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules"))
+                .rules()
+                .clone();
     });
     let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
     world.person(member, start(b"remember and correct"));

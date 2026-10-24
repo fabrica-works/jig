@@ -457,6 +457,22 @@ impl skein_world::Referee<Proc> for Referee {
             }
             for write in &commit.writes {
                 match write {
+                    root::Write::CopySettingsRevision(number) => {
+                        use jig_domain_core as core;
+                        let key = root::Key::Core(core::Key::Core(core::CoreKey::Settings(core::settings::Key::Held(
+                            *number,
+                        ))));
+                        let root::Record::Core(core::Record::Core(core::CoreRecord::Settings(
+                            core::settings::Record::Revision { revision, .. },
+                        ))) = self.rows.get(&key).expect("held settings revision").clone()
+                        else {
+                            panic!("revision row")
+                        };
+                        let row = root::Record::Core(core::Record::Core(core::CoreRecord::Settings(
+                            core::settings::Record::Revision { history: true, revision },
+                        )));
+                        self.rows.insert(row.key(), row);
+                    }
                     root::Write::Save(record) => {
                         self.rows.insert(record.key(), record.clone());
                     }

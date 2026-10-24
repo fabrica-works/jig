@@ -84,3 +84,9 @@ fn the_test_connectors_code_and_goldens_have_no_drift() {
         }
     }
 }
+
+#[test]
+fn the_settings_familys_code_and_goldens_have_no_drift() {
+    check("settings", 1);
+    check("component", 3);
+}

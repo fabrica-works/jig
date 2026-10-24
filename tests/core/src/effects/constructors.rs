@@ -18,7 +18,7 @@ pub fn fixture(seed: u64, requirement: bool) -> (root::Config, root::Limits) {
     limits.core.people.requests = 16;
     limits.connector.write_lifetime = Duration::from_secs(1);
     let mut configuration = crate::world::config(seed);
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.grants = Box::new([grant()]);
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.grants = Box::new([grant()]);
@@ -39,8 +39,10 @@ pub fn fixture(seed: u64, requirement: bool) -> (root::Config, root::Limits) {
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
     configuration.first.procedures = Box::new([connector::ProcedureSpec {
         number: 1,
         actions: Box::new([
@@ -87,7 +89,8 @@ impl World {
     }
 
     /// Walking scenarios preload their fake account records before startup wants sources.
-    pub(crate) fn first_start_with_accounts(configuration: root::Config, limits: &root::Limits) -> World {
+    #[must_use]
+    pub fn first_start_with_accounts(configuration: root::Config, limits: &root::Limits) -> World {
         let rows = crate::fixtures::account_rows(&configuration.core.settings.llm_providers);
         let mut world = Self::empty(configuration, limits);
         let env = world.env();
@@ -167,11 +170,7 @@ impl World {
     ) -> World {
         // This domain only journals roles before the exact effect configuration
         // is installed and restored below; its bootstrap needs no effect grants.
-        let mut bootstrap = crate::world::config(seed);
-        if *bootstrap.core.authority.limits() != limits.core.authority {
-            let rules = bootstrap.core.authority.rules().clone();
-            bootstrap.core.authority = authority::Domain::new(rules, limits.core.authority).expect("bootstrap bounds");
-        }
+        let bootstrap = crate::world::config(seed);
         let mut world = Self::empty(bootstrap, &limits);
         world.creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
         world.initial_ask = initial;
@@ -188,6 +187,9 @@ impl World {
         world.store.reconfigure(18, &configuration.core.settings.models);
         let mut rows = rows.into_vec();
         rows.extend(crate::fixtures::project_policy_rows(&configuration.core));
+        rows.extend(
+            root::initial_settings(&configuration.core.defaults).into_vec().into_iter().map(root::Record::Core),
+        );
         world.seed(rows.into_boxed_slice());
         world.move_provider =
             configuration.core.settings.llm_providers.providers.first().map(|provider| provider.number);

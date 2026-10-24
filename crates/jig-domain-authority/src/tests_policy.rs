@@ -1337,3 +1337,36 @@ fn malformed_or_over_bound_run_evidence_is_refused() {
         assert_eq!(check_run(&domain, &ask, &mut why), crate::RunAnswer::Refuse);
     }
 }
+
+#[test]
+fn replacement_rules_and_restore_preserve_a_project_above_the_new_ceiling() {
+    let mut domain = domain();
+    let original = domain.policy(1).unwrap().clone();
+    let mut rules = domain.rules().clone();
+    rules.ceiling.tools = Tools(0);
+    rules.ceiling.models = Models::NONE;
+    rules.period_spend = 1;
+    let mut out = Queue::with_capacity(crate::POLICY_MAX_OUT);
+    crate::step(&mut domain, Event::Rules(Box::new(rules.clone())), &mut out);
+    assert!(out.is_empty());
+    assert_eq!(domain.policy(1), Some(&original));
+    let mut restored = Domain::new(rules, LIMITS).unwrap();
+    crate::step(&mut restored, Event::Restore { project: 1, policy: original.clone() }, &mut out);
+    assert_eq!(out.pop(), Some(PolicyFact::Added { project: 1 }));
+    assert_eq!(restored.policy(1), Some(&original));
+    assert_eq!(restored.models(1, original.roles[0].number), Some(Models::NONE));
+    let ask = PersonAsk {
+        project: 1,
+        role: original.roles[0].number,
+        pool: Numbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
+        tasks_left: 1,
+        request: PersonRequest::Policy,
+    };
+    let mut before = findings(&domain);
+    let mut after = findings(&restored);
+    assert_eq!(check_request(&domain, &ask, &mut before), check_request(&restored, &ask, &mut after));
+    while let Some(finding) = before.pop() {
+        assert_eq!(Some(finding), after.pop());
+    }
+    assert!(after.is_empty());
+}

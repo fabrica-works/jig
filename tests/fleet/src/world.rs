@@ -1318,7 +1318,8 @@ fn describe(event: &Event) -> String {
         Event::Hello { worker: _, channel, hello } => {
             format!("Hello {} slots {} hosting {:?}", channel.raw(), hello.slots, hello.hosting)
         }
-        Event::CleanupPrograms { .. }
+        Event::Needs(_)
+        | Event::CleanupPrograms { .. }
         | Event::CheckProgram { .. }
         | Event::SignOutProgram { .. }
         | Event::Sources { .. }

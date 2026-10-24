@@ -128,6 +128,8 @@ pub enum Ask {
 /// Store mutation issued by a child of the core.
 #[derive(Debug)]
 pub enum Write {
+    /// Copy the old held revision to history without materialising it in the core.
+    CopySettingsRevision(u32),
     /// Save one authentic core or child record.
     Save(Record),
     /// Erase one authentic core or child key.
@@ -332,6 +334,7 @@ pub enum Now {
 /// Limits of the core's child routes.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
+    pub settings: crate::settings::Limits,
     /// Configured templates and overrides per project policy.
     pub templates: u32,
     /// Store map bytes at or above which new party work is refused (store.md, 11.2).
@@ -394,6 +397,8 @@ pub struct CoreBriefBudgets {
 /// One event routed to a child of the core.
 #[derive(Debug)]
 pub enum Event {
+    /// Commit a restored release before opening, within the journal's available writes.
+    SettingsCommit { room: u32 },
     /// A connector's deployment act, without a party or sign-in (people.md, 5.3).
     Act { reply_to: ReplyTo, connector: u16, key: [u8; 16], act: Box<people::Act>, carried: Option<Carried> },
     /// Store map bytes from each commit answer; needs no commit (store.md, 11.2).

@@ -172,15 +172,24 @@ fn later_start() -> Service {
         applications: 0,
         commits: 1,
     };
-    engine.store.ask(store::Request::Commit {
-        number: 1,
-        writes: Box::new([
-            store::Write::Save(core::Record::Core(core::CoreRecord::Deployment(header))),
-            store::Write::Save(core::Record::Tasks(tasks::Stored::Ledger(stored_period()))),
-            // The accounts' counter a first start keeps after making any none sources.
-            store::Write::Save(core::Record::Accounts(jig_domain_accounts::Stored::Next { number: 2 })),
-        ]),
-    });
+    let settings = jig_test_domain::initial_settings_current(engine.domain.settings());
+    let count = u32::try_from(settings.len())
+        .expect("fixture settings count")
+        .checked_add(3)
+        .expect("fixture first commit count");
+    let mut writes = skein_lib::List::with_capacity(count);
+    for row in settings {
+        writes.push(store::Write::Save(row)).expect("fixture first commit");
+    }
+    for write in [
+        store::Write::Save(core::Record::Core(core::CoreRecord::Deployment(header))),
+        store::Write::Save(core::Record::Tasks(tasks::Stored::Ledger(stored_period()))),
+        // The accounts' counter a first start keeps after making any none sources.
+        store::Write::Save(core::Record::Accounts(jig_domain_accounts::Stored::Next { number: 2 })),
+    ] {
+        writes.push(write).expect("fixture first commit");
+    }
+    engine.store.ask(store::Request::Commit { number: 1, writes: writes.into_boxed() });
     engine.store.iterate();
     let Some(store::Event::Committed { number, .. }) = engine.store.above.pop() else { panic!("fixture commit") };
     assert_eq!(number, 1);

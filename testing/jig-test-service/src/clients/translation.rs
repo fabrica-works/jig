@@ -128,7 +128,8 @@ pub(crate) fn application(value: root::Delivery) -> Option<kit::Event> {
 pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
     match value {
         core::Event::Watch { watcher, .. } | core::Event::WatchRun { watcher, .. } => Some(*watcher),
-        core::Event::Fill { .. }
+        core::Event::SettingsCommit { .. }
+        | core::Event::Fill { .. }
         | core::Event::Stopping
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }
@@ -209,7 +210,8 @@ pub(crate) fn starting(value: core::Event) -> Option<kit::Event> {
         core::Event::Watch { watcher, .. } | core::Event::WatchRun { watcher, .. } => {
             Some(kit::Event::WatchRefused { watcher, why: core::WatchRefusal::Busy })
         }
-        core::Event::Fill { .. }
+        core::Event::SettingsCommit { .. }
+        | core::Event::Fill { .. }
         | core::Event::Stopping
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }

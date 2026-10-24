@@ -1,0 +1,15 @@
+family jig-store-component 3
+
+versioned record Format {
+    component: u16
+    core: u16
+    tasks: u16
+    people: u16
+    notes: u16
+    accounts: u16
+    settings: u16
+    application: u32
+    deployment: fixed 16
+}
+versioned record Transcript { length: u64 window: u64 }
+versioned record Attempt { first: u64 }

@@ -190,6 +190,7 @@ pub(super) const BUDGETS: core::CoreBriefBudgets = core::CoreBriefBudgets {
     notes: 2_048,
 };
 pub(super) const CORE: core::Limits = core::Limits {
+    settings: core::settings::Limits { history: 64 },
     templates: 8,
     fill_mark: 268_435_456,
     connectors: 2,

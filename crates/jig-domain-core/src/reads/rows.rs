@@ -281,7 +281,11 @@ pub fn row_key(row: &Row) -> Option<Position> {
             Some(Key::Core(CoreKey::Terminal { task: value.task, attempt: value.attempt }))
         }
         Record::Core(
-            CoreRecord::Deployment(_) | CoreRecord::RunProof(_) | CoreRecord::Call(_) | CoreRecord::Projection(_),
+            CoreRecord::Settings(_)
+            | CoreRecord::Deployment(_)
+            | CoreRecord::RunProof(_)
+            | CoreRecord::Call(_)
+            | CoreRecord::Projection(_),
         )
         | Record::People(_)
         | Record::Notes(notes::Record::Line(_))
@@ -1212,7 +1216,8 @@ fn proposal_decision(record: &Record) -> Option<&crate::ProposalDecisionRecord> 
     match record {
         Record::Core(CoreRecord::ProposalDecision(value)) => Some(value),
         Record::Core(
-            CoreRecord::Deployment(_)
+            CoreRecord::Settings(_)
+            | CoreRecord::Deployment(_)
             | CoreRecord::Projection(_)
             | CoreRecord::RunProof(_)
             | CoreRecord::Call(_)
@@ -1290,6 +1295,7 @@ fn escalation(record: &Record) -> Option<&crate::EscalationDecisionRecord> {
         Record::Core(CoreRecord::EscalationDecision(value)) => Some(value),
         Record::Core(
             CoreRecord::Projection(_)
+            | CoreRecord::Settings(_)
             | CoreRecord::Deployment(_)
             | CoreRecord::Call(_)
             | CoreRecord::RunProof(_)
@@ -1309,6 +1315,7 @@ fn turn_record(record: &Record) -> Option<&crate::TurnRecord> {
         Record::Core(CoreRecord::Turn(value)) => Some(value),
         Record::Core(
             CoreRecord::Projection(_)
+            | CoreRecord::Settings(_)
             | CoreRecord::Deployment(_)
             | CoreRecord::Call(_)
             | CoreRecord::RunProof(_)
@@ -1493,7 +1500,8 @@ fn key_kind(key: &Key) -> KeyKind {
         Key::Core(value) => match value {
             CoreKey::EscalationDecision { task, .. } => KeyKind::Escalation(*task),
             CoreKey::Turn { task, attempt, turn } => KeyKind::Turn { task: *task, attempt: *attempt, turn: *turn },
-            CoreKey::Projection(_)
+            CoreKey::Settings(_)
+            | CoreKey::Projection(_)
             | CoreKey::Deployment
             | CoreKey::RunProof(_)
             | CoreKey::Call(_)
@@ -1600,7 +1608,8 @@ fn terminal_record(record: &Record) -> Option<&crate::TerminalRecord> {
     match record {
         Record::Core(CoreRecord::Terminal(value)) => Some(value),
         Record::Core(
-            CoreRecord::Deployment(_)
+            CoreRecord::Settings(_)
+            | CoreRecord::Deployment(_)
             | CoreRecord::RunProof(_)
             | CoreRecord::Call(_)
             | CoreRecord::Projection(_)

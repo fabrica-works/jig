@@ -84,6 +84,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.worker_name_bytes > crate::WORKER_NAME {
         return None;
     }
+    let catalogue = u64::from(crate::CATALOGUE_MODELS).checked_mul(
+        u64::from(crate::CATALOGUE_NAME_BYTES).checked_add(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?,
+    )?;
+    let evidence = u64::from(crate::CATALOGUE_MODELS).checked_mul(
+        u64::from(crate::CATALOGUE_NAME_BYTES).checked_add(u64::try_from(size_of::<crate::ModelBound>()).ok()?)?,
+    )?;
     let configured = skein_lib::List::<Box<[u8]>>::worst_case(limits.configured_workers)?
         .checked_add(u64::from(limits.configured_workers).checked_mul(u64::from(limits.worker_name_bytes))?)?;
     let count = limits.workers.checked_add(u32::from(limits.engine_slots > 0))?;
@@ -128,6 +134,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let sources = crate::sources::worst_case(limits)?;
     sources
         .checked_add(configured)?
+        .checked_add(catalogue)?
+        .checked_add(u64::from(count).checked_mul(evidence)?)?
         .checked_add(channels)?
         .checked_add(workers)?
         .checked_add(engine)?

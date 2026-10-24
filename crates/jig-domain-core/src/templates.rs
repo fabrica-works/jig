@@ -102,7 +102,11 @@ pub fn valid_executor(
 
 /// Validate every effective executor before publishing merged templates, including on restore.
 /// An override retained after its template was dropped has no merged value to validate.
-pub(crate) fn valid(settings: &crate::Settings, overrides: &[jig_domain_people::TemplateOverride]) -> bool {
+pub(crate) fn valid(
+    current: &crate::settings::Current,
+    settings: &crate::Settings,
+    overrides: &[jig_domain_people::TemplateOverride],
+) -> bool {
     for (at, entry) in overrides.iter().enumerate() {
         for earlier in overrides.iter().take(at) {
             if earlier.template == entry.template {
@@ -110,7 +114,14 @@ pub(crate) fn valid(settings: &crate::Settings, overrides: &[jig_domain_people::
             }
         }
     }
-    for template in &settings.templates {
+    for setting in &current.offered() {
+        let number = match setting {
+            crate::settings::Setting::Template(number) => *number,
+            crate::settings::Setting::Charter(_)
+            | crate::settings::Setting::Policy(_)
+            | crate::settings::Setting::Rules => continue,
+        };
+        let template = current.template(number).expect("offered template");
         let mut executor = template.executor;
         for entry in overrides {
             if entry.template == template.number {
@@ -120,7 +131,7 @@ pub(crate) fn valid(settings: &crate::Settings, overrides: &[jig_domain_people::
                 break;
             }
         }
-        if !valid_executor(template, executor, &settings.charters, &settings.models) {
+        if !valid_current_executor(current, settings, template, executor) {
             return false;
         }
     }
@@ -140,27 +151,79 @@ pub(crate) fn list_worst_case(limits: &crate::Limits) -> Option<u64> {
     )
 }
 
-pub(crate) fn assert_configured(config: &crate::Config, limits: &crate::Limits) {
-    assert!(
-        config.settings.templates.len() <= usize::try_from(limits.templates).expect("template bound"),
-        "core prices configured templates"
-    );
-    for template in &config.settings.templates {
-        assert!(
-            template.name.len() <= usize::try_from(limits.documents.text_bytes).expect("template name bound"),
-            "core prices template names"
-        );
-        assert!(jig_domain_tasks::valid_contract(&limits.tasks, &template.contract), "core prices template contracts");
+pub(crate) fn valid_current_executor(
+    current: &crate::settings::Current,
+    settings: &crate::Settings,
+    template: &Template,
+    executor: TemplateExecutor,
+) -> bool {
+    if template.flags.ended_by == jig_domain_tasks::EndedBy::Requester
+        && (!template.flags.conversation || executor == TemplateExecutor::Chosen)
+    {
+        return false;
     }
-    assert!(valid(&config.settings, &[]), "configured template choices fit their executors");
-    for project in &config.seed_projects {
-        let overrides = &project.policy.templates;
-        assert!(valid(&config.settings, overrides), "merged template choices fit their effective executors");
-        assert!(
-            overrides.len() <= usize::try_from(limits.templates).expect("template bound"),
-            "core prices policy overrides"
-        );
+    let policy = match executor {
+        TemplateExecutor::Chosen => None,
+        TemplateExecutor::Charter(number) => match current.charter(number) {
+            Some(charter) => Some(&charter.policy),
+            None => return false,
+        },
+    };
+    let Some(choice) = &template.llm else { return true };
+    if choice.subagents.len() > usize::try_from(jig_domain_tasks::MODELS).expect("models bound")
+        || !takes(&settings.models, choice.main)
+    {
+        return false;
     }
+    for chosen in &choice.subagents {
+        if !takes(&settings.models, *chosen) {
+            return false;
+        }
+    }
+    match policy {
+        Some(policy) => crate::llm::takes(&settings.models, policy, choice),
+        None => true,
+    }
+}
+
+/// Copy current templates directly into the frame's merged values.
+#[must_use]
+pub fn current_merged(
+    current: &crate::settings::Current,
+    overrides: &[jig_domain_people::TemplateOverride],
+) -> Box<[Template]> {
+    let names = current.offered();
+    let mut result = skein_lib::List::with_capacity(names.len());
+    for setting in &names {
+        let number = match setting {
+            crate::settings::Setting::Template(number) => *number,
+            crate::settings::Setting::Charter(_)
+            | crate::settings::Setting::Policy(_)
+            | crate::settings::Setting::Rules => continue,
+        };
+        let template = current.template(number).expect("offered template");
+        let mut value = template.clone();
+        for entry in overrides {
+            if entry.template != number {
+                continue;
+            }
+            if let Some(executor) = entry.executor {
+                value.executor = executor;
+            }
+            if let Some(budget) = entry.budget {
+                value.budget = budget;
+            }
+            if let Some(deadline) = entry.deadline {
+                value.deadline = deadline;
+            }
+            if let (Some(priority), Some(_)) = (entry.priority, value.tracked) {
+                value.tracked = Some(priority);
+            }
+            break;
+        }
+        result.push(value).expect("one value per offered template");
+    }
+    result.into_boxed()
 }
 
 /// Whether `chosen` names a configured model and an effort it takes: one it declares, or none

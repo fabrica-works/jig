@@ -86,7 +86,7 @@ fn ready(none: bool) -> (Core, Limits) {
     let mut other = scripted_model();
     other.name = b"other".as_slice().into();
     config.settings.models = Box::new([scripted_model(), same.clone(), other.clone()]);
-    config.settings.charters[0].policy.alternatives = Box::new([same, other]);
+    config.defaults.charters[0].policy.alternatives = Box::new([same, other]);
     config.settings.llm_providers.providers[0].models =
         Box::new([b"scripted".as_slice().into(), b"same".as_slice().into()]);
     let provider = accounts::Provider {
@@ -341,7 +341,7 @@ fn a_task_document_distinguishes_an_application_credential_wait() {
 fn a_progress_count_leaves_due_task_watches_unmarked() {
     let (mut core, mut limits) = ready(false);
     limits.fleet.engine_slots = 1;
-    core.fleet = fleet::Domain::new(&limits.fleet, fixtures::needs());
+    core.fleet = fleet::Domain::new(&limits.fleet, fixtures::needs(), Box::new([]));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet };
     let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
     fleet::step(
@@ -407,10 +407,10 @@ fn inventory(core: &mut Core, limits: &Limits, channel: Token, logins: Box<[flee
 }
 pub(super) fn placement_fleet(core: &Core, limits: &Limits) -> fleet::Domain {
     let mut config = config(41);
-    config.settings.charters[0].hosts = core.settings.charters[0].hosts;
-    config.settings.charters[0].policy = core.settings.charters[0].policy.clone();
-    config.settings.charters[0].policy.alternatives = core.settings.models[1..].into();
-    let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs::configured(&config, limits));
+    config.defaults.charters[0].hosts = core.charter(1).unwrap().hosts;
+    config.defaults.charters[0].policy = core.charter(1).unwrap().policy.clone();
+    config.defaults.charters[0].policy.alternatives = core.settings.models[1..].into();
+    let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs::configured(&config, limits), Box::new([]));
     fleet.configure_workers(
         fleet::Membership::new(config.worker_names, limits.fleet.configured_workers, limits.fleet.worker_name_bytes)
             .unwrap(),
@@ -431,10 +431,10 @@ fn placement_with_accounts(
     extra: Vec<accounts::Stored>,
 ) -> (Core, Limits) {
     let (mut core, limits) = ready(false);
-    core.settings.charters[0].policy.alternatives = Box::new([]);
+    core.current.test_charter_mut(1).policy.alternatives = Box::new([]);
     if personal_first {
         core.settings.models[0].program = Some(b"claude_code".as_slice().into());
-        core.settings.charters[0].policy.model.program = Some(b"claude_code".as_slice().into());
+        core.current.test_charter_mut(1).policy.model.program = Some(b"claude_code".as_slice().into());
     }
     core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
     let program_account = if main_holder == login_holder { 0 } else { 2 };
@@ -647,7 +647,7 @@ fn two_people_s_kept_logins_close_a_host() {
 #[test]
 fn the_engine_never_takes_a_program_source() {
     let (mut core, limits) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
-    core.settings.charters[0].hosts = fleet::Kinds::Engine;
+    core.current.test_charter_mut(1).hosts = fleet::Kinds::Engine;
     let mut limits = limits;
     limits.fleet.engine_slots = 1;
     core.fleet = placement_fleet(&core, &limits);
@@ -679,7 +679,7 @@ fn a_retained_provider_binds_an_account_the_rule_allows() {
     }
     let (mut core, limits) =
         placement_with_accounts(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), false, extra);
-    core.settings.charters[0].policy.alternatives = Box::new([core.settings.models[2].clone()]);
+    core.current.test_charter_mut(1).policy.alternatives = Box::new([core.settings.models[2].clone()]);
     granted(&mut core, &limits, 7);
     granted(&mut core, &limits, 6);
     let choice = core.run_choice(TASK).unwrap();
@@ -739,7 +739,7 @@ fn a_declared_model_s_account_takes_no_program_source() {
         ],
     );
     core.settings.models[2].program = Some(b"claude_code".as_slice().into());
-    core.settings.charters[0].policy.alternatives = Box::new([core.settings.models[2].clone()]);
+    core.current.test_charter_mut(1).policy.alternatives = Box::new([core.settings.models[2].clone()]);
     let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
     fleet::step(
         &mut core.fleet,
@@ -767,7 +767,7 @@ fn a_declared_model_s_account_takes_no_program_source() {
 fn a_declared_model_with_mains_program_shares_mains_account() {
     let (mut core, limits) = placement_fixture(accounts::Holder::Party(OWNER), accounts::Holder::Party(OWNER), true);
     core.settings.models[1].program = core.settings.models[0].program.clone();
-    core.settings.charters[0].policy.alternatives = Box::new([core.settings.models[1].clone()]);
+    core.current.test_charter_mut(1).policy.alternatives = Box::new([core.settings.models[1].clone()]);
     core.fleet = placement_fleet(&core, &limits);
     let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
     fleet::step(
@@ -806,11 +806,11 @@ fn due_and_preparing_documents_refine_only_the_host_wait_from_an_actual_refused_
         let (mut core, mut limits) = ready(false);
         limits.fleet.history = 0;
         limits.fleet.engine_slots = 1;
-        core.settings.charters[0].hosts = fleet::Kinds::Both;
+        core.current.test_charter_mut(1).hosts = fleet::Kinds::Both;
         let mut configuration = config(41);
-        configuration.settings.charters[0].hosts = fleet::Kinds::Both;
+        configuration.defaults.charters[0].hosts = fleet::Kinds::Both;
         let needs = fleet_needs::configured(&configuration, &limits);
-        core.fleet = fleet::Domain::new(&limits.fleet, needs.clone());
+        core.fleet = fleet::Domain::new(&limits.fleet, needs.clone(), Box::new([]));
         assert_eq!(document_wait(&core, &limits), Some(TaskRunWait::Host));
         let channel = if kind == fleet::HostKind::Engine { Token::new(0) } else { FIRST };
         let at = Wall::from_nanos(1234);
@@ -839,19 +839,19 @@ fn due_and_preparing_documents_refine_only_the_host_wait_from_an_actual_refused_
         }));
         assert_eq!(document_wait(&core, &limits), expected);
         assert!(core.fleet.hello_refusals().is_empty());
-        core.settings.charters[0].hosts = match kind {
+        core.current.test_charter_mut(1).hosts = match kind {
             fleet::HostKind::Engine => fleet::Kinds::Workers,
             fleet::HostKind::Worker => fleet::Kinds::Engine,
         };
         assert_eq!(document_wait(&core, &limits), Some(TaskRunWait::Host), "another kind cannot explain this task");
-        core.settings.charters[0].hosts = fleet::Kinds::Both;
+        core.current.test_charter_mut(1).hosts = fleet::Kinds::Both;
         send_task(&mut core, &limits, tasks::Event::Prepare { reply_to: ReplyTo::new(FIRST), task: TASK });
         assert_eq!(core.tasks.task(TASK).unwrap().phase, tasks::Phase::Active(tasks::Active::Preparing));
         assert_eq!(document_wait(&core, &limits), expected);
         send_task(&mut core, &limits, tasks::Event::Hold { task: TASK, why: tasks::Hold::Uncertain { entry: 1 } });
         assert_eq!(document_wait(&core, &limits), None);
         // A new fleet has no durable refusal; observing it again reconstructs the explanation.
-        core.fleet = fleet::Domain::new(&limits.fleet, needs);
+        core.fleet = fleet::Domain::new(&limits.fleet, needs, Box::new([]));
         let mut row = core.tasks.task(TASK).unwrap().clone();
         row.phase = tasks::Phase::Active(tasks::Active::Due);
         assert_eq!(task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap().run_wait, Some(TaskRunWait::Host));
@@ -997,7 +997,7 @@ fn an_alternatives_program_source_rechecks_too() {
     let (mut core, limits) = placement_fixture(accounts::Holder::Deployment, accounts::Holder::Party(OWNER), false);
     let mut alternative = core.settings.models[2].clone();
     alternative.program = Some(b"claude_code".as_slice().into());
-    core.settings.charters[0].policy.alternatives = Box::new([alternative]);
+    core.current.test_charter_mut(1).policy.alternatives = Box::new([alternative]);
     claim_open(&mut core, &limits, OPEN_ATTEMPT);
     let bindings = Box::new([
         authority::AccountBinding { provider: 1, account: 0, source: 1 },
@@ -1341,7 +1341,7 @@ fn open_omits_a_same_provider_alternative_on_a_program_endpoint() {
     const PROGRAM_ENDPOINT: u32 = 17;
     let (mut core, limits) = ready(false);
     open(&mut core, &limits);
-    core.settings.charters[0].policy.alternatives[0].endpoint = PROGRAM_ENDPOINT;
+    core.current.test_charter_mut(1).policy.alternatives[0].endpoint = PROGRAM_ENDPOINT;
     let mut old = placement_fleet(&core, &limits);
     core::mem::swap(&mut core.fleet, &mut old);
     host_with_endpoints(&mut core, &limits, FIRST, &[b"scripted", b"same"], Box::new([]), Box::new([PROGRAM_ENDPOINT]));

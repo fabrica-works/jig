@@ -16,7 +16,7 @@ pub(super) fn set_role_authority(domain: &mut authority::Domain, value: authorit
 }
 
 pub(super) fn set_seed_role_authority(config: &mut super::Config, value: authority::Authority) {
-    let mut rules = config.authority.rules().clone();
+    let mut rules = config.defaults.rules.clone();
     let policy = &mut config.seed_projects[0].policy.policy;
     let delegation = &value.delegation;
     rules.ceiling.delegation.tasks = rules.ceiling.delegation.tasks.max(delegation.tasks);
@@ -24,5 +24,5 @@ pub(super) fn set_seed_role_authority(config: &mut super::Config, value: authori
     policy.ceiling.delegation.tasks = policy.ceiling.delegation.tasks.max(delegation.tasks);
     policy.ceiling.delegation.depth = policy.ceiling.delegation.depth.max(delegation.depth);
     policy.roles[0].authority = value;
-    config.authority = authority::Domain::new(rules, *config.authority.limits()).expect("seed role rules");
+    config.defaults.rules = rules;
 }

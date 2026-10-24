@@ -42,12 +42,13 @@ fn the_format_row_reads_back_with_its_versions_and_deployment() {
         people: 4,
         notes: 5,
         accounts: 8,
+        settings: 9,
         application: 6,
         deployment: [7; 16],
     };
     let bytes = row.encode().expect("fixed width fields fit");
     assert_eq!(component::Format::decode(&bytes), Ok(row));
-    assert_eq!(component::Format::version(&bytes), Some(2));
+    assert_eq!(component::Format::version(&bytes), Some(3));
 }
 fn the_installation_reads_back_and_another_version_does_not() {
     let row = accounts::Installation { id: [9; 16] };

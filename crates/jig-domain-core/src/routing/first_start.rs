@@ -13,6 +13,9 @@ pub(super) fn seed(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>) 
     let owners = core::mem::replace(&mut core.seed_owners, Box::new([]));
     let mut identities = Map::with_capacity(env.limits.people.initial_owners);
     let mut out = Queue::with_capacity(super::route_room(&env.limits));
+    if !crate::settings::restart::first_start(core, env, &mut out) {
+        return Requests::Out(out);
+    }
     let mut holdings = List::with_capacity(env.limits.people.holdings);
     for owner in &owners {
         if identities.get(&owner.identity).is_some() {

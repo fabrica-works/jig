@@ -110,7 +110,7 @@ fn too_many_configured_policies_are_refused_at_the_list() {
 #[test]
 fn configured_policies_reach_the_core_configuration() {
     let config = domain::core_config(&override_document(SECOND));
-    let policy = config.policies.get(&FIRST).expect("configured policy");
+    let policy = config.defaults.policies.get(&FIRST).expect("configured policy");
     assert_eq!(policy.policy.period_spend, 100);
     assert_eq!(
         policy.permissions.as_ref(),
@@ -139,4 +139,20 @@ fn seed_and_configured_policies_have_separate_capacity() {
     let mut problems = crate::Problems::empty();
     crate::domain::whole(&engine, &mut problems);
     assert!(problems.is_empty(), "{problems:?}");
+}
+
+#[test]
+fn the_document_supplies_all_four_defaults_exactly() {
+    let engine = fixtures::engine(&override_document(SECOND)).expect("document defaults");
+    let config = crate::core(&engine, [3; 16], 11);
+    assert_eq!(config.defaults.charters, engine.charters);
+    assert_eq!(config.defaults.templates, engine.templates);
+    assert_eq!(config.defaults.rules, engine.rules);
+    assert_eq!(config.defaults.policies.len(), u32::try_from(engine.policies.len()).unwrap());
+    for policy in &engine.policies {
+        let value = config.defaults.policies.get(&policy.number).expect("numbered policy default");
+        assert_eq!(value.policy, policy.policy);
+        assert_eq!(value.permissions, policy.roles);
+        assert_eq!(value.templates, policy.templates);
+    }
 }

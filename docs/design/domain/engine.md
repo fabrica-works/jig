@@ -1841,7 +1841,14 @@ Its code comes after the rest (`../STATUS.md`).
   the store, a revision by its number and the records a page at a
   time, newest first, each with what it changed; a revision erased is
   answered as forgotten, naming the oldest kept
-  (`../client/domain/contract.md`, section 6).
+  (`../client/domain/contract.md`, section 6). The store keeps the
+  history's extent, the oldest revision it holds, among the live
+  settings. Each commit that makes a revision, and a start whose history
+  limit was lowered, erases from the oldest up to the limit's cutoff,
+  within the room the journal gives one commit, and records the new
+  oldest. A revision below the cutoff is answered as forgotten even while
+  a row that commit had no room for remains; later revisions' commits
+  erase the rest.
 - **A start** reads the settings right after the deployment's
   numbers, before any other record of the core's (section 6, step 1):
   the stored defaults, the changes, the held revisions' records and the
@@ -1886,6 +1893,9 @@ Its code comes after the rest (`../STATUS.md`).
   and the versions together.
 - **The current settings** cost the defaults and the changes, each
   within its kind's bounds (17.1): at most two whole sets, priced so.
+  The fleet keeps, for each connected host, what its hello declared for
+  the configured models and its agent's bounds, priced by the models'
+  bound, so that it can judge the host against changed needs.
 - **History** is a third number, of revision records the store keeps
   beyond those held, within the store's fill (`../protocol/store.md`,
   11.2). The core holds none of it.

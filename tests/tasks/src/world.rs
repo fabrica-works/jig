@@ -463,7 +463,8 @@ impl World {
             }
             Event::Turn { task, cumulative, .. }
             | Event::Activation { task, cause: Cause::Priced { cumulative }, .. } => Some((*task, *cumulative)),
-            Event::ResourceAccess { .. }
+            Event::Charters { .. }
+            | Event::ResourceAccess { .. }
             | Event::Resource { .. }
             | Event::Kinds { .. }
             | Event::Slots { .. }
@@ -535,7 +536,8 @@ impl World {
             | Event::Notice { word, .. } => {
                 self.message = self.message.max(word.number);
             }
-            Event::ResourceAccess { .. }
+            Event::Charters { .. }
+            | Event::ResourceAccess { .. }
             | Event::Resource { .. }
             | Event::Kinds { .. }
             | Event::Slots { .. }

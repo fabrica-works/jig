@@ -155,3 +155,11 @@ pub(crate) fn requirements_within(requirements: &[Requirement], limits: &Limits)
     }
     true
 }
+
+/// The rules' owned heap, separately priced by the settings overlay (engine.md, 17.8).
+#[must_use]
+pub fn rules_worst_case(limits: &Limits) -> Option<u64> {
+    authority_heap(limits)?
+        .checked_add(requirement_heap(limits)?)?
+        .checked_add(bytes(u64::from(limits.implications), size_of::<Implication>())?)
+}

@@ -43,7 +43,7 @@ fn a_policy_change_past_the_templates_limit_is_refused() {
 #[test]
 fn a_policy_change_overriding_a_template_twice_is_refused_as_a_repeated_identity() {
     let (mut core, _) = make_tree();
-    core.settings.templates = Box::new([template()]);
+    core.current.test_templates(Box::new([template()]));
     let first = people::TemplateOverride {
         template: template().number,
         executor: None,
@@ -151,22 +151,22 @@ fn choice(main: tasks::ModelEffort, subagents: &[tasks::ModelEffort]) -> tasks::
     tasks::LlmChoice { account: None, main, subagents: subagents.into() }
 }
 
-fn template_settings() -> Settings {
-    let mut settings = config(41).settings;
+fn template_settings() -> Config {
+    let mut settings = config(41);
     let first = scripted_model();
     let mut other = scripted_model();
     other.name = Box::from(&b"other"[..]);
     other.efforts = Box::new([]);
-    let mut both = settings.charters.first().expect("fixture charter").clone();
+    let mut both = settings.defaults.charters.first().expect("fixture charter").clone();
     both.policy.model = first.clone();
     both.policy.alternatives = Box::new([other.clone()]);
     let mut narrow = both.clone();
     narrow.number = OTHER_CHARTER;
     narrow.policy.model = other.clone();
     narrow.policy.alternatives = Box::new([]);
-    settings.models = Box::new([first, other]);
-    settings.charters = Box::new([both, narrow]);
-    settings.templates = Box::new([Template {
+    settings.settings.models = Box::new([first, other]);
+    settings.defaults.charters = Box::new([both, narrow]);
+    settings.defaults.templates = Box::new([Template {
         executor: people::TemplateExecutor::Charter(PROJECT),
         llm: Some(choice(
             tasks::ModelEffort { model: FIRST_MODEL, effort: Some(HIGH) },
@@ -189,8 +189,11 @@ fn executor_override(number: u32) -> people::TemplateOverride {
 
 fn choice_fits(main: tasks::ModelEffort, subagents: &[tasks::ModelEffort], executor: u32) -> bool {
     let mut settings = template_settings();
-    settings.templates.first_mut().expect("template").llm = Some(choice(main, subagents));
-    crate::templates::valid(&settings, &[executor_override(executor)])
+    settings.defaults.templates.first_mut().expect("template").llm = Some(choice(main, subagents));
+    {
+        let current = settings::Current::new(settings.defaults, &limits());
+        crate::templates::valid(&current, &settings.settings, &[executor_override(executor)])
+    }
 }
 
 const FIRST_CHOICE: tasks::ModelEffort = tasks::ModelEffort { model: FIRST_MODEL, effort: Some(LOW) };
@@ -242,7 +245,9 @@ fn merged_template_choices_outside_the_effective_charter_are_refused() {
 
 fn template_core() -> (Core, Limits) {
     let (mut core, limits) = make_tree();
-    core.settings = template_settings();
+    let configured = template_settings();
+    core.settings = configured.settings;
+    core.current = settings::Current::new(configured.defaults, &limits);
     (core, limits)
 }
 
@@ -273,8 +278,8 @@ fn requester_template_overrides_refuse_invalid_ending_authority_without_changing
         [(false, people::TemplateExecutor::Charter(PROJECT)), (true, people::TemplateExecutor::Chosen)]
     {
         let (mut core, limits) = make_tree();
-        core.settings.templates = Box::new([requester_template(conversation)]);
-        let templates = core.settings.templates.clone();
+        core.current.test_templates(Box::new([requester_template(conversation)]));
+        let templates = crate::templates::current_merged(&core.current, &[]);
         let before = template_policy(&core);
         let change = people::PolicyChange::Templates {
             overrides: Box::new([people::TemplateOverride { executor: Some(executor), ..executor_override(PROJECT) }]),
@@ -284,7 +289,7 @@ fn requester_template_overrides_refuse_invalid_ending_authority_without_changing
             Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape }),
         );
         assert_eq!(template_policy(&core), before);
-        assert_eq!(core.settings.templates, templates);
+        assert_eq!(crate::templates::current_merged(&core.current, &[]), templates);
         assert!(core.template_overrides.get(&PROJECT).expect("seed overrides").is_empty());
     }
 }
@@ -295,8 +300,8 @@ fn requester_template_restore_refuses_invalid_ending_authority_without_changing_
         [(false, people::TemplateExecutor::Charter(PROJECT)), (true, people::TemplateExecutor::Chosen)]
     {
         let (mut core, limits) = make_tree();
-        core.settings.templates = Box::new([requester_template(conversation)]);
-        let templates = core.settings.templates.clone();
+        core.current.test_templates(Box::new([requester_template(conversation)]));
+        let templates = crate::templates::current_merged(&core.current, &[]);
         let before = template_policy(&core);
         clear_projects(&mut core, &limits);
         let mut restored = before.clone();
@@ -304,7 +309,7 @@ fn requester_template_restore_refuses_invalid_ending_authority_without_changing_
             Box::new([people::TemplateOverride { executor: Some(executor), ..executor_override(PROJECT) }]);
         assert!(!core.restore_policy(&limits, PROJECT, Box::from("Project 1"), restored));
         assert!(core.authority.policy(PROJECT).is_none());
-        assert_eq!(core.settings.templates, templates);
+        assert_eq!(crate::templates::current_merged(&core.current, &[]), templates);
         assert!(core.template_overrides.is_empty());
     }
 }
@@ -317,10 +322,12 @@ fn startup_refuses_requester_templates_without_conversation_or_a_named_executor(
         let mut config = config(41);
         let mut template = requester_template(conversation);
         template.executor = executor;
-        config.settings.templates = Box::new([template]);
-        let refused = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| Core::new(config, &limits())));
-        let Err(panic) = refused else { panic!("no core is constructed from an invalid template") };
-        assert_eq!(panic.downcast_ref::<&str>(), Some(&"configured template choices fit their executors"));
+        config.defaults.templates = Box::new([template]);
+        let current = settings::Current::new(config.defaults, &limits());
+        assert_eq!(
+            settings::check(&current, &config.settings, &config.connectors, &limits()),
+            Err(settings::Failure { setting: settings::Setting::Template(1), fault: settings::Fault::Shape })
+        );
     }
 }
 
@@ -370,11 +377,13 @@ fn a_valid_template_override_changes_and_restores_the_policy() {
 #[should_panic(expected = "merged template choices fit their effective executors")]
 fn startup_rejects_an_incompatible_merged_template() {
     let mut config = config(41);
-    config.settings = template_settings();
+    let configured = template_settings();
+    config.settings = configured.settings;
+    config.defaults = configured.defaults;
     config.seed_projects[0].policy.templates = Box::new([executor_override(OTHER_CHARTER)]);
     let mut limits = limits();
     limits.tasks.charters = OTHER_CHARTER;
-    for charter in &config.settings.charters {
+    for charter in &config.defaults.charters {
         let bytes = policy_owned_bytes(&charter.policy).expect("bounded fixture policy");
         limits.run_bytes = limits.run_bytes.max(u32::try_from(bytes).expect("fixture policy size"));
     }

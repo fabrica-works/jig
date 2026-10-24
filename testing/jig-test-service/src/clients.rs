@@ -536,7 +536,7 @@ impl Clients {
                         endings.push(number).expect("bounded commit writes");
                     }
                 }
-                root::Write::Save(_) => {}
+                root::Write::Save(_) | root::Write::CopySettingsRevision(_) => {}
             }
         }
         if !endings.is_empty() {

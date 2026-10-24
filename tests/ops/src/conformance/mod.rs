@@ -217,7 +217,7 @@ impl Application for Ops {
             lead_commits: Vec::new(),
             pending_document_effects: Vec::new(),
             agents: {
-                let run = config::root_for(config.seed, config.story == Story::Environment).0.core.settings.charters[0]
+                let run = config::root_for(config.seed, config.story == Story::Environment).0.core.defaults.charters[0]
                     .policy
                     .clone();
                 scripts::Agents::new(
@@ -314,6 +314,9 @@ impl Application for Ops {
                                     }
                                 }
                                 jig_fake_store::Write::Save { key: row.key(), row }
+                            }
+                            root::Write::CopySettingsRevision(_) => {
+                                unreachable!("this scripted ops world restarts with identical defaults")
                             }
                             root::Write::Erase(key) => jig_fake_store::Write::Erase(key),
                         });

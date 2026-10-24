@@ -139,3 +139,34 @@ fn acted_keys_round_trip_after_the_ended_read_tag() {
     assert!(ended < key);
     assert!(keys::encode(&ended, fixtures::KEY_LIMIT).expect("bounded ended key") < bytes);
 }
+
+#[test]
+fn settings_subfamilies_and_history_follow_their_domain_order() {
+    use jig_domain_core::settings::{Key as SettingKey, Setting};
+    let settings = [
+        SettingKey::Default(Setting::Charter(1)),
+        SettingKey::Default(Setting::Charter(256)),
+        SettingKey::Default(Setting::Template(1)),
+        SettingKey::Default(Setting::Policy(1)),
+        SettingKey::Default(Setting::Rules),
+        SettingKey::Changed(Setting::Charter(1)),
+        SettingKey::Held(1),
+        SettingKey::Charter { charter: 1, revision: 2 },
+        SettingKey::Proposal { proposer: jig_domain_people::Proposer::Task(1), proposal: 1 },
+        SettingKey::Proposal { proposer: jig_domain_people::Proposer::Party(1), proposal: 1 },
+        SettingKey::Extent,
+        SettingKey::History(1),
+        SettingKey::History(255),
+        SettingKey::History(256),
+        SettingKey::History(u32::MAX),
+    ];
+    let mut previous =
+        keys::encode(&Key::Core(CoreKey::EscalationDecision { task: 1, revision: 1 }), fixtures::KEY_LIMIT).unwrap();
+    for setting in settings {
+        let key = Key::Core(CoreKey::Settings(setting));
+        let bytes = keys::encode(&key, fixtures::KEY_LIMIT).unwrap();
+        assert!(previous < bytes, "{setting:?} follows its predecessor");
+        assert_eq!(keys::decode(&bytes), Some(key));
+        previous = bytes;
+    }
+}

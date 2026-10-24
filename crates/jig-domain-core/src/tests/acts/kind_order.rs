@@ -16,14 +16,14 @@ fn configured(pairs: Box<[authority::Implication]>, rows: u32) -> (Core, Limits)
     limits.documents.implications = rows;
     limits.authority.implications = u32::try_from(pairs.len()).unwrap();
     let mut cfg = config(41);
-    let mut rules = cfg.authority.rules().clone();
+    let mut rules = cfg.defaults.rules.clone();
     let mut value = cfg.seed_projects[0].policy.policy.clone();
     rules.implies = authority::Implies::new(pairs, limits.authority.implications).unwrap();
     rules.ceiling.grants = Box::new([grant(2, authority::Last::Open(Box::new([])))]);
     value.ceiling.grants = rules.ceiling.grants.clone();
     value.roles[0].authority.grants = Box::new([grant(2, authority::Last::Open(b"a".as_slice().into()))]);
     value.roles[0].period_spend = 1000;
-    cfg.authority = authority::Domain::new(rules, limits.authority).unwrap();
+    cfg.defaults.rules = rules;
     cfg.seed_projects[0].policy.policy = value;
     let mut given = cfg.seed_projects[0].policy.policy.roles[0].authority.clone();
     given.grants = Box::new([grant(1, authority::Last::Exact(b"alpha".as_slice().into()))]);

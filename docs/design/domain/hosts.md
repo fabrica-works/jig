@@ -814,7 +814,12 @@ host tools' calls (6.8).
   budget (authority.md, 7 and 8.3); the fleet admits no host whose agent
   cannot run the engine's charters, and places a run only on a host that
   declares its models and where its sources are usable (engine.md,
-  section 8). The same admission decision is public as
+  section 8). When a change of settings changes the charters (engine.md,
+  17.3), the fleet judges its connected hosts afresh from what each
+  declared at its hello, kept for the deployment's configured models
+  only: a host now short of a charter stays connected, its running
+  attempts with it, and takes none of that charter's new runs; its next
+  hello is admitted or refused as any is. The same admission decision is public as
   `jig_domain_fleet::shortfall`, using the core's owned
   `fleet_needs::configured` requirements, so an application's startup can
   diagnose its prospective host before it says hello. A start smith refuses

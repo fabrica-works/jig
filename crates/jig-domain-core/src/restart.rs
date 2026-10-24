@@ -11,6 +11,8 @@ pub use census::{Census, ReadResults};
 pub enum RestoreRange {
     /// The deployment header, first.
     Deployment,
+    /// The live settings, before the children restore.
+    Settings,
     /// The accounts' counter, accounts and sources, before the child starts.
     Accounts,
     /// All people's live families.
@@ -25,16 +27,29 @@ pub enum RestoreRange {
 
 impl RestoreRange {
     /// The fixed order of `LoadCore`'s ranges.
-    pub const LIVE: [Self; 5] = [Self::Deployment, Self::Accounts, Self::People, Self::Tasks, Self::Core];
+    pub const LIVE: [Self; 6] =
+        [Self::Deployment, Self::Settings, Self::Accounts, Self::People, Self::Tasks, Self::Core];
 
     /// Predicate checked against the store's intervals (protocol/store.md, 4.3).
     #[must_use]
     pub fn admits(&self, key: &crate::Key) -> bool {
         match self {
             Self::Census(census) => return census.admits(key),
-            Self::Deployment | Self::Accounts | Self::People | Self::Tasks | Self::Core => {}
+            Self::Deployment | Self::Settings | Self::Accounts | Self::People | Self::Tasks | Self::Core => {}
         }
         match key {
+            crate::Key::Core(crate::CoreKey::Settings(key)) => {
+                *self == Self::Settings
+                    && match key {
+                        crate::settings::Key::History(_) => false,
+                        crate::settings::Key::Default(_)
+                        | crate::settings::Key::Changed(_)
+                        | crate::settings::Key::Held(_)
+                        | crate::settings::Key::Charter { .. }
+                        | crate::settings::Key::Proposal { .. }
+                        | crate::settings::Key::Extent => true,
+                    }
+            }
             crate::Key::Core(crate::CoreKey::Deployment) => *self == Self::Deployment,
             crate::Key::Core(key) => *self == Self::Core && key.live(),
             crate::Key::People(key) => *self == Self::People && key.live(),
@@ -65,6 +80,7 @@ pub enum RestartStep {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RestartRequest {
+    Settings { failure: crate::settings::Failure, changed: bool },
     Step(RestartStep),
     Idle,
     Refused { step: RestartStep },
@@ -157,6 +173,9 @@ impl Core {
     /// Advance only from the matching completed step. Proofs must all be loaded
     /// and every restored claim must reach the fleet before the script proceeds.
     pub fn restart_done(&mut self, done: RestartStep) -> RestartRequest {
+        if let Some(failure) = self.settings_failure {
+            return failure;
+        }
         match self.restart {
             Restart::Waiting(step) if step == done => {}
             Restart::Waiting(_) | Restart::Cold => return self.restart_refuse(),

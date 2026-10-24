@@ -10,16 +10,18 @@ fn project_core() -> (Core, Limits) {
     limits.authority.projects = PROJECTS;
     limits.people.projects = ROSTERS;
     let mut config = config(41);
-    config.authority = authority::Domain::new(config.authority.rules().clone(), limits.authority).expect("room");
+    config.defaults.rules =
+        (authority::Domain::new(config.defaults.rules.clone(), limits.authority).expect("room")).rules().clone();
     let seed = &config.seed_projects[0].policy;
-    config.policies = Map::with_capacity(1);
+    config.defaults.policies = Map::with_capacity(1);
     config
+        .defaults
         .policies
         .insert(
             POLICY,
             ConfiguredPolicy {
                 policy: seed.policy.clone(),
-                permissions: seed.permissions.clone(),
+                permissions: Box::new([]),
                 templates: seed.templates.clone(),
             },
         )

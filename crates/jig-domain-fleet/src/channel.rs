@@ -42,6 +42,7 @@ use crate::limits::Limits;
 /// A worker in contact.
 #[derive(Debug)]
 pub(crate) struct Channel {
+    pub(crate) evidence: crate::Bounds,
     pub(crate) program_endpoints: Box<[u32]>,
     pub(crate) sources: crate::sources::Sources,
     pub(crate) worker: Option<u32>,
@@ -171,6 +172,7 @@ pub(crate) fn hello(
             host.eligible = Box::new([]);
             host.eligible = crate::needs::eligibility(&domain.needs, &hello.bounds.models);
             host.declarations = crate::needs::declarations(&domain.needs, &hello.bounds.models);
+            host.evidence = crate::needs::evidence(&domain.catalogue, &hello.bounds);
             host.program_endpoints = hello.bounds.program_endpoints;
             domain.engine_hello = crate::domain::EngineHello::Admitted;
             domain.standing_engine = None;
@@ -193,6 +195,7 @@ pub(crate) fn hello(
     }
     let Hello { slots, workstreams, hosting, stop_bound: _, bounds } = hello;
     let mut worker = Channel {
+        evidence: crate::needs::evidence(&domain.catalogue, &bounds),
         program_endpoints: bounds.program_endpoints,
         declarations: crate::needs::declarations(&domain.needs, &bounds.models),
         worker: Some(worker),

@@ -10,8 +10,10 @@ fn restoring() -> (Core, Limits, people::PolicyValue) {
     limits.authority.projects = TWO_PROJECTS;
     let mut config = config(41);
     let value = policy::snapshot(&config.seed_projects[0].policy.policy, &[], &[]).expect("bounded policy");
-    config.authority =
-        authority::Domain::new(config.authority.rules().clone(), limits.authority).expect("two policies");
+    config.defaults.rules = (authority::Domain::new(config.defaults.rules.clone(), limits.authority)
+        .expect("two policies"))
+    .rules()
+    .clone();
     config.seed_projects = Box::new([]);
     let mut core = Core::new(config, &limits).expect("restoring core");
     core.counters.deployment.projects = u64::from(SECOND_PROJECT);
@@ -57,13 +59,11 @@ fn a_duplicate_project_row_keeps_the_first_whole_policy() {
 }
 
 #[test]
-fn a_restored_policy_past_the_rules_keeps_the_project_absent() {
+fn a_restored_policy_past_the_current_rules_keeps_its_live_project() {
     let (mut core, limits, mut value) = restoring();
     value.ceiling.spend = core.authority.rules().ceiling.budget.spend + 1;
-    assert!(!core.restore_policy(&limits, FIRST_PROJECT, Box::from("Tally"), value));
-    assert_eq!(core.authority.policy(FIRST_PROJECT), None);
-    assert!(core.projects.is_empty());
-    assert!(core.names.is_empty());
-    assert!(core.permission_roles.is_empty());
-    assert!(core.template_overrides.is_empty());
+    assert!(core.restore_policy(&limits, FIRST_PROJECT, Box::from("Tally"), value));
+    assert!(core.authority.policy(FIRST_PROJECT).is_some());
+    assert_eq!(core.projects.as_slice(), [FIRST_PROJECT]);
+    assert_eq!(core.names.get(&FIRST_PROJECT).unwrap().as_ref(), "Tally");
 }

@@ -87,3 +87,5 @@ pub use progress::{Activity, CountKind, Observation, Operation, Report};
 
 mod bounds;
 pub use bounds::{Bounds, ModelBound};
+
+pub use needs::{CATALOGUE_MODELS, CATALOGUE_NAME_BYTES};

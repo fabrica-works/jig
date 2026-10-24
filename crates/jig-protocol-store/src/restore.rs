@@ -128,6 +128,7 @@ fn people_interval(range: &Restore) -> Option<u32> {
                         people = Some(interval.checked_add(count.checked_sub(1)?)?);
                     }
                     jig_domain_core::RestoreRange::Deployment
+                    | jig_domain_core::RestoreRange::Settings
                     | jig_domain_core::RestoreRange::Accounts
                     | jig_domain_core::RestoreRange::Tasks
                     | jig_domain_core::RestoreRange::Core

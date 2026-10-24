@@ -473,7 +473,8 @@ pub fn now_event(now: core::Now) -> Option<Event> {
 pub fn watcher(event: &core::Event) -> Option<Token> {
     match event {
         core::Event::Watch { watcher, .. } | core::Event::WatchRun { watcher, .. } => Some(*watcher),
-        core::Event::Fill { .. }
+        core::Event::SettingsCommit { .. }
+        | core::Event::Fill { .. }
         | core::Event::Stopping
         | core::Event::Marked { .. }
         | core::Event::ReadLoaded { .. }

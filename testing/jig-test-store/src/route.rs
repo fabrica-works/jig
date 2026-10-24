@@ -55,6 +55,7 @@ pub fn down(routes: &mut Routes, out: StoreOut) -> Option<Request> {
             let mut translated = List::with_capacity(u32::try_from(writes.len()).ok()?);
             for write in writes {
                 let write = match write {
+                    root::Write::CopySettingsRevision(number) => store::Write::CopySettingsRevision(number),
                     root::Write::Save(root::Record::Core(row)) => store::Write::Save(row),
                     root::Write::Erase(root::Key::Core(key)) => store::Write::Erase(key),
                     root::Write::Save(root::Record::Connector { number, record }) => {

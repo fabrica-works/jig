@@ -20,7 +20,8 @@ impl Makes {
         makes
     }
     pub(super) fn configure(&mut self, config: &root::Config) {
-        self.configured = config.core.policies.iter().map(|(number, seed)| (*number, seed.policy.clone())).collect();
+        self.configured =
+            config.core.defaults.policies.iter().map(|(number, seed)| (*number, seed.policy.clone())).collect();
     }
     pub(super) fn inbound(&mut self, store: &Store, event: &root::Event) {
         match event {

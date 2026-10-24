@@ -479,6 +479,7 @@ fn set_documents(limits: &mut jig_domain_core::documents::DocumentLimits, name: 
 
 fn set_core(limits: &mut jig_domain_core::Limits, name: &[u8], value: u64) -> Result<(), What> {
     let jig_domain_core::Limits {
+        settings,
         templates,
         fill_mark,
         connectors,
@@ -504,6 +505,12 @@ fn set_core(limits: &mut jig_domain_core::Limits, name: &[u8], value: u64) -> Re
     } = limits;
     let jig_domain_core::CoreBriefBudgets { tail, task, dependencies, attempts, plan, notes } = brief_core_budgets;
     match name {
+        b"settings.history" => {
+            if value == 0 {
+                return Err(What::Override);
+            }
+            settings.history = count(value)?;
+        }
         b"templates" => *templates = count(value)?,
         b"fill_mark" => *fill_mark = value,
         b"connectors" => *connectors = count(value)?,

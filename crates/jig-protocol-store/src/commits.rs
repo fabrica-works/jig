@@ -54,6 +54,7 @@ pub(crate) fn operations(
             write @ (Write::Save(
                 Record::Core(
                     CoreRecord::Deployment(_)
+                    | CoreRecord::Settings(_)
                     | CoreRecord::Projection(_)
                     | CoreRecord::Call(_)
                     | CoreRecord::RunProof(_)
@@ -66,6 +67,7 @@ pub(crate) fn operations(
                 | Record::Notes(_)
                 | Record::Accounts(_),
             )
+            | Write::CopySettingsRevision(_)
             | Write::Erase(_)
             | Write::Put { .. }
             | Write::Remove { .. }) => {
@@ -96,9 +98,10 @@ pub(crate) fn operations(
     }
     Some(crate::transcripts::Pending { number, frames, ops: bounded.into_boxed(), drops })
 }
-fn operation(store: &Store, write: Write) -> Option<skein_kv::Op> {
+fn operation(store: &mut Store, write: Write) -> Option<skein_kv::Op> {
     let limit = store.limits.store.key;
     match write {
+        Write::CopySettingsRevision(number) => copy_settings(store, number),
         Write::Save(record) => Some(skein_kv::Op::Put {
             key: keys::encode(&record.key(), limit)?,
             value: codec::encode(&record, &store.codec, &store.names)?,
@@ -117,7 +120,8 @@ fn header_id(write: &Write) -> Option<[u8; 16]> {
         Write::Save(Record::Core(CoreRecord::Deployment(header))) => Some(header.id),
         Write::Save(
             Record::Core(
-                CoreRecord::Projection(_)
+                CoreRecord::Settings(_)
+                | CoreRecord::Projection(_)
                 | CoreRecord::Call(_)
                 | CoreRecord::RunProof(_)
                 | CoreRecord::Turn(_)
@@ -130,6 +134,7 @@ fn header_id(write: &Write) -> Option<[u8; 16]> {
             | Record::Notes(_)
             | Record::Accounts(_),
         )
+        | Write::CopySettingsRevision(_)
         | Write::Erase(_)
         | Write::Put { .. }
         | Write::Remove { .. }
@@ -178,4 +183,22 @@ pub(crate) fn worst_case(limits: &crate::Limits) -> Option<u64> {
     let capacity = most_ops(limits.journal.writes, limits.orphan_erases)?;
     Map::<Box<[u8]>, u32>::worst_case(capacity)?
         .checked_add(u64::from(limits.store.key).checked_mul(u64::from(capacity))?)
+}
+
+fn copy_settings(store: &mut Store, number: u32) -> Option<skein_kv::Op> {
+    use jig_domain_core::{CoreKey, Key, settings};
+    let held = Key::Core(CoreKey::Settings(settings::Key::Held(number)));
+    let history = Key::Core(CoreKey::Settings(settings::Key::History(number)));
+    let mut above = Queue::with_capacity(skein_kv::MAX_OUT.above);
+    let mut below = Queue::with_capacity(skein_kv::MAX_OUT.below);
+    skein_kv::down(
+        &mut store.stores.store,
+        &crate::memory_env(store.limits.store),
+        skein_kv::Request::Get { owner: Token::new(0), key: keys::encode(&held, store.limits.store.key)? },
+        &mut above,
+        &mut below,
+    );
+    assert!(below.is_empty(), "settings history copies read the in-memory map");
+    let Some(skein_kv::Event::Got { value: Some(value), .. }) = above.pop() else { return None };
+    Some(skein_kv::Op::Put { key: keys::encode(&history, store.limits.store.key)?, value })
 }

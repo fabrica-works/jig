@@ -210,7 +210,7 @@ impl SeenFence {
         let records = store.rows.values().chain(store.pending.iter().flat_map(|pending| {
             pending.writes.iter().filter_map(|write| match write {
                 root::Write::Save(record) => Some(record),
-                root::Write::Erase(_) => None,
+                root::Write::Erase(_) | root::Write::CopySettingsRevision(_) => None,
             })
         }));
         for record in records {
@@ -281,7 +281,7 @@ impl Observer {
     /// Capture policy from scenario configuration before constructing the root.
     #[must_use]
     pub fn new(configuration: &root::Config) -> Self {
-        let deployment = configuration.core.authority.rules();
+        let deployment = &configuration.core.defaults.rules;
         let mut policy = r::Policy {
             deployment: scope(&deployment.ceiling),
             projects: BTreeMap::new(),

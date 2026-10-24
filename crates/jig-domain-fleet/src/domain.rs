@@ -50,6 +50,7 @@ pub struct Domain {
     /// The workers in contact, and their channels' names.
     pub(crate) channels: Slab<Channel>,
     pub(crate) needs: crate::Needs,
+    pub(crate) catalogue: Box<[Box<[u8]>]>,
     pub(crate) engine_hello: EngineHello,
     /// Latest actual refusals, independent of history and cleared only by same-kind admission.
     pub(crate) standing_engine: Option<crate::HelloRefusalRecord>,
@@ -143,7 +144,7 @@ impl Domain {
     }
     /// A domain with room for `limits`.
     #[must_use]
-    pub fn new(limits: &Limits, needs: crate::Needs) -> Domain {
+    pub fn new(limits: &Limits, needs: crate::Needs, catalogue: Box<[Box<[u8]>]>) -> Domain {
         assert!(
             match crate::needs::owned_bytes(&needs) {
                 Some(bytes) => bytes <= limits.needs_bytes,
@@ -151,6 +152,16 @@ impl Domain {
             },
             "configured agent needs fit their byte bound"
         );
+        assert!(
+            catalogue.len() <= usize::try_from(crate::CATALOGUE_MODELS).expect("catalogue count"),
+            "bounded model catalogue"
+        );
+        for name in &catalogue {
+            assert!(
+                name.len() <= usize::try_from(crate::CATALOGUE_NAME_BYTES).expect("model name bound"),
+                "bounded model names"
+            );
+        }
         let tracked = limits::tracked(limits).expect("worst_case accepted the limits");
         let channels_count =
             limits.workers.checked_add(u32::from(limits.engine_slots > 0)).expect("worst_case accepted the limits");
@@ -158,6 +169,7 @@ impl Domain {
         let mut tokens = Map::with_capacity(channels_count);
         if limits.engine_slots > 0 {
             let engine = Channel {
+                evidence: crate::needs::empty_evidence(),
                 program_endpoints: Box::new([]),
                 worker: None,
                 declarations: Box::new([]),
@@ -179,6 +191,7 @@ impl Domain {
             worker_names: crate::Membership::empty(),
             cleanup_programs: Box::new([]),
             needs,
+            catalogue,
             engine_hello: EngineHello::Expected,
             standing_engine: None,
             standing_worker: None,
@@ -478,6 +491,7 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Needs(needs) => crate::needs::replace(domain, &env.limits, needs),
         Event::CleanupPrograms { names } => {
             domain.cleanup_programs = names;
             domain.placing = true;

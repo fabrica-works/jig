@@ -31,7 +31,7 @@ fn restored_application_tokens_cannot_exceed_the_deployments_allocations() {
     assert!(!core.restore_people_row(&record));
 }
 
-pub(super) fn limits() -> Limits {
+pub(crate) fn limits() -> Limits {
     let retry = tasks::Retry { retries: 1, base: Duration::from_millis(10), max: Duration::from_secs(1) };
     let tasks = tasks::Limits {
         circle: 8,
@@ -131,6 +131,7 @@ pub(super) fn limits() -> Limits {
         history: 2,
     };
     Limits {
+        settings: settings::Limits { history: 64 },
         templates: 8,
         fill_mark: 1000,
         documents: DocumentLimits {
@@ -250,7 +251,7 @@ fn scripted_model() -> Model {
     }
 }
 
-fn config(seed: u64) -> Config {
+pub(crate) fn config(seed: u64) -> Config {
     let ceiling = authority_value(1000, Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]));
     let rules = authority::Rules {
         ceiling: ceiling.clone(),
@@ -294,7 +295,6 @@ fn config(seed: u64) -> Config {
             project: 1,
             identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
         }]),
-        authority: domain,
         seed_projects: Box::new([SeedProject {
             number: 1,
             name: Box::from("Project 1"),
@@ -308,12 +308,26 @@ fn config(seed: u64) -> Config {
                 templates: Box::new([]),
             },
         }]),
-        policies: Map::with_capacity(0),
         connectors: Box::new([1, 2]),
         settings: Settings {
-            templates: Box::new([]),
             deployment_provider: 3,
             models: Box::new([scripted_model()]),
+            resume_bytes: 256,
+            tail_bytes: 128,
+            tools: ToolFamilies::JIG,
+            key_bytes: 256,
+            llm_providers: accounts::Providers {
+                providers: Box::new([accounts::Provider {
+                    name: b"Fake".as_slice().into(),
+                    signed_in_plan: true,
+                    manage_usage: Some(b"https://usage.example/".as_slice().into()),
+                    number: 1,
+                    models: Box::new([b"scripted".as_slice().into()]),
+                    offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+                }]),
+            },
+        },
+        defaults: settings::Defaults {
             charters: Box::new([Charter {
                 number: 1,
                 hosts: fleet::Kinds::Workers,
@@ -335,21 +349,9 @@ fn config(seed: u64) -> Config {
                     call_timeout: Duration::from_secs(10),
                 },
             }]),
-            resume_bytes: 256,
-            tail_bytes: 128,
-
-            tools: ToolFamilies::JIG,
-            key_bytes: 256,
-            llm_providers: accounts::Providers {
-                providers: Box::new([accounts::Provider {
-                    name: b"Fake".as_slice().into(),
-                    signed_in_plan: true,
-                    manage_usage: Some(b"https://usage.example/".as_slice().into()),
-                    number: 1,
-                    models: Box::new([b"scripted".as_slice().into()]),
-                    offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
-                }]),
-            },
+            templates: Box::new([]),
+            policies: Map::with_capacity(0),
+            rules: (domain).rules().clone(),
         },
     }
 }
@@ -1110,7 +1112,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
                 assert_eq!(release, Some(1));
                 assert_eq!(
                     before.instructions.as_ref().unwrap().bytes,
-                    core.charter(core.settings.charters[0].number).expect("chat charter").policy.instructions
+                    core.charter(1).expect("chat charter").policy.instructions
                 );
                 assert_eq!(after.instructions.as_ref().unwrap().bytes.as_ref(), b"Use the new evidence");
                 assert_eq!(before.spec.words.bytes.as_ref(), b"Work\nDetailed instructions");
@@ -3572,8 +3574,9 @@ fn configured_policies_are_retained_by_the_core() {
     let limits = limits();
     let mut config = config(41);
     let policy = config.seed_projects[0].policy.policy.clone();
-    config.policies = Map::with_capacity(limits.authority.projects);
+    config.defaults.policies = Map::with_capacity(limits.authority.projects);
     config
+        .defaults
         .policies
         .insert(
             1,
@@ -3585,7 +3588,7 @@ fn configured_policies_are_retained_by_the_core() {
         )
         .expect("one configured policy");
     let core = Core::new(config, &limits).expect("fixture configuration");
-    let policy = core.policies.get(&1).expect("retained configured policy");
+    let policy = core.current.policy(1).expect("retained configured policy");
     assert_eq!(policy.policy.period_spend, 1000);
     assert_eq!(policy.permissions.as_ref(), &[people::PermissionRole { connector: 1, permission: 1, role: 0 }]);
     assert!(policy.templates.is_empty());

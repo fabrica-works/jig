@@ -16,11 +16,11 @@ fn period_core(configured: u64) -> (Core, Limits) {
     limits.documents.lines = 4;
     let mut config = config(61);
     let policy = config.seed_projects[0].policy.policy.clone();
-    config.authority = authority::Domain::new(
-        config.authority.rules().clone(),
-        authority::Limits { projects: 2, ..*config.authority.limits() },
-    )
-    .unwrap();
+    config.defaults.rules =
+        (authority::Domain::new(config.defaults.rules.clone(), authority::Limits { projects: 2, ..limits.authority })
+            .unwrap())
+        .rules()
+        .clone();
     let seed = |number: u32, name: &str| SeedProject {
         number,
         name: name.into(),

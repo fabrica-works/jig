@@ -1,0 +1,373 @@
+//! Deployment settings, defaults and revisions (domain/engine.md, section 17).
+use crate::{Charter, ConfiguredPolicy, Template};
+use alloc::boxed::Box;
+use jig_domain_authority as authority;
+use jig_domain_people as people;
+use skein_lib::{List, Map, Wall};
+
+mod check;
+pub(crate) mod restart;
+pub use check::check;
+pub use restart::revision_writes;
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum Setting {
+    Charter(u32),
+    Template(u32),
+    Policy(u32),
+    Rules,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Value {
+    Charter(Box<Charter>),
+    Template(Box<Template>),
+    Policy(Box<ConfiguredPolicy>),
+    Rules(Box<authority::Rules>),
+}
+#[derive(Debug)]
+pub struct Defaults {
+    pub charters: Box<[Charter]>,
+    pub templates: Box<[Template]>,
+    pub policies: Map<u32, ConfiguredPolicy>,
+    pub rules: authority::Rules,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Default {
+    pub value: Value,
+    pub revision: u32,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Changed {
+    pub value: Option<Value>,
+    pub revision: u32,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Edit {
+    Set(Value),
+    Removed,
+    Reset,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Item {
+    pub setting: Setting,
+    pub edit: Edit,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Decider {
+    FirstStart,
+    Release,
+    Party(u64),
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Head {
+    pub number: u32,
+    pub against: u32,
+    pub at: Wall,
+    pub by: Decider,
+    pub proposal: Option<(people::Proposer, u32)>,
+    pub moved: bool,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Revision {
+    pub head: Head,
+    pub items: Box<[Item]>,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Failure {
+    pub setting: Setting,
+    pub fault: Fault,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Fault {
+    Shape,
+    Count,
+    Reference,
+    Rules,
+    Budget,
+    Grace,
+    Owner,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Limits {
+    pub history: u32,
+}
+
+/// Addresses sort in the same order as the store's tag 8 subfamilies, then tag 9.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum Key {
+    Default(Setting),
+    Changed(Setting),
+    Held(u32),
+    Charter { charter: u32, revision: u32 },
+    Proposal { proposer: people::Proposer, proposal: u32 },
+    Extent,
+    History(u32),
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct CharterVersion {
+    pub charter: Option<Box<Charter>>,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Proposal {
+    pub against: u32,
+    pub items: Box<[Item]>,
+}
+
+/// Only defaults and changes own current values. Revision history stays in the store.
+#[derive(Debug)]
+pub struct Current {
+    pub(crate) defaults: Map<Setting, Default>,
+    pub(crate) changes: Map<Setting, Changed>,
+    pub(crate) head: Head,
+    pub(crate) oldest: u32,
+}
+impl Current {
+    #[must_use]
+    pub fn new(mut defaults: Defaults, limits: &crate::Limits) -> Self {
+        let mut values = Map::with_capacity(capacity(limits).expect("settings count"));
+        for charter in defaults.charters {
+            let previous = values
+                .insert(
+                    Setting::Charter(charter.number),
+                    Default { value: Value::Charter(Box::new(charter)), revision: 1 },
+                )
+                .expect("default charter bound");
+            assert!(previous.is_none(), "unique default charter");
+        }
+        for template in defaults.templates {
+            let previous = values
+                .insert(
+                    Setting::Template(template.number),
+                    Default { value: Value::Template(Box::new(template)), revision: 1 },
+                )
+                .expect("default template bound");
+            assert!(previous.is_none(), "unique default template");
+        }
+        for _ in 0..defaults.policies.len() {
+            let number = *defaults.policies.first().expect("default policy count").0;
+            let policy = defaults.policies.remove(&number).expect("default policy");
+            values
+                .insert(Setting::Policy(number), Default { value: Value::Policy(Box::new(policy)), revision: 1 })
+                .expect("default policy bound");
+        }
+        values
+            .insert(Setting::Rules, Default { value: Value::Rules(Box::new(defaults.rules)), revision: 1 })
+            .expect("rules slot");
+        Self {
+            defaults: values,
+            changes: Map::with_capacity(capacity(limits).expect("settings count")),
+            head: Head {
+                number: 1,
+                against: 0,
+                at: Wall::EPOCH,
+                by: Decider::FirstStart,
+                proposal: None,
+                moved: false,
+            },
+            oldest: 0,
+        }
+    }
+    #[must_use]
+    pub fn value(&self, setting: Setting) -> Option<&Value> {
+        match self.changes.get(&setting) {
+            Some(change) => change.value.as_ref(),
+            None => match self.defaults.get(&setting) {
+                Some(default) => Some(&default.value),
+                None => None,
+            },
+        }
+    }
+    #[must_use]
+    pub fn charter(&self, number: u32) -> Option<&Charter> {
+        match self.value(Setting::Charter(number)) {
+            Some(Value::Charter(value)) => Some(value),
+            Some(Value::Template(_) | Value::Policy(_) | Value::Rules(_)) | None => None,
+        }
+    }
+    #[must_use]
+    pub fn template(&self, number: u32) -> Option<&Template> {
+        match self.value(Setting::Template(number)) {
+            Some(Value::Template(value)) => Some(value),
+            Some(Value::Charter(_) | Value::Policy(_) | Value::Rules(_)) | None => None,
+        }
+    }
+    #[must_use]
+    pub fn policy(&self, number: u32) -> Option<&ConfiguredPolicy> {
+        match self.value(Setting::Policy(number)) {
+            Some(Value::Policy(value)) => Some(value),
+            Some(Value::Charter(_) | Value::Template(_) | Value::Rules(_)) | None => None,
+        }
+    }
+    #[must_use]
+    pub fn rules(&self) -> &authority::Rules {
+        match self.value(Setting::Rules) {
+            Some(Value::Rules(value)) => value,
+            Some(Value::Charter(_) | Value::Template(_) | Value::Policy(_)) | None => {
+                unreachable!("checked settings always offer rules")
+            }
+        }
+    }
+    #[must_use]
+    pub const fn newest(&self) -> u32 {
+        self.head.number
+    }
+    #[must_use]
+    pub const fn newest_head(&self) -> &Head {
+        &self.head
+    }
+    #[must_use]
+    pub const fn oldest(&self) -> u32 {
+        self.oldest
+    }
+    #[must_use]
+    pub fn changed(&self, setting: Setting) -> bool {
+        self.changes.get(&setting).is_some()
+    }
+    /// Ordered setting names; this scratch holds no values.
+    #[must_use]
+    pub fn offered(&self) -> List<Setting> {
+        offered(&self.defaults, &self.changes)
+    }
+}
+#[must_use]
+pub fn capacity(limits: &crate::Limits) -> Option<u32> {
+    limits.tasks.charters.checked_add(limits.templates)?.checked_add(limits.authority.projects)?.checked_add(1)
+}
+fn offered(defaults: &Map<Setting, Default>, changes: &Map<Setting, Changed>) -> List<Setting> {
+    let mut names =
+        Map::with_capacity(defaults.capacity().checked_add(changes.capacity()).expect("settings scratch count"));
+    for (&setting, _) in defaults {
+        names.insert(setting, ()).expect("default names");
+    }
+    for (&setting, _) in changes {
+        names.insert(setting, ()).expect("change names");
+    }
+    let mut result = List::with_capacity(names.len());
+    for (&setting, ()) in &names {
+        if match changes.get(&setting) {
+            Some(change) => change.value.is_some(),
+            None => defaults.get(&setting).is_some(),
+        } {
+            result.push(setting).expect("offered names");
+        }
+    }
+    result
+}
+
+/// Settings' six record shapes, shared by the core and its store codec.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Record {
+    Default { setting: Setting, default: Default },
+    Changed { setting: Setting, changed: Changed },
+    Revision { history: bool, revision: Revision },
+    Extent { oldest: u32 },
+    Charter { charter: u32, revision: u32, value: CharterVersion },
+    Proposal { proposer: people::Proposer, proposal: u32, value: Proposal },
+}
+impl Record {
+    #[must_use]
+    pub fn key(&self) -> Key {
+        match self {
+            Self::Default { setting, .. } => Key::Default(*setting),
+            Self::Changed { setting, .. } => Key::Changed(*setting),
+            Self::Revision { history, revision } => {
+                if *history {
+                    Key::History(revision.head.number)
+                } else {
+                    Key::Held(revision.head.number)
+                }
+            }
+            Self::Extent { .. } => Key::Extent,
+            Self::Charter { charter, revision, .. } => Key::Charter { charter: *charter, revision: *revision },
+            Self::Proposal { proposer, proposal, .. } => Key::Proposal { proposer: *proposer, proposal: *proposal },
+        }
+    }
+}
+
+/// One whole set of settings at the bounds the check enforces. The template
+/// carrier deliberately shares the pre-existing conservative construction bound.
+#[must_use]
+pub fn set_worst_case(limits: &crate::Limits) -> Option<u64> {
+    let charters = u64::from(limits.tasks.charters)
+        .checked_mul(u64::from(limits.run_bytes).checked_add(u64::try_from(size_of::<Charter>()).ok()?)?)?;
+    let templates = u64::from(limits.templates).checked_mul(
+        u64::try_from(size_of::<Template>())
+            .ok()?
+            .checked_add(u64::from(limits.documents.text_bytes))?
+            .checked_add(crate::memory::task_carrier(limits)?)?,
+    )?;
+    let policies = u64::from(limits.authority.projects)
+        .checked_mul(limits.policy_bytes.checked_add(u64::try_from(size_of::<ConfiguredPolicy>()).ok()?)?)?;
+    charters
+        .checked_add(templates)?
+        .checked_add(policies)?
+        .checked_add(authority::rules_worst_case(&limits.authority)?)?
+        .checked_add(u64::try_from(size_of::<authority::Rules>()).ok()?)
+}
+/// One record's whole items, priced independently of the held heads.
+#[must_use]
+pub fn revision_worst_case(limits: &crate::Limits) -> Option<u64> {
+    set_worst_case(limits)?
+        .checked_add(List::<Item>::worst_case(capacity(limits)?.checked_mul(2)?)?)?
+        .checked_add(u64::try_from(size_of::<Head>()).ok()?)
+}
+#[must_use]
+pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
+    let count = capacity(limits)?;
+    let maps = Map::<Setting, Default>::worst_case(count)?.checked_add(Map::<Setting, Changed>::worst_case(count)?)?;
+    let restore =
+        Map::<Setting, bool>::worst_case(count.checked_mul(2)?)?.checked_add(Map::<Setting, ()>::worst_case(count)?)?;
+    let walks = Map::<Setting, ()>::worst_case(count.checked_mul(2)?)?
+        .checked_add(List::<Setting>::worst_case(count.checked_mul(2)?)?)?;
+    set_worst_case(limits)?
+        .checked_mul(2)?
+        .checked_add(walks)?
+        .checked_add(maps)?
+        .checked_add(restore)?
+        .checked_add(u64::try_from(size_of::<Head>()).ok()?)
+}
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(test)]
+impl Current {
+    pub(crate) fn test_charter_mut(&mut self, number: u32) -> &mut Charter {
+        match &mut self.defaults.get_mut(&Setting::Charter(number)).expect("fixture default charter").value {
+            Value::Charter(value) => value,
+            Value::Template(_) | Value::Policy(_) | Value::Rules(_) => unreachable!("fixture charter value"),
+        }
+    }
+    pub(crate) fn test_templates(&mut self, templates: Box<[Template]>) {
+        let mut old = List::with_capacity(self.defaults.capacity());
+        for (&setting, _) in &self.defaults {
+            match setting {
+                Setting::Template(_) => old.push(setting).expect("fixture defaults"),
+                Setting::Charter(_) | Setting::Policy(_) | Setting::Rules => {}
+            }
+        }
+        for setting in old.into_boxed() {
+            self.defaults.remove(&setting);
+        }
+        for template in templates {
+            self.defaults
+                .insert(
+                    Setting::Template(template.number),
+                    Default { value: Value::Template(Box::new(template)), revision: 1 },
+                )
+                .expect("fixture templates");
+        }
+    }
+}
+
+/// The first start or a revision's largest write set, including its deployment
+/// header and one steady-state history erase (engine.md, 17.7).
+#[must_use]
+pub fn writes_worst_case(limits: &crate::Limits) -> Option<u32> {
+    let count = capacity(limits)?;
+    let first = count
+        .checked_add(limits.people.initial_owners)?
+        .checked_add(limits.authority.projects.checked_mul(2)?)?
+        .checked_add(4)?;
+    Some(first.max(count.checked_mul(2)?.checked_add(6)?))
+}

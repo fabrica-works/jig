@@ -720,6 +720,7 @@ dependencies = [
  "jig-fake-parties",
  "jig-fake-workers",
  "jig-protocol-charter",
+ "jig-protocol-config",
  "jig-protocol-tools",
  "jig-test-connector",
  "jig-test-connector-world",

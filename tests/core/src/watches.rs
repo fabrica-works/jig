@@ -227,7 +227,7 @@ impl Parties {
                 ))) => {
                     self.proposal_projects.insert(row.number, row.project);
                 }
-                root::Write::Save(_) | root::Write::Erase(_) => {}
+                root::Write::Save(_) | root::Write::Erase(_) | root::Write::CopySettingsRevision(_) => {}
             }
         }
         for consumer in self.consumers.values_mut() {
@@ -308,7 +308,7 @@ impl Parties {
                     | Watched::Jig(_) => false,
                 },
 
-                root::Write::Save(_) | root::Write::Erase(_) => false,
+                root::Write::Save(_) | root::Write::Erase(_) | root::Write::CopySettingsRevision(_) => false,
             });
             if touched {
                 consumer.fence.changed(number);

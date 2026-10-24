@@ -195,3 +195,82 @@ pub(crate) fn allows_models(needs: &Needs, declarations: &[bool], models: &[Mode
     }
     true
 }
+
+/// The same catalogue bounds as the core's configured models (configuration.md, 6).
+pub const CATALOGUE_MODELS: u32 = 64;
+pub const CATALOGUE_NAME_BYTES: u32 = 4096;
+
+pub(crate) fn empty_evidence() -> Bounds {
+    Bounds {
+        program_endpoints: Box::new([]),
+        models: Box::new([]),
+        turns: 0,
+        spend: 0,
+        time: Duration::ZERO,
+        waiting: Duration::ZERO,
+        checks: Duration::ZERO,
+        message_bytes: 0,
+        inbox: 0,
+        unacknowledged: 0,
+    }
+}
+pub(crate) fn evidence(catalogue: &[Box<[u8]>], bounds: &Bounds) -> Bounds {
+    let mut result = empty_evidence();
+    result.turns = bounds.turns;
+    result.spend = bounds.spend;
+    result.time = bounds.time;
+    result.waiting = bounds.waiting;
+    result.checks = bounds.checks;
+    result.message_bytes = bounds.message_bytes;
+    result.inbox = bounds.inbox;
+    result.unacknowledged = bounds.unacknowledged;
+    let mut models = List::with_capacity(CATALOGUE_MODELS);
+    for name in catalogue {
+        for model in &bounds.models {
+            if *name == model.name {
+                models.push(model.clone()).expect("catalogue model bound");
+                break;
+            }
+        }
+    }
+    result.models = models.into_boxed();
+    result
+}
+pub(crate) fn replace(domain: &mut crate::Domain, limits: &crate::Limits, needs: Needs) {
+    assert!(
+        match owned_bytes(&needs) {
+            Some(bytes) => bytes <= limits.needs_bytes,
+            None => false,
+        },
+        "replacement needs within their bound"
+    );
+    domain.needs = needs;
+    for (_, id) in &domain.tokens {
+        let channel = domain.channels.get_mut(*id).expect("connected channel");
+        channel.eligible = eligibility(&domain.needs, &channel.evidence.models);
+        channel.declarations = declarations(&domain.needs, &channel.evidence.models);
+        for (at, charter) in domain.needs.charters.iter().enumerate() {
+            let bounds = &channel.evidence;
+            let mut fits = bounds.turns >= charter.turns
+                && bounds.time >= charter.time
+                && bounds.waiting >= charter.waiting
+                && bounds.spend >= domain.needs.spend
+                && bounds.message_bytes >= domain.needs.message_bytes
+                && bounds.inbox >= domain.needs.start_messages
+                && bounds.unacknowledged >= domain.needs.unacknowledged;
+            if let Some(reserve) = charter.change_reserve {
+                fits &= bounds.checks <= reserve;
+            }
+            for need in &charter.models {
+                for model in &bounds.models {
+                    if model.name == need.name {
+                        fits &= model.window >= need.window && model.output >= need.output;
+                    }
+                }
+            }
+            let eligible = channel.eligible.get_mut(at).expect("one bit per charter");
+            *eligible &= fits;
+        }
+    }
+    domain.placing = true;
+}

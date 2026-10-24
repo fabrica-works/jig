@@ -284,6 +284,22 @@ impl Store {
                 let writes = self.inflight.remove(&number).expect("commit belongs to the root");
                 for write in &writes {
                     match write {
+                        root::Write::CopySettingsRevision(number) => {
+                            use jig_domain_core as core;
+                            let key = root::Key::Core(core::Key::Core(core::CoreKey::Settings(
+                                core::settings::Key::Held(*number),
+                            )));
+                            let root::Record::Core(core::Record::Core(core::CoreRecord::Settings(
+                                core::settings::Record::Revision { revision, .. },
+                            ))) = self.rows.get(&key).expect("held revision").clone()
+                            else {
+                                panic!("revision row")
+                            };
+                            let row = root::Record::Core(core::Record::Core(core::CoreRecord::Settings(
+                                core::settings::Record::Revision { history: true, revision },
+                            )));
+                            self.rows.insert(row.key(), row);
+                        }
                         root::Write::Save(row) => {
                             self.rows.insert(row.key(), row.clone());
                         }

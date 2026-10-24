@@ -1,11 +1,14 @@
 use super::*;
 
 #[test]
-#[should_panic(expected = "charter default spend holds reserve floor")]
 fn a_charter_whose_default_spend_misses_its_floor_is_refused() {
     let mut config = config(1);
-    config.settings.charters[0].spend = 1;
-    let _core = Core::new(config, &limits()).expect("fixture core configuration");
+    config.defaults.charters[0].spend = 1;
+    let current = settings::Current::new(config.defaults, &limits());
+    assert_eq!(
+        settings::check(&current, &config.settings, &config.connectors, &limits()),
+        Err(settings::Failure { setting: settings::Setting::Charter(1), fault: settings::Fault::Budget })
+    );
 }
 
 pub(super) fn context(task: u64, charter: u32) -> Box<tasks::RunContext> {
@@ -67,16 +70,16 @@ fn startup_needs_own_models_and_preserve_charter_requirements() {
     alternative.window = 4096;
     alternative.output = 512;
     config.settings.models = Box::new([scripted_model(), alternative.clone()]);
-    config.settings.charters[0].policy.alternatives = Box::new([alternative]);
-    let mut engine = config.settings.charters[0].clone();
+    config.defaults.charters[0].policy.alternatives = Box::new([alternative]);
+    let mut engine = config.defaults.charters[0].clone();
     engine.number = 73;
     engine.hosts = fleet::Kinds::Engine;
     engine.policy.modify = false;
-    config.settings.charters = Box::new([config.settings.charters[0].clone(), engine]);
-    crate::charters::assert_configured(&config.settings, &limits);
+    config.defaults.charters = Box::new([config.defaults.charters[0].clone(), engine]);
+    crate::charters::assert_catalogue(&config.settings);
 
     let needs = fleet_needs::configured(&config, &limits);
-    assert_eq!(needs.spend, config.authority.rules().maximum_run_spend);
+    assert_eq!(needs.spend, config.defaults.rules.maximum_run_spend);
     assert_eq!(needs.message_bytes, limits.tasks.message_bytes);
     assert_eq!(needs.start_messages, limits.tasks.run_inbox);
     assert_eq!(needs.unacknowledged, config.hub_turns);

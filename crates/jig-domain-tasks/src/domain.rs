@@ -153,21 +153,7 @@ impl Domain {
     #[must_use]
     pub fn new(limits: &Limits, seed: u64, charters: Box<[crate::CharterModels]>, efforts: Box<[u8]>) -> Domain {
         assert!(crate::worst_case(limits).is_some(), "task limits are valid");
-        assert!(charters.len() <= usize::try_from(limits.charters).expect("u32 fits usize"), "configured charters fit");
-        let models = usize::try_from(crate::MODELS).expect("u32 fits usize");
-        assert!(efforts.len() <= models, "configured models fit");
-        for (at, charter) in charters.iter().enumerate() {
-            for earlier in charters.iter().take(at) {
-                assert!(earlier.number != charter.number, "charters are unique");
-            }
-            assert!(charter.models.len() <= models, "a charter's models fit");
-            for (index, model) in charter.models.iter().enumerate() {
-                assert!(usize::from(*model) < efforts.len(), "a charter's models are configured");
-                for earlier in charter.models.iter().take(index) {
-                    assert!(earlier != model, "a charter lists each model once");
-                }
-            }
-        }
+        validate_charters(limits, &charters, &efforts);
         Domain {
             startup: Startup::Restoring,
             waits: crate::waits::Index::new(limits),
@@ -494,6 +480,11 @@ pub fn max_out(limits: &Limits) -> u32 {
 #[expect(clippy::too_many_lines, reason = "the closed task event vocabulary dispatches to focused handlers")]
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Charters { charters, efforts } => {
+            validate_charters(&env.limits, &charters, &efforts);
+            domain.charters = charters;
+            domain.efforts = efforts;
+        }
         Event::Compound { reply_to, by, project, operations, period, pool_budget, period_budget } => {
             crate::compound::compound(
                 domain,
@@ -1349,4 +1340,22 @@ fn append(capacity: u32, old: &[u64], batch: &[New]) -> Box<[u64]> {
         numbers.push(new.number).expect("new numbers admitted");
     }
     numbers.into_boxed()
+}
+
+fn validate_charters(limits: &Limits, charters: &[crate::CharterModels], efforts: &[u8]) {
+    assert!(charters.len() <= usize::try_from(limits.charters).expect("u32 fits usize"), "configured charters fit");
+    let models = usize::try_from(crate::MODELS).expect("u32 fits usize");
+    assert!(efforts.len() <= models, "configured models fit");
+    for (at, charter) in charters.iter().enumerate() {
+        for earlier in charters.iter().take(at) {
+            assert!(earlier.number != charter.number, "charters are unique");
+        }
+        assert!(charter.models.len() <= models, "a charter's models fit");
+        for (index, model) in charter.models.iter().enumerate() {
+            assert!(usize::from(*model) < efforts.len(), "a charter's models are configured");
+            for earlier in charter.models.iter().take(index) {
+                assert!(earlier != model, "a charter lists each model once");
+            }
+        }
+    }
 }

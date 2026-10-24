@@ -95,7 +95,7 @@ fn a_fresh_brief_keeps_whole_newest_texts_under_its_own_budget() {
     limits.brief_core_budgets.tail = 90;
     limits.brief_core_budgets.task = 128;
     core.settings.tail_bytes = 90;
-    core.settings.charters.get_mut(0).unwrap().policy.resume = false;
+    core.current.test_charter_mut(1).policy.resume = false;
     send_task(&mut core, &limits, tasks::Event::Prepare { reply_to: ReplyTo::new(Token::new(1)), task: 1 });
     let context = core.tasks.run_context(1).unwrap();
     core.contexts.insert(1, context).unwrap();

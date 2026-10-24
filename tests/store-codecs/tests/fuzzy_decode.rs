@@ -1,5 +1,5 @@
 //! Arbitrary and mutated family bytes (protocol/store.md, sections 5.1 and 14).
-use jig_protocol_store::{accounts_v2, component_v2, notes_v1, people_v13};
+use jig_protocol_store::{accounts_v2, component_v3, notes_v1, people_v13};
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -11,17 +11,17 @@ fn notes(bytes: &[u8]) {
     }
 }
 fn component(bytes: &[u8]) {
-    if let Ok(row) = component_v2::Format::decode(&component_v2::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = component_v3::Format::decode(&component_v3::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
     }
-    if let Ok(row) = component_v2::Transcript::decode(&component_v2::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = component_v3::Transcript::decode(&component_v3::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
     }
-    if let Ok(row) = component_v2::Attempt::decode(&component_v2::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = component_v3::Attempt::decode(&component_v3::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -55,7 +55,8 @@ fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
         "core" => "v6",
         "tasks" => "v9",
         "people" => "v13",
-        "component" | "accounts" => "v2",
+        "component" => "v3",
+        "accounts" => "v2",
         _ => "v1",
     };
     let root =
@@ -163,6 +164,7 @@ fn mutated_core_goldens_never_panic() {
 fn frames(bytes: &[u8]) {
     use jig_protocol_store::{codec, core_v6, notes_v1, tasks_v9, transcripts::frame};
     let limits = codec::Limits {
+        settings: jig_protocol_store::settings_v1::CEILINGS,
         core: core_v6::CEILINGS,
         tasks: tasks_v9::CEILINGS,
         people: people_v13::CEILINGS,
@@ -180,6 +182,7 @@ fn arbitrary_frames_never_panic_and_round_trip_when_they_decode() {
 fn mutated_and_short_frames_never_panic() {
     use jig_protocol_store::{codec, core_v6, notes_v1, tasks_v9, transcripts::frame};
     let limits = codec::Limits {
+        settings: jig_protocol_store::settings_v1::CEILINGS,
         core: core_v6::CEILINGS,
         tasks: tasks_v9::CEILINGS,
         people: people_v13::CEILINGS,
@@ -230,4 +233,43 @@ fn arbitrary_test_connector_rows_never_panic_and_round_trip_when_they_decode() {
 fn mutated_test_connector_goldens_never_panic() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-store/golden/v2");
     mutate_goldens(&root, 0x5702_e018, test_connector);
+}
+
+fn settings(bytes: &[u8]) {
+    use jig_protocol_store::settings_v1 as wire;
+    if let Ok(row) = wire::Default::decode(&wire::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("settings record length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+    if let Ok(row) = wire::Changed::decode(&wire::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("settings record length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+    if let Ok(row) = wire::Revision::decode(&wire::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("settings record length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+    if let Ok(row) = wire::Extent::decode(&wire::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("settings record length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+    if let Ok(row) = wire::CharterVersion::decode(&wire::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("settings record length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+    if let Ok(row) = wire::Proposal::decode(&wire::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("settings record length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+}
+#[test]
+fn arbitrary_and_mutated_settings_records_never_panic_and_round_trip() {
+    arbitrary(0x57aa_0191, settings);
+    mutated("settings", 0x57aa_0192, settings);
 }

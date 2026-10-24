@@ -211,6 +211,20 @@ impl Store {
     fn apply(&mut self, commit: &Commit, limits: &codec::Limits) {
         for write in &commit.writes {
             match write {
+                root::Write::CopySettingsRevision(number) => {
+                    let key =
+                        root::Key::Core(core::Key::Core(core::CoreKey::Settings(core::settings::Key::Held(*number))));
+                    let root::Record::Core(core::Record::Core(core::CoreRecord::Settings(
+                        core::settings::Record::Revision { revision, .. },
+                    ))) = self.rows.get(&key).expect("held settings revision").clone()
+                    else {
+                        panic!("revision row")
+                    };
+                    let row = root::Record::Core(core::Record::Core(core::CoreRecord::Settings(
+                        core::settings::Record::Revision { history: true, revision },
+                    )));
+                    self.rows.insert(row.key(), row);
+                }
                 root::Write::Save(row) => {
                     self.rows.insert(row.key(), row.clone());
                     if let root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = row {

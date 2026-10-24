@@ -113,7 +113,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     config.core.grants =
         Box::new([jig_domain_people::ActGrant { connector: 2, may: Box::new([jig_domain_people::ActKind::Close]) }]);
     let (domain, policy) = policy_domain(&limits.core.authority, environment_chat);
-    config.core.authority = domain;
+    config.core.defaults.rules = (domain).rules().clone();
     config.core.seed_projects[0].policy.policy = policy;
     if environment_chat {
         config.core.owners = Box::new([jig_domain_people::InitialOwner {
@@ -122,19 +122,19 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
         }]);
     }
     if environment_chat {
-        for template in &mut config.core.settings.templates {
+        for template in &mut config.core.defaults.templates {
             if template.flags.conversation {
                 template.contract = jig_domain_tasks::Contract::Report { words: limits.core.tasks.result_bytes };
                 template.grace = Some(Duration::from_secs(1));
             }
         }
     }
-    config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
-    config.core.settings.charters[0].policy.resume = true;
+    config.core.defaults.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
+    config.core.defaults.charters[0].policy.resume = true;
     config.core.settings.resume_bytes = 32768;
-    config.core.settings.charters[0].policy.waiting = Duration::ZERO;
-    config.core.settings.charters[0].policy.turns = 32;
-    config.core.settings.charters[0].policy.time = Duration::from_secs(7200);
+    config.core.defaults.charters[0].policy.waiting = Duration::ZERO;
+    config.core.defaults.charters[0].policy.turns = 32;
+    config.core.defaults.charters[0].policy.time = Duration::from_secs(7200);
     (config, limits)
 }
 

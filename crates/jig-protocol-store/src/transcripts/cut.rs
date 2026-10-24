@@ -44,7 +44,8 @@ fn next(store: &mut Store, below: &mut Below) -> Result<bool, ()> {
     let task = match record {
         Record::Core(CoreRecord::RunProof(proof)) => proof.task,
         Record::Core(
-            CoreRecord::Deployment(_)
+            CoreRecord::Settings(_)
+            | CoreRecord::Deployment(_)
             | CoreRecord::Projection(_)
             | CoreRecord::Call(_)
             | CoreRecord::Turn(_)

@@ -53,6 +53,9 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
 pub fn encode(row: &domain::CoreRecord, limits: &Limits) -> Result<Box<[u8]>, wire::Problem> {
     let value = match row {
         domain::CoreRecord::Call(call) => wire::Value::Call(calls::encode_call_record(call, limits)?),
+        domain::CoreRecord::Settings(_) => {
+            return Err(wire::Problem { path: wire::Path::ValueTag, reason: skein_codec::Reason::Bound });
+        }
         domain::CoreRecord::Deployment(value) => wire::Value::Deployment(runs::encode_deployment(value, limits)?),
         domain::CoreRecord::Projection(value) => wire::Value::Projection(wire::ProjectionValue::new(
             &limits.core,

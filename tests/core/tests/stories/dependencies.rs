@@ -131,7 +131,7 @@ fn member_world(seed: u64) -> World {
     // The owner remains configured, alongside the member whose reach is its own tree.
     limits.core.authority.roles = 2;
     limits.core.tasks.dependencies = 2; // The retained outside task and one newly added inside task.
-    let rules = configuration.core.authority.rules().clone();
+    let rules = configuration.core.defaults.rules.clone();
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     let owner = policy.roles[0].clone();
     let mut member = owner.clone();
@@ -143,8 +143,10 @@ fn member_world(seed: u64) -> World {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     configuration.core.seed_projects[0].policy.policy = domain.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
     jig_core_world::peers::journal(&mut limits);
     World::configured(seed, false, configuration, limits)
 }

@@ -31,6 +31,21 @@ impl Model {
                 Write::Save(core::Record::Core(core::CoreRecord::Turn(turn))) => {
                     state.turns.entry(turn.task).or_default().push(turn.clone());
                 }
+                Write::CopySettingsRevision(number) => {
+                    let key = core::Key::Core(core::CoreKey::Settings(core::settings::Key::Held(*number)));
+                    let core::Record::Core(core::CoreRecord::Settings(core::settings::Record::Revision {
+                        revision,
+                        ..
+                    })) = state.rows.get(&key).expect("held revision").clone()
+                    else {
+                        panic!("revision row")
+                    };
+                    let row = core::Record::Core(core::CoreRecord::Settings(core::settings::Record::Revision {
+                        history: true,
+                        revision,
+                    }));
+                    state.rows.insert(row.key(), row);
+                }
                 Write::Save(row) => {
                     state.rows.insert(row.key(), row.clone());
                 }

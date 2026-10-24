@@ -7,7 +7,7 @@ fn the_environment_chat_template_fits_its_supplied_ready_report() {
     let (config, _) = config::root_for(SEED, true);
     let template = config
         .core
-        .settings
+        .defaults
         .templates
         .iter()
         .find(|row| row.flags.conversation)

@@ -194,6 +194,16 @@ pub(crate) fn whole(engine: &crate::Engine, problems: &mut Problems) {
         problems.push(Path::root().member(b"limits").member(b"driver.url_bytes"), What::Bound);
     }
     let limits = &engine.limits.core;
+    let settings_path = Path::root().member(b"limits").member(b"core").member(b"settings.history");
+    if limits.settings.history == 0 {
+        problems.push(settings_path, What::Bound);
+    }
+    if match jig_domain_core::settings::writes_worst_case(limits) {
+        Some(writes) => writes > engine.limits.journal.writes,
+        None => true,
+    } {
+        problems.push(Path::root().member(b"limits").member(b"journal.writes"), What::Bound);
+    }
     if engine.projects.len() >= usize::try_from(limits.people.projects).expect("project capacity fits usize") {
         problems.push(Path::root().member(b"projects"), What::Bound);
     }

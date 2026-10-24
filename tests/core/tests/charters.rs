@@ -37,9 +37,9 @@ fn a_delegate_waits_for_a_host_declaring_its_charters_model() {
     use jig_domain_fleet as fleet;
     let (mut config, mut limits) = world::two_charters(151);
     limits.core.fleet.workers = 2;
-    config.core.settings.charters[1].policy.model.name = b"specialist".as_slice().into();
+    config.core.defaults.charters[1].policy.model.name = b"specialist".as_slice().into();
     config.core.settings.llm_providers.providers[1].models = Box::new([b"specialist".as_slice().into()]);
-    let specialist = config.core.settings.charters[1].policy.model.clone();
+    let specialist = config.core.defaults.charters[1].policy.model.clone();
     config.core.settings.models = Box::new([config.core.settings.models[0].clone(), specialist]);
     let mut world = World::configured(151, false, config, limits);
     let chat = world.assigned.as_ref().expect("chat").task;
@@ -158,7 +158,7 @@ fn host_world(seed: u64, kinds: jig_domain_fleet::Kinds) -> World {
     use jig_fake_parties::{Act, Ask, Party, Role};
     use jig_fake_workers::{Script, Worker};
     let (mut config, limits) = fixture(seed, 1);
-    config.core.settings.charters[0].hosts = kinds;
+    config.core.defaults.charters[0].hosts = kinds;
     let workers = [0, 7].into_iter().map(|channel| Worker::new(channel, 1, vec![Box::new([Script::Wait])])).collect();
     let party = Party::new(
         1,
@@ -192,7 +192,7 @@ fn a_charter_for_the_engine_never_runs_on_a_worker() {
 #[test]
 fn a_restart_settles_an_engine_charters_claim_at_once() {
     let (mut config, mut limits) = jig_core_world::effects::fixture(148, false);
-    config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
+    config.core.defaults.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
     limits.core.fleet.engine_slots = 1;
     let mut world = World::configured(148, false, config, limits);
     let assignment = world.assigned.as_ref().expect("engine assigned");
@@ -213,7 +213,7 @@ fn a_restart_settles_an_engine_charters_claim_at_once() {
         root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof)))
         if proof.task == task && proof.host == jig_domain_fleet::HostKind::Engine)));
     let mut config = jig_core_world::effects::fixture(148, false).0;
-    config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
+    config.core.defaults.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
     world.restart_with(config);
     assert!(world.domain.ready(), "restart does not wait for a worker hello");
     assert!(world.store.rows.values().any(|record| matches!(record,
@@ -238,7 +238,7 @@ fn worker_with_affinity(world: &mut World, task: u64) {
 
 fn both_host_world(seed: u64) -> World {
     let (mut config, mut limits) = world::two_charters(seed);
-    config.core.settings.charters[1].hosts = jig_domain_fleet::Kinds::Both;
+    config.core.defaults.charters[1].hosts = jig_domain_fleet::Kinds::Both;
     limits.core.fleet.engine_slots = 1;
     limits.core.fleet.slots = 1;
     let mut world = World::configured(seed, false, config, limits);
@@ -274,7 +274,7 @@ fn first_claim_host(world: &World) -> jig_domain_fleet::HostKind {
             {
                 Some(proof.host)
             }
-            root::Write::Save(_) | root::Write::Erase(_) => None,
+            root::Write::Save(_) | root::Write::Erase(_) | root::Write::CopySettingsRevision(_) => None,
         })
         .expect("first claim submitted")
 }

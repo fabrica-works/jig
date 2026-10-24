@@ -66,8 +66,12 @@ impl Harness {
     }
 
     fn with_needs(limits: Limits, needs: crate::Needs) -> Harness {
+        Self::with_catalogue(limits, needs, Box::new([]))
+    }
+
+    fn with_catalogue(limits: Limits, needs: crate::Needs, catalogue: Box<[Box<[u8]>]>) -> Harness {
         let out = Queue::with_capacity(max_out(&limits));
-        let mut domain = Domain::new(&limits, needs);
+        let mut domain = Domain::new(&limits, needs, catalogue);
         let mut names = List::with_capacity(limits.configured_workers);
         for index in 0..limits.configured_workers {
             let name = skein_lib::Decimal::of(u64::from(index));

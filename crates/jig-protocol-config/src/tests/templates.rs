@@ -329,7 +329,7 @@ fn a_seeded_executor_override_keeps_a_compatible_choice() {
     let engine = fixtures::engine(&document).expect("compatible override");
     let config = crate::core(&engine, [0; 16], 7);
     let merged =
-        jig_domain_core::templates::merged(&config.settings.templates, &config.seed_projects[0].policy.templates);
+        jig_domain_core::templates::merged(&config.defaults.templates, &config.seed_projects[0].policy.templates);
     assert_eq!(merged.first().expect("chat").executor, TemplateExecutor::Charter(CHAT));
     assert_eq!(
         merged.first().expect("chat").llm,

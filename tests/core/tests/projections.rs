@@ -157,10 +157,11 @@ fn tree_world() -> (World, root::Config) {
     policy.ceiling.delegation.tasks = 4;
     policy.roles[0].authority.delegation.depth = 3;
     policy.roles[0].authority.delegation.tasks = 4;
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.delegation.depth = 3;
     rules.ceiling.delegation.tasks = 4;
-    configuration.core.authority = authority::Domain::new(rules, limits.core.authority).expect("tree policy");
+    configuration.core.defaults.rules =
+        (authority::Domain::new(rules, limits.core.authority).expect("tree policy")).rules().clone();
 
     configuration.core.seed_projects[0].policy.policy = policy;
     jig_core_world::world::edit_role(&mut configuration.core, |role| {
@@ -168,9 +169,7 @@ fn tree_world() -> (World, root::Config) {
             authority::Delegation { kinds: Box::new([authority::Executor::Charter(1)]), tasks: 3, depth: 3 };
     });
     let mut restart_configuration = fixture(171, false).0;
-    restart_configuration.core.authority =
-        authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
-            .expect("same deployment rules");
+    restart_configuration.core.defaults.rules = configuration.core.defaults.rules.clone();
     restart_configuration.core.seed_projects[0].policy.policy =
         configuration.core.seed_projects[0].policy.policy.clone();
     (World::configured(171, false, configuration, limits), restart_configuration)

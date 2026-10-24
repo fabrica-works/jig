@@ -91,6 +91,7 @@ mod conversation;
 pub use conversation::{DeliveryOutcome, SettledAnswer, SettledCall, conversation_worst_case};
 pub mod charters;
 pub mod fleet_needs;
+pub mod settings;
 pub use charters::Charter;
 mod stored;
 mod translate;
@@ -118,7 +119,7 @@ use jig_domain_views as views;
 use skein_lib::{List, Map, Queue, Token, Wall};
 
 /// Policy copied into a later project (configuration.md, 3; core.md, 6.1).
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ConfiguredPolicy {
     pub policy: authority::Policy,
     pub permissions: Box<[people::PermissionRole]>,
@@ -152,13 +153,11 @@ pub struct Config {
     /// Configured deployment acts for each connector (people.md, 5.3).
     pub grants: Box<[people::ActGrant]>,
     /// Configured authority and policy.
-    pub authority: authority::Domain,
+    pub defaults: settings::Defaults,
     /// Deployment and run settings retained by the core.
     pub settings: Settings,
     /// Projects used only by the first start (configuration.md, 3).
     pub seed_projects: Box<[SeedProject]>,
-    /// Configured policies for projects made after the first start.
-    pub policies: Map<u32, ConfiguredPolicy>,
     /// Numbered connectors the application routes for task lifecycle handoffs.
     pub connectors: Box<[u16]>,
 }
@@ -166,15 +165,11 @@ pub struct Config {
 /// Immutable deployment and run settings used by core decisions.
 #[derive(Debug)]
 pub struct Settings {
-    /// Configured templates, served without affecting decisions.
-    pub templates: Box<[Template]>,
     /// Provider number for the application's services.
     pub deployment_provider: u16,
     /// Configured models in configuration's order: model `i` is bit `i` of an authority's
     /// models and the `i` a task's LLM choice names (authority.md, 3; tasks.md, 3).
     pub models: Box<[Model]>,
-    /// Numbered charters offered by this deployment.
-    pub charters: Box<[Charter]>,
     /// Maximum committed conversation bytes resumed whole.
     pub resume_bytes: u32,
     /// Maximum transcript text retained for a fresh run's brief.
@@ -340,7 +335,10 @@ pub struct Core {
     pub relaying: Map<u64, PendingRelay>,
     /// Configured project identifiers for bootstrap.
     pub projects: List<u32>,
-    pub(crate) policies: Map<u32, ConfiguredPolicy>,
+    pub current: settings::Current,
+    pub(crate) hub_turns: u32,
+    pub(crate) settings_restore: settings::restart::Restore,
+    pub(crate) settings_failure: Option<RestartRequest>,
     /// Names seeded or restored with the project policies (core.md, 6.1).
     pub(crate) names: Map<u32, Box<str>>,
     /// Mutable connector permission mappings approved by policy edits.
@@ -559,7 +557,7 @@ impl Core {
         assert!(limits.people.words <= limits.tasks.message_bytes, "party words fit one run message");
         assert!(limits.tasks.message_bytes >= 24, "projection refusal news fits one run message");
         assert!(config.settings.tools.valid(), "each engine tool has one configured authority bit");
-        assert!(*config.authority.limits() == limits.authority, "core prices its authority's configured bounds");
+
         assert!(
             config.connectors.len() <= usize::try_from(limits.connectors).expect("connector count fits usize"),
             "core prices every configured connector number"
@@ -576,13 +574,12 @@ impl Core {
             config.settings.tail_bytes <= limits.brief_core_budgets.tail,
             "core prices its transcript text retention"
         );
-        charters::assert_configured(&config.settings, limits);
-        templates::assert_configured(&config, limits);
+        charters::assert_catalogue(&config.settings);
         assert!(
             config.seed_projects.len() <= usize::try_from(limits.authority.projects).expect("project bound"),
             "core prices seed projects"
         );
-        assert!(config.policies.capacity() <= limits.authority.projects, "core prices configured policies");
+        assert!(config.defaults.policies.capacity() <= limits.authority.projects, "core prices configured policies");
         assert!(
             config.seed_projects.len() < usize::try_from(limits.people.projects).expect("people project bound"),
             "people prices seed rosters and the deployment's"
@@ -605,18 +602,16 @@ impl Core {
                 "core prices seed policies"
             );
         }
-        for (_, configured) in &config.policies {
-            let value = policy::snapshot(&configured.policy, &configured.permissions, &configured.templates)
-                .expect("configured policy snapshot");
+        let fleet_needs = fleet_needs::configured(&config, limits);
+        let current = settings::Current::new(config.defaults, limits);
+        for project in &config.seed_projects {
             assert!(
-                match people::policy_bytes(&value) {
-                    Some(bytes) => bytes <= limits.policy_bytes,
-                    None => false,
-                },
-                "core prices configured policies"
+                project.policy.templates.is_empty()
+                    || templates::valid(&current, &config.settings, &project.policy.templates),
+                "merged template choices fit their effective executors"
             );
         }
-        let fleet_needs = fleet_needs::configured(&config, limits);
+        let authority = authority::Domain::new(current.rules().clone(), limits.authority).expect("configured rules");
         let room_max = room_max(limits).expect("validated immutable core limits");
         Ok(Core {
             room_max,
@@ -672,7 +667,7 @@ impl Core {
             creating_procedures: Map::with_capacity(limits.tasks.tasks),
             relaying: Map::with_capacity(limits.tasks.tasks),
             projects: List::with_capacity(limits.authority.projects),
-            policies: config.policies,
+
             names: Map::with_capacity(limits.authority.projects),
             permission_roles: Map::with_capacity(limits.authority.projects),
             template_overrides: Map::with_capacity(limits.authority.projects),
@@ -715,10 +710,14 @@ impl Core {
             tasks: tasks::Domain::new(
                 &limits.tasks,
                 config.seed,
-                charters::models(&config.settings, limits),
+                charters::models(&current, &config.settings, limits),
                 charters::efforts(&config.settings),
             ),
-            authority: config.authority,
+            current,
+            hub_turns: config.hub_turns,
+            settings_restore: settings::restart::Restore::new(limits),
+            settings_failure: None,
+            authority,
             people: people::Domain::new(
                 &limits.people,
                 config.owners,
@@ -726,7 +725,13 @@ impl Core {
                 config.grants,
             ),
             fleet: {
-                let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs);
+                let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs, {
+                    let mut names = List::with_capacity(tasks::MODELS);
+                    for model in &config.settings.models {
+                        names.push(model.name.clone()).expect("catalogue bound");
+                    }
+                    names.into_boxed()
+                });
                 fleet.configure_workers(worker_names);
                 fleet
             },

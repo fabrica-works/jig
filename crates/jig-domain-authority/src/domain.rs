@@ -1,5 +1,6 @@
 //! Policies in force, changed only by bounded events (domain/authority.md, 6).
 
+use alloc::boxed::Box;
 use skein_lib::{List, Map, Queue};
 
 use crate::limits::{authority_within, requirements_within, within};
@@ -19,6 +20,10 @@ pub struct Domain {
 /// room. (domain/authority.md, sections 2 and 6).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    /// Replace rules without revalidating existing projects (engine.md, 17.2).
+    Rules(Box<Rules>),
+    /// Restore an existing policy under its own ceiling, independently of new rules.
+    Restore { project: u32, policy: Policy },
     /// Add or replace a policy after bounded validation; refusal leaves the prior entry intact.
     Policy {
         /** Project whose live policy is added or replaced. */
@@ -88,12 +93,7 @@ impl Domain {
     pub fn new(rules: Rules, limits: Limits) -> Option<Domain> {
         max_out(&limits)?;
         worst_case(&limits)?;
-        if !authority_within(&rules.ceiling, &limits)
-            || !requirements_within(&rules.requirements, &limits)
-            || rules.implies.len() > limits.implications
-            || rules.minimum_run_spend >= rules.maximum_run_spend
-            || rules.maximum_run_spend > rules.ceiling.budget.spend
-        {
+        if !valid_rules(&rules, &limits) {
             return None;
         }
         Some(Domain { rules, policies: Map::with_capacity(limits.projects), limits })
@@ -171,9 +171,17 @@ impl Domain {
 /// refusal preserves the previous policy, and the root owns persistence.
 pub fn step(domain: &mut Domain, event: Event, out: &mut Queue<PolicyFact>) {
     assert!(out.room() >= POLICY_MAX_OUT, "caller reserves policy lifecycle output");
+    let restoring = match &event {
+        Event::Restore { .. } => true,
+        Event::Rules(_) | Event::Policy { .. } | Event::Dropped { .. } => false,
+    };
     match event {
-        Event::Policy { project, policy } => {
-            if let Some(reason) = invalid(domain, &policy) {
+        Event::Rules(rules) => {
+            assert!(valid_rules(&rules, &domain.limits), "replacement rules validated at admission");
+            domain.rules = *rules;
+        }
+        Event::Policy { project, policy } | Event::Restore { project, policy } => {
+            if let Some(reason) = invalid(&domain.rules, &domain.limits, &policy, restoring) {
                 out.push(PolicyFact::Refused { project, reason });
                 return;
             }
@@ -200,36 +208,51 @@ pub fn step(domain: &mut Domain, event: Event, out: &mut Queue<PolicyFact>) {
     }
 }
 
-fn invalid(domain: &Domain, policy: &Policy) -> Option<PolicyRefusal> {
-    if !within(policy.projections.len(), domain.limits.grants)
-        || !authority_within(&policy.ceiling, &domain.limits)
-        || !within(policy.roles.len(), domain.limits.roles)
-        || !requirements_within(&policy.requirements, &domain.limits)
+/// Check a policy before a settings value is admitted; allocates nothing.
+#[must_use]
+pub fn policy_refusal(rules: &Rules, limits: &Limits, policy: &Policy) -> Option<PolicyRefusal> {
+    invalid(rules, limits, policy, false)
+}
+/// The rules' bounded shape and consistent run ceilings.
+#[must_use]
+pub fn valid_rules(rules: &Rules, limits: &Limits) -> bool {
+    authority_within(&rules.ceiling, limits)
+        && requirements_within(&rules.requirements, limits)
+        && rules.implies.len() <= limits.implications
+        && rules.minimum_run_spend < rules.maximum_run_spend
+        && rules.maximum_run_spend <= rules.ceiling.budget.spend
+}
+fn invalid(rules: &Rules, limits: &Limits, policy: &Policy, restoring: bool) -> Option<PolicyRefusal> {
+    if !within(policy.projections.len(), limits.grants)
+        || !authority_within(&policy.ceiling, limits)
+        || !within(policy.roles.len(), limits.roles)
+        || !requirements_within(&policy.requirements, limits)
     {
         return Some(PolicyRefusal::Oversized);
     }
-    if !at_most_but_models(&policy.ceiling, &domain.rules.ceiling, &domain.rules.implies)
-        || policy.period_spend > domain.rules.period_spend
+    if !restoring
+        && (!at_most_but_models(&policy.ceiling, &rules.ceiling, &rules.implies)
+            || policy.period_spend > rules.period_spend)
     {
         return Some(PolicyRefusal::AboveRules);
     }
     for grant in &policy.projections {
-        if !crate::limits::pattern_within(&grant.pattern, &domain.limits) {
+        if !crate::limits::pattern_within(&grant.pattern, limits) {
             return Some(PolicyRefusal::Oversized);
         }
         let mut covered = false;
         for ceiling in &policy.ceiling.grants {
-            covered |= crate::grant_at_most(grant, ceiling, &domain.rules.implies);
+            covered |= crate::grant_at_most(grant, ceiling, &rules.implies);
         }
-        if !covered {
+        if !restoring && !covered {
             return Some(PolicyRefusal::AboveRules);
         }
     }
     for (position, role) in policy.roles.iter().enumerate() {
-        if !authority_within(&role.authority, &domain.limits) {
+        if !authority_within(&role.authority, limits) {
             return Some(PolicyRefusal::Oversized);
         }
-        if !at_most_but_models(&role.authority, &policy.ceiling, &domain.rules.implies)
+        if (!restoring && !at_most_but_models(&role.authority, &policy.ceiling, &rules.implies))
             || role.period_spend > policy.period_spend
             || role.requests.0 & !crate::Requests::ALL.0 != 0
             || role.decides.0 & !crate::Proposals::ALL.0 != 0

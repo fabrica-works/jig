@@ -103,7 +103,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
             Some(entries) => entries.as_ref(),
             None => &[],
         };
-        let merged = crate::templates::merged(&core.settings.templates, overrides);
+        let merged = crate::templates::current_merged(&core.current, overrides);
         let mut templates = List::with_capacity(limits.templates);
         for template in merged {
             templates.push(template).expect("configured template bound");

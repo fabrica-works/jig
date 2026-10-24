@@ -132,13 +132,14 @@ fn policy_without_effect_approvers() -> (root::Config, root::Limits) {
     use jig_domain_authority as authority;
     let (mut config, limits) = jig_core_world::effects::fixture(155, false);
 
-    let rules = config.core.authority.rules().clone();
+    let rules = config.core.defaults.rules.clone();
     let mut policy = config.core.seed_projects[0].policy.policy.clone();
     for role in &mut policy.roles {
         role.decides = authority::Proposals(16);
         role.authority.grants = Box::new([]);
     }
-    config.core.authority = authority::Domain::new(rules, limits.core.authority).expect("authority");
+    config.core.defaults.rules =
+        (authority::Domain::new(rules, limits.core.authority).expect("authority")).rules().clone();
     config.core.seed_projects[0].policy.policy = policy;
     (config, limits)
 }

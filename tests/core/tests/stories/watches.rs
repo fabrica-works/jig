@@ -168,8 +168,9 @@ fn inbox_across_projects_stories() {
     limits.core.people.initial_owners = 2;
     limits.core.authority.projects = 2;
     let policy = config.core.seed_projects[0].policy.policy.clone();
-    let rules = config.core.authority.rules().clone();
-    config.core.authority = authority::Domain::new(rules, limits.core.authority).expect("two policies");
+    let rules = config.core.defaults.rules.clone();
+    config.core.defaults.rules =
+        (authority::Domain::new(rules, limits.core.authority).expect("two policies")).rules().clone();
     let first = config.core.owners[0].clone();
     config.core.owners = Box::new([first.clone(), people::InitialOwner { project: 2, identity: first.identity }]);
     config.core.seed_projects = [1, 2]

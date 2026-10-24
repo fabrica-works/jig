@@ -52,6 +52,8 @@ impl Record {
 /// One mutation in the event's atomic decision.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Write {
+    /// Atomically copy the old settings revision to history.
+    CopySettingsRevision(u32),
     /// Save the owner's row at its key.
     Save(Record),
     /// Erase the owner's address.

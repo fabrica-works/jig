@@ -69,12 +69,9 @@ fn configuration(limits: &core::Limits) -> core::Config {
         hub_turns: 2,
         owners: Box::new([]),
         grants: Box::new([]),
-        authority: authority::Domain::new(rules, limits.authority).expect("bounded authority"),
         seed_projects: Box::new([]),
-        policies: Map::with_capacity(0),
         connectors: Box::new([]),
         settings: core::Settings {
-            templates: Box::new([]),
             deployment_provider: 2,
             models: Box::new([model()]),
             resume_bytes: 256,
@@ -82,6 +79,8 @@ fn configuration(limits: &core::Limits) -> core::Config {
             tools: core::ToolFamilies::JIG,
             key_bytes: 256,
             llm_providers: jig_domain_accounts::Providers::none(),
+        },
+        defaults: core::settings::Defaults {
             charters: Box::new([core::Charter {
                 number: 1,
                 hosts: jig_domain_fleet::Kinds::Workers,
@@ -103,6 +102,9 @@ fn configuration(limits: &core::Limits) -> core::Config {
                     call_timeout: Duration::from_secs(10),
                 },
             }]),
+            templates: Box::new([]),
+            policies: Map::with_capacity(0),
+            rules: (authority::Domain::new(rules, limits.authority).expect("bounded authority")).rules().clone(),
         },
     }
 }

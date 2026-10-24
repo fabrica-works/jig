@@ -121,7 +121,7 @@ fn refusal(h: &Harness) -> HelloRefusal {
 #[test]
 #[should_panic(expected = "configured agent needs fit their byte bound")]
 fn needs_past_their_byte_bound_fail_construction() {
-    core::mem::drop(Domain::new(&Limits { needs_bytes: 0, ..LIMITS }, needs_window(8192)));
+    core::mem::drop(Domain::new(&Limits { needs_bytes: 0, ..LIMITS }, needs_window(8192), Box::new([])));
 }
 
 #[test]
@@ -269,4 +269,35 @@ fn endpoint_numbers(count: u32) -> Box<[u32]> {
         endpoints.push(endpoint).expect("bounded test endpoints");
     }
     endpoints.into_boxed()
+}
+
+#[test]
+fn replacing_needs_keeps_running_attempts_and_rebuilds_placement_from_the_catalogue() {
+    let catalogue = Box::new([b"model".as_slice().into(), b"future".as_slice().into()]);
+    let mut h = Harness::with_catalogue(LIMITS, needs_window(4096), catalogue);
+    let mut bounds = bounds_window(8192);
+    bounds.models = Box::new([
+        bounds.models[0].clone(),
+        ModelBound { name: b"future".as_slice().into(), window: 8192, output: 1024 },
+        ModelBound { name: b"unconfigured".as_slice().into(), window: 8192, output: 1024 },
+    ]);
+    assert!(h.step(Event::Hello { worker: 0, channel: C1, hello: hello(bounds) }).is_empty());
+    assert_eq!(h.place(R1, A1, 1), C1);
+    let before = h.domain.attempts.len();
+    assert!(h.step(Event::Needs(needs_window(16384))).is_empty());
+    assert_eq!(h.domain.workers(), 1);
+    assert_eq!(h.domain.attempts.len(), before);
+    let id = *h.domain.tokens.get(&C1).unwrap();
+    assert_eq!(h.domain.channels.get(id).unwrap().evidence.models.len(), 2, "only catalogue evidence retained");
+    assert!(!h.domain.channels.get(id).unwrap().eligible[0]);
+    assert!(h.start(R2, A2, 2).is_empty());
+    assert!(h.settle().is_empty(), "new work waits while needs exceed the hello");
+    let mut needs = needs_window(4096);
+    needs.charters[0].models[0].name = b"future".as_slice().into();
+    assert!(h.step(Event::Needs(needs)).is_empty());
+    assert!(
+        h.domain.channels.get(id).unwrap().eligible[0],
+        "evidence for a previously unused catalogue model survives"
+    );
+    assert!(!h.settle().is_empty(), "the waiting attempt can now be placed");
 }

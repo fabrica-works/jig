@@ -7,6 +7,7 @@ mod core;
 mod notes;
 mod own;
 mod people;
+mod settings;
 mod tasks;
 pub use own::Own;
 pub const COMPONENT: u8 = 0;

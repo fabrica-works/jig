@@ -16,7 +16,7 @@ fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &
     let kinds: Box<[jig_domain_authority::Executor]> =
         Box::new([jig_domain_authority::Executor::Charter(1), jig_domain_authority::Executor::Procedure(1)]);
 
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.kinds.clone_from(&kinds);
@@ -29,8 +29,10 @@ fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &
     jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
     configuration.first.procedures = Box::new([jig_test_connector::ProcedureSpec {
         number: 1,
         actions: Box::new([jig_test_connector::ProcedureAction::Stall]),
@@ -133,7 +135,7 @@ fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig
         },
     };
 
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.grants = Box::new([grant.clone()]);
     let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.grants = Box::new([grant.clone()]);
@@ -143,8 +145,10 @@ fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig
     jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
 }
 
 #[test]

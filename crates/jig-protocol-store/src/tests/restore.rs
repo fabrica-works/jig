@@ -203,7 +203,7 @@ fn a_restore_page_goes_on_into_the_next_interval() {
     assert_eq!(
         next,
         Some(Cursor {
-            interval: 3,
+            interval: 4,
             after: keys::encode(&fixtures::person(ALICE).key(), fixtures::KEY_LIMIT).expect("key fits")
         }),
     );

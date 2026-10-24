@@ -1,5 +1,5 @@
 //! Checked store admission bounds (protocol/store.md, 5.4 and 6).
-use crate::{accounts_v2, codec, component_v2, core_v6, notes_v1, people_v13, tasks_v9};
+use crate::{accounts_v2, codec, component_v3, core_v6, notes_v1, people_v13, tasks_v9};
 use jig_domain_core as core;
 
 /// The application's largest encodings, before the component's key tag.
@@ -87,8 +87,15 @@ fn largest(
             .max(tasks_v9::Row::worst_case_bytes(&limits.tasks)?)
             .max(people_v13::Row::worst_case_bytes(&limits.people)?)
             .max(notes_v1::Row::worst_case_bytes(&limits.notes)?)
-            .max(component_v2::worst_case_bytes(&component_v2::CEILINGS)?)
+            .max(component_v3::worst_case_bytes(&component_v3::CEILINGS)?)
             .max(accounts_v2::worst_case_bytes(&accounts_v2::CEILINGS)?)
+            .max(
+                core::settings::revision_worst_case(domain)?.checked_add(16)?.checked_add(
+                    u64::from(jig_domain_tasks::MODELS)
+                        .checked_mul(u64::from(core::MODEL_NAME_BYTES).checked_add(4)?)?
+                        .checked_add(4)?,
+                )?,
+            )
             .max(u64::from(application.value)),
     )
     .ok()?;

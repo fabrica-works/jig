@@ -333,6 +333,7 @@ fn a_restart_restores_people_before_live_tasks_and_core_rows() {
         world.restore_ranges,
         [
             core::RestoreRange::Deployment,
+            core::RestoreRange::Settings,
             core::RestoreRange::Accounts,
             core::RestoreRange::People,
             core::RestoreRange::Tasks,
@@ -594,7 +595,7 @@ fn a_restart_restores_unread_results_and_chat_totals() {
 
 fn both_kinds_engine_fixture(seed: u64) -> (root::Config, root::Limits) {
     let (mut config, mut limits) = jig_core_world::effects::fixture(seed, false);
-    config.core.settings.charters[0].hosts = fleet::Kinds::Both;
+    config.core.defaults.charters[0].hosts = fleet::Kinds::Both;
     limits.core.fleet.engine_slots = 2;
     limits.core.fleet.slots = 1;
     (config, limits)

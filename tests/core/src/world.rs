@@ -130,6 +130,7 @@ fn profile() -> root::Limits {
         routes: 200,
         connector: jig_test_connector_world::LIMITS,
         core: core::Limits {
+            settings: core::settings::Limits { history: 64 },
             templates: 8,
             fill_mark: 1000,
             documents: core::documents::DocumentLimits {
@@ -328,7 +329,6 @@ pub fn config(seed: u64) -> root::Config {
                 project: 1,
                 identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
             }]),
-            authority: domain,
             seed_projects: Box::new([core::SeedProject {
                 number: 1,
                 name: Box::from("Project 1"),
@@ -342,12 +342,26 @@ pub fn config(seed: u64) -> root::Config {
                     templates: Box::new([]),
                 },
             }]),
-            policies: skein_lib::Map::with_capacity(0),
             connectors: Box::new([1, 2]),
             settings: core::Settings {
-                templates: crate::fixtures::templates(),
                 deployment_provider: 3,
                 models: Box::new([scripted_model()]),
+                resume_bytes: 256,
+                tail_bytes: 128,
+                tools: core::ToolFamilies::JIG,
+                key_bytes: 256,
+                llm_providers: accounts::Providers {
+                    providers: Box::new([accounts::Provider {
+                        name: b"Fake".as_slice().into(),
+                        signed_in_plan: true,
+                        manage_usage: Some(b"https://usage.example/".as_slice().into()),
+                        number: 1,
+                        models: Box::new([b"scripted".as_slice().into()]),
+                        offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
+                    }]),
+                },
+            },
+            defaults: core::settings::Defaults {
                 charters: Box::new([core::Charter {
                     number: 1,
                     hosts: fleet::Kinds::Workers,
@@ -369,21 +383,9 @@ pub fn config(seed: u64) -> root::Config {
                         call_timeout: Duration::from_secs(10),
                     },
                 }]),
-                resume_bytes: 256,
-                tail_bytes: 128,
-
-                tools: core::ToolFamilies::JIG,
-                key_bytes: 256,
-                llm_providers: accounts::Providers {
-                    providers: Box::new([accounts::Provider {
-                        name: b"Fake".as_slice().into(),
-                        signed_in_plan: true,
-                        manage_usage: Some(b"https://usage.example/".as_slice().into()),
-                        number: 1,
-                        models: Box::new([b"scripted".as_slice().into()]),
-                        offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
-                    }]),
-                },
+                templates: crate::fixtures::templates(),
+                policies: skein_lib::Map::with_capacity(0),
+                rules: (domain).rules().clone(),
             },
         },
     }

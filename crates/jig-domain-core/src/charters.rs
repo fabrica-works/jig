@@ -5,7 +5,7 @@ use jig_domain_fleet as fleet;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Queue};
 
-use crate::{Core, Limits, RunPolicy, Settings, memory, run};
+use crate::{Core, Limits, RunPolicy, Settings};
 
 /// One numbered charter offered by the deployment (protocol/configuration.md, 3).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -16,8 +16,10 @@ pub struct Charter {
     pub spend: u64,
 }
 
-pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
-    assert!(settings.charters.len() <= usize::try_from(limits.tasks.charters).expect("charter count"), "charter count");
+const _: () = assert!(fleet::CATALOGUE_MODELS == tasks::MODELS, "fleet evidence prices the model catalogue");
+const _: () = assert!(fleet::CATALOGUE_NAME_BYTES == crate::MODEL_NAME_BYTES, "fleet evidence prices model names");
+
+pub(crate) fn assert_catalogue(settings: &Settings) {
     assert!(settings.models.len() <= usize::try_from(tasks::MODELS).expect("model count"), "model count");
     for (at, model) in settings.models.iter().enumerate() {
         for earlier in settings.models.iter().take(at) {
@@ -43,49 +45,31 @@ pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
         }
         assert!(declares(model), "a model's effort among those it declares");
     }
-    let mut seen = List::with_capacity(limits.tasks.charters);
-    for charter in &settings.charters {
-        assert!(charter.number != 0 && !seen.as_slice().contains(&charter.number), "unique nonzero charter number");
-        seen.push(charter.number).expect("configured charter count");
-        assert!(configured(settings, &charter.policy.model).is_some(), "charter model configured");
-        assert!(declares(&charter.policy.model), "a model's effort among those it declares");
-        for model in &charter.policy.alternatives {
-            assert!(configured(settings, model).is_some(), "charter model configured");
-            assert!(declares(model), "a model's effort among those it declares");
-        }
-        let policy = &charter.policy;
-        assert!(
-            policy.turns > policy.reserve_turns && policy.time > policy.reserve_time,
-            "charter budget above reserve"
-        );
-        assert!(
-            match run::reserve_floor(policy) {
-                Some(floor) => charter.spend >= floor,
-                None => false,
-            },
-            "charter default spend holds reserve floor"
-        );
-        assert!(
-            match memory::policy_owned_bytes(policy) {
-                Some(bytes) => bytes <= u64::from(limits.run_bytes),
-                None => false,
-            },
-            "core prices its configured run policy"
-        );
-    }
 }
 
 /// Each charter's models as tasks checks an LLM choice against them: its main model, then its
 /// alternatives, each once, by its index in configuration's order (tasks.md, 3).
-pub(crate) fn models(settings: &Settings, limits: &Limits) -> Box<[tasks::CharterModels]> {
+pub(crate) fn models(
+    current: &crate::settings::Current,
+    settings: &Settings,
+    limits: &Limits,
+) -> Box<[tasks::CharterModels]> {
     let mut charters = List::with_capacity(limits.tasks.charters);
-    for charter in &settings.charters {
+    for setting in &current.offered() {
+        let number = match setting {
+            crate::settings::Setting::Charter(number) => *number,
+            crate::settings::Setting::Template(_)
+            | crate::settings::Setting::Policy(_)
+            | crate::settings::Setting::Rules => continue,
+        };
+        let charter = current.charter(number).expect("offered charter");
         let count = charter.policy.alternatives.len().checked_add(1).expect("charter model count");
         let mut models = List::with_capacity(u32::try_from(count).expect("charter model count"));
-        let main = configured(settings, &charter.policy.model).expect("charter model configured");
-        models.push(main).expect("charter model count");
+        if let Some(main) = configured(settings, &charter.policy.model) {
+            models.push(main).expect("charter model count");
+        }
         for model in &charter.policy.alternatives {
-            let index = configured(settings, model).expect("charter model configured");
+            let Some(index) = configured(settings, model) else { continue };
             if !models.as_slice().contains(&index) {
                 models.push(index).expect("charter model count");
             }
@@ -142,14 +126,8 @@ impl Core {
 
     /// Look up a configured charter by number.
     #[must_use]
-    #[expect(clippy::manual_find, reason = "the strict subset iterates without a closure")]
     pub fn charter(&self, number: u32) -> Option<&Charter> {
-        for charter in &self.settings.charters {
-            if charter.number == number {
-                return Some(charter);
-            }
-        }
-        None
+        self.current.charter(number)
     }
 
     /// An admitted live agent task's configured charter.

@@ -1344,6 +1344,8 @@ pub enum Accepted {
 /// notifications have no reply destination and may be ignored if stale. (domain/tasks.md, sections 4–5).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// Replace the current models after a settings commit (engine.md, 17.2).
+    Charters { charters: Box<[crate::CharterModels]>, efforts: Box<[u8]> },
     /// One project's party operations, admitted in order and made whole.
     Compound {
         reply_to: ReplyTo,

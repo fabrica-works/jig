@@ -498,9 +498,9 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     limits.core.views.runs = 5;
     limits.core.call_records = 16;
     journal(&mut limits);
-    configuration.core.settings.charters[0].hosts = fleet::Kinds::Both;
+    configuration.core.defaults.charters[0].hosts = fleet::Kinds::Both;
     let kinds = Box::new([policy::Executor::Charter(1), policy::Executor::Procedure(1), policy::Executor::Role(1)]);
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.delegation = policy::Delegation { kinds, tasks: 6, depth: 3 };
     rules.maximum_run_spend = 20;
     let mut project = configuration.core.seed_projects[0].policy.policy.clone();
@@ -526,8 +526,10 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     policy::step(&mut checked, policy::Event::Policy { project: 1, policy: project }, &mut out);
     assert_eq!(out.pop(), Some(policy::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
     (configuration, limits)
 }
 

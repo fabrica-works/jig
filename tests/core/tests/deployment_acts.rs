@@ -397,23 +397,26 @@ fn project_world(granted: bool) -> World {
     let (mut config, mut limits) = configuration(1850);
     limits.core.authority.projects = 2;
     limits.core.people.projects = 3;
-    config.core.authority =
-        jig_domain_authority::Domain::new(config.core.authority.rules().clone(), limits.core.authority)
-            .expect("room past the seed");
+    config.core.defaults.rules =
+        (jig_domain_authority::Domain::new(config.core.defaults.rules.clone(), limits.core.authority)
+            .expect("room past the seed"))
+        .rules()
+        .clone();
     if granted {
         config.core.grants =
             Box::new([people::ActGrant { connector: CONNECTOR, may: Box::new([people::ActKind::MakeProject]) }]);
     }
     let seed = &config.core.seed_projects[0].policy;
-    config.core.policies = skein_lib::Map::with_capacity(1);
+    config.core.defaults.policies = skein_lib::Map::with_capacity(1);
     config
         .core
+        .defaults
         .policies
         .insert(
             1,
             core::ConfiguredPolicy {
                 policy: seed.policy.clone(),
-                permissions: seed.permissions.clone(),
+                permissions: Box::new([]),
                 templates: seed.templates.clone(),
             },
         )

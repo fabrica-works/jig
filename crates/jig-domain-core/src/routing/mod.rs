@@ -304,7 +304,7 @@ fn route_room_checked(limits: &Limits) -> Option<u32> {
     let people = people::max_out(&limits.people).checked_mul(8)?;
     let fleet = fleet::max_out(&limits.fleet).checked_mul(8)?;
     let brief = brief::gather_max_out(&limits.brief).checked_mul(4)?;
-    tasks
+    let bound = tasks
         .checked_add(people)?
         .checked_add(limits.people.inbox_tasks)?
         .checked_add(fleet)?
@@ -317,7 +317,8 @@ fn route_room_checked(limits: &Limits) -> Option<u32> {
             limits.tasks.tasks.checked_mul(limits.tasks.tree_tasks.checked_add(limits.connectors)?.checked_add(4)?)?,
         )?
         .checked_add(limits.views.watchers.checked_mul(4)?)?
-        .checked_add(8)
+        .checked_add(8)?;
+    Some(bound.max(crate::settings::writes_worst_case(limits)?))
 }
 
 fn route_room(limits: &Limits) -> u32 {
@@ -342,6 +343,7 @@ pub fn room_max(limits: &Limits) -> Option<JournalRoom> {
 pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
     let room = room_max(limits)?;
     match event {
+        Event::SettingsCommit { room } => Some(JournalRoom { writes: *room, held: 0 }),
         Event::Fill { .. } => Some(JournalRoom { writes: 0, held: 0 }),
         Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: room.held }),
         Event::Stopping
@@ -474,6 +476,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Err(answer) => return answer,
     };
     match event {
+        Event::SettingsCommit { room } => core.commit_restored_settings(env, room.saturating_sub(1)),
         Event::Fill { bytes } => {
             core.fill = bytes;
             crate::stopping::empty()

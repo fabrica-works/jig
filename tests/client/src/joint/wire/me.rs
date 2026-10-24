@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn template_carries_its_named_choice() {
-        let mut source = jig_core_world::world::config(8455).core.settings.templates[0].clone();
+        let mut source = jig_core_world::world::config(8455).core.defaults.templates[0].clone();
         source.llm = Some(t::LlmChoice {
             account: Some(17),
             main: t::ModelEffort { model: 0, effort: Some(1) },

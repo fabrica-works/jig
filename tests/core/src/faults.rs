@@ -112,7 +112,7 @@ pub fn plan_fixture(seed: u64) -> (jig_test_domain::Config, jig_test_domain::Lim
     limits.core.people.amendment_bytes = 256;
     limits.core.people.inbox_recipients = 21;
     crate::peers::journal(&mut limits);
-    let mut rules = configuration.core.authority.rules().clone();
+    let mut rules = configuration.core.defaults.rules.clone();
     rules.ceiling.delegation.tasks = 6;
     rules.ceiling.delegation.depth = 3;
     rules.maximum_run_spend = 10;
@@ -125,7 +125,9 @@ pub fn plan_fixture(seed: u64) -> (jig_test_domain::Config, jig_test_domain::Lim
     jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
     configuration.core.seed_projects[0].policy.policy = checked.policy(1).expect("checked seed policy").clone();
-    configuration.core.authority =
-        jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits()).expect("checked rules");
+    configuration.core.defaults.rules = (jig_domain_authority::Domain::new(checked.rules().clone(), *checked.limits())
+        .expect("checked rules"))
+    .rules()
+    .clone();
     (configuration, limits)
 }

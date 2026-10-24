@@ -48,7 +48,14 @@ pub(crate) fn creating(
     let maximum_deadline = earliest(policy.ceiling.budget.deadline, core.authority.rules().ceiling.budget.deadline);
     let mut charters = List::with_capacity(limits.documents.lines);
     let canonical_deadline = earliest(role.authority.budget.deadline, maximum_deadline);
-    for charter in &core.settings.charters {
+    for setting in &core.current.offered() {
+        let number = match setting {
+            crate::settings::Setting::Charter(number) => *number,
+            crate::settings::Setting::Template(_)
+            | crate::settings::Setting::Policy(_)
+            | crate::settings::Setting::Rules => continue,
+        };
+        let charter = core.charter(number).expect("offered charter");
         if creating_charter(core, limits, party, project, held, charter.number) && charters.room() > 0 {
             charters.push(charter.number).expect("bounded offered charters");
         }

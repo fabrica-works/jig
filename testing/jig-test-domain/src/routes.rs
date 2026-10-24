@@ -26,6 +26,9 @@ pub(super) fn route_core(
     let core::Requests::Out(mut requests) = requests;
     for _ in 0..requests.len() {
         match requests.pop().expect("core request count") {
+            core::Request::Write(core::Write::CopySettingsRevision(number)) => {
+                write(domain, decision, Write::CopySettingsRevision(number));
+            }
             core::Request::Write(core::Write::Save(record)) => {
                 write(domain, decision, Write::Save(Record::Core(record)));
             }
@@ -541,7 +544,7 @@ fn route_now(
             work.push(Work::Core(core::Event::RefusedPayload { request, problem, payload }));
         }
         core::Now::RestoreRefused => {
-            unreachable!("this route awaits the testing application's scripted peer");
+            assert!(domain.core.restart_failure().is_some(), "a refused restore has stopped the core");
         }
 
         other @ (core::Now::SeenConversation { .. }

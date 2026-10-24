@@ -78,7 +78,7 @@ pub(crate) fn fresh_tasks(core: &Core, limits: &Limits) -> tasks::Domain {
     tasks::Domain::new(
         &limits.tasks,
         17,
-        crate::charters::models(&core.settings, limits),
+        crate::charters::models(&core.current, &core.settings, limits),
         crate::charters::efforts(&core.settings),
     )
 }

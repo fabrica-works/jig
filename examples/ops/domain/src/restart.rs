@@ -20,7 +20,7 @@ pub(crate) fn route(
     work: &mut Queue<Work>,
 ) {
     match request {
-        core::RestartRequest::Idle | core::RestartRequest::Refused { .. } => {}
+        core::RestartRequest::Idle | core::RestartRequest::Settings { .. } | core::RestartRequest::Refused { .. } => {}
         core::RestartRequest::Step(step) => match step {
             core::RestartStep::LoadCore => held(decision, Output::Load { step, range: Range::Core }),
             core::RestartStep::LoadInbox => {
@@ -79,6 +79,10 @@ pub(crate) fn route(
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "the store adapter preserves the core restart order across each store terminal"
+)]
 pub(crate) fn store(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -91,6 +95,12 @@ pub(crate) fn store(
         Store::Loaded(event) => work.push(Work::Core(event)),
         Store::Restored(step) => {
             if step == core::RestartStep::LoadCore {
+                if !domain.core.settings_restored(&Env { now: env.now, wall: env.wall, limits: env.limits.core }) {
+                    return;
+                }
+                work.push(Work::Core(core::Event::SettingsCommit {
+                    room: core::room_max(&env.limits.core).expect("validated core room").writes,
+                }));
                 // The completed core range is also the people's restoration
                 // terminal. Retain it when copying this cold-load adapter.
                 work.push(Work::Core(core::Event::People(people::Event::Restored)));
@@ -120,6 +130,18 @@ pub(crate) fn store(
             }
         }
         Store::Restore(record) => {
+            let after_settings = match &record {
+                Record::Core(core::Record::Core(core::CoreRecord::Settings(_) | core::CoreRecord::Deployment(_))) => {
+                    false
+                }
+                Record::Core(_) | Record::Infrastructure(_) | Record::Observability(_) => true,
+            };
+            if domain.core.restart_step() == Some(core::RestartStep::LoadCore)
+                && after_settings
+                && !domain.core.settings_restored(&Env { now: env.now, wall: env.wall, limits: env.limits.core })
+            {
+                return;
+            }
             let valid = if domain.core.restart_step() == Some(core::RestartStep::LoadInbox) {
                 if let Record::Core(row) = record {
                     domain.core.restore_inbox_row(&env.limits.core, &row)

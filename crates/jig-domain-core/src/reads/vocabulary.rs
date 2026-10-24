@@ -473,7 +473,11 @@ pub(crate) fn record_bytes(value: &Record) -> Option<u64> {
                 }
             })?,
         Record::Core(
-            CoreRecord::Deployment(_) | CoreRecord::RunProof(_) | CoreRecord::Call(_) | CoreRecord::Projection(_),
+            CoreRecord::Settings(_)
+            | CoreRecord::Deployment(_)
+            | CoreRecord::RunProof(_)
+            | CoreRecord::Call(_)
+            | CoreRecord::Projection(_),
         )
         | Record::People(_)
         | Record::Notes(notes::Record::Line(_))

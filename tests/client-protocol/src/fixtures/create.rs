@@ -60,16 +60,17 @@ pub fn create_tasks() -> List<c::NewTask> {
 pub fn batch_config(seed: u64) -> jig_test_domain::Config {
     use jig_domain_authority as a;
     let mut config = jig_core_world::world::config(seed);
-    let current = &config.core.authority;
+    let current = &config.core.defaults.rules;
     let policy = config.core.seed_projects[0].policy.policy.clone();
-    let mut bounds = *current.limits();
+    let mut bounds = jig_core_world::world::limits().core.authority;
     bounds.batch = 2;
-    let mut authority = a::Domain::new(current.rules().clone(), bounds).expect("two-member authority");
+    let mut authority = a::Domain::new(current.clone(), bounds).expect("two-member authority");
     let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
     a::step(&mut authority, a::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: 1 }));
     config.core.seed_projects[0].policy.policy = authority.policy(1).expect("checked seed policy").clone();
-    config.core.authority = a::Domain::new(authority.rules().clone(), *authority.limits()).expect("checked rules");
+    config.core.defaults.rules =
+        (a::Domain::new(authority.rules().clone(), *authority.limits()).expect("checked rules")).rules().clone();
     config
 }
 #[must_use]
@@ -85,7 +86,11 @@ mod tests {
     use jig_domain_authority as a;
     #[test]
     fn the_create_story_authority_admits_both_members() {
-        let mut config = super::batch_config(super::super::SEED);
+        let config = super::batch_config(super::super::SEED);
+        let mut bounds = jig_core_world::world::limits().core.authority;
+        bounds.batch = 2;
+        let mut authority =
+            a::Domain::new(config.core.defaults.rules.clone(), bounds).expect("fixture authority bounds");
         let given = |spend| a::Delegate {
             executor: a::Executor::Charter(1),
             symbolic: Box::new([]),
@@ -101,7 +106,7 @@ mod tests {
         };
         let mut admitted = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
         a::step(
-            &mut config.core.authority,
+            &mut authority,
             a::Event::Policy { project: 1, policy: config.core.seed_projects[0].policy.policy.clone() },
             &mut admitted,
         );
@@ -112,9 +117,7 @@ mod tests {
             tasks_left: 2,
             request: a::PersonRequest::Create(Box::new([given(20), given(10)])),
         };
-        let mut out = skein_lib::Queue::with_capacity(
-            a::max_out(config.core.authority.limits()).expect("authority output bound"),
-        );
-        assert_eq!(a::check_request(&config.core.authority, &ask, &mut out).answer, a::Answer::Allow);
+        let mut out = skein_lib::Queue::with_capacity(a::max_out(authority.limits()).expect("authority output bound"));
+        assert_eq!(a::check_request(&authority, &ask, &mut out).answer, a::Answer::Allow);
     }
 }

@@ -227,6 +227,9 @@ pub(crate) fn core_out(
     let core::Requests::Out(mut out) = requests;
     for _ in 0..out.len() {
         match out.pop().expect("core request count") {
+            core::Request::Write(core::Write::CopySettingsRevision(number)) => {
+                write(domain, decision, Write::CopySettingsRevision(number));
+            }
             core::Request::Write(core::Write::Save(record)) => {
                 write(domain, decision, Write::Save(Record::Core(record)));
             }
@@ -1081,7 +1084,14 @@ pub(crate) fn infrastructure_out(
                 let token = domain.token();
                 domain.close_replies.insert(token, key).expect("bounded infrastructure close replies");
                 let mut grace = None;
-                for template in &domain.core.settings.templates {
+                for setting in &domain.core.current.offered() {
+                    let number = match setting {
+                        core::settings::Setting::Template(number) => *number,
+                        core::settings::Setting::Charter(_)
+                        | core::settings::Setting::Policy(_)
+                        | core::settings::Setting::Rules => continue,
+                    };
+                    let template = domain.core.current.template(number).expect("offered template");
                     if template.flags.conversation {
                         grace = template.grace;
                         break;

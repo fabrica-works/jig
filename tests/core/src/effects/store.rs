@@ -56,7 +56,8 @@ impl World {
                         self.trace.push(format!("store page {step:?} 2 rows"));
                     }
                     let env = self.env();
-                    assert!(root::restore_record(&mut self.domain, &env, row.clone()), "restored {row:?}");
+                    let restored = root::restore_record(&mut self.domain, &env, row.clone());
+                    assert!(restored || self.domain.settings_failure().is_some(), "restored {row:?}");
                 }
                 Up::Root(event) => {
                     if let root::Event::RestartDone(step) = &event {
