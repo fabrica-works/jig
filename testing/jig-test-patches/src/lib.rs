@@ -1,11 +1,13 @@
 //! The application's fixture patch owner; no test family reaches the production schema.
+//! Its kept texts and patches are skein-codegen's `patch` command's, run from
+//! skein at jig's pinned revision: `patch <this crate> --owner fixture --after
+//! fixture-jig 1` (`--baseline` for the first text).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
 
 #[path = "../patches/mod.rs"]
 pub mod patches;
-
 
 pub const NAME: &str = "fixture";
 

@@ -77,7 +77,6 @@ fn clean_first_start(world: &mut World) {
 }
 
 #[test]
-#[ignore = "M3: a first start writes generation 1's manifest (store.md 2), which M3 builds"]
 fn first_start_is_empty_and_durable() {
     // store.md 2: The first start makes generation 1's manifest; the maps are empty until the root's first commit.
     let mut world = World::unopened(802);
@@ -93,7 +92,6 @@ fn first_start_is_empty_and_durable() {
 }
 
 #[test]
-#[ignore = "M3: a first start writes generation 1's manifest (store.md 2), which M3 builds"]
 fn empty_interrupted_generation_restarts() {
     // store.md 2: A lone 1/ whose store/ and secrets/ hold no file is a cut first start, removed and made afresh.
     let mut world = World::unopened(804);
@@ -105,7 +103,6 @@ fn empty_interrupted_generation_restarts() {
 }
 
 #[test]
-#[ignore = "M3: once a first start writes the manifest before active, the leftover rule must accept it beside empty maps (store.md 2)"]
 fn interrupted_manifest_is_replaced() {
     // store.md 2: A lone 1/ with file-free maps is removed before the first start makes generation 1's manifest.
     let mut world = World::unopened(805);
@@ -349,7 +346,6 @@ fn active_layout_keeps_shared_transcripts() {
 }
 
 #[test]
-#[ignore = "M3: a first start writes generation 1's manifest (store.md 2), which M3 builds"]
 fn every_first_start_cut_recovers_one_whole_generation() {
     // store.md 10.4: Before active's rename remove the partial first start; after it open 1 and make transcripts/.
     let mut baseline = World::unopened(811);

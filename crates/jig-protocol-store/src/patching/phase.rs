@@ -59,6 +59,7 @@ fn take(store: &mut Store) -> Box<Patching> {
         | Opening::LeftoverClose
         | Opening::Making(_)
         | Opening::FirstSecrets
+        | Opening::FirstManifest(_)
         | Opening::FirstActive
         | Opening::CheckingOpen
         | Opening::CheckingPage { .. }
@@ -159,15 +160,11 @@ fn opened_copy(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, b
         None => refuse(store, above),
     }
 }
-fn manifesting(store: &mut Store, env: &Env<Limits>, below: &mut Below) {
+fn manifesting(store: &mut Store, _env: &Env<Limits>, below: &mut Below) {
     let number = active(store).checked_add(1).expect("begin checked the next generation");
-    let bytes = manifest(store, env);
+    let bytes = generations::manifest(number);
     let manifesting = generations::store_manifest(root(store), number, bytes, below);
     state(store, Patching::Manifest(manifesting));
-}
-/// task B: the Manifest record (store.md 2)
-pub(crate) fn manifest(store: &Store, _env: &Env<Limits>) -> Box<[u8]> {
-    generations::encode(active(store).checked_add(1).expect("begin checked the next generation"))
 }
 fn switching(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
     let switching = generations::switch(root(store), store.directory.active.expect("active checked"), below);

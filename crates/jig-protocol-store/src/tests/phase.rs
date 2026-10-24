@@ -87,7 +87,11 @@ fn a_patch_opens_the_copy_with_the_committed_row_and_keeps_the_previous_whole() 
     assert_eq!(disk.bytes(b"active").as_ref(), b"2\n");
     assert_eq!(disk.bytes(b"generations/2/manifest").as_ref(), b"2\n");
     let contents = disk.contents();
-    for (path, kind, _, bytes) in contents.iter().filter(|(p, ..)| p.starts_with(b"generations/1/")) {
+    // The maps are copied; each generation has its own manifest.
+    for (path, kind, _, bytes) in contents
+        .iter()
+        .filter(|(p, ..)| p.starts_with(b"generations/1/store") || p.starts_with(b"generations/1/secrets"))
+    {
         let target = [b"generations/2/", path.strip_prefix(b"generations/1/").expect("prefix")].concat();
         let (_, copied_kind, _, copied_bytes) =
             contents.iter().find(|(p, ..)| p.as_ref() == target).expect("whole copy");

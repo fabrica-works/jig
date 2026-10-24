@@ -270,6 +270,7 @@ fn a_first_start_makes_generation_one_then_active_then_transcripts() {
     let mut store = disk.store();
     assert_opened(&disk.open(&mut store));
     assert_eq!(disk.bytes(b"active").as_ref(), b"1\n");
+    assert_eq!(disk.bytes(b"generations/1/manifest").as_ref(), b"1\n");
     let tree = disk.tree();
     assert!(
         tree.iter().any(|(p, k, m)| p.as_ref() == b"generations/1/secrets" && *k == Kind::Directory && *m == 0o700)
@@ -294,16 +295,43 @@ fn a_first_start_makes_generation_one_then_active_then_transcripts() {
         .iter()
         .position(|(_, r)| if let Seen::Private(p) = r { p.as_ref() == b"generations/1/secrets" } else { false })
         .expect("secrets made");
+    let manifest = requests
+        .iter()
+        .position(|(driver, r)| {
+            if let Seen::Store { path, bytes, expected: file::Expect::Absent } = r {
+                *driver == 2 && path.as_ref() == b"generations/1/manifest" && bytes.as_ref() == b"1\n"
+            } else {
+                false
+            }
+        })
+        .expect("manifest stored absent on the transcripts driver");
     let transcripts = requests
         .iter()
         .position(|(_, r)| if let Seen::Make(p) = r { p.as_ref() == b"transcripts" } else { false })
         .expect("transcripts made");
-    assert!(made < active && private < active && active < transcripts);
+    assert!(made < private && private < manifest && manifest < active && active < transcripts);
     let Some((0, Seen::Lock)) = requests.first() else { panic!("store driver locks first") };
     assert_eq!(
         store.directory.active,
         Some(crate::generations::Active { number: 1, digest: skein_io::digest::digest(b"1\n") })
     );
+}
+#[test]
+fn a_failed_manifest_refuses_before_active_is_stored() {
+    let (mut store, mut below) = at_private();
+    scripted(&mut store, &mut below);
+    let Some(file::Request::Store { owner, path, .. }) = below.transcripts.pop() else {
+        panic!("manifest on the transcripts driver");
+    };
+    assert_eq!(path.as_ref(), b"generations/1/manifest");
+    assert!(below.store.is_empty());
+    let arrived = Arrived {
+        event: file::Event::Failed { owner, error: Error::Permission, committed: false, residue: None },
+        fd: None,
+    };
+    let (events, below) = fixtures::answer(&mut store, Io::Transcripts(arrived));
+    assert_refused(&events, OpenRefusal::Failed);
+    assert!(below.store.is_empty());
 }
 #[test]
 fn a_later_start_opens_the_generation_active_names() {
@@ -424,6 +452,59 @@ fn a_cut_first_starts_leftover_is_removed_and_the_start_made_again() {
     }
 }
 
+#[test]
+fn a_leftover_manifest_or_its_temporary_is_removed_before_starting_afresh() {
+    for name in [b"manifest".as_slice(), b"manifest.skein-0123456789abcdef"] {
+        let mut items: Vec<_> = standing(1).into_iter().skip(1).collect();
+        let path = [b"generations/1/", name].concat();
+        items.push(Item::file(&path, b"partial manifest"));
+        let mut disk = Disk::new(&items);
+        let mut store = disk.store();
+        assert_opened(&disk.open(&mut store));
+        assert_eq!(disk.bytes(b"generations/1/manifest").as_ref(), b"1\n");
+        assert_eq!(disk.bytes(b"active").as_ref(), b"1\n");
+        assert!(!has(&paths(&mut disk), b"generations/1/manifest.skein-0123456789abcdef"));
+        let requests = disk.requests();
+        let removed = requests
+            .iter()
+            .position(
+                |(_, r)| if let Seen::Remove { name, directory: true } = r { name.as_ref() == b"1" } else { false },
+            )
+            .expect("leftover generation removed whole");
+        let made = requests
+            .iter()
+            .position(|(_, r)| if let Seen::Make(path) = r { path.as_ref() == b"generations/1" } else { false })
+            .expect("generation made afresh");
+        assert!(removed < made);
+    }
+}
+#[test]
+fn unrelated_or_multiple_manifest_entries_refuse_unnamed_unchanged() {
+    for extra in [
+        vec![Item::file(b"generations/1/other", b"keep")],
+        vec![Item::directory(b"generations/1/manifest")],
+        vec![Item::directory(b"generations/1/manifest.skein-0123456789abcdef")],
+        vec![Item::file(b"generations/1/manifest.skein-0123456789abcde", b"keep")],
+        vec![Item::file(b"generations/1/manifest.skein-0123456789abcdef0", b"keep")],
+        vec![Item::file(b"generations/1/manifest.skein-0123456789abcdeF", b"keep")],
+        vec![Item::file(b"generations/1/manifest.skein-0123456789abcdeg", b"keep")],
+        vec![
+            Item::file(b"generations/1/manifest", b"keep"),
+            Item::file(b"generations/1/manifest.skein-0123456789abcdef", b"keep"),
+        ],
+        vec![
+            Item::file(b"generations/1/manifest.skein-0123456789abcdef", b"keep"),
+            Item::file(b"generations/1/manifest.skein-fedcba9876543210", b"keep"),
+        ],
+        vec![Item::file(b"generations/1/manifest", b"keep"), Item::file(b"generations/1/store/row", b"keep")],
+        vec![Item::file(b"generations/1/manifest", b"keep"), Item::file(b"generations/1/secrets/row", b"keep")],
+    ] {
+        let mut items: Vec<_> = standing(1).into_iter().skip(1).collect();
+        items.extend(extra);
+        unchanged_refusal(&items, OpenRefusal::Generations { why: Generations::Unnamed });
+    }
+}
+
 fn strays() -> Vec<Item> {
     let mut items = Vec::new();
     for name in ["3", "4", "6", "0", "dropped"] {
@@ -534,6 +615,7 @@ fn the_first_start_cut_at_each_operation_starts_again_whole() {
         let mut store = disk.store();
         assert_opened(&disk.open(&mut store));
         assert_eq!(disk.bytes(b"active").as_ref(), b"1\n", "cut {cut}");
+        assert_eq!(disk.bytes(b"generations/1/manifest").as_ref(), b"1\n", "cut {cut}");
         assert_eq!(
             paths(&mut disk)
                 .iter()
