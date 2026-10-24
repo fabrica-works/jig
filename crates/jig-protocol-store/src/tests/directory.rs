@@ -139,6 +139,7 @@ fn a_directory_failure_refuses_open() {
     };
     let (events, _) = fixtures::answer(&mut store, Io::Store(arrived));
     assert_refused(&events, OpenRefusal::Failed);
+    super::words::has_deployment_slots(&events, super::words::FAILED);
 }
 #[test]
 fn a_failed_skein_commit_on_disk_answers_failed() {

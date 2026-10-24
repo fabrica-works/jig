@@ -233,14 +233,17 @@ pub enum OpenRefusal {
     /// The binary's sets do not plan (10.3).
     Set { owner: crate::Owner, patch: u32 },
 }
-/// An older build's refusal whose fix moves the generations (store.md 2), `why`
-/// saying which build.
+/// A refusal whose fix moves the generations (store.md 2), `why` saying
+/// which version or build.
 macro_rules! older {
     ($why:literal) => {
+        older!(" holds a store from an older build, ", $why)
+    };
+    ($clause:literal, $why:literal) => {
         &[
             "",
             concat!(
-                " holds a store from an older build, ",
+                $clause,
                 $why,
                 ", and this start has changed nothing in it. Before the first release a store is not translated, so every start refuses this one until it is moved. To start afresh, stop the service, move `active`, `generations/` and `transcripts/` out of ",
             ),
@@ -256,8 +259,47 @@ impl OpenRefusal {
     #[must_use]
     pub fn words(&self) -> &'static [&'static str] {
         match self {
-            // o/configuring-2's L gives these their words.
-            Self::Format { .. } | Self::Deployment | Self::Numbers { .. } | Self::Failed => &[],
+            Self::Format { family, .. } => match family {
+                Family::Settings => {
+                    older!(" holds a store whose ", "settings family is at another version than this build's")
+                }
+                Family::Component => {
+                    older!(" holds a store whose ", "component family is at another version than this build's")
+                }
+                Family::Core => older!(" holds a store whose ", "core family is at another version than this build's"),
+                Family::Tasks => {
+                    older!(" holds a store whose ", "tasks family is at another version than this build's")
+                }
+                Family::People => {
+                    older!(" holds a store whose ", "people family is at another version than this build's")
+                }
+                Family::Notes => {
+                    older!(" holds a store whose ", "notes family is at another version than this build's")
+                }
+                Family::Accounts => {
+                    older!(" holds a store whose ", "accounts family is at another version than this build's")
+                }
+                Family::Application => {
+                    older!(" holds a store whose ", "application family is at another version than this build's")
+                }
+            },
+            Self::Deployment => &[
+                "The store in ",
+                " names another deployment than its header does, so its files come from two deployments, and this start has changed nothing in it. Restore ",
+                " whole from one backup, or, to start afresh, stop the service, move `active`, `generations/` and `transcripts/` out of ",
+                " together, and start again: nothing is deleted, and the next start makes a new, empty store.",
+            ],
+            Self::Numbers { .. } => &[
+                "The store in ",
+                " does not end at the commit its header records, so a file was lost, cut or restored apart from the others, and this start has changed nothing in it. Restore ",
+                " whole from one backup, or, to start afresh, stop the service, move `active`, `generations/` and `transcripts/` out of ",
+                " together, and start again: nothing is deleted, and the next start makes a new, empty store.",
+            ],
+            Self::Failed => &[
+                "A file in ",
+                " could not be read or written, or its store could not be recovered, while this start opened it, and the start stopped there. Check the disk's space and the directory's permissions, and start again. If the next start fails the same way, restore ",
+                " from a backup.",
+            ],
             Self::OlderBuild { why: Older::Unleveled } => &[
                 "",
                 " holds a store from before the first release, which records no patch levels, and this start has changed nothing in it. A store from before the first release is not translated, so every start refuses this one until it is moved. To start afresh, stop the service, move `active`, `generations/` and `transcripts/` out of ",

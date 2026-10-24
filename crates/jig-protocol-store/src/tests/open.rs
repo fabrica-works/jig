@@ -149,7 +149,9 @@ fn a_format_row_of_another_component_version_refuses_naming_it() {
     let [high, low, ..] = &mut *value else { panic!("a version prefix") };
     (*high, *low) = (0, 2);
     let mut store = planted(&[skein_kv::Op::Put { key, value }, fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 2, wanted: 3 });
+    let events = open(&mut store);
+    assert_refusal(&events, OpenRefusal::Format { family: Family::Component, found: 2, wanted: 3 });
+    super::words::has_deployment_slots(&events, super::words::FORMAT);
 }
 
 #[test]
@@ -165,7 +167,9 @@ fn a_store_of_another_deployment_refuses_to_open() {
         fixtures::layouts_put(),
         fixtures::header_put(fixtures::DEPLOYMENT, 1),
     ]);
-    assert_refusal(&open(&mut store), OpenRefusal::Deployment);
+    let events = open(&mut store);
+    assert_refusal(&events, OpenRefusal::Deployment);
+    super::words::has_deployment_slots(&events, super::words::DEPLOYMENT);
 }
 
 #[test]
@@ -185,7 +189,9 @@ fn a_header_behind_the_last_commit_refuses_naming_both_numbers() {
     let mut stores = stores_with_header();
     fixtures::plant(&mut stores, &[]);
     let mut store = fixtures::over(stores);
-    assert_refusal(&open(&mut store), OpenRefusal::Numbers { store: 2, header: 1 });
+    let events = open(&mut store);
+    assert_refusal(&events, OpenRefusal::Numbers { store: 2, header: 1 });
+    super::words::has_deployment_slots(&events, super::words::NUMBERS);
 }
 
 #[test]

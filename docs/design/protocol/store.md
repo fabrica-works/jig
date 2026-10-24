@@ -180,6 +180,48 @@ skein-io                        files: the ring, or the simulator's disk
   > makes a new, empty store. The new store has no tasks, sign-ins,
   > accounts or keys, and every client signs in again.
 
+- **`OpenRefusal::Format`** refuses another version of a family (5.3),
+  putting the family's lower-case name in place of <family>:
+
+  > `<deployment>` holds a store whose <family> family is at another
+  > version than this build's, and this start has changed nothing in it.
+  > Before the first release a store is not translated, so every start
+  > refuses this one until it is moved. To start afresh, stop the service,
+  > move `active`, `generations/` and `transcripts/` out of `<deployment>`
+  > together, and start again: nothing is deleted, and the next start
+  > makes a new, empty store. The new store has no tasks, sign-ins,
+  > accounts or keys, and every client signs in again.
+
+- **`OpenRefusal::Deployment`** refuses a format row naming another
+  deployment than its header (5.3):
+
+  > The store in `<deployment>` names another deployment than its header
+  > does, so its files come from two deployments, and this start has
+  > changed nothing in it. Restore `<deployment>` whole from one backup,
+  > or, to start afresh, stop the service, move `active`, `generations/`
+  > and `transcripts/` out of `<deployment>` together, and start again:
+  > nothing is deleted, and the next start makes a new, empty store.
+
+- **`OpenRefusal::Numbers`** refuses a recovered last commit other than
+  the one the header records (section 6):
+
+  > The store in `<deployment>` does not end at the commit its header
+  > records, so a file was lost, cut or restored apart from the others,
+  > and this start has changed nothing in it. Restore `<deployment>` whole
+  > from one backup, or, to start afresh, stop the service, move `active`,
+  > `generations/` and `transcripts/` out of `<deployment>` together, and
+  > start again: nothing is deleted, and the next start makes a new,
+  > empty store.
+
+- **`OpenRefusal::Failed`** stops an open when a file fails or a store
+  cannot recover (section 10):
+
+  > A file in `<deployment>` could not be read or written, or its store
+  > could not be recovered, while this start opened it, and the start
+  > stopped there. Check the disk's space and the directory's permissions,
+  > and start again. If the next start fails the same way, restore
+  > `<deployment>` from a backup.
+
 - **Each `Older` names its own layout's fix,** in a sentence its
   refusal's text carries whole:
   - `Directory`: "To start afresh, stop the service, move `store/`,
