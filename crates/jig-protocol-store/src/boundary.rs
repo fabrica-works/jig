@@ -32,6 +32,8 @@ pub enum Request {
     Transcript { owner: Token, read: TranscriptRead, rows: u32, bytes: u64 },
     /// The secrets' store (store.md 9).
     Secrets { owner: Token, request: Secrets },
+    /// A written site's answer (store.md 10.3), with its machine handed back.
+    Site { owner: Token, patcher: Box<skein_codec::patch::Patcher>, result: Result<(), skein_codec::patch::Halt> },
 }
 
 /// One write of a commit (store.md 6).
@@ -364,6 +366,25 @@ pub enum Event {
     /// stops (store.md 7.1).
     Corrupt {
         owner: Token,
+    },
+    /// The shell sets this record's key in `of`'s Context, runs its generated
+    /// written function over `patcher.parts()`, and answers `Request::Site`
+    /// (store.md 10.3). Application keys are relative to their tag; every
+    /// other owner's keys are the map's whole keys.
+    Site {
+        owner: Token,
+        of: crate::Owner,
+        key: Box<[u8]>,
+        site: skein_codec::patch::Site,
+        at: skein_codec::value::Node,
+        patcher: Box<skein_codec::patch::Patcher>,
+    },
+    /// A patch's walk is done and committed (store.md 10.2, step 4).
+    Patched {
+        owner: Token,
+        of: crate::Owner,
+        patch: u32,
+        counts: crate::Counts,
     },
 }
 

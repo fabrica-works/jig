@@ -21,7 +21,7 @@ impl Levels {
             Owner::Application => self.application,
         }
     }
-    fn set(&mut self, owner: Owner, level: Option<u32>) {
+    pub(crate) fn set(&mut self, owner: Owner, level: Option<u32>) {
         match owner {
             Owner::Skein => self.skein = level,
             Owner::Smith => self.smith = level,

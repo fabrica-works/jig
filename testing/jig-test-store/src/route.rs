@@ -184,6 +184,11 @@ fn window(now: core::Now) -> Option<(u64, u64, u32)> {
 /// Translate a terminal, preserving pages and requesting their continuations.
 pub fn up(routes: &mut Routes, event: Event, into: &mut Queue<Up>) {
     match event {
+        // The reference shells never hand patch sets. Return the unknown
+        // written site to its open's asker through their ordinary request path.
+        Event::Site { owner, patcher, site, .. } => {
+            into.push(Up::Ask(Request::Site { owner, patcher, result: Err(skein_codec::patch::Halt::NoSite(site)) }));
+        }
         Event::Committed { number, fill } => into.push(Up::Root(root::Event::Committed { number, fill })),
         Event::Failed { number } => into.push(Up::Root(root::Event::Failed { number })),
         Event::Restored { owner, rows, next } => restored(routes, owner, rows, next, into),
@@ -270,7 +275,9 @@ pub fn up(routes: &mut Routes, event: Event, into: &mut Queue<Up>) {
             stop(routes, into);
         }
         Event::OpenRefused { .. } => stop(routes, into),
-        Event::Opened { .. }
+        // The shell driving open owns progress; this root route prints no lines.
+        Event::Patched { .. }
+        | Event::Opened { .. }
         | Event::Kept { .. }
         | Event::Carried { .. }
         | Event::Stale { .. }

@@ -5,10 +5,16 @@ use crate::{Arrived, Below, Event, Io, Limits, OpenRefusal, Phase, Root, Store, 
 use alloc::boxed::Box;
 use skein_io::file;
 use skein_lib::{Env, Queue};
+mod walking;
+pub(crate) use walking::Walking;
 
-/// What open's checks leave for the phase; task B adds the plan, machines and levels found.
+/// What open's checks leave for the phase (store.md 10.2, step 1).
 #[derive(Debug)]
-pub(crate) struct Pending {}
+pub(crate) struct Pending {
+    pub plan: super::plan::Plan,
+    pub machines: super::machines::Machines,
+    pub found: super::plan::Levels,
+}
 
 /// Closing and Leaving count two KV close bits (1, 2), then two directory
 /// close bits (4, 8); Recovering two KV open bits (1, 2).
@@ -19,6 +25,8 @@ pub(crate) enum Patching {
     Copying(Copying),
     Mapping { secrets: bool },
     Recovering { opened: u8 },
+    Walking(Box<Walking>),
+    Sealing { number: u64 },
     Manifest(Manifesting),
     Leaving { closed: u8 },
     Switching(Switching),
@@ -68,11 +76,10 @@ fn take(store: &mut Store) -> Box<Patching> {
         | Opening::TranscriptsOpen => unreachable!("phase routing checked"),
     }
 }
-#[expect(clippy::boxed_local, reason = "the pending plan is handed off by ownership; task B fills it")]
 pub(crate) fn begin(
     store: &mut Store,
     env: &Env<Limits>,
-    _pending: Box<Pending>,
+    pending: Box<Pending>,
     above: &mut Queue<Event>,
     below: &mut Below,
 ) {
@@ -80,6 +87,7 @@ pub(crate) fn begin(
     if active(store).checked_add(1).is_none() {
         return refuse(store, above);
     }
+    store.directory.patch = Some(pending);
     state(store, Patching::Closing { closed: 0 });
     close_stores(store, env, above, below);
 }
@@ -99,7 +107,7 @@ fn kv_down(
         skein_kv::down(&mut store.stores.store, &kv_env, request, &mut events, &mut below.store);
     }
     directory::events_up(store, secret, &mut events, above, below);
-    resume(store, env, below);
+    resume(store, env, above, below);
 }
 fn close_stores(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Below) {
     kv_down(store, env, false, skein_kv::Request::Close { owner: OWNER }, above, below);
@@ -141,8 +149,17 @@ fn open_copy(store: &mut Store, below: &mut Below) {
     });
     state(store, Patching::Mapping { secrets: false });
 }
-/// Task B adds the copy's checks, record walk, sealing commit and final check here.
-fn opened_copy(store: &mut Store, env: &Env<Limits>, below: &mut Below) {
+fn opened_copy(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Below) {
+    let pending = store.directory.patch.take().expect("begin retained the plan until copy recovery");
+    match walking::opened(store, pending) {
+        Some(walking) => {
+            state(store, Patching::Walking(Box::new(walking)));
+            walking::resume(store, env, above, below);
+        }
+        None => refuse(store, above),
+    }
+}
+fn manifesting(store: &mut Store, env: &Env<Limits>, below: &mut Below) {
     let number = active(store).checked_add(1).expect("begin checked the next generation");
     let bytes = manifest(store, env);
     let manifesting = generations::store_manifest(root(store), number, bytes, below);
@@ -195,7 +212,7 @@ pub(crate) fn kv(
     below: &mut Below,
 ) {
     self::event(store, secret, event, above, below);
-    resume(store, env, below);
+    resume(store, env, above, below);
 }
 /// Also serves `directory::events_up`'s synchronous events; no timed KV request here.
 pub(crate) fn event(
@@ -218,6 +235,8 @@ pub(crate) fn event(
                 | Patching::Copying(_)
                 | Patching::Mapping { .. }
                 | Patching::Recovering { .. }
+                | Patching::Walking(_)
+                | Patching::Sealing { .. }
                 | Patching::Manifest(_)
                 | Patching::Switching(_) => return refuse(store, above),
             };
@@ -239,12 +258,40 @@ pub(crate) fn event(
                 | Patching::Leaving { .. }
                 | Patching::Dropping(_)
                 | Patching::Copying(_)
+                | Patching::Walking(_)
+                | Patching::Sealing { .. }
                 | Patching::Manifest(_)
                 | Patching::Switching(_) => refuse(store, above),
             }
         }
-        skein_kv::Event::Committed { .. }
-        | skein_kv::Event::Refused { .. }
+        skein_kv::Event::Committed { owner, number } => {
+            if secret || owner != skein_lib::Token::new(number) {
+                return refuse(store, above);
+            }
+            let phase = take(store);
+            match *phase {
+                Patching::Walking(mut walking) => {
+                    if !walking.committed(number) {
+                        return refuse(store, above);
+                    }
+                    state(store, Patching::Walking(walking));
+                }
+                Patching::Sealing { number: expected } if number == expected => {
+                    // resume has the environment required by the manifest's durable replace.
+                    state(store, Patching::Sealing { number: 0 });
+                }
+                Patching::Closing { .. }
+                | Patching::Dropping(_)
+                | Patching::Copying(_)
+                | Patching::Mapping { .. }
+                | Patching::Recovering { .. }
+                | Patching::Sealing { .. }
+                | Patching::Manifest(_)
+                | Patching::Leaving { .. }
+                | Patching::Switching(_) => refuse(store, above),
+            }
+        }
+        skein_kv::Event::Refused { .. }
         | skein_kv::Event::Failed { .. }
         | skein_kv::Event::Got { .. }
         | skein_kv::Event::Loaded { .. }
@@ -254,19 +301,22 @@ pub(crate) fn event(
     }
 }
 /// Finish synchronous KV events with the current step's environment.
-pub(crate) fn resume(store: &mut Store, env: &Env<Limits>, below: &mut Below) {
+pub(crate) fn resume(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Below) {
     if store.phase == Phase::Stopped {
         return;
     }
     if let Some(phase) = directory::patching(store) {
         match *phase {
-            Patching::Recovering { opened: 3 } => opened_copy(store, env, below),
+            Patching::Recovering { opened: 3 } => opened_copy(store, env, above, below),
+            Patching::Walking(_) => walking::resume(store, env, above, below),
+            Patching::Sealing { number: 0 } => manifesting(store, env, below),
             Patching::Recovering { .. }
             | Patching::Mapping { .. }
             | Patching::Closing { .. }
             | Patching::Leaving { .. }
             | Patching::Dropping(_)
             | Patching::Copying(_)
+            | Patching::Sealing { .. }
             | Patching::Manifest(_)
             | Patching::Switching(_) => {}
         }
@@ -295,7 +345,7 @@ fn file_up(
             Progress::Failed => refuse(store, above),
         },
         Patching::Mapping { secrets } => opened_directory(store, env, secrets, arrived, above, below),
-        Patching::Recovering { .. } => refuse(store, above),
+        Patching::Recovering { .. } | Patching::Walking(_) | Patching::Sealing { .. } => refuse(store, above),
         Patching::Manifest(mut manifesting) => match generations::manifested(&mut manifesting, arrived) {
             Progress::Pending => state(store, Patching::Manifest(manifesting)),
             Progress::Done => {
@@ -367,4 +417,59 @@ fn opened_directory(
         });
         state(store, Patching::Mapping { secrets: true });
     }
+}
+
+/// The levels' task: `OpenRefusal::Patch { owner, patch, key, halt }`.
+/// Until then every walk halt refuses Failed and abandons the copy.
+pub(crate) fn site(
+    store: &mut Store,
+    env: &Env<Limits>,
+    owner: skein_lib::Token,
+    patcher: Box<skein_codec::patch::Patcher>,
+    result: Result<(), skein_codec::patch::Halt>,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    if owner != store.directory.owner {
+        return refuse(store, above);
+    }
+    if directory::patching(store).is_none() {
+        return refuse(store, above);
+    }
+    let phase = take(store);
+    match *phase {
+        Patching::Walking(mut walking) => {
+            if !walking.answer(patcher, result) {
+                return refuse(store, above);
+            }
+            state(store, Patching::Walking(walking));
+            resume(store, env, above, below);
+        }
+        Patching::Closing { .. }
+        | Patching::Dropping(_)
+        | Patching::Copying(_)
+        | Patching::Mapping { .. }
+        | Patching::Recovering { .. }
+        | Patching::Sealing { .. }
+        | Patching::Manifest(_)
+        | Patching::Leaving { .. }
+        | Patching::Switching(_) => refuse(store, above),
+    }
+}
+
+/// Persistent state is counted by lib's common peak; copy buffers and walk
+/// buffers are disjoint. Both KV maps' bounds already include their commits.
+pub(crate) fn worst_case(limits: &Limits, sets: &crate::PatchSets) -> Option<u64> {
+    let room = super::machines::Room { bytes: limits.store.value, nodes: limits.store.value };
+    let walking = walking::worst_case(limits)?;
+    let copying = generations::operations_worst_case(limits.store.chunk)?;
+    // Pending owns the machines during copying as well as walking.
+    walking
+        .max(copying)
+        .checked_add(super::machines::worst_case(sets, room)?)?
+        .checked_add(u64::try_from(size_of::<Patching>()).ok()?)?
+        .checked_add(u64::try_from(size_of::<Pending>()).ok()?)?
+        .checked_add(Queue::<Event>::worst_case(crate::MAX_OUT_DOWN)?)?
+        .checked_add(Queue::<file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)?
+        .checked_add(Queue::<skein_kv::Event>::worst_case(skein_kv::MAX_OUT.above)?)
 }
