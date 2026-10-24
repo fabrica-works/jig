@@ -4,7 +4,7 @@
     clippy::disallowed_methods,
     reason = "text assertions use ordinary Rust (programming-model.md 10.2)"
 )]
-use crate::{Generations, Older, OpenRefusal};
+use crate::{Check, Generations, Older, OpenRefusal};
 
 #[expect(clippy::disallowed_macros, reason = "the task pins refusal words to the design itself")]
 const DESIGN: &str = include_str!("../../../../docs/design/protocol/store.md");
@@ -128,5 +128,18 @@ fn level_and_patch_refusals_say_the_designs_words() {
         (OpenRefusal::Set { owner: crate::Owner::Application, patch: 2 }, "- `Set`: \""),
     ] {
         says(refusal, start, "\"");
+    }
+}
+
+#[test]
+fn check_refusals_say_the_designs_words() {
+    for (why, start) in [
+        (Check::Large { key: Box::new([]) }, "- `Check { why: Large }`: \""),
+        (Check::Count { family: "fixture-label", before: 3, after: 2 }, "- `Check { why: Count }`: \""),
+        (Check::Load { key: Box::new([]) }, "- `Check { why: Load }`: \""),
+        (Check::Join { key: Box::new([]) }, "- `Check { why: Join }`: \""),
+        (Check::Private { name: Box::new([]) }, "- `Check { why: Private }`: \""),
+    ] {
+        says(OpenRefusal::Check { why }, start, "\"");
     }
 }

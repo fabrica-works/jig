@@ -475,12 +475,18 @@ have, and acknowledges each.
 binary's patch levels before the root starts, and switches to it
 (`../protocol/store.md`, 10.2), so a restart always runs over the
 generation the deployment's `active` names, at the binary's levels,
-and sees nothing of the patching. The check before that switch uses
-this section's rules, strictly: where a restart counts a record that
-breaks its child's rules and leaves it in the store, the check refuses
-the upgrade, naming the record, and the old generation stays active
-(temper's `draft/upgrades.md`, 6.4). The restart then runs over the
-switched generation as any restart does.
+and sees nothing of the patching. The check before that switch
+(temper's `draft/upgrades.md`, 6.4) runs what the store holds of this
+section's rules: every record of the live ranges and of the census's
+ended read positions loads within its codec's limits, and each ended
+read position's task is held (`../protocol/store.md`, 10.2, step 5).
+This section's rules, strictly, the live sets' limits and the rows the
+census chooses are not in it yet (store.md, section 16): a
+patched record a child refuses makes the restart after the switch
+refuse, as any restart's does, with the generation patched from kept on
+disk as `active` − 1 for the operator to go back to; one the accounts
+child counts and leaves stays. The restart then runs over the switched
+generation as any restart does.
 
 ### 6.1 Stopping
 

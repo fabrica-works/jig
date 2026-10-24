@@ -1,0 +1,2 @@
+family fixture-token 2
+versioned record Token { value: bytes 64, issued: u64, expires: option u64 }

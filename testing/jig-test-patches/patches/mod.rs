@@ -60,6 +60,31 @@ pub mod kept {
             pub use super::v2 as new;
         }
     }
+    pub mod fixture_token {
+        pub const TEXTS: &[&str] = &[
+            include_str!("../schema/kept/fixture-token-v1.schema"),
+            include_str!("../schema/kept/fixture-token-v2.schema"),
+        ];
+        pub mod v1 {
+            pub mod token {
+                use skein_codec::schema::FieldIx;
+                pub const VALUE: FieldIx = FieldIx::new(0);
+                pub const ISSUED: FieldIx = FieldIx::new(1);
+            }
+        }
+        pub mod v2 {
+            pub mod token {
+                use skein_codec::schema::FieldIx;
+                pub const VALUE: FieldIx = FieldIx::new(0);
+                pub const ISSUED: FieldIx = FieldIx::new(1);
+                pub const EXPIRES: FieldIx = FieldIx::new(2);
+            }
+        }
+        pub mod p0002 {
+            pub use super::v1 as old;
+            pub use super::v2 as new;
+        }
+    }
 }
 
 pub mod refusal {

@@ -1,6 +1,6 @@
 //! Kept schemas, plans and reached versions (protocol/store.md 10.3).
 use super::plan::{Levels, Plan, Planned, Unplanned};
-use super::sets::{Keys, Owner, PatchSet, PatchSets};
+use super::sets::{KeptMap, Keys, Owner, PatchSet, PatchSets};
 use alloc::boxed::Box;
 use skein_codec::patch::{Capacity, Patcher, PlanIx};
 use skein_lib::List;
@@ -11,6 +11,27 @@ pub(crate) struct FamilyIx(pub(crate) u32);
 pub(crate) struct Room {
     pub bytes: u32,
     pub nodes: u32,
+}
+/// Each map's record room, from that map's own limits: a family's
+/// records are patched within the room of the map they live in (10.3).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Rooms {
+    pub store: Room,
+    pub secrets: Room,
+}
+impl Rooms {
+    pub(crate) fn of(limits: &crate::Limits) -> Self {
+        Self {
+            store: Room { bytes: limits.store.value, nodes: limits.store.value },
+            secrets: Room { bytes: limits.secrets.value, nodes: limits.secrets.value },
+        }
+    }
+    pub(crate) fn of_map(self, map: KeptMap) -> Room {
+        match map {
+            KeptMap::Store => self.store,
+            KeptMap::Secrets => self.secrets,
+        }
+    }
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Identity {
@@ -31,7 +52,7 @@ pub(crate) struct Machine {
 pub(crate) struct Machines {
     families: List<Machine>,
     sets: PatchSets,
-    room: Room,
+    rooms: Rooms,
 }
 impl Machines {
     pub(crate) fn keys(&self, family: FamilyIx) -> &'static [Keys] {
@@ -103,8 +124,19 @@ impl Machines {
         selected
     }
 
-    pub(crate) fn room(&self) -> Room {
-        self.room
+    pub(crate) fn map(&self, family: FamilyIx) -> KeptMap {
+        let machine = self.get(family);
+        self.sets
+            .sets
+            .get(machine.set)
+            .expect("machine's set")
+            .families
+            .get(machine.family)
+            .expect("machine's family")
+            .map
+    }
+    pub(crate) fn room(&self, family: FamilyIx) -> Room {
+        self.rooms.of_map(self.map(family))
     }
     pub(crate) fn len(&self) -> u32 {
         self.families.len()
@@ -200,9 +232,9 @@ fn capacity(set: &PatchSet, family: usize, room: Room) -> Option<Capacity> {
     Some(Capacity { versions, patches, text, bytes: room.bytes, nodes: room.nodes })
 }
 
-pub(crate) fn make(sets: &PatchSets, plan: &Plan, found: &Levels, room: Room) -> Result<Machines, Unplanned> {
+pub(crate) fn make(sets: &PatchSets, plan: &Plan, found: &Levels, rooms: Rooms) -> Result<Machines, Unplanned> {
     if plan.steps().is_empty() {
-        return Ok(Machines { families: List::with_capacity(0), sets: *sets, room });
+        return Ok(Machines { families: List::with_capacity(0), sets: *sets, rooms });
     }
     let count = count(sets).expect("static family count fits u32");
     let mut families = List::with_capacity(count);
@@ -214,7 +246,7 @@ pub(crate) fn make(sets: &PatchSets, plan: &Plan, found: &Levels, room: Room) ->
                 continue;
             }
             let refusal = Unplanned { owner: set.owner, patch: 0 };
-            let capacity = capacity(set, family_ix, room).ok_or(refusal)?;
+            let capacity = capacity(set, family_ix, rooms.of_map(family.map)).ok_or(refusal)?;
             let mut patcher = Box::new(Patcher::new(capacity));
             let mut identities = List::with_capacity(capacity.versions);
             let mut reached = None;
@@ -277,7 +309,7 @@ pub(crate) fn make(sets: &PatchSets, plan: &Plan, found: &Levels, room: Room) ->
                 .expect("one machine per nonempty kept family");
         }
     }
-    Ok(Machines { families, sets: *sets, room })
+    Ok(Machines { families, sets: *sets, rooms })
 }
 fn last_plan(plans: &List<Option<PlanIx>>) -> Option<PlanIx> {
     let mut last = None;
@@ -289,14 +321,14 @@ fn last_plan(plans: &List<Option<PlanIx>>) -> Option<PlanIx> {
     last
 }
 
-pub(crate) fn worst_case_heap(sets: &PatchSets, room: Room) -> Option<u64> {
+pub(crate) fn worst_case_heap(sets: &PatchSets, rooms: Rooms) -> Option<u64> {
     let mut heap = List::<Machine>::worst_case(count(sets)?)?;
     for set in sets.sets {
         for (family_ix, family) in set.families.iter().enumerate() {
             if family.texts.is_empty() {
                 continue;
             }
-            let capacity = capacity(set, family_ix, room)?;
+            let capacity = capacity(set, family_ix, rooms.of_map(family.map))?;
             heap = heap
                 .checked_add(Patcher::worst_case_heap(capacity)?)?
                 .checked_add(u64::try_from(size_of::<Patcher>()).ok()?)?
@@ -308,13 +340,13 @@ pub(crate) fn worst_case_heap(sets: &PatchSets, room: Room) -> Option<u64> {
 }
 
 /// The schemas and plans are static input; room bounds every record machine.
-pub(crate) fn worst_case(sets: &PatchSets, room: Room) -> Option<u64> {
+pub(crate) fn worst_case(sets: &PatchSets, rooms: Rooms) -> Option<u64> {
     let families = count(sets)?;
     let mut patches = 0_u32;
     for set in sets.sets {
         patches = patches.checked_add(u32::try_from(set.patches.len()).ok()?)?;
     }
-    worst_case_heap(sets, room)?
+    worst_case_heap(sets, rooms)?
         .checked_add(List::<Planned>::worst_case(patches)?)?
         .checked_add(List::<bool>::worst_case(families)?.checked_mul(2)?)?
         .checked_add(super::walk::worst_case(families)?)

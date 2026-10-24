@@ -17,11 +17,19 @@ pub struct PatchSet {
     /// Patch texts in number order.
     pub patches: &'static [&'static str],
 }
+/// Which of the deployment's two maps a kept family's records live in (store.md 9, 10.3).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum KeptMap {
+    Store,
+    Secrets,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct KeptFamily {
     pub name: &'static str,
     /// Kept texts in version order.
     pub texts: &'static [&'static str],
+    pub map: KeptMap,
     pub keys: &'static [Keys],
 }
 #[derive(Clone, Copy, Debug)]

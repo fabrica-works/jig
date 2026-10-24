@@ -16,7 +16,7 @@ mod open;
 mod pages;
 mod patching;
 pub use patching::Counts;
-pub use patching::sets::{KeptFamily, Keys, Owner, PatchSet, PatchSets};
+pub use patching::sets::{KeptFamily, KeptMap, Keys, Owner, PatchSet, PatchSets};
 mod reads;
 mod restore;
 mod secrets;
@@ -178,16 +178,7 @@ pub fn worst_case_with_patches(limits: &Limits, sets: &PatchSets) -> Option<u64>
 fn serving_peak(limits: &Limits) -> Option<(u64, u64)> {
     let state = u64::try_from(size_of::<Store>()).ok()?;
     let rows = u64::from(limits.store.value).checked_add(u64::from(limits.store.key))?.checked_mul(2)?;
-    let codec = codec::limits(&limits.core)?;
-    let decoded = core_v6::Row::worst_case_heap(&codec.core)?
-        .checked_add(tasks_v9::Row::worst_case_heap(&codec.tasks)?)?
-        .checked_add(people_v13::Row::worst_case_heap(&codec.people)?)?
-        .checked_add(notes_v1::Row::worst_case_heap(&codec.notes)?)?
-        .checked_add(accounts_v2::Row::worst_case_heap(&accounts_v2::CEILINGS)?)?
-        .checked_add(settings_v1::Revision::worst_case_heap(&codec.settings)?)?
-        .checked_add(jig_domain_core::settings::revision_worst_case(&limits.core)?)?
-        .checked_add(u64::try_from(size_of::<jig_domain_tasks::TaskRecord>()).ok()?)?
-        .checked_mul(2)?;
+    let decoded = decoded_worst_case(limits)?;
     // One byte per encoded row bounds carrier counts. Count wire values and
     // their translated records together, including the census's fetched task.
     let page = u64::from(limits.store.page.bytes)
@@ -217,6 +208,20 @@ fn serving_peak(limits: &Limits) -> Option<(u64, u64)> {
         .checked_add(question_restore_worst_case(limits)?)?
         .checked_add(commits::worst_case(limits)?)?;
     Some((common, serving))
+}
+
+// Two decoded records, including their wire values and the census's joined task.
+pub(crate) fn decoded_worst_case(limits: &Limits) -> Option<u64> {
+    let codec = codec::limits(&limits.core)?;
+    core_v6::Row::worst_case_heap(&codec.core)?
+        .checked_add(tasks_v9::Row::worst_case_heap(&codec.tasks)?)?
+        .checked_add(people_v13::Row::worst_case_heap(&codec.people)?)?
+        .checked_add(notes_v1::Row::worst_case_heap(&codec.notes)?)?
+        .checked_add(accounts_v2::Row::worst_case_heap(&accounts_v2::CEILINGS)?)?
+        .checked_add(settings_v1::Revision::worst_case_heap(&codec.settings)?)?
+        .checked_add(jig_domain_core::settings::revision_worst_case(&limits.core)?)?
+        .checked_add(u64::try_from(size_of::<jig_domain_tasks::TaskRecord>()).ok()?)?
+        .checked_mul(2)
 }
 
 // The census's exact question keys become point ranges beside the combined
@@ -308,8 +313,8 @@ pub mod tasks_v9;
 pub mod core_v6;
 pub mod keys;
 pub use boundary::{
-    Arrived, Below, CARRIED, Cursor, Event, Family, Generations, Get, Io, Load, Older, OpenRefusal, Request, Restore,
-    Root, Row, SecretOwner, SecretRow, Secrets, TranscriptRead, Write,
+    Arrived, Below, CARRIED, Check, Cursor, Event, Family, Generations, Get, Io, Load, Older, OpenRefusal, Request,
+    Restore, Root, Row, SecretOwner, SecretRow, Secrets, TranscriptRead, Write,
 };
 
 #[cfg(test)]

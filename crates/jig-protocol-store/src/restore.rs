@@ -92,6 +92,16 @@ fn decode(store: &mut Store, row: skein_kv::Row) -> Option<(Row, Option<Row>, u6
         Row::Jig(Record::People(jig_domain_people::Stored::EndedRead { task, .. })) => *task,
         Row::Jig(_) | Row::Application { .. } => return Some((row, None, size)),
     };
+    let (record, owner_size) = ended(store, task)?;
+    if let Row::Jig(Record::People(jig_domain_people::Stored::EndedRead { .. })) = row {
+        Some((row, Some(Row::Jig(record)), size.checked_add(owner_size)?))
+    } else {
+        Some((Row::Jig(record), None, owner_size))
+    }
+}
+
+/// The restart's census join, shared with the check before the switch.
+pub(crate) fn ended(store: &mut Store, task: u64) -> Option<(Record, u64)> {
     let key = Key::Tasks(tasks::Key::Ended(task));
     let mut above = Queue::with_capacity(skein_kv::MAX_OUT.above);
     let mut below = Queue::with_capacity(skein_kv::MAX_OUT.below);
@@ -108,12 +118,7 @@ fn decode(store: &mut Store, row: skein_kv::Row) -> Option<(Row, Option<Row>, u6
     if record.key() != key {
         return None;
     }
-    let owner_size = u64::try_from(value.len()).ok()?;
-    if let Row::Jig(Record::People(jig_domain_people::Stored::EndedRead { .. })) = row {
-        Some((row, Some(Row::Jig(record)), size.checked_add(owner_size)?))
-    } else {
-        Some((Row::Jig(record), None, owner_size))
-    }
+    Some((record, u64::try_from(value.len()).ok()?))
 }
 
 fn people_interval(range: &Restore) -> Option<u32> {

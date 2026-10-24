@@ -77,6 +77,20 @@ fn key(owner: SecretOwner, number: u64, limit: u32) -> Option<Box<[u8]>> {
     key.tag(tag).tag(owner).u64(number);
     key.finish()
 }
+/// Application ranges are relative to their secrets prefix (store.md 9, 10.3).
+pub(crate) fn application(relative: &[u8], limit: u32) -> Option<Box<[u8]>> {
+    let mut key = skein_kv::KeyWriter::new(limit);
+    for byte in prefix(SecretOwner::Application) {
+        key.tag(byte);
+    }
+    for &byte in relative {
+        key.tag(byte);
+    }
+    key.finish()
+}
+pub(crate) fn of_application(key: &[u8]) -> Option<&[u8]> {
+    key.strip_prefix(&prefix(SecretOwner::Application))
+}
 fn read_key(key: &[u8]) -> Option<(SecretOwner, u64)> {
     let mut reader = skein_kv::KeyReader::new(key);
     let tag = reader.tag()?;

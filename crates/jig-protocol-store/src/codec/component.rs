@@ -1,7 +1,8 @@
 //! The component's own durable rows (protocol/store.md, sections 5.3 and 8.1).
 use crate::component_v3 as wire;
 use alloc::boxed::Box;
-use skein_lib::{Reader, Writer};
+use skein_lib::{List, Reader, Writer};
+pub use wire::{Count, CountParts};
 
 /// Each owner's applied patch level (store.md 5.3).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -17,6 +18,7 @@ impl Levels {
             &wire::CEILINGS,
             wire::LevelsParts { skein: self.skein, smith: self.smith, jig: self.jig, application: self.application },
         )
+        .expect("levels have no bounded fields")
     }
     fn decoded(row: wire::Levels) -> Self {
         let wire::LevelsParts { skein, smith, jig, application } = row.into_parts();
@@ -56,7 +58,7 @@ impl Format {
                 deployment: self.deployment,
                 levels: self.levels.encoded(),
             },
-        );
+        )?;
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded row fits usize"));
         row.encode(&mut writer).expect("measured room");
         Ok(writer.finish())
@@ -99,19 +101,20 @@ impl Format {
 }
 
 /// A generation's immutable manifest (store.md 2).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Manifest {
     pub generation: u64,
     pub from: Option<u64>,
     pub before: Levels,
     pub after: Levels,
+    pub counts: List<Count>,
     pub store: u64,
     pub secrets: Option<u64>,
     pub written: u64,
 }
 impl Manifest {
     #[must_use]
-    pub fn encode(&self) -> Box<[u8]> {
+    pub fn encode(self) -> Box<[u8]> {
         let row = wire::Manifest::new(
             &wire::CEILINGS,
             wire::ManifestParts {
@@ -119,23 +122,26 @@ impl Manifest {
                 from: self.from,
                 before: self.before.encoded(),
                 after: self.after.encoded(),
+                counts: self.counts,
                 store: self.store,
                 secrets: self.secrets,
                 written: self.written,
             },
-        );
+        )
+        .expect("manifest counts fit the checked sets");
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded manifest fits usize"));
         row.encode(&mut writer).expect("measured manifest room");
         writer.finish()
     }
     pub fn decode(bytes: &[u8]) -> Result<Self, wire::Problem> {
-        let wire::ManifestParts { generation, from, before, after, store, secrets, written } =
+        let wire::ManifestParts { generation, from, before, after, counts, store, secrets, written } =
             wire::Manifest::decode(&wire::CEILINGS, &mut Reader::new(bytes))?.into_parts();
         Ok(Self {
             generation,
             from,
             before: Levels::decoded(before),
             after: Levels::decoded(after),
+            counts,
             store,
             secrets,
             written,
@@ -154,7 +160,7 @@ impl Transcript {
     /// Encode this row with the component family's version.
     pub fn encode(&self) -> Result<Box<[u8]>, wire::Problem> {
         let row =
-            wire::Transcript::new(&wire::CEILINGS, wire::TranscriptParts { length: self.length, window: self.window });
+            wire::Transcript::new(&wire::CEILINGS, wire::TranscriptParts { length: self.length, window: self.window })?;
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded row fits usize"));
         row.encode(&mut writer).expect("measured room");
         Ok(writer.finish())
@@ -177,7 +183,7 @@ pub struct Attempt {
 impl Attempt {
     /// Encode this row with the component family's version.
     pub fn encode(&self) -> Result<Box<[u8]>, wire::Problem> {
-        let row = wire::Attempt::new(&wire::CEILINGS, wire::AttemptParts { first: self.first });
+        let row = wire::Attempt::new(&wire::CEILINGS, wire::AttemptParts { first: self.first })?;
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded row fits usize"));
         row.encode(&mut writer).expect("measured room");
         Ok(writer.finish())
@@ -218,7 +224,8 @@ impl Layouts {
                 accounts: self.accounts,
                 settings: self.settings,
             },
-        );
+        )
+        .expect("layouts have no bounded fields");
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded row fits usize"));
         row.encode(&mut writer).expect("measured room");
         writer.finish()

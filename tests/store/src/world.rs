@@ -290,6 +290,12 @@ impl World {
         acknowledged
     }
 
+    /// A deployment's changed limits take effect when its next process starts.
+    pub fn restart_with_limits(&mut self, seed: u64, limits: jig_protocol_store::Limits) {
+        self.env.limits = limits;
+        self.crash(seed);
+    }
+
     pub fn crash(&mut self, seed: u64) {
         self.machine.crash(seed);
         let handle = self.machine.reopen_root(0);
@@ -501,6 +507,16 @@ impl World {
             self.machine.close(parent);
         }
         self.machine.close(root);
+    }
+
+    /// An operator's rewrite of a file at the deployment's top, such as
+    /// `active` named back to the generation before (store.md 2, "Strays").
+    pub fn rewrite(&mut self, name: &[u8], bytes: &[u8]) {
+        let root = self.machine.reopen_root(0);
+        self.machine.remove(root, name, false).expect("rewritten file stands");
+        self.machine.sync(root);
+        self.machine.close(root);
+        self.lay(&[skein_fake_machine::Item::file(name, bytes)]);
     }
 
     #[must_use]

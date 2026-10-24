@@ -1,16 +1,19 @@
 //! The two fixture binaries and their independent record model (store.md 14).
 use crate::{World, root};
-use jig_protocol_store::{KeptFamily, Keys, Owner, PatchSet, PatchSets, Write};
+use jig_protocol_store::{Event, KeptFamily, KeptMap, Keys, Owner, PatchSet, PatchSets, SecretOwner, Secrets, Write};
 use jig_test_patches::{self as fixture, patches as app};
 use jig_test_patches_jig::{self as upstream, patches as jig};
+use skein_lib::Secret;
 use std::collections::BTreeMap;
 const LABEL: KeptFamily = KeptFamily {
     name: "fixture-label",
+    map: KeptMap::Store,
     texts: app::kept::fixture_label::TEXTS,
     keys: &[Keys { from: fixture::keys::LABELS_FROM, to: fixture::keys::LABELS_TO, root: fixture::keys::LABELS_ROOT }],
 };
 const SHELF: KeptFamily = KeptFamily {
     name: "fixture-shelf",
+    map: KeptMap::Store,
     texts: app::kept::fixture_shelf::TEXTS,
     keys: &[Keys {
         from: fixture::keys::SHELVES_FROM,
@@ -18,13 +21,24 @@ const SHELF: KeptFamily = KeptFamily {
         root: fixture::keys::SHELVES_ROOT,
     }],
 };
+const TOKEN: KeptFamily = KeptFamily {
+    name: "fixture-token",
+    texts: app::kept::fixture_token::TEXTS,
+    map: KeptMap::Secrets,
+    keys: &[Keys { from: fixture::keys::TOKENS_FROM, to: fixture::keys::TOKENS_TO, root: fixture::keys::TOKENS_ROOT }],
+};
 const NOTE: KeptFamily = KeptFamily {
     name: "fixture-note",
+    map: KeptMap::Store,
     texts: jig::kept::fixture_note::TEXTS,
     keys: &[Keys { from: upstream::keys::NOTES_FROM, to: upstream::keys::NOTES_TO, root: upstream::keys::NOTES_ROOT }],
 };
-const APPLICATION: PatchSet =
-    PatchSet { owner: Owner::Application, name: fixture::NAME, families: &[LABEL, SHELF], patches: app::PATCHES };
+const APPLICATION: PatchSet = PatchSet {
+    owner: Owner::Application,
+    name: fixture::NAME,
+    families: &[LABEL, SHELF, TOKEN],
+    patches: app::PATCHES,
+};
 const JIG: PatchSet = PatchSet { owner: Owner::Jig, name: upstream::NAME, families: &[NOTE], patches: jig::PATCHES };
 pub const SETS: PatchSets = PatchSets { sets: &[APPLICATION, JIG] };
 pub const BASE: PatchSets = PatchSets {
@@ -33,6 +47,7 @@ pub const BASE: PatchSets = PatchSets {
             families: &[
                 KeptFamily { texts: &[app::kept::fixture_label::TEXTS[0]], ..LABEL },
                 KeptFamily { texts: &[app::kept::fixture_shelf::TEXTS[0]], ..SHELF },
+                KeptFamily { texts: &[app::kept::fixture_token::TEXTS[0]], ..TOKEN },
             ],
             patches: &[],
             ..APPLICATION
@@ -61,13 +76,16 @@ pub fn limits() -> jig_protocol_store::Limits {
         map.chunk = 4096;
         map.page.bytes = 2048;
     }
+    limits.secrets.ops = 2;
     limits
 }
 
-/// Two labels, three shelves and two notes: two-put pages split the shelves.
+/// Two labels, three shelves, two notes and three tokens: two-put pages
+/// split the shelves and the tokens.
 pub const STORY_LABELS: u32 = 2;
 pub const STORY_SHELVES: u32 = 3;
 pub const STORY_NOTES: u32 = 2;
+pub const STORY_TOKENS: u64 = 3;
 
 #[derive(Clone, Debug)]
 pub struct Shelf {
@@ -82,6 +100,7 @@ pub struct Records {
     pub labels: Vec<(Vec<u8>, Vec<u8>)>,
     pub shelves: Vec<Shelf>,
     pub notes: Vec<(Vec<u8>, Vec<u8>)>,
+    pub tokens: Vec<(u64, Vec<u8>)>,
 }
 
 fn text(out: &mut Vec<u8>, bytes: &[u8]) {
@@ -91,6 +110,16 @@ fn text(out: &mut Vec<u8>, bytes: &[u8]) {
 fn label(caption: &[u8], version: u16) -> Vec<u8> {
     let mut out = version.to_be_bytes().to_vec();
     text(&mut out, caption);
+    if version == 2 {
+        out.push(0);
+    }
+    out
+}
+
+fn token(bytes: &[u8], issued: u64, version: u16) -> Vec<u8> {
+    let mut out = version.to_be_bytes().to_vec();
+    text(&mut out, bytes);
+    out.extend(issued.to_be_bytes());
     if version == 2 {
         out.push(0);
     }
@@ -110,6 +139,7 @@ impl Records {
                     caption: b"held".to_vec(),
                 })
                 .collect(),
+            tokens: (0..STORY_TOKENS).map(|n| (n, b"fixture credential".to_vec())).collect(),
             notes: (0..STORY_NOTES).map(|n| (format!("n/{n}").into_bytes(), b"note".to_vec())).collect(),
         }
     }
@@ -156,16 +186,53 @@ impl Records {
 
     #[must_use]
     pub fn committed_at(&self, seed: u64, sets: PatchSets, version: u16) -> World {
-        let mut world = World::unopened_observed(seed, limits(), None);
+        self.committed_with(seed, sets, version, limits(), &[])
+    }
+
+    /// Base rows and limits for the check's honest refusal scenarios.
+    #[must_use]
+    pub fn committed_with(
+        &self,
+        seed: u64,
+        sets: PatchSets,
+        version: u16,
+        limits: jig_protocol_store::Limits,
+        rows: &[jig_domain_core::Record],
+    ) -> World {
+        let mut world = World::unopened_observed(seed, limits, None);
         world.patch_sets(sets);
         assert_eq!(world.open(), Some(0));
-        assert_eq!(world.commit(self.writes(version)), Some(1));
+        let mut writes = self.writes(version).into_vec();
+        writes.extend(rows.iter().cloned().map(Write::Save));
+        assert_eq!(world.commit(writes.into_boxed_slice()), Some(1));
+        for (number, bytes) in &self.tokens {
+            assert!(*number < (1_u64 << 63));
+            let events = world.secret(Secrets::Keep {
+                owner: SecretOwner::Application,
+                number: *number,
+                value: Secret::new(token(bytes, *number, version).into_boxed_slice()),
+            });
+            assert!(matches!(events.as_slice(), [Event::Kept { .. }]), "token kept: {events:?}");
+        }
         world.crash(seed);
         world
     }
 
     /// Decode by each family's kept text as well as compare every modeled byte.
     pub fn check(&self, world: &mut World, version: u16, context: &dyn std::fmt::Debug) {
+        for (number, bytes) in &self.tokens {
+            let events = world.secret(Secrets::Get { owner: SecretOwner::Application, number: *number });
+            let [Event::Secret { value: Some(value), .. }] = events.as_slice() else {
+                panic!("token {number}: {events:?}, {context:?}");
+            };
+            assert_eq!(value.expose(), token(bytes, *number, version), "token {number}, {context:?}");
+            let schema =
+                skein_codec::schema::parse(app::kept::fixture_token::TEXTS[usize::from(version - 1)].as_bytes())
+                    .expect("token schema");
+            let root = schema.find(b"Token").expect("token root");
+            let mut decoded = skein_codec::value::Value::with_room(16);
+            decoded.decode(&schema, root, Box::from(value.expose())).expect("token decodes at its level");
+        }
         let rows = world.application(false);
         assert_eq!(rows, self.rows(version), "all records belong to one whole level: {context:?}");
         for (key, bytes) in rows {
@@ -218,7 +285,7 @@ pub fn source(world: &mut World) -> BTreeMap<Vec<u8>, Option<Vec<u8>>> {
 
 /// A start leaves every file it found as it was; the one write before its
 /// checks is skein-kv's recovery, which may open an empty log segment in
-/// the store it reads (store.md 10.1, step 4).
+/// each map it reads (store.md 10.1, step 4).
 pub fn kept(
     before: &BTreeMap<Vec<u8>, Option<Vec<u8>>>,
     after: &BTreeMap<Vec<u8>, Option<Vec<u8>>>,
@@ -229,11 +296,28 @@ pub fn kept(
     }
     for (path, bytes) in after {
         if !before.contains_key(path) {
+            let segment = path
+                .strip_prefix(b"generations/1/".as_slice())
+                .and_then(|map| map.strip_prefix(b"store/log-").or_else(|| map.strip_prefix(b"secrets/log-")));
             assert!(
-                path.starts_with(b"generations/1/store/") && bytes.as_deref() == Some(&[][..]),
+                segment.is_some_and(|digits| digits.len() == 20 && digits.iter().all(u8::is_ascii_digit))
+                    && bytes.as_deref() == Some(&[][..]),
                 "{} is new and not an empty recovery segment, {what:?}",
                 String::from_utf8_lossy(path)
             );
         }
     }
+}
+
+/// The story reads the component's manifest through its public codec.
+#[must_use]
+pub fn counts(world: &mut World) -> Vec<(Vec<u8>, u64, u64)> {
+    let contents = world.contents();
+    let bytes = contents
+        .get(b"generations/2/manifest".as_slice())
+        .expect("patched manifest")
+        .as_ref()
+        .expect("manifest is a file");
+    let manifest = jig_protocol_store::codec::component::Manifest::decode(bytes).expect("manifest codec");
+    manifest.counts.iter().map(|count| (count.family().to_vec(), count.before(), count.after())).collect()
 }

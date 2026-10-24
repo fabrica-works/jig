@@ -87,21 +87,26 @@ fn settle(machines: &mut Machines, walk: &mut Walk) -> Result<Stop, Halt> {
     result
 }
 fn drive(machines: &mut Machines, walk: &mut Walk) -> Result<Stop, Halt> {
-    // Each pass makes at most nodes stops plus Done, across all resumes.
-    // A stop can start a held record, each through at most its kept versions.
-    // No active family repeats, so the call tree's depth is the family count.
-    // The product bounds that tree's next() calls without recursion. Saturation
-    // still gives a finite turn bound: a larger walk halts Room.
-    let nodes = u64::from(machines.room().nodes).checked_add(1).expect("u32 plus one fits u64");
-    let mut turns = nodes;
+    // No active family repeats. Each family's nodes bound its calls in a
+    // pass, and each held record runs at most its family's kept versions.
+    // Sum the families' own bounds before taking the bounded call tree's
+    // product. Saturation still leaves a finite bound, as before; the sum
+    // is checked and an unrepresentable family bound halts Room.
+    let mut calls = 0_u64;
     for ix in 0..machines.len() {
-        let passes = u64::from(machines.get(FamilyIx(ix)).identities.len());
-        turns = turns.saturating_mul(nodes.saturating_mul(passes).saturating_add(1));
+        let family = FamilyIx(ix);
+        let nodes = u64::from(machines.room(family).nodes).checked_add(1).ok_or(Halt::Room)?;
+        let passes = u64::from(machines.get(family).identities.len());
+        calls = calls.checked_add(nodes.checked_mul(passes).ok_or(Halt::Room)?).ok_or(Halt::Room)?;
+    }
+    let mut turns = calls;
+    for _ in 0..machines.len() {
+        turns = turns.saturating_mul(calls.saturating_add(1));
     }
     for _ in 0..turns {
         let top = walk.frames.len().checked_sub(1).ok_or(Halt::Order)?;
         let frame = walk.frames.get_mut(top).expect("top frame exists");
-        if frame.calls > u64::from(machines.room().nodes) {
+        if frame.calls > u64::from(machines.room(frame.family).nodes) {
             return Err(Halt::Room);
         }
         frame.calls = frame.calls.checked_add(1).expect("u32 node bound plus Done fits u64");

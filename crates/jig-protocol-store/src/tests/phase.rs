@@ -11,7 +11,7 @@ use super::fixtures::{
     self,
     disk::{Disk, Seen},
 };
-use super::patching::{BASE, SETS, decoded, label, levels, shelf};
+use super::patching::{BASE, SETS, decoded, label, levels, shelf, token};
 use crate::directory::{OWNER, Opening};
 use crate::patching::phase::{Patching, Pending};
 use crate::{Arrived, Event, Get, Io, OpenRefusal, Phase, Request, Root, Row, Store, Write};
@@ -33,13 +33,8 @@ fn empty_pending() -> Pending {
     let sets = crate::PatchSets::NONE;
     let found = crate::patching::plan::binary(&sets);
     let plan = crate::patching::plan::plan(&sets, &found, &found).expect("empty plan");
-    let machines = crate::patching::machines::make(
-        &sets,
-        &plan,
-        &found,
-        crate::patching::machines::Room { bytes: 128, nodes: 16 },
-    )
-    .expect("empty machines");
+    let machines =
+        crate::patching::machines::make(&sets, &plan, &found, super::patching::ROOMS).expect("empty machines");
     Pending { plan, machines, found }
 }
 fn assert_opened(events: &[Event], expected: u64) {
@@ -147,6 +142,7 @@ enum Stage {
     Opening,
     Walking,
     Sealing,
+    Checking,
     Manifest,
     Leaving,
     Switching,
@@ -160,6 +156,7 @@ fn stage(store: &Store) -> Stage {
             Patching::Mapping { .. } | Patching::Recovering { .. } => Stage::Opening,
             Patching::Walking(_) => Stage::Walking,
             Patching::Sealing { .. } => Stage::Sealing,
+            Patching::Checking(_) => Stage::Checking,
             Patching::Manifest(_) => Stage::Manifest,
             Patching::Leaving { .. } => Stage::Leaving,
             Patching::Switching(_) => Stage::Switching,
@@ -245,7 +242,9 @@ struct Harness {
     sites: Vec<(crate::Owner, Box<[u8]>)>,
     site_answer: SiteAnswer,
     site_commit_limit: Option<u32>,
+    site_secret_commit_limit: Option<u32>,
     page_header: Option<u64>,
+    check_entries: Vec<Item>,
     wall: skein_lib::Wall,
 }
 impl Harness {
@@ -284,7 +283,9 @@ impl Harness {
             sites: Vec::new(),
             site_answer: SiteAnswer::Written,
             site_commit_limit: None,
+            site_secret_commit_limit: None,
             page_header: None,
+            check_entries: Vec::new(),
             wall: skein_lib::Wall::EPOCH,
         }
     }
@@ -329,6 +330,9 @@ impl Harness {
                     if let Some(limit) = self.site_commit_limit {
                         store.limits.store.commit = limit;
                     }
+                    if let Some(limit) = self.site_secret_commit_limit {
+                        store.limits.secrets.commit = limit;
+                    }
                     let result = if self.site_answer == SiteAnswer::NoSite {
                         Err(skein_codec::patch::Halt::NoSite(site))
                     } else {
@@ -369,6 +373,10 @@ impl Harness {
                 return fixtures::events(&mut above);
             };
             let stage = stage(store);
+            if stage == Stage::Checking && !self.check_entries.is_empty() {
+                let items = core::mem::take(&mut self.check_entries);
+                self.lay_private(&items);
+            }
             if stage == Stage::Walking
                 && let Some(last) = self.page_header
             {
@@ -406,7 +414,8 @@ impl Harness {
                 let targeted = (stage == Stage::Manifest
                     || stage == Stage::Opening
                     || stage == Stage::Walking
-                    || stage == Stage::Sealing)
+                    || stage == Stage::Sealing
+                    || stage == Stage::Checking)
                     && changing != Change::Other;
                 let ordinal = self.changes.len();
                 if targeted {
@@ -416,7 +425,7 @@ impl Harness {
                         return None;
                     }
                 }
-                if changing == Change::Write
+                if (changing == Change::Write || stage == Stage::Checking)
                     && ((self.fault_write && stage == Stage::Manifest) || self.fault_at == Some(stage))
                 {
                     self.fault_write = false;
@@ -480,6 +489,30 @@ impl Harness {
         }
         self.machine.close(directory);
     }
+    // Lay a file, or a segment and its second link, through the fake's Item
+    // vocabulary. Move them beneath the live copy without changing its handles.
+    fn lay_private(&mut self, laid: &[Item]) {
+        use skein_fake_machine::Made;
+        let mut items = Vec::new();
+        for item in laid {
+            if let Made::HardLink(target) = &item.made {
+                let path = [b"generations/2/secrets/", target.as_slice()].concat();
+                items.push(Item::file(target, &self.bytes(&path)).mode(0o600));
+            }
+        }
+        items.extend_from_slice(laid);
+        let staged = self.machine.lay(&items);
+        let private = self
+            .machine
+            .open(self.handle, b"generations/2/secrets", How::DirectoryNoFollow)
+            .expect("sealed copy's private directory");
+        for item in &items {
+            self.machine.rename(staged, &item.path, private, &item.path, false).expect("lay check entry");
+        }
+        self.machine.sync(private);
+        self.machine.close(private);
+        self.machine.close(staged);
+    }
     fn source_items(&mut self, number: u64) -> Vec<Item> {
         let prefix = format!("generations/{number}/");
         self.items().into_iter().filter(|item| item.path.starts_with(prefix.as_bytes())).collect()
@@ -518,6 +551,7 @@ fn the_phase_closes_drops_copies_opens_manifests_closes_switches_then_reopens() 
             Stage::Copying,
             Stage::Opening,
             Stage::Sealing,
+            Stage::Checking,
             Stage::Manifest,
             Stage::Leaving,
             Stage::Switching
@@ -699,6 +733,185 @@ fn fixture_baseline_with_secret(bad: Option<(u32, u16, u32)>, secret: bool) -> V
     assert_eq!(store.stores.store.last(), FIXTURE_LAST);
     disk.items()
 }
+
+struct SecretFixture {
+    items: Vec<Item>,
+    store_last: u64,
+    secrets_last: u64,
+    carried: Box<[u8]>,
+    counter: Box<[u8]>,
+    accounts: Box<[u8]>,
+}
+fn secret_row(store: &mut Store, key: &[u8]) -> Box<[u8]> {
+    let mut above = Queue::with_capacity(skein_kv::MAX_OUT.above);
+    let mut below = Queue::with_capacity(skein_kv::MAX_OUT.below);
+    skein_kv::down(
+        &mut store.stores.secrets,
+        &crate::memory_env(store.limits.secrets),
+        skein_kv::Request::Get { owner: Token::new(0), key: Box::from(key) },
+        &mut above,
+        &mut below,
+    );
+    assert!(below.is_empty());
+    let Some(skein_kv::Event::Got { value: Some(value), .. }) = above.pop() else {
+        panic!("secret row exists");
+    };
+    value
+}
+fn secret_key(store: &Store, number: u64) -> Box<[u8]> {
+    crate::secrets::application(&number.to_be_bytes(), store.limits.secrets.key).expect("application prefix")
+}
+fn accounts_key(store: &Store) -> Box<[u8]> {
+    let key =
+        crate::keys::encode(&jig_domain_core::Key::Accounts(jig_domain_accounts::Key::Next), store.limits.store.key)
+            .expect("accounts counter key");
+    assert_eq!(key.as_ref(), &[1, 4, 0]);
+    key
+}
+fn secret_fixture() -> SecretFixture {
+    let mut disk = Disk::new(&fixture_baseline(None));
+    let mut store = disk.store_with_chunk(CHUNK);
+    store.patch_sets(BASE);
+    store.application.version = 0;
+    assert_opened(&disk.open(&mut store), FIXTURE_LAST);
+    let number = FIXTURE_LAST.checked_add(1).expect("counter commit");
+    let events = disk.request(
+        &mut store,
+        fixtures::commit(
+            number,
+            Box::new([
+                fixtures::header(number),
+                Write::Save(jig_domain_core::Record::Accounts(jig_domain_accounts::Stored::Next { number: 97 })),
+            ]),
+        ),
+    );
+    let [Event::Committed { number, .. }] = events.as_ref() else { panic!("counter committed: {events:?}") };
+    assert_eq!(*number, FIXTURE_LAST.checked_add(1).expect("counter commit"));
+    for number in 0_u64..3 {
+        let events = disk.request(
+            &mut store,
+            Request::Secrets {
+                owner: Token::new(2),
+                request: crate::Secrets::Keep {
+                    owner: crate::SecretOwner::Application,
+                    number,
+                    value: skein_lib::Secret::new(token(b"token", number.checked_add(71).expect("issued"))),
+                },
+            },
+        );
+        let [Event::Kept { .. }] = events.as_ref() else { panic!("token kept: {events:?}") };
+    }
+    let events = disk.request(
+        &mut store,
+        Request::Secrets {
+            owner: Token::new(2),
+            request: crate::Secrets::Carry { value: skein_lib::Secret::new(Box::from(b"carried bytes".as_slice())) },
+        },
+    );
+    let [Event::Carried { number, .. }] = events.as_ref() else { panic!("value carried: {events:?}") };
+    assert_eq!(*number, crate::CARRIED);
+    let key = secret_key(&store, crate::CARRIED);
+    let carried = secret_row(&mut store, &key);
+    let counter = secret_row(&mut store, &[2, 1]);
+    assert_eq!(counter.as_ref(), &crate::CARRIED.checked_add(1).expect("next carried number").to_be_bytes());
+    let key = accounts_key(&store);
+    let accounts = fixtures::get_kv(&mut store, &key).expect("accounts counter");
+    SecretFixture {
+        items: disk.items(),
+        store_last: store.stores.store.last(),
+        secrets_last: store.stores.secrets.last(),
+        carried,
+        counter,
+        accounts,
+    }
+}
+fn assert_tokens(store: &mut Store) {
+    use app::kept::fixture_token::v2::token as fields;
+    for number in 0_u64..3 {
+        let key = secret_key(store, number);
+        let bytes = secret_row(store, &key);
+        let (_, value, root) = decoded(app::kept::fixture_token::TEXTS[1], "Token", &bytes);
+        assert_eq!(value.content(value.field(root, fields::VALUE).expect("value")).expect("bytes"), b"token");
+        assert_eq!(
+            value.uint(value.field(root, fields::ISSUED).expect("issued")).expect("u64"),
+            number.checked_add(71).expect("issued")
+        );
+        assert_eq!(value.some(value.field(root, fields::EXPIRES).expect("expires")).expect("option"), None);
+    }
+}
+
+#[test]
+fn secret_tokens_patch_in_their_own_commits() {
+    let before = secret_fixture();
+    let mut disk = Harness::new(&before.items);
+    let mut store = fixture_store(&disk, 2, fixtures::store_limits().store.commit, levels(2, 1));
+    store.limits.secrets.ops = 2;
+    let events = disk.open(&mut store);
+    assert_tokens(&mut store);
+    let key = secret_key(&store, crate::CARRIED);
+    assert_eq!(secret_row(&mut store, &key), before.carried);
+    assert_eq!(secret_row(&mut store, &[2, 1]), before.counter);
+    let key = accounts_key(&store);
+    assert_eq!(fixtures::get_kv(&mut store, &key).expect("accounts counter"), before.accounts);
+    assert_eq!(store.stores.secrets.last(), before.secrets_last.checked_add(2).expect("token pages"));
+    let last = before.store_last.checked_add(9).expect("eight store pages and seal");
+    assert_opened(events.get(events.len().checked_sub(1).expect("opened")..).expect("last event"), last);
+    assert_eq!(
+        crate::codec::component::Manifest::decode(&disk.bytes(b"generations/2/manifest")),
+        Ok(crate::codec::component::Manifest {
+            generation: 2,
+            from: Some(1),
+            before: crate::format::recorded(levels(0, 0)),
+            after: crate::format::recorded(levels(2, 1)),
+            counts: fixture_counts(3),
+            store: last,
+            secrets: Some(store.stores.secrets.last()),
+            written: 0,
+        })
+    );
+    disk.assert_source_unchanged(1);
+}
+
+#[test]
+fn a_secrets_page_commits_in_the_secrets_store_alone() {
+    let before = secret_fixture();
+    let mut disk = Harness::new(&before.items);
+    let mut store = fixture_store(&disk, 2, fixtures::store_limits().store.commit, levels(2, 1));
+    store.limits.secrets.ops = 2;
+    let events = disk.open(&mut store);
+    assert_eq!(
+        patched(&events),
+        [
+            (crate::Owner::Application, 1, crate::Counts { records: 7, commits: 4 }),
+            (crate::Owner::Jig, 1, crate::Counts { records: 1, commits: 1 }),
+            (crate::Owner::Application, 2, crate::Counts { records: 8, commits: 5 }),
+        ]
+    );
+    assert_eq!(store.stores.secrets.last().checked_sub(before.secrets_last), Some(2));
+    assert_eq!(store.stores.store.last().checked_sub(before.store_last), Some(9));
+    assert_sealed(&mut store, before.store_last.checked_add(9).expect("eight store pages and seal"));
+}
+
+#[test]
+fn secrets_pages_use_their_own_byte_and_operation_limits() {
+    let before = secret_fixture();
+    // Each v1 row is 29 bytes; each v2 put is 39 plus the commit's 26.
+    // The journal alone must not split a secrets page. The secrets page
+    // bytes and commit bytes must each split it independently.
+    for (writes, ops, page_bytes, commit_bytes, commits) in
+        [(1, 3, 4096, 4096, 1), (2, 16, 58, 4096, 2), (2, 16, 4096, 104, 2)]
+    {
+        let mut disk = Harness::new(&before.items);
+        let mut store = fixture_store(&disk, writes, fixtures::store_limits().store.commit, levels(2, 1));
+        store.limits.secrets.ops = ops;
+        store.limits.secrets.page.bytes = page_bytes;
+        store.limits.secrets.commit = commit_bytes;
+        let events = disk.open(&mut store);
+        let Some(Event::Opened { .. }) = events.last() else { panic!("patched open: {events:?}") };
+        assert_eq!(store.stores.secrets.last().checked_sub(before.secrets_last), Some(commits));
+        assert_tokens(&mut store);
+    }
+}
 // A binary with only the first application patch landed.
 const ONE: crate::PatchSets = crate::PatchSets {
     sets: &[
@@ -873,7 +1086,10 @@ fn assert_refused(events: &[Event], store: &Store) {
     );
     assert_eq!(store.phase, Phase::Stopped);
 }
-fn assert_abandoned(mut disk: Harness) {
+fn assert_abandoned(disk: Harness) {
+    assert_abandoned_at(disk, FIXTURE_LAST);
+}
+fn assert_abandoned_at(mut disk: Harness, last: u64) {
     disk.assert_source_unchanged(1);
     assert_eq!(disk.bytes(b"active").as_ref(), b"1\n");
     let source = disk.source_items(1);
@@ -881,7 +1097,7 @@ fn assert_abandoned(mut disk: Harness) {
     let mut store = disk.store(false);
     store.patch_sets(BASE);
     store.application.version = 0;
-    assert_opened(&disk.open(&mut store), FIXTURE_LAST);
+    assert_opened(&disk.open(&mut store), last);
     assert!(!disk.items().iter().any(|item| item.path.starts_with(b"generations/2")));
     assert_eq!(disk.source_items(1), source);
 }
@@ -1041,7 +1257,7 @@ fn one_put_past_the_commit_byte_bound_stops_before_submitting_its_page() {
     let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
     disk.site_commit_limit = Some(65); // 26 + (tagged key 4 + shelf 27 + put overhead 9) - 1.
     let events = disk.open(&mut store);
-    assert_refused(&events, &store);
+    assert_check(&events, &store, crate::Check::Large { key: fixture_key(b's', 0) });
     assert_eq!(patched(&events).len(), 2, "patch two never commits its first page");
     assert_eq!(store.stores.store.last(), FIXTURE_LAST.checked_add(3).expect("prior patches"));
     assert_abandoned(disk);
@@ -1095,6 +1311,7 @@ fn assert_manifest(
             from: generation.checked_sub(1),
             before: crate::format::recorded(before),
             after: crate::format::recorded(after),
+            counts: if after == levels(2, 1) { fixture_counts(0) } else { skein_lib::List::with_capacity(0) },
             store: last,
             secrets: Some(0),
             written: 0,
@@ -1128,6 +1345,7 @@ fn a_patch_manifest_records_the_copys_secret_commit_and_write_clock() {
             from: Some(1),
             before: crate::format::recorded(levels(0, 0)),
             after: crate::format::recorded(levels(2, 1)),
+            counts: fixture_counts(0),
             store: 8,
             secrets: Some(1),
             written: WRITTEN,
@@ -1162,4 +1380,201 @@ fn assert_page_rows(store: &mut Store, last: u64) {
         Some(crate::format::layouts().encode()),
         "page commits never write layouts"
     );
+}
+
+// component-v3.schema bounds: 64 counts, each family at most 64 bytes.
+const MANIFEST_FAMILIES: usize = 64;
+const MANIFEST_NAME: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab";
+const MANIFEST_FAMILY: crate::KeptFamily =
+    crate::KeptFamily { name: MANIFEST_NAME, map: crate::KeptMap::Store, texts: &[], keys: &[] };
+const MANIFEST_SET: crate::PatchSet =
+    crate::PatchSet { owner: crate::Owner::Application, name: "manifest-bounds", families: &[], patches: &[] };
+
+#[test]
+fn manifest_bounds_accept_the_count_and_name_ceilings() {
+    let sets = crate::PatchSets {
+        sets: &[crate::PatchSet { families: &[MANIFEST_FAMILY; MANIFEST_FAMILIES], ..MANIFEST_SET }],
+    };
+    assert!(crate::patching::phase::worst_case(&fixtures::store_limits(), &sets).is_some());
+}
+
+#[test]
+fn manifest_bounds_refuse_a_count_or_name_past_the_ceiling() {
+    const HALF: usize = MANIFEST_FAMILIES / 2;
+    const PAST_HALF: usize = HALF + 1;
+    for sets in [
+        crate::PatchSets {
+            sets: &[
+                crate::PatchSet { families: &[MANIFEST_FAMILY; HALF], ..MANIFEST_SET },
+                crate::PatchSet { owner: crate::Owner::Jig, families: &[MANIFEST_FAMILY; PAST_HALF], ..MANIFEST_SET },
+            ],
+        },
+        crate::PatchSets {
+            sets: &[crate::PatchSet {
+                families: &[crate::KeptFamily {
+                    name: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abc",
+                    ..MANIFEST_FAMILY
+                }],
+                ..MANIFEST_SET
+            }],
+        },
+    ] {
+        assert_eq!(crate::patching::phase::worst_case(&fixtures::store_limits(), &sets), None);
+    }
+}
+
+fn fixture_counts(tokens: u64) -> skein_lib::List<crate::codec::component::Count> {
+    fixtures::manifest_counts(&[
+        ("fixture-label", 2, 2),
+        ("fixture-shelf", 5, 5),
+        ("fixture-token", tokens, tokens),
+        ("fixture-note", 1, 1),
+    ])
+}
+
+#[test]
+fn the_manifest_counts_each_kept_family_before_and_after() {
+    let before = secret_fixture();
+    let mut disk = Harness::new(&before.items);
+    let mut store = fixture_store(&disk, 2, fixtures::store_limits().store.commit, levels(2, 1));
+    disk.open(&mut store);
+    let manifest =
+        crate::codec::component::Manifest::decode(&disk.bytes(b"generations/2/manifest")).expect("checked manifest");
+    assert_eq!(manifest.counts, fixture_counts(3));
+    let check_changes: Vec<_> = disk.changes.iter().filter(|(stage, _)| *stage == Stage::Checking).collect();
+    assert!(check_changes.is_empty(), "the check writes nothing");
+}
+
+fn assert_check(events: &[Event], store: &Store, why: crate::Check) {
+    let Some(Event::OpenRefused { owner, why: refusal }) = events.last() else { panic!("check refusal: {events:?}") };
+    assert_eq!(*owner, Token::new(1));
+    assert_eq!(*refusal, OpenRefusal::Check { why });
+    assert_eq!(store.phase, Phase::Stopped);
+}
+
+#[test]
+fn the_count_check_names_the_first_family_whose_rows_differ() {
+    let mut store = fixtures::opened();
+    store.patch_sets(SETS);
+    fixtures::committed(
+        &mut store,
+        Box::new([fixtures::header(1), Write::Put { key: fixture_key(b'l', 0), value: label(1) }]),
+    );
+    let mut before = crate::patching::check::before(&mut store).expect("count kept rows");
+    before.get_mut(0).expect("label count").before = 2;
+    assert_eq!(
+        crate::patching::check::counts(&mut store, before),
+        Err(OpenRefusal::Check { why: crate::Check::Count { family: "fixture-label", before: 2, after: 1 } })
+    );
+}
+
+fn fixture_with_record(record: jig_domain_core::Record) -> Vec<Item> {
+    let mut disk = Disk::new(&fixture_baseline(None));
+    let mut store = disk.store_with_chunk(CHUNK);
+    store.patch_sets(BASE);
+    store.application.version = 0;
+    disk.open(&mut store);
+    let last = FIXTURE_LAST + 1;
+    let events =
+        disk.request(&mut store, fixtures::commit(last, Box::new([fixtures::header(last), Write::Save(record)])));
+    let [Event::Committed { .. }] = events.as_ref() else { panic!("base record committed: {events:?}") };
+    disk.items()
+}
+
+fn ended_position() -> jig_domain_core::Record {
+    jig_domain_core::Record::People(jig_domain_people::Stored::EndedRead {
+        task: fixtures::ENDED,
+        party: fixtures::ALICE,
+        through: 1,
+    })
+}
+
+#[test]
+fn a_restart_row_past_the_deployments_lowered_limit_refuses_load() {
+    let record = fixtures::live_task(fixtures::LIVE);
+    let key = crate::keys::encode(&record.key(), fixtures::KEY_LIMIT).expect("live row key");
+    let mut disk = Harness::new(&fixture_with_record(record));
+    let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
+    // The fixture task has a dependency, valid under the base's two-entry limit.
+    store.limits.core.tasks.dependencies = 0;
+    store.codec = crate::codec::limits(&store.limits.core).expect("lower deployment limits");
+    let events = disk.open(&mut store);
+    assert_check(&events, &store, crate::Check::Load { key });
+    assert_abandoned_at(disk, FIXTURE_LAST + 1);
+}
+
+#[test]
+fn an_ended_read_without_its_task_refuses_the_join() {
+    let record = ended_position();
+    let key = crate::keys::encode(&record.key(), fixtures::KEY_LIMIT).expect("ended position key");
+    let mut disk = Harness::new(&fixture_with_record(record));
+    let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
+    let events = disk.open(&mut store);
+    assert_check(&events, &store, crate::Check::Join { key });
+    assert_abandoned_at(disk, FIXTURE_LAST + 1);
+}
+
+#[test]
+fn a_secret_file_with_group_bits_or_another_link_refuses_private() {
+    let before = secret_fixture();
+    let prefix = b"generations/1/secrets/";
+    let segment = before
+        .items
+        .iter()
+        .find_map(|item| item.path.strip_prefix(prefix.as_slice()))
+        .expect("source's secrets segment");
+    // A refusal beyond a full listing page proves the scan does not stop at PAGE.
+    let mut paged: Vec<_> = (0..crate::generations::PAGE)
+        .map(|n| Item::file(format!("private-{n:02}").as_bytes(), b"page entry").mode(0o600))
+        .collect();
+    paged.push(Item::file(b"z-group", b"private check").mode(0o640));
+    for (items, name) in [
+        (vec![Item::file(b"!group", b"private check").mode(0o640)], b"!group".as_slice()),
+        (vec![Item::hard_link(b"!linked", segment)], b"!linked".as_slice()),
+        (paged, b"z-group".as_slice()),
+    ] {
+        let name = Box::from(name);
+        let mut disk = Harness::new(&before.items);
+        disk.check_entries = items;
+        let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
+        let events = disk.open(&mut store);
+        assert_check(&events, &store, crate::Check::Private { name });
+        assert!(disk.check_entries.is_empty());
+        assert_abandoned_at(disk, before.store_last);
+    }
+}
+
+#[test]
+fn a_secret_record_too_large_for_its_own_commit_refuses_large() {
+    let before = secret_fixture();
+    let mut disk = Harness::new(&before.items);
+    let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
+    // The v1 token fits in 26 + 9 + 10 + 19 bytes; its v2 option adds one.
+    disk.site_secret_commit_limit = Some(64);
+    let events = disk.open(&mut store);
+    assert_check(&events, &store, crate::Check::Large { key: Box::new(0_u64.to_be_bytes()) });
+    assert_abandoned_at(disk, before.store_last);
+}
+
+#[test]
+fn a_file_fault_during_the_check_refuses_failed_before_the_switch() {
+    let mut disk = Harness::new(&fixture_baseline(None));
+    disk.fault_at = Some(Stage::Checking);
+    let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
+    let events = disk.open(&mut store);
+    assert_refused(&events, &store);
+    assert_eq!(disk.fault_at, None);
+    assert_abandoned(disk);
+}
+
+#[test]
+fn a_restart_row_at_the_deployments_lowered_limit_loads() {
+    let record = fixtures::live_task(fixtures::LIVE);
+    let mut disk = Harness::new(&fixture_with_record(record));
+    let mut store = fixture_store(&disk, 8, fixtures::store_limits().store.commit, levels(2, 1));
+    store.limits.core.tasks.dependencies = 1;
+    store.codec = crate::codec::limits(&store.limits.core).expect("lower deployment limits");
+    let events = disk.open(&mut store);
+    let Some(Event::Opened { .. }) = events.last() else { panic!("row within its bound loads: {events:?}") };
+    assert_eq!(disk.bytes(b"active").as_ref(), b"2\n");
 }

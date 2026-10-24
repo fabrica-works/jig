@@ -1,6 +1,7 @@
 //! Patching at open (protocol/store.md 10.2 and 10.3): the owners' patch
 //! sets, the plan across them, one machine per kept family, a record's
 //! walk, and the phase that runs them over a copy.
+pub(crate) mod check;
 pub(crate) mod machines;
 pub(crate) mod phase;
 pub(crate) mod plan;

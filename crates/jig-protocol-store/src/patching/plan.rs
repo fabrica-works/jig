@@ -99,7 +99,25 @@ fn read(set: &PatchSet, patch: u32) -> Result<Header, Unplanned> {
     }
     Ok(head)
 }
+/// The manifest counts each kept family by its name (store.md 2, 10.3): the
+/// set where the families pass its bounds, in number or a name's bytes, is
+/// refused as patch 0. Judged before the plan and before a first start writes.
+pub(crate) fn bounds(sets: &PatchSets) -> Result<(), Unplanned> {
+    let ceilings = &crate::component_v3::CEILINGS;
+    let name = usize::try_from(ceilings.count_family).expect("family name ceiling fits usize");
+    let mut families = 0_u32;
+    for set in sets.sets {
+        for family in set.families {
+            families = families.checked_add(1).expect("the ceiling stops the count first");
+            if families > ceilings.manifest_counts || family.name.len() > name {
+                return Err(Unplanned { owner: set.owner, patch: 0 });
+            }
+        }
+    }
+    Ok(())
+}
 fn validate(sets: &PatchSets, found: &Levels, wanted: &Levels) -> Result<u32, Unplanned> {
+    bounds(sets)?;
     let mut pending = 0_u32;
     for owner in DOWNSTREAM {
         let mut seen = false;

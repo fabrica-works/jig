@@ -657,6 +657,7 @@ fn first_manifest() -> crate::codec::component::Manifest {
         from: None,
         before: crate::format::recorded(crate::format::NONE),
         after: crate::format::recorded(crate::format::NONE),
+        counts: skein_lib::List::with_capacity(0),
         store: 0,
         secrets: None,
         written: 0,
@@ -688,8 +689,24 @@ fn the_first_manifest_records_the_binarys_levels_and_the_write_clock() {
         crate::codec::component::Manifest::decode(&bytes),
         Ok(crate::codec::component::Manifest {
             after: crate::codec::component::Levels { skein: None, smith: None, jig: Some(1), application: Some(2) },
+            counts: fixtures::manifest_counts(fixtures::FIRST_MANIFEST_COUNTS),
             written: WRITTEN,
             ..first_manifest()
         })
     );
+}
+
+#[test]
+fn a_first_start_counts_every_kept_family_zero() {
+    for (sets, expected) in [
+        (super::patching::SETS, fixtures::manifest_counts(fixtures::FIRST_MANIFEST_COUNTS)),
+        (crate::PatchSets::NONE, fixtures::manifest_counts(&[])),
+    ] {
+        let (mut store, mut below) = at_private();
+        store.patch_sets(sets);
+        scripted(&mut store, &mut below);
+        let Some(file::Request::Store { bytes, .. }) = below.transcripts.pop() else { panic!("first manifest") };
+        let manifest = crate::codec::component::Manifest::decode(&bytes).expect("first manifest decodes");
+        assert_eq!(manifest.counts, expected);
+    }
 }

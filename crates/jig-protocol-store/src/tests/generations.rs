@@ -125,13 +125,24 @@ fn a_removal_cut_at_each_operation_is_finished_by_the_next() {
 }
 
 #[test]
-fn a_manifest_encodes_both_levels_map_commits_and_write_time_without_growth() {
+fn a_manifest_encodes_levels_counts_map_commits_and_write_time_without_growth() {
     // Version 2 + generation 8 + from 9 + two full Levels (20 each) +
+    // counts 4 + two (name length 4 + 13 name bytes + two u64s 16),
     // store 8 + secrets 9 + written 8. Writer allocates exactly the measure.
-    const FULL: usize = 84;
+    const FULL: usize = 154;
     let before = crate::patching::plan::Levels { skein: Some(1), smith: Some(2), jig: Some(3), application: Some(4) };
     let after = crate::patching::plan::Levels { skein: Some(2), smith: Some(3), jig: Some(4), application: Some(5) };
-    let bytes = generations::manifest(8, Some(7), before, after, 17, Some(11), skein_lib::Wall::from_nanos(73));
+    let counts = fixtures::manifest_counts(&[("fixture-label", 3, 3), ("fixture-shelf", 7, 9)]);
+    let bytes = generations::manifest(
+        8,
+        Some(7),
+        before,
+        after,
+        counts.as_slice(),
+        17,
+        Some(11),
+        skein_lib::Wall::from_nanos(73),
+    );
     assert_eq!(bytes.len(), FULL);
     assert_eq!(
         crate::codec::component::Manifest::decode(&bytes),
@@ -140,6 +151,7 @@ fn a_manifest_encodes_both_levels_map_commits_and_write_time_without_growth() {
             from: Some(7),
             before: crate::format::recorded(before),
             after: crate::format::recorded(after),
+            counts,
             store: 17,
             secrets: Some(11),
             written: 73,

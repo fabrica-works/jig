@@ -1,5 +1,5 @@
 //! Ordered memory pages and exclusive cursors (protocol/store.md, 4.3 and 7.1).
-use crate::{Cursor, Row, Store, codec, keys};
+use crate::{Cursor, KeptMap, Row, Store, codec, keys};
 use alloc::boxed::Box;
 use skein_kv::{KeyWriter, Range};
 use skein_lib::{List, Queue, Token};
@@ -21,9 +21,20 @@ pub(crate) struct Decoded {
 }
 
 pub(crate) fn walk(store: &mut Store, intervals: &[Range], after: Option<&Cursor>, rows: u32) -> Option<Walked> {
+    walk_map(store, KeptMap::Store, intervals, after, rows)
+}
+
+pub(crate) fn walk_map(
+    store: &mut Store,
+    map: KeptMap,
+    intervals: &[Range],
+    after: Option<&Cursor>,
+    rows: u32,
+) -> Option<Walked> {
     // Every encoded row costs at least one byte. The encoded page therefore
     // bounds the carrier list even when the asker supplies a larger row count.
-    let capacity = rows.min(store.limits.store.page.bytes);
+    let limits = map_limits(store, map);
+    let capacity = rows.min(limits.page.bytes);
     let mut found = List::with_capacity(capacity);
     let mut encoded = 0_u64;
     let mut last = after.cloned().unwrap_or(Cursor { interval: 0, after: Box::new([]) });
@@ -40,12 +51,12 @@ pub(crate) fn walk(store: &mut Store, intervals: &[Range], after: Option<&Cursor
             {
                 break;
             }
-            let page = load(store, range.clone())?;
+            let page = load_map(store, map, range.clone())?;
             let mut page_rows = page.rows.into_iter();
             let Some(row) = page_rows.next() else { break };
             let size = u64::try_from(row.key.len()).ok()?.checked_add(u64::try_from(row.value.len()).ok()?)?;
             let total = encoded.checked_add(size)?;
-            if found.len() == capacity || total > u64::from(store.limits.store.page.bytes) {
+            if found.len() == capacity || total > u64::from(limits.page.bytes) {
                 return Some(Walked { rows: found.into_boxed(), next: Some(last) });
             }
             encoded = total;
@@ -77,14 +88,22 @@ pub(crate) struct Page {
 }
 
 pub(crate) fn load(store: &mut Store, range: Range) -> Option<Page> {
-    let mut limits = store.limits.store;
+    load_map(store, KeptMap::Store, range)
+}
+
+fn load_map(store: &mut Store, map: KeptMap, range: Range) -> Option<Page> {
+    let mut limits = map_limits(store, map);
     // A valid maximum-length key's exclusive cursor has one extra byte.
     // This widens range endpoints only; stored keys retain their own bound.
     limits.key = limits.key.checked_add(1)?;
     let mut above = Queue::with_capacity(skein_kv::MAX_OUT.above);
     let mut below = Queue::with_capacity(skein_kv::MAX_OUT.below);
+    let kv = match map {
+        KeptMap::Store => &mut store.stores.store,
+        KeptMap::Secrets => &mut store.stores.secrets,
+    };
     skein_kv::down(
-        &mut store.stores.store,
+        kv,
         &crate::memory_env(limits),
         skein_kv::Request::Load {
             owner: Token::new(0),
@@ -135,4 +154,28 @@ pub(crate) fn decode(store: &Store, row: skein_kv::Row) -> Option<(Row, u64)> {
     // The generated family's measure is its wire length. Once decoded,
     // these stored bytes give that measure without encoding the value again.
     Some((Row::Jig(record), u64::try_from(row.value.len()).ok()?))
+}
+
+pub(crate) fn map_limits(store: &Store, map: KeptMap) -> skein_kv::Limits {
+    match map {
+        KeptMap::Store => store.limits.store,
+        KeptMap::Secrets => store.limits.secrets,
+    }
+}
+
+/// Kept keys share the walk's map and application prefix (store.md 10.3).
+pub(crate) fn kept_interval(store: &Store, owner: crate::Owner, map: KeptMap, keys: &crate::Keys) -> Option<Range> {
+    if owner != crate::Owner::Application {
+        return Some(Range { start: Box::from(keys.from), end: Some(Box::from(keys.to)) });
+    }
+    let limit = map_limits(store, map).key;
+    let start = application_key(map, keys.from, limit)?;
+    let end = Some(application_key(map, keys.to, limit)?);
+    Some(Range { start, end })
+}
+fn application_key(map: KeptMap, key: &[u8], limit: u32) -> Option<Box<[u8]>> {
+    match map {
+        KeptMap::Store => keys::application(key, limit),
+        KeptMap::Secrets => crate::secrets::application(key, limit),
+    }
 }

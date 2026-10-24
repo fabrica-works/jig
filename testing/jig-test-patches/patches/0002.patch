@@ -5,3 +5,6 @@ family fixture-shelf 1 to 2
 add Shelf.weight u32 written
 written Shelf.weight
 refuses empty "a shelf without books"
+
+family fixture-token 1 to 2
+add Token.expires option u64 none

@@ -48,20 +48,27 @@ pub(crate) fn number(name: &[u8]) -> Option<u64> {
     Some(number)
 }
 /// Immutable account of the generation, at the wall clock of its write (store.md 2).
+#[expect(clippy::too_many_arguments, reason = "the manifest's eight fields follow component-v3.schema")]
 pub(crate) fn manifest(
     generation: u64,
     from: Option<u64>,
     before: crate::patching::plan::Levels,
     after: crate::patching::plan::Levels,
+    counts: &[crate::codec::component::Count],
     store: u64,
     secrets: Option<u64>,
     written: skein_lib::Wall,
 ) -> Box<[u8]> {
+    let mut kept = List::with_capacity(u32::try_from(counts.len()).expect("bounded manifest counts"));
+    for count in counts {
+        kept.push(count.clone()).expect("measured manifest counts");
+    }
     crate::codec::component::Manifest {
         generation,
         from,
         before: crate::format::recorded(before),
         after: crate::format::recorded(after),
+        counts: kept,
         store,
         secrets,
         written: written.as_nanos(),

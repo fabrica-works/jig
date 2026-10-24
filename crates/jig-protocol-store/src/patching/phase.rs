@@ -1,10 +1,11 @@
 //! The store's patch phase, between the open's checks and cuts (store.md 10.2).
+use super::check::{self, Checking, Counted};
 use crate::directory::{OWNER, Opening};
 use crate::generations::{Copying, Dropping, Manifesting, Map, Progress, Switching};
 use crate::{Arrived, Below, Event, Io, Limits, OpenRefusal, Phase, Root, Store, directory, generations, open};
 use alloc::boxed::Box;
 use skein_io::file;
-use skein_lib::{Env, Queue};
+use skein_lib::{Env, List, Queue};
 mod walking;
 pub(crate) use walking::Walking;
 
@@ -27,7 +28,8 @@ pub(crate) enum Patching {
     Mapping { secrets: bool },
     Recovering { opened: u8 },
     Walking(Box<Walking>),
-    Sealing { number: u64, before: super::plan::Levels },
+    Sealing { number: u64, before: super::plan::Levels, counts: List<Counted> },
+    Checking(Box<Checking>),
     Manifest(Manifesting),
     Leaving { closed: u8 },
     Switching(Switching),
@@ -153,7 +155,8 @@ fn open_copy(store: &mut Store, below: &mut Below) {
 }
 fn opened_copy(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Below) {
     let pending = store.directory.patch.take().expect("begin retained the plan until copy recovery");
-    match walking::opened(store, pending) {
+    let Some(counts) = check::before(store) else { return refuse(store, above) };
+    match walking::opened(store, pending, counts) {
         Some(walking) => {
             state(store, Patching::Walking(Box::new(walking)));
             walking::resume(store, env, above, below);
@@ -161,13 +164,20 @@ fn opened_copy(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event>, b
         None => refuse(store, above),
     }
 }
-fn manifesting(store: &mut Store, env: &Env<Limits>, before: super::plan::Levels, below: &mut Below) {
+fn manifesting(
+    store: &mut Store,
+    env: &Env<Limits>,
+    before: super::plan::Levels,
+    counts: &[crate::codec::component::Count],
+    below: &mut Below,
+) {
     let number = active(store).checked_add(1).expect("begin checked the next generation");
     let bytes = generations::manifest(
         number,
         Some(active(store)),
         before,
         super::plan::binary(&store.patch_sets),
+        counts,
         store.stores.store.last(),
         Some(store.stores.secrets.last()),
         env.wall,
@@ -243,6 +253,7 @@ pub(crate) fn event(
                 | Patching::Recovering { .. }
                 | Patching::Walking(_)
                 | Patching::Sealing { .. }
+                | Patching::Checking(_)
                 | Patching::Manifest(_)
                 | Patching::Switching(_) => return refuse(store, above),
             };
@@ -266,25 +277,27 @@ pub(crate) fn event(
                 | Patching::Copying(_)
                 | Patching::Walking(_)
                 | Patching::Sealing { .. }
+                | Patching::Checking(_)
                 | Patching::Manifest(_)
                 | Patching::Switching(_) => refuse(store, above),
             }
         }
         skein_kv::Event::Committed { owner, number } => {
-            if secret || owner != skein_lib::Token::new(number) {
+            if owner != skein_lib::Token::new(number) {
                 return refuse(store, above);
             }
             let phase = take(store);
             match *phase {
                 Patching::Walking(mut walking) => {
-                    if !walking.committed(number) {
+                    if !walking.committed(if secret { crate::KeptMap::Secrets } else { crate::KeptMap::Store }, number)
+                    {
                         return refuse(store, above);
                     }
                     state(store, Patching::Walking(walking));
                 }
-                Patching::Sealing { number: expected, before } if number == expected => {
-                    // resume has the environment required by the manifest's durable replace.
-                    state(store, Patching::Sealing { number: 0, before });
+                Patching::Sealing { number: expected, before, counts } if !secret && number == expected => {
+                    // resume runs the check only after the seal is durable.
+                    state(store, Patching::Sealing { number: 0, before, counts });
                 }
                 Patching::Closing { .. }
                 | Patching::Dropping(_)
@@ -292,6 +305,7 @@ pub(crate) fn event(
                 | Patching::Mapping { .. }
                 | Patching::Recovering { .. }
                 | Patching::Sealing { .. }
+                | Patching::Checking(_)
                 | Patching::Manifest(_)
                 | Patching::Leaving { .. }
                 | Patching::Switching(_) => refuse(store, above),
@@ -315,7 +329,7 @@ pub(crate) fn resume(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Eve
         match *phase {
             Patching::Recovering { opened: 3 } => opened_copy(store, env, above, below),
             Patching::Walking(_) => walking::resume(store, env, above, below),
-            Patching::Sealing { number: 0, before } => manifesting(store, env, before, below),
+            Patching::Sealing { number: 0, .. } => checking(store, above, below),
             Patching::Recovering { .. }
             | Patching::Mapping { .. }
             | Patching::Closing { .. }
@@ -323,9 +337,31 @@ pub(crate) fn resume(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Eve
             | Patching::Dropping(_)
             | Patching::Copying(_)
             | Patching::Sealing { .. }
+            | Patching::Checking(_)
             | Patching::Manifest(_)
             | Patching::Switching(_) => {}
         }
+    }
+}
+fn checking(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
+    let phase = take(store);
+    let (before, counts) = match *phase {
+        Patching::Sealing { number: 0, before, counts } => (before, counts),
+        Patching::Closing { .. }
+        | Patching::Dropping(_)
+        | Patching::Copying(_)
+        | Patching::Mapping { .. }
+        | Patching::Recovering { .. }
+        | Patching::Walking(_)
+        | Patching::Sealing { .. }
+        | Patching::Checking(_)
+        | Patching::Manifest(_)
+        | Patching::Leaving { .. }
+        | Patching::Switching(_) => unreachable!("resume routed the durable seal"),
+    };
+    match check::start(store, before, counts, below) {
+        Ok(checking) => state(store, Patching::Checking(Box::new(checking))),
+        Err(why) => open::refuse(store, store.directory.owner, why, above),
     }
 }
 fn file_up(
@@ -352,6 +388,11 @@ fn file_up(
         },
         Patching::Mapping { secrets } => opened_directory(store, env, secrets, arrived, above, below),
         Patching::Recovering { .. } | Patching::Walking(_) | Patching::Sealing { .. } => refuse(store, above),
+        Patching::Checking(mut checking) => match check::up(&mut checking, arrived, below) {
+            Ok(false) => state(store, Patching::Checking(checking)),
+            Ok(true) => manifesting(store, env, checking.before(), checking.counts(), below),
+            Err(why) => open::refuse(store, store.directory.owner, why, above),
+        },
         Patching::Manifest(mut manifesting) => match generations::manifested(&mut manifesting, arrived) {
             Progress::Pending => state(store, Patching::Manifest(manifesting)),
             Progress::Done => {
@@ -456,22 +497,33 @@ pub(crate) fn site(
         | Patching::Mapping { .. }
         | Patching::Recovering { .. }
         | Patching::Sealing { .. }
+        | Patching::Checking(_)
         | Patching::Manifest(_)
         | Patching::Leaving { .. }
         | Patching::Switching(_) => refuse(store, above),
     }
 }
 
-/// Persistent state is counted by lib's common peak; copy buffers and walk
+/// Persistent state is counted by lib's common peak; copy, walk and check
 /// buffers are disjoint. Both KV maps' bounds already include their commits.
 pub(crate) fn worst_case(limits: &Limits, sets: &crate::PatchSets) -> Option<u64> {
-    let room = super::machines::Room { bytes: limits.store.value, nodes: limits.store.value };
+    super::plan::bounds(sets).ok()?;
+    // The counts' source and encoded row coexist with the manifest's buffer.
+    // The first start reserves the ceiling even when its sets have no families.
+    let codec = &crate::component_v3::CEILINGS;
+    let manifest = crate::component_v3::Manifest::worst_case_heap(codec)?
+        .checked_mul(2)?
+        .checked_add(crate::component_v3::Manifest::worst_case_bytes(codec)?)?;
     let walking = walking::worst_case(limits)?;
     let copying = generations::operations_worst_case(limits.store.chunk)?;
+    let checking = check::worst_case(limits, crate::component_v3::CEILINGS.manifest_counts)?;
     // Pending owns the machines during copying as well as walking.
     walking
         .max(copying)
-        .checked_add(super::machines::worst_case(sets, room)?)?
+        .max(checking)
+        .checked_add(List::<Counted>::worst_case(crate::component_v3::CEILINGS.manifest_counts)?)?
+        .checked_add(manifest)?
+        .checked_add(super::machines::worst_case(sets, super::machines::Rooms::of(limits))?)?
         .checked_add(u64::try_from(size_of::<Patching>()).ok()?)?
         .checked_add(u64::try_from(size_of::<Pending>()).ok()?)?
         .checked_add(Queue::<Event>::worst_case(crate::MAX_OUT_DOWN)?)?

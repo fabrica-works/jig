@@ -18,11 +18,13 @@ versioned record Format {
     deployment: fixed 16
     levels: Levels
 }
+record Count { family: text 64, before: u64, after: u64 }
 versioned record Manifest {
     generation: u64
     from: option u64
     before: Levels
     after: Levels
+    counts: list 64 Count
     store: u64
     secrets: option u64
     written: u64

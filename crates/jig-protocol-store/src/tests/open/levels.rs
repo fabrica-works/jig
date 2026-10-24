@@ -5,7 +5,7 @@ use crate::tests::{
     fixtures,
     patching::{BASE, ROOM, SETS, levels},
 };
-use crate::{Event, Family, Older, OpenRefusal, Owner, PatchSet, PatchSets, Store, format};
+use crate::{Event, Family, KeptFamily, Older, OpenRefusal, Owner, PatchSet, PatchSets, Store, format};
 use skein_lib::{Queue, Token};
 
 const FOUR: PatchSets = PatchSets {
@@ -148,7 +148,7 @@ fn behind_plans_before_ready_and_ignores_only_the_application_version() {
             Planned { owner: Owner::Application, patch: 2 },
         ]
     );
-    assert_eq!(pending.machines.len(), 3);
+    assert_eq!(pending.machines.len(), 4);
 }
 #[test]
 fn behind_keeps_jigs_versions_layouts_deployment_and_numbers_checks() {
@@ -189,4 +189,48 @@ fn unplannable_headers_and_unchained_blocks_refuse_set_before_file_operations() 
     for (sets, patch) in [(BAD_HEADER, 1), (UNCHAINED, 2)] {
         refused(&mut store(levels(0, 0), sets), OpenRefusal::Set { owner: Owner::Application, patch });
     }
+}
+#[test]
+fn a_family_past_the_manifests_bounds_refuses_set_before_any_write() {
+    // The manifest counts each kept family by name: at most 64, each at most 64 bytes.
+    const BOUND: &str = "fixture-label-at-the-manifests-sixty-four-byte-family-name-bound";
+    const PAST: &str = "fixture-label-at-the-manifests-sixty-four-byte-family-name-bounds";
+    const AT_BOUND: PatchSets = PatchSets {
+        sets: &[
+            PatchSet { families: &[KeptFamily { name: BOUND, ..SETS.sets[0].families[0] }], ..SETS.sets[0] },
+            SETS.sets[1],
+        ],
+    };
+    const LONG: PatchSets = PatchSets {
+        sets: &[
+            PatchSet { families: &[KeptFamily { name: PAST, ..SETS.sets[0].families[0] }], ..SETS.sets[0] },
+            SETS.sets[1],
+        ],
+    };
+    // Sixty-four of the application's, so jig's one family is the 65th.
+    const MANY: PatchSets =
+        PatchSets { sets: &[PatchSet { families: &[SETS.sets[0].families[0]; 64], ..SETS.sets[0] }, SETS.sets[1]] };
+    assert_eq!((BOUND.len(), PAST.len()), (64, 65));
+    for (sets, owner) in [(LONG, Owner::Application), (MANY, Owner::Jig)] {
+        let why = OpenRefusal::Set { owner, patch: 0 };
+        // Behind: the plan refuses before any file operation.
+        refused(&mut store(levels(0, 0), sets), why.clone());
+        // A first start: nothing is made in the empty deployment.
+        let mut disk = fixtures::disk::Disk::new(&[]);
+        let before = disk.contents();
+        let mut first = disk.store();
+        first.patch_sets(sets);
+        assert_refusal(&disk.open(&mut first), why);
+        assert_eq!(disk.contents(), before);
+    }
+    let mut disk = fixtures::disk::Disk::new(&[]);
+    let mut first = disk.store();
+    first.patch_sets(AT_BOUND);
+    let events = disk.open(&mut first);
+    let [Event::Opened { .. }] = &*events else { panic!("a first start at the bound opens: {events:?}") };
+    let manifest = crate::codec::component::Manifest::decode(&disk.bytes(b"generations/1/manifest"));
+    assert_eq!(
+        manifest.expect("first manifest").counts,
+        fixtures::manifest_counts(&[(BOUND, 0, 0), ("fixture-note", 0, 0)])
+    );
 }

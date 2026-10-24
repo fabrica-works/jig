@@ -1,4 +1,4 @@
-use jig_protocol_store::{Counts, Older, OpenRefusal, Owner, PatchSet, PatchSets, Write};
+use jig_protocol_store::{Check, Counts, Older, OpenRefusal, Owner, PatchSet, PatchSets, Write};
 use jig_store_world::{
     patches::{self, BASE, Records, SETS},
     root,
@@ -16,11 +16,20 @@ fn old_records_patch_in_order_and_the_root_continues() {
         [
             (Owner::Application, 1, Counts { records: 5, commits: 2 }),
             (Owner::Jig, 1, Counts { records: 2, commits: 1 }),
-            (Owner::Application, 2, Counts { records: 3, commits: 1 }),
+            (Owner::Application, 2, Counts { records: 6, commits: 3 }),
         ]
     );
-    assert_eq!(last, 6); // Initial commit, four patch pages and the seal.
+    assert_eq!(last, 6); // Initial commit, four store patch pages and the seal; two secrets pages have their own numbers.
     patches::whole(&mut world);
+    assert_eq!(
+        patches::counts(&mut world),
+        [
+            (b"fixture-label".to_vec(), 2, 2),
+            (b"fixture-shelf".to_vec(), 3, 3),
+            (b"fixture-token".to_vec(), 3, 3),
+            (b"fixture-note".to_vec(), 2, 2)
+        ]
+    );
     patches::kept(&original, &patches::source(&mut world), &"story");
     records.check(&mut world, 2, &"story");
     world.crash(902);
@@ -95,5 +104,47 @@ fn every_patch_write_cut_recovers_all_records_and_no_stray() {
         assert!(world.open().is_some(), "clean start after cut {cut}: {:?}", world.refusal());
         patches::whole(&mut world);
         records.check(&mut world, 2, &(908, cut));
+    }
+}
+
+#[test]
+fn each_check_refusal_leaves_the_generation_before_active() {
+    const SEED: u64 = 912;
+    const ENDED: u64 = root::LIVE + 1;
+    // The base's token commits have become a snapshot, so lowering the commit
+    // limit tests the patched put rather than refusing recovery of the log.
+    let mut token_limits = patches::limits();
+    token_limits.secrets.snapshot_after = 1;
+    let mut token_open = token_limits;
+    // 26 frame + 9 put + 10 key + 32 v1 token; v2 adds one byte.
+    token_open.secrets.commit = 77;
+    let mut load_limits = patches::limits();
+    load_limits.core.tasks.dependencies = 0;
+    let mut live = root::live_task(root::LIVE);
+    let jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(task)) = &mut live else { panic!("live task") };
+    task.dependencies = Box::new([ENDED]);
+    let read =
+        jig_domain_core::Record::People(jig_domain_people::Stored::EndedRead { task: ENDED, party: 1, through: 1 });
+    let key = |row: &jig_domain_core::Record| jig_protocol_store::keys::encode(&row.key(), 64).expect("fixture key");
+    for (base_limits, open_limits, rows, why) in [
+        (token_limits, token_open, vec![], Check::Large { key: Box::new(0_u64.to_be_bytes()) }),
+        (patches::limits(), load_limits, vec![live.clone()], Check::Load { key: key(&live) }),
+        (patches::limits(), patches::limits(), vec![read.clone()], Check::Join { key: key(&read) }),
+    ] {
+        let records = Records::story();
+        let mut world = records.committed_with(SEED, BASE, 1, base_limits, &rows);
+        let before = patches::source(&mut world);
+        world.patch_sets(SETS);
+        world.restart_with_limits(SEED, open_limits);
+        let expected = OpenRefusal::Check { why };
+        for seed in [SEED + 1, SEED + 2] {
+            assert_eq!(world.open(), None, "{expected:?}");
+            assert_eq!(world.refusal(), Some(&expected));
+            assert_eq!(world.active(), b"1\n");
+            patches::kept(&before, &patches::source(&mut world), &expected);
+            assert!(!world.paths().iter().any(|path| path == b"generations/2/check-copy"));
+            world.lay(&[skein_fake_machine::Item::file(b"generations/2/check-copy", b"remove on retry")]);
+            world.crash(seed);
+        }
     }
 }

@@ -464,6 +464,10 @@ fn read_active(store: &mut Store, below: &mut Below) {
 }
 fn active_read(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
     if let file::Event::Failed { error: Error::NotFound, .. } = arrived.event {
+        // A first start writes the manifest's counts: its sets fit them first.
+        if let Err(why) = crate::patching::plan::bounds(&store.patch_sets) {
+            return refusal(store, OpenRefusal::Set { owner: why.owner, patch: why.patch }, above);
+        }
         survey(store, Survey::Top, below);
         return;
     }
@@ -570,11 +574,23 @@ fn first_secrets_opened(
         return refuse(store, above);
     };
     store.directory.private_root = Some(private);
+    let mut counts = skein_lib::List::with_capacity(crate::component_v3::CEILINGS.manifest_counts);
+    for set in store.patch_sets.sets {
+        for family in set.families {
+            let count = crate::codec::component::Count::new(
+                &crate::component_v3::CEILINGS,
+                crate::codec::component::CountParts { family: Box::from(family.name.as_bytes()), before: 0, after: 0 },
+            )
+            .expect("plan::bounds checked each family's name before this first start wrote");
+            counts.push(count).expect("plan::bounds checked the families' count before this first start wrote");
+        }
+    }
     let bytes = generations::manifest(
         generations::FIRST,
         None,
         crate::format::NONE,
         crate::patching::plan::binary(&store.patch_sets),
+        counts.as_slice(),
         0,
         None,
         env.wall,

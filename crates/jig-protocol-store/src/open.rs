@@ -104,8 +104,7 @@ fn pending(store: &Store, found: plan::Levels, binary: plan::Levels) -> Result<P
         Ok(plan) => plan,
         Err(why) => return Err(OpenRefusal::Set { owner: why.owner, patch: why.patch }),
     };
-    let room = machines::Room { bytes: store.limits.store.value, nodes: store.limits.store.value };
-    let machines = match machines::make(&store.patch_sets, &plan, &found, room) {
+    let machines = match machines::make(&store.patch_sets, &plan, &found, machines::Rooms::of(&store.limits)) {
         Ok(machines) => machines,
         Err(why) => return Err(OpenRefusal::Set { owner: why.owner, patch: why.patch }),
     };

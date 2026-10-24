@@ -34,6 +34,11 @@ pub fn restore(range: &RestoreRange) -> Box<[Range]> {
     }])
 }
 
+/// The census reads the ended-read family whole, without selecting rows.
+pub(crate) fn ended_reads() -> Range {
+    Range::prefix(&[keys::JIG, 2, 7])
+}
+
 fn census_ranges(census: &core::Census) -> Box<[Range]> {
     let capacity = u32::try_from(census.results.len())
         .expect("bounded census parties")
@@ -42,7 +47,7 @@ fn census_ranges(census: &core::Census) -> Box<[Range]> {
         .checked_add(u32::try_from(census.questions.len()).expect("bounded census questions"))
         .expect("bounded census parties, questions and conversation family");
     let mut ranges = List::with_capacity(capacity);
-    ranges.push(Range::prefix(&[keys::JIG, 2, 7])).expect("one conversation family");
+    ranges.push(ended_reads()).expect("one conversation family");
     for read in &census.results {
         let mut range = numbered_prefix(&[keys::JIG, 1, 13], read.party);
         let key = core::Key::Tasks(jig_domain_tasks::Key::Result { party: read.party, position: read.after });

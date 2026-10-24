@@ -10,7 +10,7 @@ use skein_lib::Rng;
 const SEEDS: std::ops::Range<u64> = 0..64;
 
 fn drawn(random: &mut Rng) -> Records {
-    let mut records = Records { labels: Vec::new(), shelves: Vec::new(), notes: Vec::new() };
+    let mut records = Records { labels: Vec::new(), shelves: Vec::new(), notes: Vec::new(), tokens: Vec::new() };
     for n in 0..=random.below(4) {
         let caption = vec![
             b'a' + u8::try_from(random.below(26)).expect("letter");
@@ -29,6 +29,13 @@ fn drawn(random: &mut Rng) -> Records {
     }
     for n in 0..=random.below(3) {
         records.notes.push((format!("n/{n}-{}", random.below(1000)).into_bytes(), b"drawn note".to_vec()));
+    }
+    for n in 0..random.below(4) {
+        let bytes = vec![
+            u8::try_from(random.below(256)).expect("byte");
+            usize::try_from(random.below(65)).expect("token length")
+        ];
+        records.tokens.push((n, bytes));
     }
     records
 }

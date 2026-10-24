@@ -209,6 +209,50 @@ pub enum Family {
     Application,
 }
 
+/// What the check before the switch found (store.md 10.2, step 5).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Check {
+    /// A patched record too large for a commit alone, by its key as `Patch` gives it.
+    Large { key: Box<[u8]> },
+    /// A kept family whose count of records the patches changed.
+    Count { family: &'static str, before: u64, after: u64 },
+    /// A row of the restart's ranges that does not load within the deployment's limits.
+    Load { key: Box<[u8]> },
+    /// An ended read position whose ended task the store does not hold.
+    Join { key: Box<[u8]> },
+    /// A file in the copy's secrets' store that is not private.
+    Private { name: Box<[u8]> },
+}
+impl Check {
+    /// Its refusal's words, in pieces with the deployment's directory between
+    /// them, as `OpenRefusal::words` gives every refusal's (store.md 10.1).
+    fn words(&self) -> &'static [&'static str] {
+        match self {
+            Self::Large { .. } => &[
+                "The check before the switch found a patched record too large for a commit alone in the copy of the store this start patched in ",
+                ", and the generation it patched from stays active, unchanged. Every start of this build checks a fresh copy the same way: start the build before it again, which opens that generation as it was.",
+            ],
+            Self::Count { .. } => &[
+                "The check before the switch found a family whose count of records the patches changed in the copy of the store this start patched in ",
+                ", and the generation it patched from stays active, unchanged. Every start of this build checks a fresh copy the same way: start the build before it again, which opens that generation as it was.",
+            ],
+            Self::Load { .. } => &[
+                "The check before the switch found a record the restart could not load within the deployment's limits in the copy of the store this start patched in ",
+                ", and the generation it patched from stays active, unchanged. Every start of this build checks a fresh copy the same way: start the build before it again, which opens that generation as it was.",
+            ],
+            Self::Join { .. } => &[
+                "The check before the switch found a record naming an ended task the store does not hold in the copy of the store this start patched in ",
+                ", and the generation it patched from stays active, unchanged. Every start of this build checks a fresh copy the same way: start the build before it again, which opens that generation as it was.",
+            ],
+            Self::Private { .. } => &[
+                "The check before the switch found a file in the secrets' store of the copy this start patched in ",
+                " that is not private to the service's user, and the generation it patched from stays active, unchanged. A start makes its copy's files private, so another process or user changed one: make sure nothing else writes in ",
+                ", and start again.",
+            ],
+        }
+    }
+}
+
 /// Why a store refuses to open, saying which (store.md 5.3, 6, 10).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum OpenRefusal {
@@ -232,6 +276,9 @@ pub enum OpenRefusal {
     Patch { owner: crate::Owner, patch: u32, key: Box<[u8]>, halt: skein_codec::patch::Halt },
     /// The binary's sets do not plan (10.3).
     Set { owner: crate::Owner, patch: u32 },
+    /// The check before the switch failed (10.2, step 5); the generation
+    /// patched from stays active, unchanged.
+    Check { why: Check },
 }
 /// A refusal whose fix moves the generations (store.md 2), `why` saying
 /// which version or build.
@@ -318,6 +365,7 @@ impl OpenRefusal {
                 "This build's patches do not plan, and this start has changed nothing in ",
                 ". The build is wrong: start the build before it again.",
             ],
+            Self::Check { why } => why.words(),
             Self::OlderBuild { why: Older::Unrecorded } => older!("made before its families' layouts were recorded"),
             Self::OlderBuild { why: Older::Layout(family) } => match family {
                 Family::Settings => older!("whose settings family's layout differs from this build's"),

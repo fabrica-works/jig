@@ -6,11 +6,14 @@ use crate::patching::{
     plan::Planned,
     walk::{self, Stop},
 };
-use crate::{Below, Cursor, Event, Limits, OpenRefusal, Owner, Store, codec, commits, format, keys, open, pages};
+use crate::{
+    Below, Cursor, Event, KeptMap, Limits, OpenRefusal, Owner, Store, codec, commits, format, keys, open, pages,
+    secrets,
+};
 use alloc::boxed::Box;
 use jig_domain_core::{CoreKey, CoreRecord, Deployment, Key, Record};
 use skein_codec::patch::{Halt, Patcher};
-use skein_lib::{Env, List, Queue, bytes};
+use skein_lib::{Env, List, Queue, Token, bytes};
 
 #[derive(Debug)]
 struct Running {
@@ -29,13 +32,15 @@ struct Put {
 enum Waiting {
     Ready,
     Site(FamilyIx),
-    Commit(u64),
+    Commit { map: KeptMap, number: u64 },
 }
 #[derive(Debug)]
 pub(crate) struct Walking {
     pending: Box<Pending>,
+    before: List<crate::patching::check::Counted>,
     header: Deployment,
     next: u64,
+    secrets_next: u64,
     step: usize,
     selected: List<bool>,
     family: u32,
@@ -57,30 +62,28 @@ impl Walking {
     fn step(&self) -> Option<Planned> {
         self.pending.plan.steps().get(self.step).copied()
     }
-    pub(super) fn committed(&mut self, number: u64) -> bool {
+    pub(super) fn committed(&mut self, map: KeptMap, number: u64) -> bool {
         match self.waiting {
-            Waiting::Commit(expected) if number == expected => {
+            Waiting::Commit { map: expected_map, number: expected } if map == expected_map && number == expected => {
                 self.cursor = self.through.take();
                 self.counts.commits = self.counts.commits.checked_add(1).expect("commit count bounded by number");
                 self.waiting = Waiting::Ready;
                 true
             }
-            Waiting::Ready | Waiting::Site(_) | Waiting::Commit(_) => false,
+            Waiting::Ready | Waiting::Site(_) | Waiting::Commit { .. } => false,
         }
     }
-    fn refused(&self, of: Owner, key: &[u8], halt: Halt) -> OpenRefusal {
+    fn refused(&self, key: &[u8], halt: Halt) -> OpenRefusal {
         let step = self.step().expect("a running record has a plan step");
-        let key = if of == Owner::Application {
-            bytes::copy_of(keys::of_application(key).expect("application walk key has its tag"))
-        } else {
-            bytes::copy_of(key)
-        };
+        let key = bytes::copy_of(
+            relative(&self.pending.machines, FamilyIx(self.family), key).expect("walk key has its prefix"),
+        );
         OpenRefusal::Patch { owner: step.owner, patch: step.patch, key, halt }
     }
     pub(super) fn answer(&mut self, patcher: Box<Patcher>, result: Result<(), Halt>) -> Result<(), OpenRefusal> {
         let family = match self.waiting {
             Waiting::Site(family) => family,
-            Waiting::Ready | Waiting::Commit(_) => return Err(OpenRefusal::Failed),
+            Waiting::Ready | Waiting::Commit { .. } => return Err(OpenRefusal::Failed),
         };
         walk::give(&mut self.pending.machines, family, patcher);
         let running = self.running.as_mut().expect("site has a record");
@@ -90,14 +93,15 @@ impl Walking {
                 self.waiting = Waiting::Ready;
                 Ok(())
             }
-            Err(halt) => {
-                let of = self.pending.machines.get(family).owner;
-                Err(self.refused(of, &self.running.as_ref().expect("site has a record").key, halt))
-            }
+            Err(halt) => Err(self.refused(&self.running.as_ref().expect("site has a record").key, halt)),
         }
     }
 }
-pub(super) fn opened(store: &mut Store, pending: Box<Pending>) -> Option<Walking> {
+pub(super) fn opened(
+    store: &mut Store,
+    pending: Box<Pending>,
+    before: List<crate::patching::check::Counted>,
+) -> Option<Walking> {
     let key = Key::Core(CoreKey::Deployment);
     let encoded = keys::encode(&key, store.limits.store.key)?;
     let bytes = open::get(store, store.directory.owner, encoded).ok()??;
@@ -129,21 +133,21 @@ pub(super) fn opened(store: &mut Store, pending: Box<Pending>) -> Option<Walking
     };
     Some(Walking {
         pending,
+        before,
         header,
         next: last.checked_add(1)?,
+        secrets_next: store.stores.secrets.last().checked_add(1)?,
         step: 0,
         selected,
         family: 0,
         range: 0,
         cursor: None,
-        page: Queue::with_capacity(
-            store.limits.journal.writes.min(store.limits.store.ops).min(store.limits.store.page.bytes),
-        ),
+        page: Queue::with_capacity(page_capacity(&store.limits)),
         more: false,
         loaded: false,
         running: None,
         deferred: None,
-        ops: List::with_capacity(store.limits.journal.writes.min(store.limits.store.ops)),
+        ops: List::with_capacity(ops_capacity(&store.limits)),
         bytes: 26,
         through: None,
         counts: Counts { records: 0, commits: 0 },
@@ -154,20 +158,13 @@ pub(super) fn opened(store: &mut Store, pending: Box<Pending>) -> Option<Walking
 fn interval(store: &Store, walking: &Walking) -> Option<skein_kv::Range> {
     let machine = walking.pending.machines.get(FamilyIx(walking.family));
     let range = walking.pending.machines.keys(FamilyIx(walking.family)).get(walking.range)?;
-    if machine.owner == Owner::Application {
-        Some(skein_kv::Range {
-            start: keys::application(range.from, store.limits.store.key)?,
-            end: Some(keys::application(range.to, store.limits.store.key)?),
-        })
-    } else {
-        Some(skein_kv::Range { start: bytes::copy_of(range.from), end: Some(bytes::copy_of(range.to)) })
-    }
+    pages::kept_interval(store, machine.owner, walking.pending.machines.map(FamilyIx(walking.family)), range)
 }
 /// No request is issued here. Each iteration consumes a row, a range, a
 /// family or a plan step; commits and sites leave through the step's outputs.
 fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> Option<bool> {
     match walking.waiting {
-        Waiting::Site(_) | Waiting::Commit(_) => return Some(false),
+        Waiting::Site(_) | Waiting::Commit { .. } => return Some(false),
         Waiting::Ready => {}
     }
     let families = walking.pending.machines.len();
@@ -180,7 +177,7 @@ fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> 
         .checked_add(usize::try_from(families).ok()?)?
         .checked_add(1)?
         .checked_mul(steps.checked_add(1)?)?
-        .checked_add(usize::try_from(store.limits.journal.writes.min(store.limits.store.ops)).ok()?)?
+        .checked_add(usize::try_from(ops_capacity(&store.limits)).ok()?)?
         .checked_mul(3)?;
     for _ in 0..turns {
         let Some(step) = walking.step() else { return Some(true) };
@@ -216,11 +213,8 @@ fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> 
             match running.stop {
                 Stop::Site { family, site, at } => {
                     let of = walking.pending.machines.get(family).owner;
-                    let key = if of == Owner::Application {
-                        bytes::copy_of(keys::of_application(&running.key)?)
-                    } else {
-                        running.key.clone()
-                    };
+                    let key =
+                        bytes::copy_of(relative(&walking.pending.machines, FamilyIx(walking.family), &running.key)?);
                     let patcher = walk::take(&mut walking.pending.machines, family);
                     walking.waiting = Waiting::Site(family);
                     above.push(Event::Site { owner: store.directory.owner, of, key, site, at, patcher });
@@ -250,12 +244,8 @@ fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> 
             continue;
         }
         let range = interval(store, walking)?;
-        let page = pages::walk(
-            store,
-            &[range],
-            walking.cursor.as_ref(),
-            store.limits.journal.writes.min(store.limits.store.ops),
-        )?;
+        let map = walking.pending.machines.map(FamilyIx(walking.family));
+        let page = pages::walk_map(store, map, &[range], walking.cursor.as_ref(), puts(&store.limits, map))?;
         if page.rows.is_empty() && page.next.is_some() {
             return None;
         }
@@ -270,19 +260,20 @@ fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> 
 /// A finished record that does not fit waits for the preceding page's commit.
 fn append(store: &Store, walking: &mut Walking) -> Option<bool> {
     let Some(put) = walking.deferred.take() else { return Some(true) };
+    let map = walking.pending.machines.map(FamilyIx(walking.family));
+    let limits = pages::map_limits(store, map);
     let size = u64::try_from(put.key.len()).ok()?.checked_add(u64::try_from(put.value.len()).ok()?)?.checked_add(9)?;
-    // M4: OpenRefusal::Check. No part of this page is submitted on a
-    // put that cannot fit alone, or a walk halt.
-    if size.checked_add(26)? > u64::from(store.limits.store.commit)
-        || store.limits.journal.writes.min(store.limits.store.ops) == 0
-        || put.value.len() > usize::try_from(store.limits.store.value).ok()?
+    // No part of this page is submitted on a put that cannot fit alone.
+    if size.checked_add(26)? > u64::from(limits.commit)
+        || puts(&store.limits, map) == 0
+        || put.value.len() > usize::try_from(limits.value).ok()?
     {
+        let key = bytes::copy_of(relative(&walking.pending.machines, FamilyIx(walking.family), &put.key)?);
+        walking.refusal = Some(OpenRefusal::Check { why: crate::Check::Large { key } });
         return None;
     }
     let total = walking.bytes.checked_add(size)?;
-    if walking.ops.len() == store.limits.journal.writes.min(store.limits.store.ops)
-        || total > u64::from(store.limits.store.commit)
-    {
+    if walking.ops.len() == puts(&store.limits, map) || total > u64::from(limits.commit) {
         walking.deferred = Some(put);
         return Some(false);
     }
@@ -302,6 +293,7 @@ pub(super) fn resume(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Eve
         | Patching::Mapping { .. }
         | Patching::Recovering { .. }
         | Patching::Sealing { .. }
+        | Patching::Checking(_)
         | Patching::Manifest(_)
         | Patching::Leaving { .. }
         | Patching::Switching(_) => unreachable!("resume routed Walking"),
@@ -318,33 +310,51 @@ pub(super) fn resume(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Eve
         let before = walking.pending.found;
         let header = walking.header;
         let number = walking.next;
-        drop(walking);
-        return seal(store, env, header, number, before, above, below);
+        let counts = walking.before;
+        return seal(store, env, header, number, before, counts, above, below);
     }
     match walking.waiting {
         Waiting::Ready if !walking.ops.is_empty() => {
-            let number = walking.next;
+            let map = walking.pending.machines.map(FamilyIx(walking.family));
+            let counter = match map {
+                KeptMap::Store => &mut walking.next,
+                KeptMap::Secrets => &mut walking.secrets_next,
+            };
+            let number = *counter;
             let Some(next) = number.checked_add(1) else { return refuse(store, above) };
-            walking.next = next;
-            walking.waiting = Waiting::Commit(number);
-            let ops = core::mem::replace(
-                &mut walking.ops,
-                List::with_capacity(store.limits.journal.writes.min(store.limits.store.ops)),
-            )
-            .into_boxed();
+            *counter = next;
+            walking.waiting = Waiting::Commit { map, number };
+            let ops =
+                core::mem::replace(&mut walking.ops, List::with_capacity(ops_capacity(&store.limits))).into_boxed();
             walking.bytes = 26;
             state(store, Patching::Walking(walking));
-            commits::submit(store, env, number, ops, above, below);
+            match map {
+                KeptMap::Store => commits::submit(store, env, number, ops, above, below),
+                KeptMap::Secrets => {
+                    let kv_env = crate::directory::env(store, env, true);
+                    let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
+                    skein_kv::down(
+                        &mut store.stores.secrets,
+                        &kv_env,
+                        skein_kv::Request::Commit { owner: Token::new(number), ops },
+                        &mut events,
+                        &mut below.secrets,
+                    );
+                    crate::directory::events_up(store, true, &mut events, above, below);
+                }
+            }
         }
-        Waiting::Ready | Waiting::Site(_) | Waiting::Commit(_) => state(store, Patching::Walking(walking)),
+        Waiting::Ready | Waiting::Site(_) | Waiting::Commit { .. } => state(store, Patching::Walking(walking)),
     }
 }
+#[expect(clippy::too_many_arguments, reason = "the seal carries the levels and counts into the check")]
 fn seal(
     store: &mut Store,
     env: &Env<Limits>,
     mut header: Deployment,
     number: u64,
     before: crate::patching::plan::Levels,
+    counts: List<crate::patching::check::Counted>,
     above: &mut Queue<Event>,
     below: &mut Below,
 ) {
@@ -379,7 +389,7 @@ fn seal(
         }
         ops.push(skein_kv::Op::Put { key, value }).expect("three sealing puts");
     }
-    state(store, Patching::Sealing { number, before });
+    state(store, Patching::Sealing { number, before, counts });
     commits::submit(store, env, number, ops.into_boxed(), above, below);
 }
 
@@ -388,8 +398,12 @@ fn put_size(key: &[u8], value: &[u8], before: u64) -> Option<u64> {
 }
 
 pub(super) fn worst_case(limits: &Limits) -> Option<u64> {
-    let puts = limits.journal.writes.min(limits.store.ops);
-    let rows = puts.min(limits.store.page.bytes);
+    let puts = ops_capacity(limits);
+    let rows = page_capacity(limits);
+    let page = limits.store.page.bytes.max(limits.secrets.page.bytes);
+    let key = limits.store.key.max(limits.secrets.key);
+    let value = limits.store.value.max(limits.secrets.value);
+    let commit = limits.store.commit.max(limits.secrets.commit);
     u64::try_from(size_of::<Walking>())
         .ok()?
         .checked_add(Queue::<pages::WalkRow>::worst_case(rows)?)?
@@ -397,11 +411,11 @@ pub(super) fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<skein_kv::Op>::worst_case(puts.max(3))?.checked_mul(2)?)?
         // Loaded rows (including their key cursors), output puts, and a
         // deferred finished record can coexist; page loads make one temporary.
-        .checked_add(u64::from(limits.store.page.bytes).checked_mul(2)?)?
-        .checked_add(u64::from(limits.store.key).checked_mul(u64::from(rows))?.checked_mul(3)?)?
-        .checked_add(u64::from(limits.store.commit))?
-        .checked_add(u64::from(limits.store.value).checked_mul(3)?)?
-        .checked_add(u64::from(limits.store.key).checked_mul(8)?)
+        .checked_add(u64::from(page).checked_mul(2)?)?
+        .checked_add(u64::from(key).checked_mul(u64::from(rows))?.checked_mul(3)?)?
+        .checked_add(u64::from(commit))?
+        .checked_add(u64::from(value).checked_mul(3)?)?
+        .checked_add(u64::from(key).checked_mul(8)?)
 }
 
 fn start(walking: &mut Walking, family: FamilyIx, root: &str, row: pages::WalkRow) -> Option<()> {
@@ -409,8 +423,7 @@ fn start(walking: &mut Walking, family: FamilyIx, root: &str, row: pages::WalkRo
     let (walk, stopped) = match walk::start(&mut walking.pending.machines, step, family, root, row.row.value) {
         Ok(started) => started,
         Err(halt) => {
-            let of = walking.pending.machines.get(family).owner;
-            walking.refusal = Some(walking.refused(of, &row.row.key, halt));
+            walking.refusal = Some(walking.refused(&row.row.key, halt));
             return None;
         }
     };
@@ -422,11 +435,34 @@ fn finish(walking: &mut Walking, running: Running) -> Option<()> {
     let value = match walk::finished(&mut walking.pending.machines, &running.walk) {
         Ok(value) => bytes::copy_of(value),
         Err(halt) => {
-            let of = walking.pending.machines.get(FamilyIx(walking.family)).owner;
-            walking.refusal = Some(walking.refused(of, &running.key, halt));
+            walking.refusal = Some(walking.refused(&running.key, halt));
             return None;
         }
     };
     walking.deferred = Some(Put { key: running.key, value, cursor: running.cursor });
     Some(())
+}
+
+fn puts(limits: &Limits, map: KeptMap) -> u32 {
+    match map {
+        KeptMap::Store => limits.journal.writes.min(limits.store.ops),
+        KeptMap::Secrets => limits.secrets.ops,
+    }
+}
+fn ops_capacity(limits: &Limits) -> u32 {
+    puts(limits, KeptMap::Store).max(puts(limits, KeptMap::Secrets))
+}
+fn page_capacity(limits: &Limits) -> u32 {
+    puts(limits, KeptMap::Store)
+        .min(limits.store.page.bytes)
+        .max(puts(limits, KeptMap::Secrets).min(limits.secrets.page.bytes))
+}
+fn relative<'a>(machines: &crate::patching::machines::Machines, family: FamilyIx, key: &'a [u8]) -> Option<&'a [u8]> {
+    if machines.get(family).owner != Owner::Application {
+        return Some(key);
+    }
+    match machines.map(family) {
+        KeptMap::Store => keys::of_application(key),
+        KeptMap::Secrets => secrets::of_application(key),
+    }
 }

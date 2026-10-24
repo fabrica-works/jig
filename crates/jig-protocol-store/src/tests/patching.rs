@@ -1,9 +1,9 @@
 //! Static sets, owner ordering and record stops (store.md 10.3).
-use crate::patching::machines::{FamilyIx, Machines, Room};
+use crate::patching::machines::{FamilyIx, Machines, Room, Rooms};
 use crate::patching::plan::{Levels, Planned, Unplanned};
 use crate::patching::walk::Stop;
 use crate::patching::{machines, plan, walk};
-use crate::{KeptFamily, Keys, Owner, PatchSet, PatchSets};
+use crate::{KeptFamily, KeptMap, Keys, Owner, PatchSet, PatchSets};
 use jig_test_patches::{self as fixture, patches as app};
 use jig_test_patches_jig::{self as upstream, patches as jig};
 use skein_codec::patch::{Halt, Site};
@@ -13,11 +13,13 @@ use skein_lib::{Writer, bytes};
 
 const LABEL: KeptFamily = KeptFamily {
     name: "fixture-label",
+    map: KeptMap::Store,
     texts: app::kept::fixture_label::TEXTS,
     keys: &[Keys { from: fixture::keys::LABELS_FROM, to: fixture::keys::LABELS_TO, root: fixture::keys::LABELS_ROOT }],
 };
 const SHELF: KeptFamily = KeptFamily {
     name: "fixture-shelf",
+    map: KeptMap::Store,
     texts: app::kept::fixture_shelf::TEXTS,
     keys: &[Keys {
         from: fixture::keys::SHELVES_FROM,
@@ -25,13 +27,24 @@ const SHELF: KeptFamily = KeptFamily {
         root: fixture::keys::SHELVES_ROOT,
     }],
 };
+const TOKEN: KeptFamily = KeptFamily {
+    name: "fixture-token",
+    texts: app::kept::fixture_token::TEXTS,
+    map: KeptMap::Secrets,
+    keys: &[Keys { from: fixture::keys::TOKENS_FROM, to: fixture::keys::TOKENS_TO, root: fixture::keys::TOKENS_ROOT }],
+};
 const NOTE: KeptFamily = KeptFamily {
     name: "fixture-note",
+    map: KeptMap::Store,
     texts: jig::kept::fixture_note::TEXTS,
     keys: &[Keys { from: upstream::keys::NOTES_FROM, to: upstream::keys::NOTES_TO, root: upstream::keys::NOTES_ROOT }],
 };
-const APPLICATION: PatchSet =
-    PatchSet { owner: Owner::Application, name: fixture::NAME, families: &[LABEL, SHELF], patches: app::PATCHES };
+const APPLICATION: PatchSet = PatchSet {
+    owner: Owner::Application,
+    name: fixture::NAME,
+    families: &[LABEL, SHELF, TOKEN],
+    patches: app::PATCHES,
+};
 const JIG: PatchSet = PatchSet { owner: Owner::Jig, name: upstream::NAME, families: &[NOTE], patches: jig::PATCHES };
 pub(super) const SETS: PatchSets = PatchSets { sets: &[APPLICATION, JIG] };
 pub(super) const BASE: PatchSets = PatchSets {
@@ -40,6 +53,7 @@ pub(super) const BASE: PatchSets = PatchSets {
             families: &[
                 KeptFamily { texts: &[app::kept::fixture_label::TEXTS[0]], ..LABEL },
                 KeptFamily { texts: &[app::kept::fixture_shelf::TEXTS[0]], ..SHELF },
+                KeptFamily { texts: &[app::kept::fixture_token::TEXTS[0]], ..TOKEN },
             ],
             patches: &[],
             ..APPLICATION
@@ -52,6 +66,7 @@ pub(super) const BASE: PatchSets = PatchSets {
     ],
 };
 pub(super) const ROOM: Room = Room { bytes: 128, nodes: 16 };
+pub(super) const ROOMS: Rooms = Rooms { store: ROOM, secrets: ROOM };
 const LABEL_STEP: Planned = Planned { owner: Owner::Application, patch: 1 };
 const SHELF_STEP: Planned = Planned { owner: Owner::Application, patch: 2 };
 const JIG_STEP: Planned = Planned { owner: Owner::Jig, patch: 1 };
@@ -146,7 +161,7 @@ fn after_cannot_pass_the_binary_or_precede_the_store() {
 
 fn made(found: Levels) -> Machines {
     let plan = plan::plan(&SETS, &found, &plan::binary(&SETS)).expect("fixture plan");
-    machines::make(&SETS, &plan, &found, ROOM).expect("fixture machines")
+    machines::make(&SETS, &plan, &found, ROOMS).expect("fixture machines")
 }
 fn shelf_ix(machines: &Machines) -> FamilyIx {
     machines.find(0, 1).expect("shelf machine")
@@ -169,7 +184,7 @@ fn an_unkept_text_is_refused_beside_a_valid_kept_text() {
         let found = levels(0, 0);
         let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("headers plan");
         assert_eq!(
-            match machines::make(&sets, &plan, &found, ROOM) {
+            match machines::make(&sets, &plan, &found, ROOMS) {
                 Ok(_) => Ok(()),
                 Err(error) => Err(error),
             },
@@ -191,7 +206,7 @@ fn a_patch_must_plan_its_family_changes() {
         let found = levels(0, 0);
         let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("headers plan");
         assert_eq!(
-            match machines::make(&sets, &plan, &found, ROOM) {
+            match machines::make(&sets, &plan, &found, ROOMS) {
                 Ok(_) => Ok(()),
                 Err(error) => Err(error),
             },
@@ -209,6 +224,52 @@ pub(super) fn label(version: u16) -> Box<[u8]> {
         out.put(&[0]).expect("color none");
     }
     out.finish()
+}
+pub(super) fn token(value: &[u8], issued: u64) -> Box<[u8]> {
+    let mut out = Writer::new(14_usize.checked_add(value.len()).expect("token length"));
+    out.put(&1_u16.to_be_bytes()).expect("version");
+    out.put(&u32::try_from(value.len()).expect("value length").to_be_bytes()).expect("length");
+    out.put(value).expect("value");
+    out.put(&issued.to_be_bytes()).expect("issued");
+    out.finish()
+}
+
+#[test]
+fn a_secrets_family_patches_in_its_own_maps_room() {
+    let found = levels(1, 1);
+    let plan = plan::plan(&SETS, &found, &plan::binary(&SETS)).expect("token and shelf plan");
+    let input = token(&[7; 64], 91);
+    assert_eq!(input.len(), 78);
+    for (store_bytes, secrets_bytes, accepted) in [(64, 128, true), (128, 64, false)] {
+        // The rooms come from each map's own value limit, as the open picks them.
+        let mut limits = super::fixtures::store_limits();
+        limits.store.value = store_bytes;
+        limits.secrets.value = secrets_bytes;
+        let mut machines = machines::make(&SETS, &plan, &found, Rooms::of(&limits)).expect("unequal map rooms");
+        let family = machines.find(0, 2).expect("token machine");
+        assert_eq!(machines.room(family).bytes, secrets_bytes);
+        let result = walk::start(&mut machines, SHELF_STEP, family, "Token", input.clone());
+        if accepted {
+            let (walk, stop) = result.expect("token fits the secrets room");
+            assert_eq!(stop, Stop::Done);
+            let bytes = walk::finished(&mut machines, &walk).expect("patched token");
+            let (_, value, root) = decoded(app::kept::fixture_token::TEXTS[1], "Token", bytes);
+            assert_eq!(
+                value
+                    .content(value.field(root, app::kept::fixture_token::v2::token::VALUE).expect("value"))
+                    .expect("bytes"),
+                &[7; 64]
+            );
+            assert_eq!(
+                value
+                    .some(value.field(root, app::kept::fixture_token::v2::token::EXPIRES).expect("expires"))
+                    .expect("option"),
+                None
+            );
+        } else {
+            assert_eq!(result.expect_err("token exceeds the secrets room"), Halt::Room);
+        }
+    }
 }
 pub(super) fn shelf(version: u16, books: u32, label: &[u8]) -> Box<[u8]> {
     let size = 15_usize.checked_add(label.len()).expect("fixture size");
@@ -336,8 +397,9 @@ fn advance_moves_only_the_step_owners_families_with_blocks() {
 fn the_machine_heap_bound_grows_with_record_room() {
     // This crate has no counting allocator. This checks the declared bound's
     // availability and room sensitivity, not a measurement of allocations.
-    let bound = machines::worst_case_heap(&SETS, ROOM).expect("fixture bound fits");
-    let larger = machines::worst_case_heap(&SETS, Room { bytes: 256, nodes: 32 }).expect("larger bound fits");
+    let bound = machines::worst_case_heap(&SETS, ROOMS).expect("fixture bound fits");
+    let larger = machines::worst_case_heap(&SETS, Rooms { store: Room { bytes: 256, nodes: 32 }, ..ROOMS })
+        .expect("larger bound fits");
     assert!(larger > bound, "record room contributes to the bound");
 }
 
@@ -403,7 +465,7 @@ fn a_written_held_site_names_its_own_machine_then_resumes_the_holder() {
         PatchSets { sets: &[PatchSet { patches: &[WRITTEN, app::PATCHES[1]], ..APPLICATION }, JIG] };
     let found = levels(0, 0);
     let plan = plan::plan(&TEST_SETS, &found, &plan::binary(&TEST_SETS)).expect("plan");
-    let mut machines = machines::make(&TEST_SETS, &plan, &found, ROOM).expect("machines");
+    let mut machines = machines::make(&TEST_SETS, &plan, &found, ROOMS).expect("machines");
     machines.advance(LABEL_STEP);
     let family = shelf_ix(&machines);
     let (mut walk, stopped) =
@@ -429,7 +491,8 @@ fn record_room_is_checked_on_both_sides_of_a_shelfs_node_count() {
     let plan = plan::plan(&SETS, &found, &plan::binary(&SETS)).expect("plan");
     for (nodes, accepted) in [(3, false), (4, false), (5, true)] {
         // The old shelf has four nodes; the new one adds the weight node.
-        let mut machines = machines::make(&SETS, &plan, &found, Room { nodes, ..ROOM }).expect("machines");
+        let mut machines =
+            machines::make(&SETS, &plan, &found, Rooms { store: Room { nodes, ..ROOM }, ..ROOMS }).expect("machines");
         let family = shelf_ix(&machines);
         let result = walk::start(&mut machines, SHELF_STEP, family, "Shelf", shelf(1, 2, &label(1)));
         if accepted {
@@ -467,7 +530,7 @@ fn a_held_record_two_versions_behind_runs_each_pass() {
     };
     let found = levels(2, 1);
     let plan = plan::plan(&TEST_SETS, &found, &plan::binary(&TEST_SETS)).expect("plan");
-    let mut machines = machines::make(&TEST_SETS, &plan, &found, ROOM).expect("machines");
+    let mut machines = machines::make(&TEST_SETS, &plan, &found, ROOMS).expect("machines");
     let family = shelf_ix(&machines);
     // Version zero's layout is the fixture's v1 layout, with its own prefix.
     let mut old_label = label(1);
@@ -502,13 +565,13 @@ fn an_identity_walk_of_another_owners_holder_is_allowed() {
         owner: Owner::Application,
         name: "holder",
         patches: &[],
-        families: &[KeptFamily { name: "holder", texts: &[HOLDER], keys: &[] }],
+        families: &[KeptFamily { map: KeptMap::Store, name: "holder", texts: &[HOLDER], keys: &[] }],
     };
     let sets = PatchSets { sets: &[HOLDER_SET, JIG] };
     let found = plan::binary(&PatchSets { sets: &[HOLDER_SET] });
     let found = Levels { jig: Some(0), ..found };
     let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("plan");
-    let mut machines = machines::make(&sets, &plan, &found, ROOM).expect("machines");
+    let mut machines = machines::make(&sets, &plan, &found, ROOMS).expect("machines");
     let mut input = Writer::new(13);
     input.put(&1_u16.to_be_bytes()).expect("holder version");
     input.put(&7_u32.to_be_bytes()).expect("held bytes");
@@ -531,14 +594,14 @@ fn two_families_holding_each_other_halt_order() {
             name: "cycle",
             patches: &[PATCH],
             families: &[
-                KeptFamily { name: "cycle-a", texts: &[A], keys: &[] },
-                KeptFamily { name: "cycle-b", texts: &[B1, B2], keys: &[] },
+                KeptFamily { map: KeptMap::Store, name: "cycle-a", texts: &[A], keys: &[] },
+                KeptFamily { map: KeptMap::Store, name: "cycle-b", texts: &[B1, B2], keys: &[] },
             ],
         }],
     };
     let found = Levels { skein: None, smith: None, jig: None, application: Some(0) };
     let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("plan");
-    let mut machines = machines::make(&sets, &plan, &found, ROOM).expect("machines");
+    let mut machines = machines::make(&sets, &plan, &found, ROOMS).expect("machines");
     // The innermost A need not decode: encountering its active machine halts.
     let input = Box::from([0, 1, 0, 0, 0, 6, 0, 1, 0, 0, 0, 0]);
     let result = walk::start(&mut machines, LABEL_STEP, FamilyIx(0), "A", input);

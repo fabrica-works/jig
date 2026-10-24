@@ -143,15 +143,17 @@ skein-io                        files: the ring, or the simulator's disk
   - `before` and `after`, each owner's levels (5.3), none before its
     baseline; a first start's before levels are all none, and its after
     levels the binary's;
-  - each family's count of records before and after;
+  - `counts`: each kept family's count of records before its patches
+    and after, one per family the binary's sets keep, in their order (a
+    first start's each 0 and 0; none with no sets). Only kept families
+    are walked: every other record is copied byte for byte, and no patch
+    adds or removes a record, so the check before the switch refuses a
+    count that moved (10.2, step 5);
   - `store` and `secrets`, the last commit of each map when patching
     ended: the store's, which the deployment's header names (section 6),
     and the secrets' store's; for a first start, 0 and none respectively;
   - `written`, the wall-clock time it was written, `env.wall` in its own
     unit.
-
-  (M3 writes all but the counts, which come with the check before the
-  switch, 10.2 step 5.)
 
   Nothing at open reads it: it is the operator's record of what an
   upgrade did, and what temper's `upgrade --check` and `versions`
@@ -1048,11 +1050,17 @@ Removing a missing file is not a failure.
   a row is kept under, the sources' and accounts' drawn by the accounts'
   counter in the store (`[1, 4, 0]`), so that the start's sweep erases
   nothing it should keep and no number is drawn twice. Its last commit
-  is named in the manifest (section 2). Rough, made exact with the
-  secrets' schemas: today the sign-in and service secrets are the
-  shell's own 40-byte encoding and skein's OAuth records a hand codec
-  of skein-oauth's (its `RECORD_VERSION`), neither from a schema, so
-  neither has a kept text a patch could name (section 16).
+  is named in the manifest (section 2). As built, a kept family names
+  its map (`KeptFamily::map`, 10.3): a secrets family is walked in the
+  copy's secrets' store, each page one commit of that store's own,
+  within that map's limits and record room, and the seal stays the
+  store's (the secrets' store has no format row or header). A fixture
+  family of the application's records proves it (`jig-test-patches`'
+  `fixture-token`), both numbers unchanged across the switch. Still
+  open: the sign-in and service secrets are the shell's own 40-byte
+  encoding and skein's OAuth records a hand codec of skein-oauth's (its
+  `RECORD_VERSION`), neither from a schema, so neither has a kept text
+  a patch could name, and no set keeps them (section 16).
 
 ## 10. Opening and restart
 
@@ -1167,6 +1175,33 @@ one that stands; an older build's is moved aside (section 2). Each
 - `Set`: "This build's patches do not plan, and this start has changed
   nothing in `<deployment>`. The build is wrong: start the build before it
   again."
+- `Check { why: Large }`: "The check before the switch found a patched record
+  too large for a commit alone in the copy of the store this start patched in
+  `<deployment>`, and the generation it patched from stays active, unchanged.
+  Every start of this build checks a fresh copy the same way: start the build
+  before it again, which opens that generation as it was."
+- `Check { why: Count }`: "The check before the switch found a family whose
+  count of records the patches changed in the copy of the store this start
+  patched in `<deployment>`, and the generation it patched from stays active,
+  unchanged. Every start of this build checks a fresh copy the same way: start
+  the build before it again, which opens that generation as it was."
+- `Check { why: Load }`: "The check before the switch found a record the
+  restart could not load within the deployment's limits in the copy of the
+  store this start patched in `<deployment>`, and the generation it patched
+  from stays active, unchanged. Every start of this build checks a fresh copy
+  the same way: start the build before it again, which opens that generation
+  as it was."
+- `Check { why: Join }`: "The check before the switch found a record naming an
+  ended task the store does not hold in the copy of the store this start
+  patched in `<deployment>`, and the generation it patched from stays active,
+  unchanged. Every start of this build checks a fresh copy the same way: start
+  the build before it again, which opens that generation as it was."
+- `Check { why: Private }`: "The check before the switch found a file in the
+  secrets' store of the copy this start patched in `<deployment>` that is not
+  private to the service's user, and the generation it patched from stays
+  active, unchanged. A start makes its copy's files private, so another
+  process or user changed one: make sure nothing else writes in
+  `<deployment>`, and start again."
 
 The refusals at open, beside section 3's others:
 
@@ -1180,15 +1215,19 @@ pub enum OpenRefusal {
     Ahead { owner: Owner, found: Option<u32>, wanted: Option<u32> }, // no patch runs backwards
     Generations { why: Generations },
     Patch { owner: Owner, patch: u32, key: Box<[u8]>, halt: Halt }, // a record the patch refused (10.2)
-    Check { why: Check },                                      // the check before the switch (10.2, step 5)
     Set { owner: Owner, patch: u32 },                          // a patch set that does not plan (10.3)
+    Check { why: Check },                                      // the check before the switch (10.2, step 5)
 }
 pub enum Older { Unrecorded, Layout(Family), Directory, Unleveled }
 pub enum Generations { Busy, Unreadable, Unnamed, Missing { generation: u64 } }
+pub enum Check { Large { key }, Count { family, before, after }, Load { key }, Join { key }, Private { name } }
 ```
 
-`Older`'s first two compare the layouts' row (5.3); `Check` names the
-join, the family's rule or the limit that failed, and its record.
+`Older`'s first two compare the layouts' row (5.3); `Check` names what
+failed: a record too large for a commit alone, or a row that does not
+load, by its key; a family whose count moved, with both counts; an ended
+read position whose ended task is missing, by its key; a secrets' file
+that is not private, by its name.
 
 ### 10.2 Patching a copy
 
@@ -1224,9 +1263,9 @@ generation `A` to `A + 1`:
    text, run through the patch, encoded by its `to`'s and put back at
    its key; a record at another version refuses, `Patch` with its key.
    Each page is one commit through the component's own path, within
-   skein-kv's bounds (5.4); one past the map's budget refuses, `Check`
-   naming the limit (with the check, M4; until then `Failed`). The secrets'
-   store is patched the same way, in its own commits (section 9). The store's
+   skein-kv's bounds (5.4); a record a page cannot hold alone refuses,
+   `Check { why: Large }` with its key. The secrets' store is patched the
+   same way, in its own commits, within its own limits (section 9). The store's
    last commit, one of its own after the last page's, writes the format
    row's levels and versions and the layouts, the binary's (5.3), and
    the deployment's header as patched, naming that commit's number
@@ -1238,12 +1277,18 @@ generation `A` to `A + 1`:
    counts, for the shell's line (temper's `draft/upgrades.md`, 3.1).
 5. **Check,** before anything switches (temper's `draft/upgrades.md`,
    6.4), over the copy as patched and still open (skein-kv has no
-   read-only open), writing nothing: every join resolves; each family's
-   rules hold as a restart checks them, strictly (`../domain/engine.md`,
-   section 6); its rows load within the deployment's limits, a live set
-   past them refusing as a start would; the secrets' files are private;
-   each family's count after is its count before, since no patch adds
-   or removes a record.
+   read-only open), writing nothing; the first failure refuses, `Check`:
+   each kept family's count after is its count before, taken as the copy
+   opened, since no patch adds or removes a record; every row of the
+   core's live ranges and of the census's ended read positions (7.2),
+   which the restart reads whole, loads by the binary's codecs within
+   the deployment's limits, its key its record's; each ended read
+   position's ended task is held, joined as the restart joins it; and
+   each file of the copy's secrets' store is a regular file, private to
+   the service's user, with one link. What the core's census chooses
+   (the results after each party's read position, the unanswered
+   questions' activity), the children's rules, strictly, and their live
+   sets' limits are not checked here yet (section 16).
 6. **The manifest** written into `A + 1` (section 2), by io's durable
    replace expecting no file there.
 7. **Switch:** `active` replaced by io's durable replace, expecting the
@@ -1288,9 +1333,11 @@ pub struct PatchSet {
     pub families: &'static [KeptFamily],
     pub patches: &'static [&'static str], // `patches::PATCHES`, in number order
 }
+pub enum KeptMap { Store, Secrets }       // the map its records live in (section 9)
 pub struct KeptFamily {
     pub name: &'static str,               // the family, as its texts spell it
     pub texts: &'static [&'static str],   // `patches::kept::<family>::TEXTS`, in version order
+    pub map: KeptMap,
     pub keys: &'static [Keys],            // its records' keys, and no other's
 }
 pub struct Keys {
@@ -1306,14 +1353,14 @@ impl PatchSets {
 }
 ```
 
-  `map` (the store's or the secrets') comes with the secrets' walk
-  (section 9, M4); until then every kept family is the store map's.
-  A family's ranges hold records of different declarations (the
+  A family's records are its `map`'s, walked and committed there
+  (section 9). A family's ranges hold records of different declarations (the
   core's tasks beside their turns), and a machine starts each record at a
   declaration (skein's `codec.md`, 11.4: `start(plan, root, record)`), so
   each range names its records' own. Keys' bytes: the application's are
   its own keys, relative to its tag, as its rows are (4.2: the component
-  adds the tag); every other owner's are the map's whole keys.
+  adds the tag), and in the secrets' map relative to its secrets' prefix
+  `[2, 0]` (section 9); every other owner's are the map's whole keys.
 
   A family's `keys` hold its own records and leave out what lies among
   them but is another's (the installation's identifier at `01 04 03`
@@ -1333,6 +1380,11 @@ impl PatchSets {
 - **The plan** reads each patch's header (skein's `codec.md`, 11.6:
   `header`, `level`, `after`): a patch's owner must be its set's `name`
   and its number its place there, or the set is refused, naming it.
+  The manifest counts every kept family by its name (section 2), so the
+  sets fit its bounds, at most 64 families in all and each name at most
+  64 bytes, or the set where they pass them is refused, `Set` with
+  patch 0, as two sets for one owner are: judged before the plan, and
+  at a first start before anything is written.
   The order across owners follows the pins (temper's
   `draft/upgrades.md`, 4.4), downstream first. From the most
   downstream owner with patches pending, its patches run in number
@@ -1503,7 +1555,9 @@ was made (`../domain/tasks.md`, section 3):
 - **The worst case** is both stores' (skein's `kv.md`, section 7: about
   three times each map's budget), the component's buffers and tables, and
   the three drivers' (skein's `io.md`, section 5). Patching's peak (10.2:
-  one map open, one machine per kept family, the copy's chunk) is the
+  one map open, one machine per kept family within its own map's record
+  room, the walk's page and commit buffers at the larger of the two
+  maps' bounds, since one walk serves both, the copy's chunk) is the
   larger of it and serving's, since the root never serves while it
   patches. The sets are the shell's, so `worst_case_with_patches(limits, sets)`
   prices their machines, and `worst_case(limits)` prices `PatchSets::NONE`.
@@ -1620,8 +1674,28 @@ section 2).
   - effects in flight that a patch changes (temper's
     `draft/upgrades.md`, section 8), and transcripts patched as they
     are read;
-  - how the check before the switch runs the restart's rules with
-    nothing committed (10.2, step 5);
+  - the children's rules, strictly, their live sets' limits, and the
+    rows the core's census chooses, in the check before the switch
+    (10.2, step 5; `../domain/engine.md`, section 6). The rules live in
+    each child's restore, which refuses the start on a broken record,
+    but for the accounts child, which counts such records and leaves
+    them; no child has a check over decoded rows the store could call
+    with nothing committed, and a live set's limit is the child's own
+    arena's, counted by its own members. The census's results after each
+    party's read position and its unanswered questions' activity are
+    chosen by the core from its restored state (7.2), which the store
+    does not hold before the switch. Until then a patched record a child
+    refuses, or a result row naming an ended task the store does not
+    hold (the store's own join, which stops the start), makes the start
+    after the switch refuse, as any restart's does, and the generation patched from stays
+    on disk as `active` − 1, spared by the strays' sweep (section 2), for
+    the operator to go back to before the active generation's first
+    commit of its own. Writing `active` back to A gives up A + 1, the
+    patched copy, which the next start sweeps as a stray: a start of the
+    build before opens A as it was, and a start of this build patches A
+    again and refuses the same way, until the binary or the record
+    changes. One the accounts child counts and leaves stays in the
+    patched store;
   - schemas for the secrets' records, so that a patch can name them
     (section 9);
   - keys a patch moves (10.3), left to a later mission: a line for them

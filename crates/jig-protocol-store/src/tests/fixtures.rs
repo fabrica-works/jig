@@ -800,3 +800,25 @@ fn people_compounds() -> [people::Ask; 3] {
 
 // A finite wall distinct from the row timestamps.
 pub const DEADLINE: skein_lib::Wall = skein_lib::Wall::from_nanos(101);
+
+/// The fixture sets' families, in their supplied order, on a first start.
+pub const FIRST_MANIFEST_COUNTS: &[(&str, u64, u64)] =
+    &[("fixture-label", 0, 0), ("fixture-shelf", 0, 0), ("fixture-token", 0, 0), ("fixture-note", 0, 0)];
+
+/// Manifest count rows through the codec's checked constructor.
+pub fn manifest_counts(rows: &[(&str, u64, u64)]) -> skein_lib::List<crate::codec::component::Count> {
+    let mut counts = skein_lib::List::with_capacity(u32::try_from(rows.len()).expect("fixture count"));
+    for (family, before, after) in rows {
+        let count = crate::codec::component::Count::new(
+            &crate::component_v3::CEILINGS,
+            crate::codec::component::CountParts {
+                family: Box::from(family.as_bytes()),
+                before: *before,
+                after: *after,
+            },
+        )
+        .expect("fixture family");
+        counts.push(count).expect("fixture count");
+    }
+    counts
+}
