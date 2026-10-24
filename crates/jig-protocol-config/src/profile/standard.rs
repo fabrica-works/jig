@@ -13,7 +13,7 @@
 //! **core**: `templates=16, fill_mark=1073741824, connectors=4, load_slots=16, call_records=128, tasks=TASKS, authority=AUTHORITY, people=PEOPLE, fleet=FLEET, brief=BRIEF, accounts=ACCOUNTS, notes=NOTES, views=VIEWS, resume_bytes=262144, run_bytes=65536, documents=DOCUMENTS`.
 //! **hub**: `slots=4, accounts=32, facts=256, told=256`.
 //! **link**: `opening=16, facts=256`.
-//! **driver**: `exchanges=8, listeners=ACCOUNTS.sign_ins`.
+//! **driver**: `exchanges=8, listeners=2 × ACCOUNTS.sign_ins`.
 //! **clients**: `provider_codes=256, provider_tokens=1024`.
 use super::small;
 use super::{Limits, Link};
@@ -145,7 +145,7 @@ pub(super) const LIMITS: Limits = Limits {
     driver: skein_oauth_accounts::Limits {
         accounts: super::driver_places(&CORE.accounts).expect("all sources and pending account sign-ins"),
         exchanges: 8,
-        listeners: CORE.accounts.sign_ins,
+        listeners: CORE.accounts.sign_ins.checked_mul(2).expect("a listener and a settling one per sign-in"),
         io: skein_io::Limits { sockets: 64, names: 64, ..small::IO },
         ..small::DRIVER
     },

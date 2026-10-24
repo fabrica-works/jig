@@ -1124,12 +1124,15 @@ nothing is written.
   value, and leaves its request unused whatever the answer, so the
   clients' component erases it once the request is answered, its one
   eraser; the accounts component only reads it, and a value already
-  gone answers its finish not waiting. The store drops what it holds
-  at its close, and a value held past the sign-in time; a crash or a
-  restart loses it with the sign-in it was for, which never survives
-  one. Held values are bounded by the clients' component's carried
-  values at once, each by the driver's redirect bound, in the worst
-  case.
+  gone answers its finish not waiting. The store has no clock and
+  drops a value by no time of its own: the accounts child answers
+  every finish by its sign-in's end at the latest, and the clients'
+  component then erases it. The store drops what it holds at its
+  close; a crash or a restart loses it with the sign-in it was for,
+  which never survives one. Held values are bounded by the clients'
+  component's carried values at once, each by the driver's redirect
+  bound, in the worst case; past them the store holds nothing and the
+  request is answered busy.
 - **An LLM key adopted before granted.** The accounts component checks
   the carried value against its byte bound, then asks the store to
   adopt it into the source's row, naming the digest it replaces, or

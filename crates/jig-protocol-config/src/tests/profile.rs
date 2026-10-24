@@ -86,7 +86,8 @@ fn profiles_drivers_listen_for_each_sign_in_at_once() {
     for profile_name in [Profile::Small, Profile::Standard] {
         let limits = limits(profile_name);
         assert!(limits.driver.listeners >= 1, "{profile_name:?} listens for a sign-in");
-        assert_eq!(limits.driver.listeners, limits.core.accounts.sign_ins, "{profile_name:?}");
+        // A cancelled sign-in's listener counts until it settles (skein's oauth.md, 6.5).
+        assert_eq!(limits.driver.listeners, 2 * limits.core.accounts.sign_ins, "{profile_name:?}");
         assert_eq!(
             limits.driver.accounts,
             limits.core.accounts.accounts * limits.core.accounts.sources + limits.core.accounts.sign_ins + 1

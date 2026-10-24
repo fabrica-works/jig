@@ -393,8 +393,10 @@ host's half reports it (`llm.md`, 5.5).
   holder, sources per account, sign-ins at once (moves out and in
   count among them: `../domain/accounts.md`, 3.6), program sources per
   worker, and a credential's bytes, which bound a key (skein's
-  `llm.md`, 2.6). Within them the accounts' table, skein's driver, the
-  hub's grants, a worker's `sources` and `logins` and the secrets'
+  `llm.md`, 2.6). Within them the accounts' table, skein's driver (its
+  listeners twice the sign-ins at once, so that a sign-in started
+  again has room while the one it cancels settles: `llm.md`, section
+  7), the hub's grants, a worker's `sources` and `logins` and the secrets'
   store are sized; a request that would pass one is refused, naming it
   (`../domain/accounts.md`, 3.6). Clients receive at least the engine's
   document lines in each account, source and sign-in list

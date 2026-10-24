@@ -366,7 +366,7 @@ fn sign_ins_at_once_and_the_sign_in_deadline_reach_the_driver() {
     let limits =
         parse(br#"{"profile":"small","overrides":{"accounts.sign_ins":3,"accounts.sign_in_deadline_ms":120000}}"#)
             .unwrap();
-    assert_eq!((limits.core.accounts.sign_ins, limits.driver.listeners), (3, 3));
+    assert_eq!((limits.core.accounts.sign_ins, limits.driver.listeners), (3, 6));
     assert_eq!(limits.driver.client.sign_in_time, skein_lib::Duration::from_secs(120));
 }
 fn no_sign_ins_at_once_is_refused() {

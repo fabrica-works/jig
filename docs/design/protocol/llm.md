@@ -491,7 +491,11 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 - **Text as it comes:** a piece's bytes, and the pieces a pass may hand
   up.
 - **The driver's:** accounts, the signed-in sources the accounts' bounds
-  allow; exchanges at once; listeners, the sign-ins at once; the sign-in
+  allow; exchanges at once; listeners, twice the sign-ins at once,
+  since a cancelled sign-in's listener counts until it settles (skein's
+  `oauth.md`, 6.5) and a person starting again at the sign-ins' bound
+  needs its replacement's beside it (`../domain/accounts.md`, section
+  5), one more socket per sign-in; the sign-in
   deadline (skein's `oauth.md`, section 3); the refresh lead (skein's
   `oauth.md`, 6.7). The table's, from the accounts' bounds
   and a credential's bytes (`configuration.md`, section 6). The moves'
