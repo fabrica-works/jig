@@ -34,6 +34,8 @@ skein-lib.workspace = true
 skein-world.workspace = true
 
 [dev-dependencies]
+jig-protocol-engine-clients.workspace = true
+jig-client-protocol-wire.workspace = true
 jig-protocol-config.workspace = true
 
 [lints.rust]

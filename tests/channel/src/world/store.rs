@@ -144,7 +144,7 @@ impl Store {
         &mut self,
         events: &mut Vec<Observed>,
         limits: &codec::Limits,
-        names: &[Box<[u8]>],
+        names: &[core::settings::ModelName],
         connector: &jig_test_connector::Limits,
     ) -> Vec<Commit> {
         let mut committed = Vec::new();
@@ -191,7 +191,7 @@ impl Store {
         &mut self,
         path: &[u8],
         limits: &codec::Limits,
-        names: &[Box<[u8]>],
+        names: &[core::settings::ModelName],
         connector: &jig_test_connector::Limits,
     ) -> Vec<Commit> {
         let mut committed = Vec::new();
@@ -244,7 +244,7 @@ impl Store {
         number: u64,
         ops: Box<[skein_kv::Op]>,
         limits: &codec::Limits,
-        names: &[Box<[u8]>],
+        names: &[core::settings::ModelName],
         connector: &jig_test_connector::Limits,
     ) -> Commit {
         let mut writes = Vec::new();

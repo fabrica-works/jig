@@ -794,6 +794,12 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
                 Phase::Held { why, .. } => Some(why),
                 Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => None,
             };
+            match task.executor {
+                Executor::Agent { .. } => {
+                    domain.live_agents = domain.live_agents.checked_add(1).expect("bounded restored agents");
+                }
+                Executor::Person(_) | Executor::Procedure { .. } => {}
+            }
             let id = domain
                 .tasks
                 .insert(Task {

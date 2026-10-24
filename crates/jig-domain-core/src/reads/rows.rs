@@ -20,6 +20,7 @@ fn note_project(scope: &notes::Scope) -> u32 {
 
 pub(super) fn scope_allowed(core: &Core, party: u64, scope: &Scope) -> bool {
     match scope {
+        Scope::SettingsHistory { .. } => core.people.role(party, jig_domain_people::DEPLOYMENT).is_some(),
         Scope::Tasks { query } => documents::task_query::admission(core, party, query).is_ok(),
         Scope::Notes { project } | Scope::Spend { project } => core.people.role(party, *project).is_some(),
         Scope::ScopedNotes { scope, .. } => core.people.role(party, note_project(scope)).is_some(),
@@ -119,6 +120,10 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
             | Read::Notes { .. }
             | Read::ScopedNotes { .. }
             | Read::Spend { .. }
+            | Read::Settings
+            | Read::Setting { .. }
+            | Read::Revision { .. }
+            | Read::Revisions { .. }
             | Read::Deployment
             | Read::Application { .. } => false,
         },
@@ -136,6 +141,7 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
         | Document::Project(_)
         | Document::Note(_)
         | Document::Accounts(_)
+        | Document::Settings(_)
         | Document::Deployment(_) => false,
     }
 }
@@ -165,6 +171,10 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                 | Read::Notes { .. }
                 | Read::ScopedNotes { .. }
                 | Read::Spend { .. }
+                | Read::Settings
+                | Read::Setting { .. }
+                | Read::Revision { .. }
+                | Read::Revisions { .. }
                 | Read::Deployment
                 | Read::Application { .. } => unreachable!("inbox subject comes from inbox read"),
             };
@@ -253,6 +263,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
         | Document::Project(_)
         | Document::Note(_)
         | Document::Accounts(_)
+        | Document::Settings(_)
         | Document::Deployment(_)) => Answer::Document(Box::new(document)),
     }
 }
@@ -310,6 +321,7 @@ fn is_page(scope: &Scope) -> bool {
         | Scope::Tasks { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
+        | Scope::SettingsHistory { .. }
         | Scope::Spend { .. } => true,
         Scope::Task { .. }
         | Scope::Proposal { .. }
@@ -350,6 +362,35 @@ fn ended(task: &tasks::TaskRecord) -> bool {
 }
 
 pub(super) fn from_store(
+    core: &Core,
+    limits: &Limits,
+    range: &Range,
+    raw: Box<[Row]>,
+    next: Option<Position>,
+    wall: skein_lib::Wall,
+) -> Answer {
+    match range.scope {
+        Scope::SettingsHistory { .. } => super::settings::from_store(core, limits, range, raw, next),
+        Scope::Tasks { .. }
+        | Scope::Task { .. }
+        | Scope::Proposal { .. }
+        | Scope::Escalation { .. }
+        | Scope::Question { .. }
+        | Scope::PersonTask { .. }
+        | Scope::Result { .. }
+        | Scope::Reply { .. }
+        | Scope::Turn { .. }
+        | Scope::EndedDelegates { .. }
+        | Scope::History { .. }
+        | Scope::Activity { .. }
+        | Scope::Inbox { .. }
+        | Scope::Notes { .. }
+        | Scope::ScopedNotes { .. }
+        | Scope::Spend { .. } => owner_rows(core, limits, range, raw, next, wall),
+    }
+}
+
+fn owner_rows(
     core: &Core,
     limits: &Limits,
     range: &Range,
@@ -538,6 +579,7 @@ fn object(
                 | Scope::Tasks { .. }
                 | Scope::Notes { .. }
                 | Scope::ScopedNotes { .. }
+                | Scope::SettingsHistory { .. }
                 | Scope::Spend { .. } => unreachable!("task object scope"),
             };
             Ok(Some(answer))
@@ -780,6 +822,7 @@ fn object(
         | Scope::Tasks { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
+        | Scope::SettingsHistory { .. }
         | Scope::Spend { .. } => Ok(None),
     }
 }
@@ -890,6 +933,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
         | Scope::PersonTask { .. }
         | Scope::Result { .. }
         | Scope::Reply { .. }
+        | Scope::SettingsHistory { .. }
         | Scope::Turn { .. } => Ok(None),
     }
 }
@@ -911,6 +955,7 @@ fn inbox_contexts(scope: &Scope, rows: u32) -> Option<List<documents::InboxSelec
         | Scope::Tasks { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
+        | Scope::SettingsHistory { .. }
         | Scope::Spend { .. } => None,
     }
 }
@@ -1403,6 +1448,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
             | Scope::Tasks { .. }
             | Scope::Notes { .. }
             | Scope::ScopedNotes { .. }
+            | Scope::SettingsHistory { .. }
             | Scope::Spend { .. } => false,
         },
         Position::Owner(key) => {
@@ -1447,6 +1493,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     | Key::People(_)
                     | Key::Accounts(_) => false,
                 },
+                Scope::SettingsHistory { .. } => false,
                 Scope::Spend { project } => kind == KeyKind::Ledger(*project),
                 Scope::Inbox { group, .. } => group.updates() && super::indexed::is_update(key),
             }

@@ -347,6 +347,7 @@ impl Parties {
                     | Document::Chips(_)
                     | Document::Inbox(_)
                     | Document::Run(_)
+                    | Document::Settings(_)
                     | Document::Deployment(_)
                     | Document::Question(_)
                     | Document::PersonTask(_)
@@ -451,6 +452,7 @@ fn task_subject(watched: &Watched, task: u64) -> bool {
         Subject::Frame { .. }
         | Subject::Inbox { .. }
         | Subject::Query { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::Proposal { proposer: core::documents::Proposer::Party(_), .. }
         | Subject::Project { .. }
@@ -489,7 +491,11 @@ fn project_subject(
             proposals.get(number) == Some(&project)
         }
         Subject::Chips { tasks: watched } => watched.iter().any(|task| tasks.get(task) == Some(&project)),
-        Subject::Frame { .. } | Subject::Inbox { .. } | Subject::Deployment | Subject::Application { .. } => false,
+        Subject::Frame { .. }
+        | Subject::Inbox { .. }
+        | Subject::Settings
+        | Subject::Deployment
+        | Subject::Application { .. } => false,
     }
 }
 
@@ -520,6 +526,7 @@ fn party_subject(watched: &Watched, party: u64) -> bool {
         | Subject::Run { .. }
         | Subject::Chips { .. }
         | Subject::Query { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::Proposal { .. }
         | Subject::Escalation { .. }
@@ -611,6 +618,7 @@ pub(crate) fn named_subject(value: &core::documents::Watched, party: u64) -> Sub
         W::Accounts => unreachable!("Parties open no accounts watch; the accounts story uses the client peer"),
         W::Query { query } => Subject::Query { query: *query },
         W::Run { task } => Subject::Run { task: *task },
+        W::Settings => Subject::Settings,
         W::Deployment => Subject::Deployment,
     }
 }

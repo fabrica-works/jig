@@ -40,27 +40,7 @@ pub fn templates(
 ) -> Result<Box<[u8]>, w::Problem> {
     let mut rows = List::with_capacity(values.len());
     for value in values {
-        rows.push(w::Template::new(
-            limits,
-            w::TemplateParts {
-                number: value.number,
-                name: w::DocumentText::new(
-                    limits,
-                    w::DocumentTextParts { bytes: bytes::copy_of(&value.name), cut: false },
-                )?,
-                executor: executor(value.executor, limits)?,
-                contract: objects::goal::contract(&value.contract, limits)?,
-                shallower: value.shallower,
-                budget: budget(value.budget, limits)?,
-                deadline: deadline(value.deadline, limits)?,
-                tracked: value.tracked,
-                flags: flags(value.flags, limits)?,
-                label: value.label,
-                grace: value.grace,
-                llm: super::llm::choice(value.llm.as_ref(), models, limits)?,
-            },
-        )?)
-        .expect("one row per template");
+        rows.push(template(value, models, limits)?).expect("one row per template");
     }
     let mut encoded = List::with_capacity(rows.len());
     for row in &rows {
@@ -139,4 +119,31 @@ pub fn overrides(
         .expect("same capacity");
     }
     Ok(rows)
+}
+
+pub(super) fn template(
+    value: &jig_domain_core::Template,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<w::Template, w::Problem> {
+    w::Template::new(
+        limits,
+        w::TemplateParts {
+            number: value.number,
+            name: w::DocumentText::new(
+                limits,
+                w::DocumentTextParts { bytes: bytes::copy_of(&value.name), cut: false },
+            )?,
+            executor: executor(value.executor, limits)?,
+            contract: objects::goal::contract(&value.contract, limits)?,
+            shallower: value.shallower,
+            budget: budget(value.budget, limits)?,
+            deadline: deadline(value.deadline, limits)?,
+            tracked: value.tracked,
+            flags: flags(value.flags, limits)?,
+            label: value.label,
+            grace: value.grace,
+            llm: super::llm::choice(value.llm.as_ref(), models, limits)?,
+        },
+    )
 }

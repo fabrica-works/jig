@@ -1416,6 +1416,11 @@ pub(super) fn tag_tasks(
         };
         out.push(request);
     }
+    let holders = core.tasks.live_agent_tasks();
+    if holders != core.settings_holders {
+        core.settings_holders = holders;
+        core.touch_settings();
+    }
     let capacity_mark = core.tasks.capacity_mark();
     if capacity_mark != core.task_capacity_mark || capacity_mark == u64::MAX {
         core.task_capacity_mark = capacity_mark;

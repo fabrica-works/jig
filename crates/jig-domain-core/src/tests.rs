@@ -1,5 +1,6 @@
 //! Unit fixtures use the core world's small configuration and child entry points.
 #![expect(clippy::too_many_lines, reason = "tests state complete bounded fixtures")]
+use crate::Settings;
 use crate::documents::*;
 use crate::*;
 use skein_lib::{Duration, Env, ReplyTo, Time, Token, Wall};
@@ -131,7 +132,7 @@ pub(crate) fn limits() -> Limits {
         history: 2,
     };
     Limits {
-        settings: settings::Limits { history: 64 },
+        settings: settings::Limits { history: 64, alternatives: 16, permissions: 32 },
         templates: 8,
         fill_mark: 1000,
         documents: DocumentLimits {
@@ -1979,6 +1980,7 @@ fn watch_admission_checks_each_subjects_project_or_owner() {
             | Watched::Chips { .. }
             | Watched::Query { .. }
             | Watched::Run { .. }
+            | Watched::Settings
             | Watched::Deployment
             | Watched::Application { .. } => {}
         }

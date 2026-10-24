@@ -1,4 +1,4 @@
-//! M3's client wire is served while task B/C engine ingress is explicitly pending.
+//! Settings reads and watches reach the core; task B still owns deciding ingress.
 use jig_client_protocol_wire::v19 as w;
 use jig_engine_clients_world::fixtures::{self, Peer};
 use skein_lib::{Reader, Writer};
@@ -11,7 +11,7 @@ macro_rules! encoded {
     }};
 }
 #[test]
-fn settings_requests_reads_and_watch_are_not_served() {
+fn settings_reads_and_watch_reach_the_core_while_decisions_wait_for_task_b() {
     let limits = fixtures::limits().wire;
     let mut peer = Peer::started(&fixtures::settings());
     let bearer = fixtures::signed_in(&mut peer);
@@ -45,10 +45,14 @@ fn settings_requests_reads_and_watch_are_not_served() {
             w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: 19, record: encoded!(&read) })
                 .expect("owned");
         let socket = peer.post(b"/jig/v1/read", encoded!(&owned), Some(&bearer));
+        let Some(jig_domain_core::Event::Read { reply, .. }) = peer.take_core() else {
+            panic!("settings read reaches core")
+        };
+        assert!(peer.answered(socket).is_none());
+        peer.answer_read(reply, jig_domain_core::reads::Answer::None(jig_domain_core::reads::Why::Unknown));
         assert!(matches!(
-            w::ReadAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("read answer")))
-                .expect("wire answer"),
-            w::ReadAnswer::NotServed(_)
+            w::ReadAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("read answer"))).unwrap(),
+            w::ReadAnswer::None(_)
         ));
     }
     // A fresh seeded peer installs the same first test credential for its stream.
@@ -61,10 +65,15 @@ fn settings_requests_reads_and_watch_are_not_served() {
     .expect("subject");
     let open = w::Open::new(&limits, w::OpenParts { stream, watch: 999, subject }).expect("open");
     let socket = peer.post(b"/jig/v1/watch", encoded!(&open), Some(&bearer));
+    let Some(jig_domain_core::Event::Watch { watcher, subject, .. }) = peer.take_core() else {
+        panic!("settings watch reaches core")
+    };
+    assert_eq!(subject, jig_domain_core::documents::Watched::Settings);
+    assert!(peer.answered(socket).is_none());
+    peer.refuse_watch(watcher, jig_domain_core::WatchRefusal::Unknown);
     assert!(matches!(
-        w::OpenAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("watch answer")))
-            .expect("wire answer"),
-        w::OpenAnswer::NotServed(_)
+        w::OpenAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("watch answer"))).unwrap(),
+        w::OpenAnswer::Refused(_)
     ));
     assert!(peer.take_core().is_none());
 }

@@ -22,6 +22,7 @@ pub mod programs;
 pub(crate) mod queries;
 pub(crate) mod reads;
 pub(crate) mod refusals;
+pub mod settings;
 pub mod task;
 mod task_wait;
 pub(crate) mod watches;

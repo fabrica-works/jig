@@ -19,6 +19,7 @@ fn subtree(scope: &Scope) -> bool {
         | Scope::Tasks { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
+        | Scope::SettingsHistory { .. }
         | Scope::Spend { .. } => false,
     }
 }

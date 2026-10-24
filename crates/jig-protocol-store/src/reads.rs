@@ -3,6 +3,7 @@ mod indexed;
 mod joins;
 mod paged;
 mod point;
+mod settings;
 use crate::{Below, Event, Phase, Store, loads};
 use alloc::boxed::Box;
 use jig_domain_core::reads::{Loaded, Range, Scope};
@@ -31,6 +32,7 @@ pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Qu
     }
     let mut spent = Spent { rows: range.rows, bytes: range.bytes, joins: store.limits.joins };
     let result = match range.scope {
+        Scope::SettingsHistory { .. } => settings::read(store, &range),
         Scope::Task { task } | Scope::PersonTask { task } | Scope::Result { task } => {
             point::task(store, &range, task, &mut spent)
         }

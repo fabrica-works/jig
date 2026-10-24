@@ -8,7 +8,7 @@ use skein_lib::{List, Queue};
 use crate::{Core, Limits, RunPolicy, Settings};
 
 /// One numbered charter offered by the deployment (protocol/configuration.md, 3).
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Charter {
     pub number: u32,
     pub policy: RunPolicy,

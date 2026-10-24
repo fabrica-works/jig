@@ -126,17 +126,7 @@ fn the_document_bridge_starts_once_and_preserves_templates_policies_rules_and_mo
     assert_eq!(value.ceiling.spend, policy.ceiling.budget.spend);
     assert_eq!(world.domain.settings().rules(), &configuration().0.core.defaults.rules);
     world.send(root::Event::Core(core::Event::Period { project: 1, period: 1, budget: 100, next: None }));
-    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
-        worker: 0,
-        channel: Token::new(7),
-        hello: fleet::Hello {
-            bounds: fixtures::bounds(),
-            stop_bound: Duration::from_millis(1),
-            slots: 1,
-            workstreams: Box::new([]),
-            hosting: Box::new([]),
-        },
-    })));
+    ready_host(&mut world);
     let chat = fixtures::chat(&world, 1, Box::from(b"hello".as_slice()));
     let reply = ask(&mut world, signed, 2, chat);
     assert!(matches!(reply, people::Reply::Outcome(people::Outcome::Created { .. })), "{reply:?}");
@@ -304,4 +294,294 @@ fn changes_past_their_kinds_bound_refuse_before_the_overflow_value_is_retained()
         })
     );
     assert_eq!(revision(&world, 1, false).head.number, 1);
+}
+
+fn client_read(world: &mut World, signed: u64, read: reads::Read) -> reads::Answer {
+    world.send(root::Event::Core(core::Event::Read { reply: ReplyTo::new(Token::new(SEED)), sign_in: signed, read }));
+    let (_, root::Delivery::Core(core::Held::Read { answer, .. })) =
+        world.client_peer.as_mut().expect("settings story fixture").delivered.pop().expect("read terminal")
+    else {
+        panic!("settings read answer")
+    };
+    answer
+}
+fn inventory(world: &mut World, signed: u64) -> documents::Settings {
+    let reads::Answer::Document(document) = client_read(world, signed, reads::Read::Settings) else {
+        panic!("settings inventory")
+    };
+    let documents::Document::Settings(document) = *document else { panic!("settings document") };
+    *document
+}
+fn released_history() -> World {
+    let (config, mut limits) = configuration();
+    limits.core.settings.history = 2;
+    limits.core.documents.rows = 2;
+    peers::journal(&mut limits);
+    let mut world = World::first_start_with_accounts(config, &limits);
+    world.client_peer = Some(ClientPeer::default());
+    for grace in 6..=10 {
+        let mut config = configuration().0;
+        config.core.defaults.templates[0].grace = Some(Duration::from_secs(grace));
+        restart(&mut world, config);
+    }
+    world
+}
+#[test]
+fn settings_inventory_tracks_each_defaults_revision_across_a_release() {
+    let mut world = start(2);
+    let signed = sign_in(&mut world);
+    let first = inventory(&mut world, signed);
+    assert_eq!(first.newest, 1);
+    assert!(first.settings.iter().all(|line| line.follows == documents::Follows::Default && line.last == 1));
+    assert_eq!(first.held.get(0).expect("settings story fixture").holders, 0);
+    let mut config = configuration().0;
+    config.core.defaults.templates[0].grace = Some(Duration::from_secs(6));
+    restart(&mut world, config);
+    let signed = sign_in(&mut world);
+    let second = inventory(&mut world, signed);
+    assert_eq!(second.newest, 2);
+    for line in &second.settings {
+        assert_eq!(line.last, if line.setting == settings::Setting::Template(1) { 2 } else { 1 });
+    }
+}
+#[test]
+fn settings_inventory_is_unknown_without_a_deployment_role() {
+    let mut world = jig_core_world::stories::reads::world(SEED);
+    jig_core_world::reads::ask(&mut world, 1, reads::Read::Settings);
+    assert_eq!(jig_core_world::reads::latest(&world), &reads::Answer::None(reads::Why::Unknown));
+    jig_core_world::reads::ask(&mut world, 2, reads::Read::Deployment);
+    assert_eq!(jig_core_world::reads::latest(&world), &reads::Answer::None(reads::Why::Unknown));
+}
+#[test]
+fn a_setting_reads_whole_only_from_the_newest() {
+    let mut world = released_history();
+    let signed = sign_in(&mut world);
+    let reads::Answer::Setting(value) =
+        client_read(&mut world, signed, reads::Read::Setting { setting: settings::Setting::Template(1), revision: 6 })
+    else {
+        panic!("whole template")
+    };
+    let settings::Value::Template(template) = value.value else { panic!("template value") };
+    assert_eq!(template.grace, Some(Duration::from_secs(10)));
+    assert_eq!(
+        client_read(&mut world, signed, reads::Read::Setting { setting: settings::Setting::Template(1), revision: 5 }),
+        reads::Answer::None(reads::Why::Unknown)
+    );
+    assert_eq!(
+        client_read(
+            &mut world,
+            signed,
+            reads::Read::Setting { setting: settings::Setting::Template(999), revision: 6 }
+        ),
+        reads::Answer::None(reads::Why::Unknown)
+    );
+}
+#[test]
+fn revision_reads_load_held_and_history_records_and_name_the_forgotten_cutoff() {
+    let mut world = released_history();
+    let signed = sign_in(&mut world);
+    for number in [6, 5, 4] {
+        let reads::Answer::Revision(value) = client_read(&mut world, signed, reads::Read::Revision { number }) else {
+            panic!("revision read")
+        };
+        let reads::RevisionAnswer::Revision { revision, .. } = *value else { panic!("kept revision") };
+        assert_eq!(revision.head.number, number);
+        assert_eq!(revision.head.by, settings::Decider::Release);
+        assert_eq!(revision.items.len(), 1);
+    }
+    assert_eq!(
+        client_read(&mut world, signed, reads::Read::Revision { number: 3 }),
+        reads::Answer::Revision(Box::new(reads::RevisionAnswer::Forgotten { oldest: 4 }))
+    );
+    assert_eq!(
+        client_read(&mut world, signed, reads::Read::Revision { number: 7 }),
+        reads::Answer::Revision(Box::new(reads::RevisionAnswer::Unknown))
+    );
+    world.erase(key(settings::Key::History(5)));
+    assert_eq!(
+        client_read(&mut world, signed, reads::Read::Revision { number: 5 }),
+        reads::Answer::Revision(Box::new(reads::RevisionAnswer::Forgotten { oldest: 4 }))
+    );
+}
+#[test]
+fn revisions_pages_run_newest_first_and_end_with_forgotten() {
+    let mut world = released_history();
+    let signed = sign_in(&mut world);
+    let reads::Answer::Revisions(first) = client_read(&mut world, signed, reads::Read::Revisions { before: None })
+    else {
+        panic!("history page")
+    };
+    assert_eq!(first.rows.iter().map(|row| row.head.number).collect::<Vec<_>>(), [6, 5]);
+    assert_eq!(first.next, Some(5));
+    assert!(!first.forgotten);
+    let reads::Answer::Revisions(last) = client_read(&mut world, signed, reads::Read::Revisions { before: first.next })
+    else {
+        panic!("last history page")
+    };
+    assert_eq!(last.rows.iter().map(|row| row.head.number).collect::<Vec<_>>(), [4]);
+    assert_eq!(last.next, None);
+    assert!(last.forgotten);
+}
+fn ready_host(world: &mut World) {
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+        worker: 0,
+        channel: Token::new(7),
+        hello: fleet::Hello {
+            bounds: fixtures::bounds(),
+            stop_bound: Duration::from_millis(1),
+            slots: 1,
+            workstreams: Box::new([]),
+            hosting: Box::new([]),
+        },
+    })));
+}
+fn watched_holders(world: &World) -> Vec<u32> {
+    world
+        .client_peer
+        .as_ref()
+        .expect("settings story fixture")
+        .delivered
+        .iter()
+        .filter_map(|(_, delivery)| match delivery {
+            root::Delivery::Core(core::Held::Delivery { document, .. }) => match document.as_ref() {
+                documents::Document::Settings(value) => {
+                    Some(value.held.get(0).expect("settings story fixture").holders)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+#[test]
+fn settings_watch_marks_when_an_agent_task_is_added_and_ends() {
+    const WATCHER: Token = Token::new(37_002);
+    let mut world = start(2);
+    let signed = sign_in(&mut world);
+    world.send(root::Event::Core(core::Event::Watch {
+        watcher: WATCHER,
+        sign_in: signed,
+        subject: documents::Watched::Settings,
+        window: documents::Window { rows: 1, after: None },
+    }));
+    assert_eq!(watched_holders(&world), [0]);
+    world.send(root::Event::Core(core::Event::Delivered { watcher: WATCHER }));
+    world.send(root::Event::Core(core::Event::Period { project: 1, period: 1, budget: 100, next: None }));
+    ready_host(&mut world);
+    let chat = fixtures::chat(&world, 1, Box::from(b"hello".as_slice()));
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(SEED)),
+        sign_in: signed,
+        key: [61; 16],
+        ask: chat,
+    })));
+    assert_eq!(watched_holders(&world), [0, 1]);
+    world.send(root::Event::Core(core::Event::Delivered { watcher: WATCHER }));
+    let task = world.assigned.as_ref().expect("live agent task").task;
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(SEED)),
+        sign_in: signed,
+        key: [62; 16],
+        ask: people::Ask::Cancel { project: 1, task, reason: Box::from(b"finished".as_slice()), grace: None },
+    })));
+    world.end(jig_domain_tasks::End::Parked, 0);
+    assert_eq!(watched_holders(&world), [0, 1, 0]);
+}
+
+#[test]
+fn a_removed_setting_keeps_its_inventory_line_and_reads_unknown() {
+    let mut world = start(2);
+    world.seed(Box::new([record(settings::Record::Changed {
+        setting: settings::Setting::Template(2),
+        changed: settings::Changed { value: None, revision: 1 },
+    })]));
+    restart(&mut world, configuration().0);
+    let signed = sign_in(&mut world);
+    let document = inventory(&mut world, signed);
+    let line = document
+        .settings
+        .iter()
+        .find(|line| line.setting == settings::Setting::Template(2))
+        .expect("settings story fixture");
+    assert_eq!(line.follows, documents::Follows::Change);
+    assert_eq!(line.last, 1);
+    assert_eq!(
+        client_read(&mut world, signed, reads::Read::Setting { setting: settings::Setting::Template(2), revision: 1 }),
+        reads::Answer::None(reads::Why::Unknown)
+    );
+}
+#[test]
+fn revision_item_previews_state_how_many_were_cut() {
+    let (config, mut limits) = configuration();
+    limits.core.documents.lines = 1;
+    let mut world = World::first_start_with_accounts(config, &limits);
+    world.client_peer = Some(ClientPeer::default());
+    let mut config = configuration().0;
+    for template in &mut config.core.defaults.templates {
+        template.name = Box::from(b"new name".as_slice());
+    }
+    restart(&mut world, config);
+    let signed = sign_in(&mut world);
+    let reads::Answer::Revisions(page) = client_read(&mut world, signed, reads::Read::Revisions { before: None })
+    else {
+        panic!("revision page")
+    };
+    let row = page.rows.get(0).expect("settings story fixture");
+    assert_eq!(row.head.number, 2);
+    assert_eq!(row.items.len(), 1);
+    assert_eq!(row.more, 1);
+    assert_eq!(page.next, None);
+    assert!(!page.forgotten);
+}
+#[test]
+fn revision_loads_answer_busy_when_the_load_slab_is_full() {
+    let mut world = start(2);
+    let signed = sign_in(&mut world);
+    world.sign_in = Some(signed);
+    world.client_peer = None;
+    let mut parties = jig_core_world::reads::Parties::new(world.store.applied);
+    parties.hold_loads = true;
+    world.reads = Some(parties);
+    // The small profile has four load slots (configuration.md, section 6).
+    for number in 1..=5 {
+        jig_core_world::reads::ask(&mut world, number, reads::Read::Revision { number: 1 });
+    }
+    assert_eq!(jig_core_world::reads::latest(&world), &reads::Answer::None(reads::Why::Busy));
+    jig_core_world::reads::complete(&mut world);
+    assert_eq!(world.reads.as_ref().expect("settings story fixture").receipts.len(), 5);
+}
+
+#[test]
+fn a_revision_item_past_the_single_read_budget_answers_its_encoded_size() {
+    use jig_client_protocol_wire::v19 as w;
+    use jig_protocol_engine_clients::translate::settings as wire;
+    const SINGLE_READ_BYTES: u64 = 4096;
+    const NAME_BYTES: usize = 4096;
+    // v19 SettingValue tag + this fixture's Template: 46 fixed bytes + its 4096-byte name.
+    const ENCODED_TEMPLATE_BYTES: u64 = 4142;
+    let (config, mut limits) = configuration();
+    limits.core.load_bytes = SINGLE_READ_BYTES;
+    let mut world = World::first_start_with_accounts(config, &limits);
+    world.client_peer = Some(ClientPeer::default());
+    let mut config = configuration().0;
+    config.core.defaults.templates[0].name = vec![b'x'; NAME_BYTES].into_boxed_slice();
+    restart(&mut world, config);
+    let signed = sign_in(&mut world);
+    let reads::Answer::Revision(answer) = client_read(&mut world, signed, reads::Read::Revision { number: 2 }) else {
+        panic!("revision read")
+    };
+    let reads::RevisionAnswer::Revision { value_bytes, .. } = answer.as_ref() else { panic!("revision") };
+    assert_eq!(*value_bytes, SINGLE_READ_BYTES);
+    let w::RevisionAnswer::Revision(document) = wire::revision(&answer, &[], &w::CEILINGS).expect("revision answer")
+    else {
+        panic!("revision record")
+    };
+    let mut pieces = skein_lib::Reader::new(document.items());
+    let length = pieces.u32().expect("item length");
+    let bytes = pieces.bytes(length).expect("item bytes");
+    let item = w::RevisionItem::decode(&w::CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("revision item");
+    let w::RevisionEdit::TooLarge(size) = item.edit() else { panic!("item size") };
+    assert_eq!(size.bytes(), ENCODED_TEMPLATE_BYTES);
 }

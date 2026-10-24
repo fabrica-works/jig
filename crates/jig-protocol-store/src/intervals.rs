@@ -97,6 +97,26 @@ fn after(key: &[u8]) -> Box<[u8]> {
 pub fn scope(party: u64, scope: &core::reads::Scope) -> Option<Box<[Range]>> {
     use core::reads::Scope;
     Some(match scope {
+        Scope::SettingsHistory { first, last, newest, .. } => {
+            let mut ranges = List::with_capacity(2);
+            if first < newest {
+                ranges
+                    .push(Range {
+                        start: encoded(&core::Key::Core(core::CoreKey::Settings(core::settings::Key::History(*first)))),
+                        end: point(&core::Key::Core(core::CoreKey::Settings(core::settings::Key::History(
+                            (*last).min(newest.saturating_sub(1)),
+                        ))))
+                        .end,
+                    })
+                    .expect("history interval");
+            }
+            if first <= newest && newest <= last {
+                ranges
+                    .push(point(&core::Key::Core(core::CoreKey::Settings(core::settings::Key::Held(*newest)))))
+                    .expect("held point");
+            }
+            ranges.into_boxed()
+        }
         Scope::Task { task } | Scope::PersonTask { task } | Scope::Result { task } => Box::new([
             point(&core::Key::Tasks(jig_domain_tasks::Key::Live(*task))),
             point(&core::Key::Tasks(jig_domain_tasks::Key::Ended(*task))),

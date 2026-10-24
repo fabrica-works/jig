@@ -265,6 +265,7 @@ fn take_cursor(r: &mut Reader<'_>) -> Option<reads::Cursor> {
 
 fn put_scope(w: &mut Writer, value: &reads::Scope) -> Option<()> {
     match value {
+        reads::Scope::SettingsHistory { .. } => return None,
         reads::Scope::Task { task } => {
             w.byte(0)?;
             w.u64(*task)?;

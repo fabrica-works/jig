@@ -74,6 +74,7 @@ pub(super) fn admit(
         | documents::Subject::Tree { .. }
         | documents::Subject::Chips { .. }
         | documents::Subject::Run { .. }
+        | documents::Subject::Settings
         | documents::Subject::Deployment => Admission::Refused(people::Refusal::NotOffered),
     }
 }

@@ -123,6 +123,7 @@ fn refused_subject(watcher: Token, subject: &Subject, why: WatchRefusal) -> Requ
         | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::Proposal { .. }
         | Subject::Escalation { .. }
@@ -151,6 +152,7 @@ pub(super) fn open(
         | Watched::Accounts
         | Watched::Inbox
         | Watched::Query { .. }
+        | Watched::Settings
         | Watched::Deployment
         | Watched::Application { .. } => None,
     };
@@ -200,6 +202,7 @@ fn open_follow(
             | Watched::Inbox
             | Watched::Query { .. }
             | Watched::Run { .. }
+            | Watched::Settings
             | Watched::Deployment => refused(watcher, WatchRefusal::SignedOut),
         };
     };
@@ -226,6 +229,7 @@ fn open_follow(
         | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::Proposal { .. }
         | Subject::Escalation { .. }
@@ -291,6 +295,7 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
         | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::Proposal { .. }
         | Subject::Escalation { .. }
@@ -317,6 +322,7 @@ fn named_subject(subject: Watched, party: u64) -> Subject {
         Watched::Accounts => Subject::Accounts { party },
         Watched::Query { query } => Subject::Query { query },
         Watched::Run { task } => Subject::Run { task },
+        Watched::Settings => Subject::Settings,
         Watched::Deployment => Subject::Deployment,
     }
 }
@@ -339,6 +345,7 @@ fn application_subject(
         | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::Proposal { .. }
         | Subject::Escalation { .. }
@@ -366,6 +373,7 @@ pub(super) fn marked(core: &mut Core, connector: u16, subjects: List<Token>) -> 
             | Subject::Accounts { .. }
             | Subject::Query { .. }
             | Subject::Run { .. }
+            | Subject::Settings
             | Subject::Deployment
             | Subject::Proposal { .. }
             | Subject::Escalation { .. }
@@ -428,6 +436,7 @@ fn watch_document(
         | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
+        | Subject::Settings
         | Subject::Deployment
         | Subject::Proposal { .. }
         | Subject::Escalation { .. }
@@ -541,6 +550,7 @@ fn changed_run(core: &mut Core, env: &Env<Limits>, run: Token, out: &mut Queue<R
             | Subject::Accounts { .. }
             | Subject::Query { .. }
             | Subject::Run { .. }
+            | Subject::Settings
             | Subject::Deployment
             | Subject::Proposal { .. }
             | Subject::Escalation { .. }

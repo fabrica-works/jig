@@ -187,13 +187,6 @@ impl Component {
             self.respond(env, exchange, routes::encoded_open(&answer));
             return;
         }
-        // task C
-        if family.is_none() && settings_subject(&subject.record, &env.limits.wire) {
-            let answer =
-                w::OpenAnswer::NotServed(crate::served::not_served(&self.settings, w::Owner::Jig, &env.limits.wire));
-            self.respond(env, exchange, routes::encoded_open(&answer));
-            return;
-        }
         let watcher = self.name();
         let version = subject.version;
         let Some(opening) = crate::served::watch(subject, watcher, sign_in, self.settings.rows, &env.limits.wire)
@@ -471,24 +464,5 @@ impl Component {
         }
         self.streams.insert(owner, stream).expect("same stream slot");
         true
-    }
-}
-
-// task C
-fn settings_subject(record: &[u8], limits: &w::Limits) -> bool {
-    let Some(value) = crate::translate::watches::decode(record, limits) else {
-        return false;
-    };
-    match value {
-        w::Subject::Settings => true,
-        w::Subject::Me
-        | w::Subject::Task(_)
-        | w::Subject::Tree(_)
-        | w::Subject::Chips(_)
-        | w::Subject::Inbox(_)
-        | w::Subject::Tasks(_)
-        | w::Subject::Run(_)
-        | w::Subject::Deployment
-        | w::Subject::Accounts => false,
     }
 }

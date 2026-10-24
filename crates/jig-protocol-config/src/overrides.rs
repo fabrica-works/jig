@@ -511,6 +511,8 @@ fn set_core(limits: &mut jig_domain_core::Limits, name: &[u8], value: u64) -> Re
             }
             settings.history = count(value)?;
         }
+        b"settings.alternatives" => settings.alternatives = count(value)?,
+        b"settings.permissions" => settings.permissions = count(value)?,
         b"templates" => *templates = count(value)?,
         b"fill_mark" => *fill_mark = value,
         b"connectors" => *connectors = count(value)?,
@@ -605,6 +607,7 @@ pub fn parse(document: &Document, at: u32, path: &Path) -> Result<Limits, Proble
     limits.core.documents.executors = profile::authority_executors(&limits.core.tasks, &limits.core.authority);
     limits.core.documents.implications = limits.core.authority.implications;
     object.finish(document, path, &mut problems);
+    crate::clients::check_settings(&limits, &mut problems);
     if problems.is_empty() { Ok(limits) } else { Err(problems) }
 }
 

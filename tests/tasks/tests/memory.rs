@@ -641,6 +641,8 @@ fn the_wait_index_and_walk_have_an_explicit_memory_delta() {
     // replacement list of question positions, during a first answer.
     const QUESTION_POSITION_BYTES: u64 = 1_776;
     const ENDING_AUTHORITY_BYTES: u64 = 384;
+    // O(1) live agent count, including alignment room.
+    const SETTINGS_HOLDERS_BYTES: u64 = 8;
     assert_eq!(
         tasks::worst_case(&LIMITS),
         Some(
@@ -652,6 +654,7 @@ fn the_wait_index_and_walk_have_an_explicit_memory_delta() {
                 + JUDGEMENT_BYTES
                 + QUESTION_POSITION_BYTES
                 + ENDING_AUTHORITY_BYTES
+                + SETTINGS_HOLDERS_BYTES
         )
     );
 }

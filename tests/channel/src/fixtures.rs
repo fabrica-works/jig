@@ -513,8 +513,8 @@ pub fn store_limits() -> jig_test_service::limits::Limits {
 
 /// The fixture's configured model names, by which the store keeps a role's models.
 #[must_use]
-pub fn store_names() -> &'static [Box<[u8]>] {
-    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
+pub fn store_names() -> &'static [jig_domain_core::settings::ModelName] {
+    static NAMES: std::sync::OnceLock<Box<[jig_domain_core::settings::ModelName]>> = std::sync::OnceLock::new();
     NAMES.get_or_init(|| jig_protocol_store::codec::names(&engine_configuration().llm.models))
 }
 
@@ -593,6 +593,6 @@ pub(crate) fn providers_document() -> Vec<u8> {
 }
 
 pub(crate) fn providers_store_names() -> &'static [Box<[u8]>] {
-    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
+    static NAMES: std::sync::OnceLock<Box<[jig_domain_core::settings::ModelName]>> = std::sync::OnceLock::new();
     NAMES.get_or_init(|| Box::new([b"fake".as_slice().into(), b"other".as_slice().into()]))
 }

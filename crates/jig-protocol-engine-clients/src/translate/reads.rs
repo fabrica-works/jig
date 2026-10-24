@@ -7,8 +7,12 @@ use jig_domain_people as people;
 use skein_lib::{Reader, Writer};
 pub(crate) fn read(value: w::Read) -> Option<reads::Read> {
     Some(match value {
-        // task C
-        w::Read::Settings | w::Read::Setting(_) | w::Read::Revision(_) | w::Read::Revisions(_) => return None,
+        w::Read::Settings => reads::Read::Settings,
+        w::Read::Setting(value) => {
+            reads::Read::Setting { setting: super::settings::setting(value.setting()), revision: value.revision() }
+        }
+        w::Read::Revision(value) => reads::Read::Revision { number: value.number() },
+        w::Read::Revisions(value) => reads::Read::Revisions { before: *value.before() },
         w::Read::Tasks(value) => {
             let value = value.into_parts();
             reads::Read::Tasks {
@@ -145,6 +149,14 @@ pub(crate) fn answer(
 ) -> Result<w::ReadAnswer, w::Problem> {
     let value = match answer {
         reads::Answer::None(why) => return Ok(none(*why, limits)),
+        reads::Answer::Setting(value) => {
+            w::ReadValue::Setting(super::settings::setting_document(value, models, limits)?)
+        }
+        reads::Answer::Revision(value) => w::ReadValue::Revision(w::ReadRevisionAnswer::new(
+            limits,
+            w::ReadRevisionAnswerParts { value: super::settings::revision(value, models, limits)? },
+        )?),
+        reads::Answer::Revisions(value) => w::ReadValue::Revisions(super::settings::revisions(value, limits)?),
         reads::Answer::Tasks(page) => pages::tasks(page, limits)?,
         reads::Answer::Page(page) => pages::page(models, read, page, limits)?,
         reads::Answer::Document(_) | reads::Answer::Historical(_) => objects::document(answer, models, limits)?,

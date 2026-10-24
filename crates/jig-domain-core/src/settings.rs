@@ -5,7 +5,7 @@ use jig_domain_authority as authority;
 use jig_domain_people as people;
 use skein_lib::{List, Map, Wall};
 
-mod check;
+pub(crate) mod check;
 pub(crate) mod restart;
 pub use check::check;
 pub use restart::revision_writes;
@@ -17,7 +17,7 @@ pub enum Setting {
     Policy(u32),
     Rules,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Value {
     Charter(Box<Charter>),
     Template(Box<Template>),
@@ -41,24 +41,24 @@ pub struct Changed {
     pub value: Option<Value>,
     pub revision: u32,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Edit {
     Set(Value),
     Removed,
     Reset,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Item {
     pub setting: Setting,
     pub edit: Edit,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Decider {
     FirstStart,
     Release,
     Party(u64),
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Head {
     pub number: u32,
     pub against: u32,
@@ -67,7 +67,31 @@ pub struct Head {
     pub proposal: Option<(people::Proposer, u32)>,
     pub moved: bool,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+/// A stored catalogue's identity; revision indices are relative to these names.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ModelName {
+    pub name: Box<[u8]>,
+    pub efforts: Box<[Box<[u8]>]>,
+}
+#[must_use]
+pub fn model_names(models: &[crate::Model]) -> Box<[ModelName]> {
+    let mut names = List::with_capacity(u32::try_from(models.len()).expect("configured model count"));
+    for model in models {
+        names.push(ModelName { name: model.name.clone(), efforts: model.efforts.clone() }).expect("model count");
+    }
+    names.into_boxed()
+}
+#[must_use]
+pub fn model_names_worst_case() -> Option<u64> {
+    List::<ModelName>::worst_case(jig_domain_tasks::MODELS)?.checked_add(
+        u64::from(jig_domain_tasks::MODELS).checked_mul(
+            u64::from(crate::MODEL_NAME_BYTES)
+                .checked_add(List::<Box<[u8]>>::worst_case(crate::EFFORTS)?)?
+                .checked_add(u64::from(crate::EFFORTS).checked_mul(u64::from(crate::EFFORT_BYTES))?)?,
+        )?,
+    )
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Revision {
     pub head: Head,
     pub items: Box<[Item]>,
@@ -90,6 +114,8 @@ pub enum Fault {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
     pub history: u32,
+    pub alternatives: u32,
+    pub permissions: u32,
 }
 
 /// Addresses sort in the same order as the store's tag 8 subfamilies, then tag 9.

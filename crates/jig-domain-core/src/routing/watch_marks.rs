@@ -30,6 +30,7 @@ impl Core {
                 | Subject::Chips { .. }
                 | Subject::Query { .. }
                 | Subject::Run { .. }
+                | Subject::Settings
                 | Subject::Deployment
                 | Subject::Proposal { .. }
                 | Subject::Escalation { .. }
@@ -52,7 +53,8 @@ impl Core {
             let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
             let touched = match subject {
                 Subject::Frame { .. } => true,
-                Subject::Deployment
+                Subject::Settings
+                | Subject::Deployment
                 | Subject::Task { .. }
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
@@ -75,13 +77,43 @@ impl Core {
         }
     }
 
+    /// Gather every settings watch after the inventory or its holders changes.
+    pub fn touch_settings(&mut self) {
+        for (_, binding) in &self.view_subjects {
+            let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
+            match subject {
+                Subject::Settings => {
+                    self.changed_views.insert(binding.subject).expect("bounded watched marks");
+                }
+                Subject::Application { .. }
+                | Subject::Frame { .. }
+                | Subject::Task { .. }
+                | Subject::Tree { .. }
+                | Subject::Chips { .. }
+                | Subject::Inbox { .. }
+                | Subject::Accounts { .. }
+                | Subject::Query { .. }
+                | Subject::Run { .. }
+                | Subject::Deployment
+                | Subject::Proposal { .. }
+                | Subject::Escalation { .. }
+                | Subject::Question { .. }
+                | Subject::PersonTask { .. }
+                | Subject::Result { .. }
+                | Subject::Project { .. }
+                | Subject::Note { .. } => {}
+            }
+        }
+    }
+
     /// Gather deployment facts after host, account or capacity changes.
     pub fn touch_deployment(&mut self) {
         for (_, binding) in &self.view_subjects {
             let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
             let touched = match subject {
                 Subject::Deployment => true,
-                Subject::Frame { .. }
+                Subject::Settings
+                | Subject::Frame { .. }
                 | Subject::Task { .. }
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
@@ -133,6 +165,7 @@ impl Core {
                 | Subject::Inbox { .. }
                 | Subject::Query { .. }
                 | Subject::Run { .. }
+                | Subject::Settings
                 | Subject::Deployment
                 | Subject::Proposal { .. }
                 | Subject::Escalation { .. }
@@ -200,6 +233,7 @@ impl Core {
                 Subject::Accounts { .. }
                 | Subject::Frame { .. }
                 | Subject::Inbox { .. }
+                | Subject::Settings
                 | Subject::Deployment
                 | Subject::Application { .. } => false,
             };
@@ -254,6 +288,7 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             Subject::Inbox { party } => core.people.role(*party, row.project).is_some(),
             Subject::Accounts { .. }
             | Subject::Frame { .. }
+            | Subject::Settings
             | Subject::Deployment
             | Subject::Note { .. }
             | Subject::Application { .. }
@@ -554,7 +589,7 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
             Ok(()) => None,
             Err(_) => Some(views::End::NotAllowed),
         },
-        Subject::Deployment => {
+        Subject::Settings | Subject::Deployment => {
             if core.people.role(binding.party, people::DEPLOYMENT).is_some() {
                 None
             } else {

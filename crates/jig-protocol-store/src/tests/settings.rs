@@ -200,7 +200,7 @@ fn each_settings_record_round_trips_its_whole_domain_value() {
         })
         .expect("settings fixture count");
     }
-    let names = Box::new([Box::from(b"one".as_slice()), Box::from(b"two".as_slice())]);
+    let names = Box::new([catalogue_name(b"one"), catalogue_name(b"two")]);
     for row in rows.into_boxed() {
         let row = core::Record::Core(core::CoreRecord::Settings(row));
         let bytes = codec::encode(&row, &limits, &*names).expect("bounded settings row");
@@ -214,7 +214,7 @@ fn frozen_model_masks_and_template_choices_follow_names_after_a_catalogue_reorde
     let mut domain = fixtures::CORE_LIMITS;
     domain.authority.executors = 3;
     let limits = codec::limits(&domain).unwrap();
-    let before: [Box<[u8]>; 2] = [Box::from(b"one".as_slice()), Box::from(b"two".as_slice())];
+    let before = [catalogue_name(b"one"), catalogue_name(b"two")];
     let after = [before[1].clone(), before[0].clone()];
     let mut rules = rules();
     rules.ceiling.models = a::Models::Named(1);
@@ -246,4 +246,76 @@ fn frozen_model_masks_and_template_choices_follow_names_after_a_catalogue_reorde
             s::Value::Policy(_) | s::Value::Charter(_) => panic!("fixture setting"),
         }
     }
+}
+
+fn catalogue_name(name: &[u8]) -> s::ModelName {
+    s::ModelName {
+        name: Box::from(name),
+        efforts: Box::new([Box::from(b"low".as_slice()), Box::from(b"high".as_slice())]),
+    }
+}
+#[test]
+fn live_settings_remap_efforts_by_name_and_refuse_missing_efforts() {
+    let limits = codec::limits(&fixtures::CORE_LIMITS).unwrap();
+    let before = [catalogue_name(b"one"), catalogue_name(b"two")];
+    let mut after = before.clone();
+    after[0].efforts.swap(0, 1);
+    let value = s::Value::Template(Box::new(template()));
+    for original in [
+        s::Record::Default {
+            setting: s::Setting::Template(1),
+            default: s::Default { value: value.clone(), revision: 2 },
+        },
+        s::Record::Changed {
+            setting: s::Setting::Template(1),
+            changed: s::Changed { value: Some(value.clone()), revision: 2 },
+        },
+        s::Record::Proposal {
+            proposer: people::Proposer::Party(1),
+            proposal: 1,
+            value: s::Proposal {
+                against: 1,
+                items: Box::new([s::Item { setting: s::Setting::Template(1), edit: s::Edit::Set(value.clone()) }]),
+            },
+        },
+    ] {
+        let original = core::Record::Core(core::CoreRecord::Settings(original));
+        let bytes = codec::encode(&original, &limits, &before).unwrap();
+        for (names, expected_model, expected_effort) in
+            [(&after, 0, 0), (&[catalogue_name(b"gone"), catalogue_name(b"two")], u8::MAX, 1)]
+        {
+            let decoded = codec::decode(&original.key(), &bytes, &limits, names).unwrap();
+            let core::Record::Core(core::CoreRecord::Settings(record)) = decoded else { panic!("settings") };
+            let value = match record {
+                s::Record::Default { default, .. } => default.value,
+                s::Record::Changed { changed, .. } => changed.value.unwrap(),
+                s::Record::Proposal { value, .. } => match value.items[0].edit.clone() {
+                    s::Edit::Set(value) => value,
+                    s::Edit::Removed | s::Edit::Reset => panic!("set"),
+                },
+                s::Record::Revision { .. } | s::Record::Extent { .. } | s::Record::Charter { .. } => {
+                    panic!("live fixture")
+                }
+            };
+            let s::Value::Template(value) = value else { panic!("template") };
+            assert_eq!(
+                value.llm.unwrap().main,
+                tasks::ModelEffort { model: expected_model, effort: Some(expected_effort) }
+            );
+        }
+    }
+    let mut missing = before.clone();
+    missing[0].efforts = Box::new([Box::from(b"low".as_slice())]);
+    let row = core::Record::Core(core::CoreRecord::Settings(s::Record::Changed {
+        setting: s::Setting::Template(1),
+        changed: s::Changed { value: Some(value), revision: 2 },
+    }));
+    let bytes = codec::encode(&row, &limits, &before).unwrap();
+    let Some(core::Record::Core(core::CoreRecord::Settings(s::Record::Changed { changed, .. }))) =
+        codec::decode(&row.key(), &bytes, &limits, &missing)
+    else {
+        panic!("changed")
+    };
+    let s::Value::Template(value) = changed.value.unwrap() else { panic!("template") };
+    assert_eq!(value.llm.unwrap().main.model, u8::MAX);
 }

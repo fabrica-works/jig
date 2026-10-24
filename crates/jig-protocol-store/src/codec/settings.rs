@@ -1420,7 +1420,7 @@ fn decode_item(value: wire::Item, limits: &wire::Limits) -> Result<settings::Ite
 fn encode_default(
     value: &settings::Default,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<wire::Default, wire::Problem> {
     let field_value = encode_value(&value.value, limits)?;
     let field_revision = value.revision;
@@ -1432,19 +1432,19 @@ fn encode_default(
 fn decode_default(
     value: wire::Default,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<settings::Default, wire::Problem> {
     let wire::DefaultParts { models, value, revision } = value.into_parts();
     let field_value = decode_value(value, limits)?;
     let field_revision = revision;
     let mut field_value = field_value;
-    remap_value(&mut field_value, &model_moves(&models, names));
+    remap_value(&mut field_value, &model_moves(&models, names), &models, names);
     Ok(settings::Default { value: field_value, revision: field_revision })
 }
 fn encode_changed(
     value: &settings::Changed,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<wire::Changed, wire::Problem> {
     let field_value = match &value.value {
         Some(entry) => Some(encode_value(entry, limits)?),
@@ -1459,7 +1459,7 @@ fn encode_changed(
 fn decode_changed(
     value: wire::Changed,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<settings::Changed, wire::Problem> {
     let wire::ChangedParts { models, value, revision } = value.into_parts();
     let field_value = match value {
@@ -1469,14 +1469,14 @@ fn decode_changed(
     let field_revision = revision;
     let mut field_value = field_value;
     if let Some(value) = &mut field_value {
-        remap_value(value, &model_moves(&models, names));
+        remap_value(value, &model_moves(&models, names), &models, names);
     }
     Ok(settings::Changed { value: field_value, revision: field_revision })
 }
 fn encode_revision(
     value: &settings::Revision,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<wire::Revision, wire::Problem> {
     let field_head = encode_head(&value.head, limits)?;
     let mut list_35 = List::with_capacity(limits.revision_items);
@@ -1495,7 +1495,7 @@ fn encode_revision(
 fn decode_revision(
     value: wire::Revision,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<settings::Revision, wire::Problem> {
     let wire::RevisionParts { models, head, items } = value.into_parts();
     let field_head = decode_head(head, limits);
@@ -1509,7 +1509,7 @@ fn decode_revision(
     let moved = model_moves(&models, names);
     for item in &mut field_items {
         match &mut item.edit {
-            settings::Edit::Set(value) => remap_value(value, &moved),
+            settings::Edit::Set(value) => remap_value(value, &moved, &models, names),
             settings::Edit::Removed | settings::Edit::Reset => {}
         }
     }
@@ -1536,7 +1536,7 @@ fn decode_charter_version(value: wire::CharterVersion, limits: &wire::Limits) ->
 fn encode_proposal(
     value: &settings::Proposal,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<wire::Proposal, wire::Problem> {
     let field_against = value.against;
     let mut list_37 = List::with_capacity(limits.proposal_items);
@@ -1555,7 +1555,7 @@ fn encode_proposal(
 fn decode_proposal(
     value: wire::Proposal,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<settings::Proposal, wire::Problem> {
     let wire::ProposalParts { models, against, items } = value.into_parts();
     let field_against = against;
@@ -1569,7 +1569,7 @@ fn decode_proposal(
     let moved = model_moves(&models, names);
     for item in &mut field_items {
         match &mut item.edit {
-            settings::Edit::Set(value) => remap_value(value, &moved),
+            settings::Edit::Set(value) => remap_value(value, &moved, &models, names),
             settings::Edit::Removed | settings::Edit::Reset => {}
         }
     }
@@ -1581,6 +1581,9 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let mut limits = wire::CEILINGS;
     limits.text_bytes = core::EFFORT_BYTES;
     limits.model_name = core::MODEL_NAME_BYTES;
+    limits.model_name_name = core::MODEL_NAME_BYTES;
+    limits.model_name_efforts = core::EFFORTS;
+    limits.model_name_efforts_item = core::EFFORT_BYTES;
     limits.run_policy_instructions = domain.run_bytes;
     limits.segment_bytes = domain.authority.segment_bytes.max(domain.tasks.hold_bytes);
     limits.last_exact_bytes = domain.authority.segment_bytes;
@@ -1615,7 +1618,7 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
 pub fn encode(
     record: &settings::Record,
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<Box<[u8]>, wire::Problem> {
     match record {
         settings::Record::Default { default, .. } => {
@@ -1660,7 +1663,7 @@ pub fn decode(
     key: &settings::Key,
     bytes: &[u8],
     limits: &wire::Limits,
-    names: &[Box<[u8]>],
+    names: &[settings::ModelName],
 ) -> Result<settings::Record, wire::Problem> {
     let mut reader = Reader::new(bytes);
     Ok(match key {
@@ -1705,20 +1708,26 @@ pub fn decode(
 
 // Like the people family's live policy rows, settings remember the catalogue's
 // order. Frozen masks and template choices follow names when that order moves.
-fn encode_names(names: &[Box<[u8]>], limits: &wire::Limits) -> Result<List<wire::ModelName>, wire::Problem> {
+fn encode_names(names: &[settings::ModelName], limits: &wire::Limits) -> Result<List<wire::ModelName>, wire::Problem> {
     let mut result = List::with_capacity(jig_domain_tasks::MODELS);
     for name in names {
-        if result.push(wire::ModelName::new(limits, wire::ModelNameParts { name: name.clone() })?).is_err() {
+        if result
+            .push(wire::ModelName::new(
+                limits,
+                wire::ModelNameParts { name: name.name.clone(), efforts: effort_names(&name.efforts)? },
+            )?)
+            .is_err()
+        {
             return Err(bound());
         }
     }
     Ok(result)
 }
-fn model_moves(kept: &List<wire::ModelName>, names: &[Box<[u8]>]) -> [u64; 64] {
+fn model_moves(kept: &List<wire::ModelName>, names: &[settings::ModelName]) -> [u64; 64] {
     let mut moved = [0; 64];
     for (bit, name) in kept.iter().enumerate() {
         for (today, configured) in names.iter().enumerate() {
-            if configured.as_ref() == name.name() {
+            if configured.name.as_ref() == name.name() {
                 let today = u32::try_from(today).expect("configured model count");
                 *moved.get_mut(bit).expect("bounded stored catalogue") = 1_u64.checked_shl(today).unwrap_or(0);
                 break;
@@ -1744,7 +1753,48 @@ fn remap_model(value: &mut u8, moved: &[u64; 64]) {
     let bit = moved.get(usize::from(*value)).copied().unwrap_or(0);
     *value = if bit == 0 { u8::MAX } else { u8::try_from(bit.trailing_zeros()).expect("model index") };
 }
-fn remap_value(value: &mut settings::Value, moved: &[u64; 64]) {
+fn effort_names(names: &[Box<[u8]>]) -> Result<List<Box<[u8]>>, wire::Problem> {
+    let mut result = List::with_capacity(core::EFFORTS);
+    for name in names {
+        if result.push(name.clone()).is_err() {
+            return Err(bound());
+        }
+    }
+    // ModelName's constructor validates each effort's byte length too.
+    Ok(result)
+}
+fn remap_choice(
+    value: &mut tasks::ModelEffort,
+    moved: &[u64; 64],
+    kept: &List<wire::ModelName>,
+    names: &[settings::ModelName],
+) {
+    let old_model = value.model;
+    remap_model(&mut value.model, moved);
+    let Some(effort) = value.effort else { return };
+    let Some(old) = kept.get(u32::from(old_model)) else {
+        value.model = u8::MAX;
+        return;
+    };
+    let Some(name) = old.efforts().get(u32::from(effort)) else {
+        value.model = u8::MAX;
+        return;
+    };
+    let Some(today) = names.get(usize::from(value.model)) else { return };
+    for (at, configured) in today.efforts.iter().enumerate() {
+        if configured == name {
+            value.effort = Some(u8::try_from(at).expect("effort count"));
+            return;
+        }
+    }
+    value.model = u8::MAX;
+}
+fn remap_value(
+    value: &mut settings::Value,
+    moved: &[u64; 64],
+    kept: &List<wire::ModelName>,
+    names: &[settings::ModelName],
+) {
     match value {
         settings::Value::Policy(value) => {
             remap_mask(&mut value.policy.ceiling.models, moved);
@@ -1755,9 +1805,9 @@ fn remap_value(value: &mut settings::Value, moved: &[u64; 64]) {
         settings::Value::Rules(value) => remap_mask(&mut value.ceiling.models, moved),
         settings::Value::Template(value) => {
             if let Some(choice) = &mut value.llm {
-                remap_model(&mut choice.main.model, moved);
+                remap_choice(&mut choice.main, moved, kept, names);
                 for model in &mut choice.subagents {
-                    remap_model(&mut model.model, moved);
+                    remap_choice(model, moved, kept, names);
                 }
             }
         }
