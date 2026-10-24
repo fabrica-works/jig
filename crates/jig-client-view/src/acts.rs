@@ -317,7 +317,7 @@ fn decide(object: &Object, confirmation: &Confirmation, fields: &Fields, project
                 | ActKind::MakeService
                 | ActKind::SetPool => return None,
             };
-            Some(Ask::Decide { project, on: DecideOn::Proposal { proposal, decision } })
+            Some(Ask::Decide { project, on: DecideOn::Proposal { proposal, decision, running: None } })
         }
         ObjectKey::Escalation(task) => {
             if confirmation.act != ActKind::PassUp {

@@ -210,6 +210,7 @@ pub fn named(ask: &Ask) -> Vec<(Object, Revision)> {
             .collect(),
         Ask::Answer { on: AnswerOn::Question { .. }, .. }
         | Ask::Decide { on: DecideOn::Proposal { .. }, .. }
+        | Ask::Propose { action: ProposeAction::Settings(_), .. }
         | Ask::Propose { action: ProposeAction::Batch { .. }, .. }
         | Ask::Withdraw { .. }
         | Ask::Create { .. }

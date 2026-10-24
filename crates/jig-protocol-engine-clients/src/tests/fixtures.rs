@@ -412,6 +412,7 @@ fn decide_proposal_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
                     )
                     .expect("proposal"),
                     decision: w::Decision::Accepted,
+                    running: None,
                 },
             )
             .expect("DecideProposal"),

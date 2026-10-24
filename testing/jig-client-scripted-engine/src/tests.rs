@@ -143,7 +143,10 @@ fn keyed_contract_durability_sign_ins_conflict_and_decided_first() {
     let mut setup = script();
     let p = proposal();
     setup.truth.objects.insert(ObjectKey::Proposal(p.key), ReadValue::Proposal(Box::new(p.clone())));
-    let ask = Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted } };
+    let ask = Ask::Decide {
+        project: 1,
+        on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted, running: None },
+    };
     let mut engine = Engine::new(setup, 1).expect("valid script");
     send(&mut engine, 0, 11, 1, 1, ask.clone());
     send(&mut engine, 1, 12, 1, 2, ask.clone());
@@ -166,7 +169,10 @@ fn keyed_contract_durability_sign_ins_conflict_and_decided_first() {
         11,
         1,
         4,
-        Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: p.key, decision: Decision::PassedUp } },
+        Ask::Decide {
+            project: 1,
+            on: DecideOn::Proposal { proposal: p.key, decision: Decision::PassedUp, running: None },
+        },
     );
     assert_eq!(
         final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]),
@@ -1098,7 +1104,10 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
         11,
         1,
         1,
-        Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: row.key, decision: Decision::Accepted } },
+        Ask::Decide {
+            project: 1,
+            on: DecideOn::Proposal { proposal: row.key, decision: Decision::Accepted, running: None },
+        },
     );
     let up = engine.poll(Time::from_nanos(10_000_000));
     assert_eq!(
@@ -1698,8 +1707,10 @@ fn full_width_task_and_party_makers_remain_distinct_in_scripted_reads_decisions_
         assert_eq!(row.proposer, key.proposer);
         assert_eq!(row.why.bytes(), if index == 0 { b"task maker".as_slice() } else { b"party maker".as_slice() });
     }
-    let asks = keys
-        .map(|proposal| Ask::Decide { project: 1, on: DecideOn::Proposal { proposal, decision: Decision::Accepted } });
+    let asks = keys.map(|proposal| Ask::Decide {
+        project: 1,
+        on: DecideOn::Proposal { proposal, decision: Decision::Accepted, running: None },
+    });
     send(&mut engine, 0, 11, 1, 10, asks[0].clone());
     send(&mut engine, 1, 11, 2, 11, asks[1].clone());
     let answers = engine.poll(Time::from_nanos(10_000_001));

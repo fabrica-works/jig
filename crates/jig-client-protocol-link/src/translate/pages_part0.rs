@@ -5,6 +5,7 @@ pub(crate) fn owner_message_proposal_kind_fields(
     _limits: &Limits,
 ) -> c::OwnerMessageProposalKind {
     match value {
+        w::OwnerMessageProposalKind::Settings => c::OwnerMessageProposalKind::Settings,
         w::OwnerMessageProposalKind::Batch => c::OwnerMessageProposalKind::Batch,
         w::OwnerMessageProposalKind::Effect => c::OwnerMessageProposalKind::Effect,
         w::OwnerMessageProposalKind::Amend => c::OwnerMessageProposalKind::Amend,

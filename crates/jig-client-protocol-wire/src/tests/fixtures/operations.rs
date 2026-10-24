@@ -15,8 +15,11 @@ pub fn merged_targets() -> [(&'static str, Ask); 4] {
         (
             "proposal",
             DecideOn::Proposal(
-                DecideProposal::new(&limits, DecideProposalParts { proposal, decision: Decision::Accepted })
-                    .expect("proposal decision"),
+                DecideProposal::new(
+                    &limits,
+                    DecideProposalParts { proposal, decision: Decision::Accepted, running: None },
+                )
+                .expect("proposal decision"),
             ),
         ),
         (

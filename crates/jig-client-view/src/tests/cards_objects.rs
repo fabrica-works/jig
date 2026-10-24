@@ -1726,7 +1726,8 @@ fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
                 project: 4,
                 on: DecideOn::Proposal {
                     proposal: ProposalKey { proposer: maker, number: u64::MAX },
-                    decision: Decision::Accepted
+                    decision: Decision::Accepted,
+                    running: None
                 }
             }
         );

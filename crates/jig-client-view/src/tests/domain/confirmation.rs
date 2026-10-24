@@ -211,7 +211,7 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
             },
             3 => Ask::Decide {
                 project: 1,
-                on: DecideOn::Proposal { proposal: proposal().key, decision: Decision::Accepted },
+                on: DecideOn::Proposal { proposal: proposal().key, decision: Decision::Accepted, running: None },
             },
             4 => Ask::Stop { project: 1, task: 8 },
             _ => unreachable!(),

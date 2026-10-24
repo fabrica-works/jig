@@ -44,3 +44,4 @@ mod queries;
 mod account_hosts;
 
 pub mod settings;
+pub mod settings_proposals;

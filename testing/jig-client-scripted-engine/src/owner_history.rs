@@ -24,6 +24,7 @@ impl Payload for OwnerRetainedAmendment {
 impl Payload for OwnerRetainedAction {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Settings(value) => value.heap(bounds),
             Self::Batch(tasks) => tasks.heap(bounds),
             Self::Effect { part, authority, .. } | Self::ProcedureEffect { part, authority, .. } => {
                 part.heap(bounds)?.checked_add(authority.heap(bounds)?)

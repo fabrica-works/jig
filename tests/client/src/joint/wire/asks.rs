@@ -93,7 +93,10 @@ fn translate(
         }
         client::Ask::Take { project, task } => people::Ask::TakePerson { project: *project, task: *task },
         client::Ask::HandBack { project, task } => people::Ask::HandBackPerson { project: *project, task: *task },
-        client::Ask::Decide { project, on: client::DecideOn::Proposal { proposal, decision } } => {
+        client::Ask::Decide { project, on: client::DecideOn::Proposal { proposal, decision, running } } => {
+            if running.is_some() {
+                return Err(Invalid::Settings);
+            }
             people::Ask::DecideProposal {
                 project: *project,
                 proposer: match proposal.proposer {
@@ -761,7 +764,8 @@ mod tests {
                         project: 4,
                         on: client::DecideOn::Proposal {
                             proposal: client::ProposalKey { proposer, number: 7 },
-                            decision: client::Decision::Rejected { reason: text(UTF8_TEXTS[0]) }
+                            decision: client::Decision::Rejected { reason: text(UTF8_TEXTS[0]) },
+                            running: None
                         }
                     },
                     &[]

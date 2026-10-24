@@ -73,7 +73,10 @@ fn owner_proposal_original_maker_keys_all_three_decisions_and_reason_survive_dou
             };
             assert_eq!(
                 ask.as_ref(),
-                &Ask::Decide { project: u32::MAX, on: DecideOn::Proposal { proposal: supplied.key, decision } }
+                &Ask::Decide {
+                    project: u32::MAX,
+                    on: DecideOn::Proposal { proposal: supplied.key, decision, running: None }
+                }
             );
             assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
             pending.push((id, *request)).unwrap();

@@ -103,6 +103,7 @@ pub fn action(
     limits: &w::Limits,
 ) -> Result<w::OwnerProposalAction, w::Problem> {
     Ok(match value {
+        // task E: add the settings action with its pending review or accepted revision when the domain produces it.
         d::ProposalAction::Batch(value) => {
             let mut rows = List::with_capacity(value.len());
             for row in value {

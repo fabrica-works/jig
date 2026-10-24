@@ -113,6 +113,9 @@ pub(crate) fn owner_retained_action_fields(
     limits: &Limits,
 ) -> Result<c::OwnerRetainedAction, w::Problem> {
     Ok(match value {
+        w::OwnerRetainedAction::Settings(row) => c::OwnerRetainedAction::Settings(
+            crate::translate::settings_proposals::restore_owner_retained_action_settings(row, limits)?,
+        ),
         w::OwnerRetainedAction::Batch(row) => {
             c::OwnerRetainedAction::Batch(proposed_task_piece(row.value(), limits, limits.client.rows)?)
         }

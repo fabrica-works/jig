@@ -297,7 +297,10 @@ pub fn incident_world(seed: u64) -> ClientWorld {
         Some(Ending::Decided { by: 7, party: Some(party(7)), how: Some(Decision::Accepted), at: Wall::EPOCH });
     let rule = jig_client_scripted_engine::Rule {
         party: Some(7),
-        ask: Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted } },
+        ask: Ask::Decide {
+            project: 1,
+            on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted, running: None },
+        },
         answer: Answer::Done(Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH }),
         changes: vec![
             jig_client_scripted_engine::Change::Object {
@@ -435,7 +438,10 @@ pub fn environment_world(seed: u64) -> ClientWorld {
     };
     let accept = jig_client_scripted_engine::Rule {
         party: Some(7),
-        ask: Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted } },
+        ask: Ask::Decide {
+            project: 1,
+            on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted, running: None },
+        },
         answer: Answer::Done(Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH }),
         changes: vec![jig_client_scripted_engine::Change::Object {
             project: 1,

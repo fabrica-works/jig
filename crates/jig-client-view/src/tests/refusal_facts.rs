@@ -359,6 +359,7 @@ fn settings_refusals_name_each_setting_fault_and_retained_holder_fact() {
         assert!(contains(&tree, words));
     }
     assert!(contains(&render(Refusal::Malformed { at: 0, why: Malformed::SettingsUnchanged }), b"settings unchanged"));
+    assert!(contains(&render(Refusal::Malformed { at: 0, why: Malformed::Running }), b"whether running work moves"));
     let mut builder = Builder::new(&limits());
     builder.open(Role::Page);
     shared_words().outcome(&mut builder, &Outcome::SettingsChanged(OutcomeSettingsChanged { revision: 31 }));

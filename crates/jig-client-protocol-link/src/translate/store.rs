@@ -93,6 +93,10 @@ pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::P
             project: value.project(),
             on: match value.on() {
                 w::DecideOn::Proposal(v) => c::DecideOn::Proposal {
+                    running: match v.running() {
+                        Some(value) => Some(super::settings::restore_running(value, limits)?),
+                        None => None,
+                    },
                     proposal: answers::proposal_key(v.proposal(), limits),
                     decision: answers::decision(v.decision(), limits)?,
                 },

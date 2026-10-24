@@ -40,7 +40,7 @@ impl<A: crate::Application> crate::Engine<A> {
         result
     }
     pub(super) fn accepting_admission(&self, party: u64, ask: &Ask, decision: skein_lib::Wall) -> Option<Admission> {
-        let Ask::Decide { project, on: c::DecideOn::Proposal { proposal, decision: c::Decision::Accepted } } = ask
+        let Ask::Decide { project, on: c::DecideOn::Proposal { proposal, decision: c::Decision::Accepted, .. } } = ask
         else {
             return None;
         };

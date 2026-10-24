@@ -245,7 +245,8 @@ fn retained_proposal_fragment_preserves_absent_empty_and_independent_retained_lo
                     assert_eq!(values.capacity(), 3);
                 }
             }
-            OwnerRetainedAction::Batch(_)
+            OwnerRetainedAction::Settings(_)
+            | OwnerRetainedAction::Batch(_)
             | OwnerRetainedAction::Effect { .. }
             | OwnerRetainedAction::ProcedureEffect { .. }
             | OwnerRetainedAction::Widen { .. }

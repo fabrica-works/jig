@@ -103,7 +103,7 @@ pub struct Decider {
 /// The target and decision of a `Decide`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DecideOn {
-    Proposal { proposal: ProposalKey, decision: Decision },
+    Proposal { proposal: ProposalKey, decision: Decision, running: Option<super::Running> },
     Escalation { task: u64, revision: Revision, decision: Decision },
 }
 /// The target and result of an `Answer`.

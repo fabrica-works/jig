@@ -144,6 +144,11 @@ fn actions() -> Vec<OwnerRetainedAction> {
         OwnerRetainedAction::Amend { task: u64::MAX, change: Box::new(delta()) },
         OwnerRetainedAction::Widen { task: u64::MAX, authority: state().authority },
         OwnerRetainedAction::Release { task: u64::MAX },
+        OwnerRetainedAction::Settings(OwnerRetainedActionSettings {
+            against: 6,
+            items: List::with_capacity(3),
+            made: Some(7),
+        }),
     ]
 }
 fn proposal(action: OwnerRetainedAction) -> OwnerProposalHistory {
@@ -295,6 +300,7 @@ fn expected_action(action: &OwnerRetainedAction) -> u64 {
     let spec = List::<ParameterDocument>::worst_case(3).unwrap() + List::<u64>::worst_case(3).unwrap() + 4 + 5;
     let path = List::<Box<[u8]>>::worst_case(3).unwrap() + 3 + 2;
     match action {
+        OwnerRetainedAction::Settings(_) => List::<RevisionItemHead>::worst_case(3).unwrap(),
         OwnerRetainedAction::Batch(_) => {
             List::<ProposedTask>::worst_case(3).unwrap()
                 + 3 * (spec

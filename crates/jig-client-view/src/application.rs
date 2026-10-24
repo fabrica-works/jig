@@ -339,7 +339,8 @@ fn parts(body: &Body, limit: u32) -> Parts {
                     push(&mut parts, part);
                 }
             }
-            contract::OwnerProposalAction::Batch(_)
+            contract::OwnerProposalAction::Settings(_)
+            | contract::OwnerProposalAction::Batch(_)
             | contract::OwnerProposalAction::Amend { .. }
             | contract::OwnerProposalAction::Widen { .. }
             | contract::OwnerProposalAction::Release { .. } => {}

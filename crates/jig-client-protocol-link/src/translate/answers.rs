@@ -507,6 +507,7 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
                 w::Malformed::Settings(value) => {
                     c::Malformed::Settings(super::settings::restore_malformed_settings(value, limits)?)
                 }
+                w::Malformed::Running => c::Malformed::Running,
                 w::Malformed::SettingsUnchanged => c::Malformed::SettingsUnchanged,
                 w::Malformed::TwoAsAllowed => c::Malformed::TwoAsAllowed,
                 w::Malformed::ConversationNotAgent => c::Malformed::ConversationNotAgent,

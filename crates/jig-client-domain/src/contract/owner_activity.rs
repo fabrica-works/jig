@@ -102,6 +102,7 @@ pub enum OwnerMessageKind {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerMessageProposalKind {
+    Settings,
     Batch,
     Effect,
     Amend,

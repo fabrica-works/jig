@@ -208,6 +208,7 @@ pub(crate) fn refused(
     let (at, found) = match record {
         w::Ask::Create(value) => (None, batch(value.tasks(), models, limits)?),
         w::Ask::Propose(value) => match value.action() {
+            w::ProposeAction::Settings(_) => return Ok(None), // task E: answered not-served at the request entrance.
             w::ProposeAction::Batch(value) => (None, batch(value.tasks(), models, limits)?),
             w::ProposeAction::Amendment(value) => (None, lacking(value.change().llm().as_ref(), models)),
         },

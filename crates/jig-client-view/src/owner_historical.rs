@@ -53,6 +53,7 @@ fn kind(b: &mut Builder, value: OwnerMessageProposalKind, words: &Words) {
         b,
         words,
         match value {
+            OwnerMessageProposalKind::Settings => return,
             OwnerMessageProposalKind::Batch => P::BatchKind,
             OwnerMessageProposalKind::Effect => P::EffectKind,
             OwnerMessageProposalKind::Amend => P::AmendKind,

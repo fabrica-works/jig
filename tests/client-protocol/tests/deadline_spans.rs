@@ -198,6 +198,7 @@ fn a_named_proposal_keeps_its_span_across_client_and_engine_restart() {
                     number: FIRST_PROPOSAL,
                 },
                 decision: c::Decision::Accepted,
+                running: None,
             },
         },
     );

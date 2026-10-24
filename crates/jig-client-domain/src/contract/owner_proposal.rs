@@ -32,6 +32,7 @@ pub struct OwnerFundingOffer {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerProposalAction {
+    Settings(Box<super::OwnerProposalActionSettings>),
     Batch(List<ProposedTask>),
     Effect {
         part: OwnerPart,

@@ -339,7 +339,7 @@ fn owner_historical_proposal_choices_keep_the_named_winner_and_clock_without_exp
                 ActKind::Accept,
                 Box::new(Ask::Decide {
                     project: 1,
-                    on: DecideOn::Proposal { proposal: key, decision: Decision::Accepted },
+                    on: DecideOn::Proposal { proposal: key, decision: Decision::Accepted, running: None },
                 }),
                 &mut out,
                 &domain.client,

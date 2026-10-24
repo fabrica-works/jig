@@ -424,3 +424,4 @@ mod activity_reads;
 pub use activity_reads::*;
 
 pub mod settings;
+pub mod settings_proposals;

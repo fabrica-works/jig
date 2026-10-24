@@ -99,6 +99,16 @@ impl Component {
     ) {
         let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
             Ok(value) => {
+                if settings_not_served(&value) {
+                    // task E: settings proposals and decisions carrying the running-work choice.
+                    let answer = w::KeyedAnswer::NotServed(crate::served::not_served(
+                        &self.settings,
+                        w::Owner::Jig,
+                        &env.limits.wire,
+                    ));
+                    self.respond(env, exchange, routes::encoded(&answer));
+                    return;
+                }
                 let value = match value {
                     w::Ask::ChangeSettings(value) => {
                         if keyed.value.is_some() {
@@ -337,5 +347,44 @@ fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64) -> u64 {
         | w::AccountChange::SetUses(_)
         | w::AccountChange::MoveOut(_)
         | w::AccountChange::Written(_) => 0,
+    }
+}
+
+// task E: remove this admission guard when the people/core proposal vocabulary lands.
+fn settings_not_served(ask: &w::Ask) -> bool {
+    match ask {
+        w::Ask::Propose(value) => match value.action() {
+            w::ProposeAction::Settings(_) => true,
+            w::ProposeAction::Batch(_) | w::ProposeAction::Amendment(_) => false,
+        },
+        w::Ask::Decide(value) => match value.on() {
+            w::DecideOn::Proposal(value) => value.running().is_some(),
+            w::DecideOn::Escalation(_) => false,
+        },
+        w::Ask::AccountChange(_)
+        | w::Ask::Amend(_)
+        | w::Ask::Answer(_)
+        | w::Ask::Cancel(_)
+        | w::Ask::ChangePolicy(_)
+        | w::Ask::Compound(_)
+        | w::Ask::Create(_)
+        | w::Ask::DeleteNote(_)
+        | w::Ask::EditNote(_)
+        | w::Ask::HandBack(_)
+        | w::Ask::MakeProject(_)
+        | w::Ask::MakeService(_)
+        | w::Ask::Message(_)
+        | w::Ask::MoveTask(_)
+        | w::Ask::Release(_)
+        | w::Ask::Rename(_)
+        | w::Ask::Seen(_)
+        | w::Ask::SetPool(_)
+        | w::Ask::SetRoles(_)
+        | w::Ask::SignIn(_)
+        | w::Ask::SignOut(_)
+        | w::Ask::Stop(_)
+        | w::Ask::Take(_)
+        | w::Ask::Withdraw(_)
+        | w::Ask::ChangeSettings(_) => false,
     }
 }

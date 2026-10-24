@@ -25,6 +25,10 @@ pub(super) fn answer(project: u32, on: w::AnswerOn) -> p::Ask {
 pub(super) fn decide(project: u32, on: w::DecideOn) -> Result<p::Ask, Untranslatable> {
     Ok(match on {
         w::DecideOn::Proposal(value) => {
+            // task E: the request entrance answers this choice not-served.
+            if value.running().is_some() {
+                return Err(Untranslatable { path: w::Path::DecideProposalRunning });
+            }
             let v = value.into_parts();
             p::Ask::DecideProposal {
                 project,
@@ -352,6 +356,8 @@ pub(super) fn propose(
 ) -> Result<p::Ask, Untranslatable> {
     let v = value.into_parts();
     let action = match v.action {
+        // task E: the request entrance answers settings proposals not-served.
+        w::ProposeAction::Settings(_) => return Err(Untranslatable { path: w::Path::ProposeSettingsItems }),
         w::ProposeAction::Batch(value) => {
             p::Action::Batch(batch(value.tasks(), w::Path::ProposeBatchTasks, models, limits, names)?)
         }

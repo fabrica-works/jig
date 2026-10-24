@@ -368,7 +368,7 @@ fn a_deciding_card_survives_a_drop_until_its_durable_answer_then_lingers() {
         ActKind::Accept,
         Box::new(Ask::Decide {
             project: 1,
-            on: DecideOn::Proposal { proposal: proposal().key, decision: Decision::Accepted },
+            on: DecideOn::Proposal { proposal: proposal().key, decision: Decision::Accepted, running: None },
         }),
         &mut out,
         &domain.client,
@@ -486,7 +486,7 @@ fn equal_number_task_and_party_proposals_keep_separate_requests_and_terminal_car
             ask.as_ref(),
             &Ask::Decide {
                 project: row.project,
-                on: DecideOn::Proposal { proposal: row.key, decision: Decision::Accepted }
+                on: DecideOn::Proposal { proposal: row.key, decision: Decision::Accepted, running: None }
             }
         );
         assert!(drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::Confirm }).is_empty());

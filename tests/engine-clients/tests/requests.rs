@@ -369,3 +369,68 @@ fn a_carried_value_is_kept_before_the_application_sees_its_request() {
     assert_eq!(answer.record(), [7]);
     assert_eq!(peer.carried(number).map(skein_lib::Secret::expose), Some(b"a carried key".as_slice()), "used, so kept");
 }
+
+#[test]
+fn settings_proposals_and_running_choices_are_not_served_until_task_e() {
+    let limits = fixtures::limits().wire;
+    let propose = w::Ask::Propose(
+        w::Propose::new(
+            &limits,
+            w::ProposeParts {
+                project: 0,
+                reason: Box::from(b"settings".as_slice()),
+                action: w::ProposeAction::Settings(
+                    w::ProposeSettings::new(&limits, w::ProposeSettingsParts { against: 6, items: Box::new([]) })
+                        .expect("settings proposal"),
+                ),
+            },
+        )
+        .expect("propose"),
+    );
+    let proposal = w::ProposalKey::new(
+        &limits,
+        w::ProposalKeyParts {
+            proposer: w::Proposer::Party(
+                w::ProposerParty::new(&limits, w::ProposerPartyParts { value: 3 }).expect("party"),
+            ),
+            number: 7,
+        },
+    )
+    .expect("proposal key");
+    let mut asks = vec![propose];
+    for running in [w::Running::Stays, w::Running::Moves] {
+        asks.push(w::Ask::Decide(
+            w::Decide::new(
+                &limits,
+                w::DecideParts {
+                    project: 0,
+                    on: w::DecideOn::Proposal(
+                        w::DecideProposal::new(
+                            &limits,
+                            w::DecideProposalParts {
+                                proposal: proposal.clone(),
+                                decision: w::Decision::Accepted,
+                                running: Some(running),
+                            },
+                        )
+                        .expect("proposal decision"),
+                    ),
+                },
+            )
+            .expect("decide"),
+        ));
+    }
+    let mut peer = Peer::started(&fixtures::settings());
+    let bearer = fixtures::signed_in(&mut peer);
+    for ask in asks {
+        let socket = peer.post(b"/jig/v1/request", keyed([71; 16], &ask), Some(&bearer));
+        assert!(peer.take_core().is_none(), "task E must own settings proposal admission");
+        let answer = w::KeyedAnswer::decode(
+            &limits,
+            &mut skein_lib::Reader::new(peer.answered(socket).expect("not-served answer")),
+        )
+        .expect("wire answer");
+        let w::KeyedAnswer::NotServed(value) = answer else { panic!("not-served") };
+        assert_eq!(value.owner(), &w::Owner::Jig);
+    }
+}

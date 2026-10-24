@@ -87,6 +87,13 @@ pub(crate) fn check_settings(limits: &crate::Limits, problems: &mut Problems) {
     let core = &limits.core;
     let wire = &limits.clients.wire;
     let path = Path::root().member(b"limits");
+    // settings-v1 bounds a proposal to 128 item heads; its review shares the document envelope.
+    if wire.owner_proposal_action_settings_items < 128 || wire.owner_retained_action_settings_items < 128 {
+        problems.push(path.member(b"clients.wire.proposal_heads"), crate::What::Bound);
+    }
+    if wire.settings_review_items < wire.owned_record {
+        problems.push(path.member(b"clients.wire.settings_review"), crate::What::Bound);
+    }
     // Defaults and changes may name disjoint settings; both belong to the inventory.
     let inventory = match jig_domain_core::settings::capacity(core) {
         Some(count) => double_settings(count),
@@ -201,6 +208,53 @@ mod settings_tests {
         for profile in [crate::Profile::Small, crate::Profile::Standard] {
             let limits = crate::profile(profile);
             assert!(jig_domain_core::worst_case(&limits.core).is_some(), "a profile's core share is representable");
+        }
+    }
+}
+
+#[cfg(test)]
+mod proposal_settings_tests {
+    use super::*;
+    #[test]
+    fn proposal_heads_and_review_fit_their_wire_ceilings() {
+        // settings-v1's proposal holds 128 heads; the review shares Owned.record's document ceiling.
+        for (proposal, retained, review, expected) in [
+            (128, 128, jig_client_protocol_wire::v19::CEILINGS.owned_record, None),
+            (
+                127,
+                128,
+                jig_client_protocol_wire::v19::CEILINGS.owned_record,
+                Some(b"clients.wire.proposal_heads".as_slice()),
+            ),
+            (
+                128,
+                127,
+                jig_client_protocol_wire::v19::CEILINGS.owned_record,
+                Some(b"clients.wire.proposal_heads".as_slice()),
+            ),
+            (
+                128,
+                128,
+                jig_client_protocol_wire::v19::CEILINGS.owned_record - 1,
+                Some(b"clients.wire.settings_review".as_slice()),
+            ),
+        ] {
+            let mut limits = crate::profile(crate::Profile::Small);
+            limits.clients.wire.owner_proposal_action_settings_items = proposal;
+            limits.clients.wire.owner_retained_action_settings_items = retained;
+            limits.clients.wire.settings_review_items = review;
+            let mut problems = Problems::empty();
+            check_settings(&limits, &mut problems);
+            match expected {
+                None => assert!(problems.is_empty(), "{problems:?}"),
+                Some(name) => {
+                    assert_eq!(problems.problems.len(), 1);
+                    assert_eq!(
+                        problems.problems.get(0).expect("one problem").path,
+                        Path::root().member(b"limits").member(name)
+                    );
+                }
+            }
         }
     }
 }

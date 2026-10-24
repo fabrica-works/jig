@@ -62,6 +62,7 @@ pub enum OwnerHistoryHolder {
 /// The whole retained action, distinct from a live request or inferred scope.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerRetainedAction {
+    Settings(super::OwnerRetainedActionSettings),
     /// Whole admitted batch; no synthetic outer loss marker or clipped batch.
     Batch(List<ProposedTask>),
     /// Raw owner reference; application scope is not supplied by this source.

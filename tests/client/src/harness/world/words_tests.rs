@@ -59,7 +59,11 @@ fn reject(world: &mut World<Test, Scripted>, text: &[u8]) {
         key: KEY,
         ask: Box::new(Ask::Decide {
             project: PROJECT,
-            on: DecideOn::Proposal { proposal: key, decision: Decision::Rejected { reason: stories::text(b"No") } },
+            on: DecideOn::Proposal {
+                proposal: key,
+                decision: Decision::Rejected { reason: stories::text(b"No") },
+                running: None,
+            },
         }),
         scene: Some(check::scene(&tree, node)),
     });

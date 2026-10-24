@@ -40,6 +40,15 @@ fn records_1(bytes: &[u8]) {
     check!(AuthorizeRefused, bytes);
     check!(AuthorizeAnswer, bytes);
     check!(DocumentText, bytes);
+    check!(ProposeSettings, bytes);
+    check!(OriginRevision, bytes);
+    check!(ReviewItem, bytes);
+    check!(SettingsReview, bytes);
+    check!(OwnerProposalActionSettings, bytes);
+    check!(OwnerRetainedActionSettings, bytes);
+    check!(SettingOrigin, bytes);
+    check!(ReviewValue, bytes);
+
     check!(ExecutorAgent, bytes);
     check!(ExecutorProcedure, bytes);
     check!(ExecutorParty, bytes);

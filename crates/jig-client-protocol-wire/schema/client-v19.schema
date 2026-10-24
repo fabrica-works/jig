@@ -298,7 +298,8 @@ enum AnswerOn { question: AnswerQuestion, person: AnswerPerson }
 record Answer { project: u32 on: AnswerOn }
 record Take { project: u32 task: u64 }
 record HandBack { project: u32 task: u64 }
-record DecideProposal { proposal: ProposalKey decision: Decision }
+enum Running { stays, moves }
+record DecideProposal { proposal: ProposalKey decision: Decision running: option Running }
 record DecideEscalation { task: u64 revision: Revision decision: Decision }
 enum DecideOn { proposal: DecideProposal, escalation: DecideEscalation }
 record Decide { project: u32 on: DecideOn }
@@ -336,7 +337,9 @@ record NewTask { deadline: NewDeadline executor: OwnerExecutor spec: Specificati
 record Create { project: u32 tasks: bytes 1048576 }
 record ProposeBatch { tasks: bytes 1048576 }
 record ProposeAmendment { task: u64 revision: Revision change: Amendment }
-enum ProposeAction { batch: ProposeBatch, amendment: boxed ProposeAmendment }
+# items is a list of length-prefixed SettingItem records, at most 128, as ChangeSettings' items are.
+record ProposeSettings { against: u32 items: bytes 1114240 }
+enum ProposeAction { batch: ProposeBatch, amendment: boxed ProposeAmendment, settings: ProposeSettings }
 record Propose { project: u32 action: ProposeAction reason: text 65536 }
 record Withdraw { project: u32 proposal: u64 }
 enum AccountHolder { own, deployment }
@@ -465,7 +468,7 @@ enum ReadAnswer { not_served: NotServed, value: Owned, none: ReadAnswerNone }
 record OwnerPeriodTimes { began: u64 next: option u64 }
 record OwnerFundingRecord { period: option OwnerPeriodTimes funder: Funder parent: option Funder numbers: OwnerNumbers made: u32 closed: bool }
 record OwnerSpendPage { rows: list 32 OwnerFundingRecord before: option Cursor after: option Cursor cut: bool }
-enum OwnerMessageProposalKind { batch, effect, amend, widen, release }
+enum OwnerMessageProposalKind { batch, effect, amend, widen, release, settings }
 enum OwnerNoticeState { held, done, failed, cancelled }
 enum OwnerNewsClass { wakes, kept, dropped }
 record OwnerWordResultApproved { state: text 65536 words_present: bool }
@@ -579,7 +582,12 @@ record OwnerRetainedActionProcedureEffect { part: OwnerPart authority: OwnerAuth
 record OwnerRetainedActionAmend { task: u64 change: OwnerRetainedAmendment }
 record OwnerRetainedActionWiden { task: u64 authority: OwnerAuthorityDocument }
 record OwnerRetainedActionRelease { task: u64 }
-enum OwnerRetainedAction { batch: OwnerRetainedActionBatch, effect: OwnerRetainedActionEffect, procedure_effect: OwnerRetainedActionProcedureEffect, amend: boxed OwnerRetainedActionAmend, widen: OwnerRetainedActionWiden, release: OwnerRetainedActionRelease }
+record SettingNumber { number: u32 }
+enum Setting { charter: SettingNumber, template: SettingNumber, policy: SettingNumber, rules }
+enum RevisionItemEdit { set, removed, reset }
+record RevisionItemHead { setting: Setting edit: RevisionItemEdit }
+record OwnerRetainedActionSettings { against: u32 items: list 128 RevisionItemHead made: option u32 }
+enum OwnerRetainedAction { batch: OwnerRetainedActionBatch, effect: OwnerRetainedActionEffect, procedure_effect: OwnerRetainedActionProcedureEffect, amend: boxed OwnerRetainedActionAmend, widen: OwnerRetainedActionWiden, release: OwnerRetainedActionRelease, settings: OwnerRetainedActionSettings }
 record OwnerHistoryHolderTask { value: u64 }
 record OwnerHistoryHolderPerson { value: u64 }
 record OwnerHistoryHolderPolicy { project: u32 kind: OwnerMessageProposalKind }
@@ -737,7 +745,10 @@ record OwnerProposalActionProcedureEffect { part: OwnerPart authority: OwnerAuth
 record OwnerProposalActionAmend { task: OwnerTaskLink addressed: option AddressChange before: OwnerAmendmentState after: OwnerAmendmentState reason: DocumentText release: option u64 }
 record OwnerProposalActionWiden { task: OwnerTaskLink before: OwnerAuthorityDocument after: OwnerAuthorityDocument }
 record OwnerProposalActionRelease { task: OwnerTaskLink hold: option OwnerChipHold }
-enum OwnerProposalAction { batch: OwnerProposalActionBatch, effect: OwnerProposalActionEffect, procedure_effect: OwnerProposalActionProcedureEffect, amend: boxed OwnerProposalActionAmend, widen: OwnerProposalActionWiden, release: OwnerProposalActionRelease }
+# items is a list of length-prefixed ReviewItem records, at most 128, within the document's byte bound.
+record SettingsReview { newest: u32 items: bytes 16777216 cut: bool }
+record OwnerProposalActionSettings { against: u32 items: list 128 RevisionItemHead review: option SettingsReview made: option u32 }
+enum OwnerProposalAction { batch: OwnerProposalActionBatch, effect: OwnerProposalActionEffect, procedure_effect: OwnerProposalActionProcedureEffect, amend: boxed OwnerProposalActionAmend, widen: OwnerProposalActionWiden, release: OwnerProposalActionRelease, settings: boxed OwnerProposalActionSettings }
 record OwnerProposalWaiting { holder: OwnerHistoryHolder since: u64 }
 record OwnerFundingOffer { source: Funder needed: u64 left: option u64 after: option u64 }
 record OwnerProposal { key: ProposalKey project: u32 reason: DocumentText action: OwnerProposalAction as_holder: bool waiting: OwnerProposalWaiting funding: list 32 OwnerFundingOffer acts: bytes 16777216 }

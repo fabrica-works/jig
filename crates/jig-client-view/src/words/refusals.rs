@@ -102,6 +102,7 @@ impl Words {
     fn malformed(&self, b: &mut Builder, at: u32, why: Malformed) {
         let position = [Hole::Number(u64::from(at))];
         match why {
+            Malformed::Running => self.text(b, JigPhrase::MalformedRunning, &[]),
             Malformed::SettingsUnchanged => self.text(b, JigPhrase::SettingsUnchanged, &[]),
             Malformed::Settings(value) => {
                 use jig_client::contract::{Setting, SettingFault};

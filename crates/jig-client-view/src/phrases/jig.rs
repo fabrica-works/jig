@@ -12,6 +12,7 @@ pub enum JigPhrase {
     SettingsFullTask,
     SettingsFullMore,
     SettingsUnchanged,
+    MalformedRunning,
     SettingCharter,
     SettingTemplate,
     SettingPolicy,
@@ -1067,6 +1068,7 @@ impl JigPhrase {
             Self::SettingsFullTask => 7903,
             Self::SettingsFullMore => 7904,
             Self::SettingsUnchanged => 7905,
+            Self::MalformedRunning => 7917,
             Self::SettingCharter => 7906,
             Self::SettingTemplate => 7907,
             Self::SettingPolicy => 7908,
@@ -1732,7 +1734,8 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::SettingsUnchanged
+            Self::MalformedRunning
+            | Self::SettingsUnchanged
             | Self::SettingRules
             | Self::SettingFaultShape
             | Self::SettingFaultCount
@@ -2391,13 +2394,14 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 636] = [
+pub const ALL: [JigPhrase; 637] = [
     JigPhrase::SettingsChanged,
     JigPhrase::SettingsStale,
     JigPhrase::SettingsFull,
     JigPhrase::SettingsFullTask,
     JigPhrase::SettingsFullMore,
     JigPhrase::SettingsUnchanged,
+    JigPhrase::MalformedRunning,
     JigPhrase::SettingCharter,
     JigPhrase::SettingTemplate,
     JigPhrase::SettingPolicy,

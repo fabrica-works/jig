@@ -371,7 +371,8 @@ impl<A: crate::Application> Engine<A> {
                     };
                     self.amendment_admission(offer, *task, change)
                 }
-                Ask::Message { .. }
+                Ask::Propose { action: jig_client_domain::contract::ProposeAction::Settings(_), .. }
+                | Ask::Message { .. }
                 | Ask::Answer { .. }
                 | Ask::Take { .. }
                 | Ask::HandBack { .. }
@@ -702,7 +703,7 @@ fn target(ask: &Ask) -> Option<Target> {
         Ask::HandBack { project, task } => {
             (Some(*project), Some(ObjectKey::PersonTask(*task)), ActKind::HandBack, None)
         }
-        Ask::Decide { project, on: DecideOn::Proposal { proposal, decision } } => {
+        Ask::Decide { project, on: DecideOn::Proposal { proposal, decision, .. } } => {
             (Some(*project), Some(ObjectKey::Proposal(*proposal)), decision_kind(decision), None)
         }
         Ask::Decide { project, on: DecideOn::Escalation { task, revision, decision } } => (
@@ -721,7 +722,10 @@ fn target(ask: &Ask) -> Option<Target> {
             jig_client_domain::contract::ProposeAction::Amendment { task, revision, .. } => {
                 (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Amend, Some((*revision, Moved::Spec)))
             }
-            jig_client_domain::contract::ProposeAction::Batch { .. } => (Some(*project), None, ActKind::Message, None),
+            jig_client_domain::contract::ProposeAction::Settings(_)
+            | jig_client_domain::contract::ProposeAction::Batch { .. } => {
+                (Some(*project), None, ActKind::Message, None)
+            }
         },
         Ask::Amend { project, task, revision, .. } => {
             (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Amend, revision.map(|value| (value, Moved::Spec)))

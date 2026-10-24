@@ -23,9 +23,13 @@ pub(super) fn answer(value: &c::AnswerOn, limits: &w::Limits) -> Result<w::Answe
 }
 pub(super) fn decide(value: &c::DecideOn, limits: &w::Limits) -> Result<w::DecideOn, w::Problem> {
     Ok(match value {
-        c::DecideOn::Proposal { proposal, decision } => w::DecideOn::Proposal(w::DecideProposal::new(
+        c::DecideOn::Proposal { proposal, decision, running } => w::DecideOn::Proposal(w::DecideProposal::new(
             limits,
             w::DecideProposalParts {
+                running: match running {
+                    Some(value) => Some(super::settings::wire_running(value, limits)?),
+                    None => None,
+                },
                 proposal: asks::wire_proposal_key(proposal, limits)?,
                 decision: asks::wire_decision(decision, limits)?,
             },
@@ -378,6 +382,9 @@ pub(super) fn propose(
     limits: &w::Limits,
 ) -> Result<w::Ask, w::Problem> {
     let action = match action {
+        c::ProposeAction::Settings(value) => {
+            w::ProposeAction::Settings(super::settings_proposals::wire_propose_settings(value, limits)?)
+        }
         c::ProposeAction::Batch { tasks } => w::ProposeAction::Batch(w::ProposeBatch::new(
             limits,
             w::ProposeBatchParts { tasks: batch(tasks, limits.propose_batch_tasks, limits)? },
@@ -400,6 +407,9 @@ pub(super) fn propose(
 }
 pub(super) fn restore_propose(value: &w::Propose, limits: &crate::Limits) -> Result<c::Ask, w::Problem> {
     let action = match value.action() {
+        w::ProposeAction::Settings(value) => {
+            c::ProposeAction::Settings(super::settings_proposals::restore_propose_settings(value, limits)?)
+        }
         w::ProposeAction::Batch(value) => c::ProposeAction::Batch { tasks: restore_batch(value.tasks(), limits)? },
         w::ProposeAction::Amendment(value) => c::ProposeAction::Amendment {
             task: value.task(),

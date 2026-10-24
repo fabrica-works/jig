@@ -510,7 +510,9 @@ fn decisions(ask: &Ask) -> Vec<(ObjectKey, ActKind)> {
         }
         Ask::Stop { task, .. } => vec![(ObjectKey::Task(*task), ActKind::Stop)],
         Ask::Decide { on, .. } => match on {
-            DecideOn::Proposal { proposal, decision: value } => vec![(ObjectKey::Proposal(*proposal), decision(value))],
+            DecideOn::Proposal { proposal, decision: value, .. } => {
+                vec![(ObjectKey::Proposal(*proposal), decision(value))]
+            }
             DecideOn::Escalation { task, decision: value, .. } => vec![(ObjectKey::Escalation(*task), decision(value))],
         },
         Ask::Answer { on: AnswerOn::Person { task, .. }, .. } => vec![(ObjectKey::PersonTask(*task), ActKind::Answer)],
@@ -529,6 +531,7 @@ fn decisions(ask: &Ask) -> Vec<(ObjectKey, ActKind)> {
             })
             .collect(),
         Ask::Answer { on: AnswerOn::Question { .. }, .. }
+        | Ask::Propose { action: ProposeAction::Settings(_), .. }
         | Ask::Propose { action: ProposeAction::Batch { .. }, .. }
         | Ask::Withdraw { .. }
         | Ask::Create { .. }

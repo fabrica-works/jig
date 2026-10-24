@@ -219,7 +219,7 @@ fn confirmed_accept(domain: &mut Fixture, object: Token, value: &OwnerProposal) 
                 ask.as_ref(),
                 &Ask::Decide {
                     project: value.project,
-                    on: DecideOn::Proposal { proposal: value.key, decision: Decision::Accepted }
+                    on: DecideOn::Proposal { proposal: value.key, decision: Decision::Accepted, running: None }
                 }
             );
             assert!(request.replace(*token).is_none());

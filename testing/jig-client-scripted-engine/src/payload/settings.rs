@@ -101,3 +101,38 @@ impl Payload for RevisionAnswer {
         }
     }
 }
+
+use jig_client_domain::contract::{
+    OriginRevision, OwnerProposalActionSettings, OwnerRetainedActionSettings, ProposeSettings, ReviewItem, ReviewValue,
+    SettingOrigin, SettingsReview,
+};
+plain!(OriginRevision, SettingOrigin);
+fields!(ReviewItem { setting, edit, now, origin, would_be });
+impl Payload for ReviewValue {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Value(value) => value.heap(bounds),
+            Self::TooLarge(_) | Self::None => Some(0),
+        }
+    }
+}
+impl Payload for ProposeSettings {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.items.heap(&Bounds { rows: 128, ..*bounds })
+    }
+}
+impl Payload for SettingsReview {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.items.heap(&Bounds { rows: 128, ..*bounds })
+    }
+}
+impl Payload for OwnerProposalActionSettings {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.items.heap(&Bounds { rows: 128, ..*bounds })?.checked_add(self.review.heap(bounds)?)
+    }
+}
+impl Payload for OwnerRetainedActionSettings {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.items.heap(&Bounds { rows: 128, ..*bounds })
+    }
+}

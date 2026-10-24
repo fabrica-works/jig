@@ -31,6 +31,9 @@ pub fn language() -> Language {
             JigPhrase::SettingsFullMore => {
                 Box::new([Segment::Hole { index: 0, kind: HoleKind::Number }, Segment::Text(copy_of(b" more tasks"))])
             }
+            JigPhrase::MalformedRunning => Box::new([Segment::Text(copy_of(
+                b"Choose whether running work moves only when accepting a settings proposal",
+            ))]),
             JigPhrase::SettingsUnchanged => {
                 Box::new([Segment::Text(copy_of(b"The change leaves the settings unchanged"))])
             }

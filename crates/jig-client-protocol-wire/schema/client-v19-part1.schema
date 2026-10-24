@@ -24,8 +24,6 @@ versioned record Kept { store_version: u16 record: bytes 65536 }
 record TableEntry { asker: u32 number: u64 key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1114240 }
 record Chips { rows: bytes 16777216 }
 record OwnerInbox { party: u64 needs: bytes 16777216 updates: bytes 16777216 next: option OwnerInboxCursor cached_needs: u32 cached_updates: Count results_seen: u64 updates_time_complete: bool selection: option bytes 16777216 }
-record SettingNumber { number: u32 }
-enum Setting { charter: SettingNumber, template: SettingNumber, policy: SettingNumber, rules }
 record SettingModel { dialect: u32 endpoint: u32 program: option text 32 name: text 4096 window: u32 output: u32 input_price: u64 cached_price: u64 cache_write_price: option u64 output_price: u64 price_unit: u32 efforts: list 16 text 32 effort: option text 32 }
 enum SettingHosts { workers, engine, both }
 record Charter { number: u32 instructions: text 1114240 waiting: duration resume: bool turns: u32 time: duration reserve_turns: u32 reserve_time: duration model: SettingModel alternatives: list 16 SettingModel inspect: bool modify: bool shell: bool agents: bool call_timeout: duration hosts: SettingHosts spend: u64 }
@@ -35,7 +33,6 @@ enum SettingValue { charter: boxed Charter, template: boxed Template, policy: bo
 record SettingSet { value: SettingValue }
 enum SettingEdit { set: SettingSet, removed, reset }
 record SettingItem { setting: Setting edit: SettingEdit }
-enum Running { stays, moves }
 record ChangeSettings { against: u32 items: bytes 1114240 running: Running }
 record OutcomeSettingsChanged { revision: u32 }
 record RefusalStale { newest: u32 }
@@ -61,12 +58,10 @@ record RevisionDocument { head: RevisionHead items: bytes 16777216 }
 record RevisionForgotten { oldest: u32 }
 enum RevisionAnswer { revision: RevisionDocument, forgotten: RevisionForgotten, unknown }
 record ReadRevisionAnswer { value: RevisionAnswer }
-enum RevisionItemEdit { set, removed, reset }
-record RevisionItemHead { setting: Setting edit: RevisionItemEdit }
 record RevisionRow { head: RevisionHead items: list 32 RevisionItemHead more: u32 }
 record RevisionsPage { rows: list 32 RevisionRow next: option u32 forgotten: bool }
 enum Outcome { owner: OutcomeOwner, made: OutcomeMade, proposed: OutcomeProposed, decided: OutcomeDecided, decided_first: OutcomeDecidedFirst, changed, settings_changed: OutcomeSettingsChanged }
-enum Malformed { project_mismatch, two_as_allowed, conversation_not_agent, cycle, proposed_as_allowed, ended_by, name: MalformedName, settings: MalformedSettings, settings_unchanged }
+enum Malformed { project_mismatch, two_as_allowed, conversation_not_agent, cycle, proposed_as_allowed, ended_by, name: MalformedName, settings: MalformedSettings, settings_unchanged, running }
 record RefusalMalformed { at: u32 why: Malformed }
 enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider, account: RefusalAccount, circle: RefusalCircle, dependency: RefusalDependency, kept: RefusalKept, name_taken, account_move: RefusalAccountMove, stale: RefusalStale, full: RefusalFull }
 record Done { outcome: Outcome }
@@ -85,3 +80,7 @@ record EntranceRefusal { refusal: Refusal }
 enum Ask { message: Message, answer: Answer, take: Take, hand_back: HandBack, decide: Decide, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, move_task: Move, seen: Seen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool, compound: Compound, create: Create, propose: Propose, withdraw: Withdraw, sign_in: AskSignIn, sign_out: AskSignOut, account_change: AskAccountChange, rename: Rename, make_project: MakeProject, change_settings: ChangeSettings }
 enum ReadValue { tasks: TaskPage, owner_project: OwnerProject, historical: boxed OwnerHistorical, me: Me, task: Task, proposal: Proposal, owner_proposal: OwnerProposal, escalation: Escalation, owner_escalation: OwnerEscalation, question: Question, person_task: PersonTask, owner_person_task: OwnerPersonTask, result: ResultDocument, ended: ObjectPage, owner_ended: OwnerEndedPage, history: HistoryPage, activity: ActivityPage, inbox: InboxPage, owner_inbox: OwnerInboxPage, spend: SpendPage, owner_spend: OwnerSpendPage, project: Project, notes: NotePage, deployment: Deployment, owner_deployment: OwnerDeployment, turn: ArchivedTurn, settings: SettingsDocument, setting: SettingDocument, revision: ReadRevisionAnswer, revisions: RevisionsPage }
 enum DeliveryValue { owner_project: OwnerProject, me: Me, task: boxed Task, owner_proposal: OwnerProposal, tree: Tree, owner_tree: OwnerTree, chips: Chips, inbox: Inbox, owner_inbox: OwnerInbox, tasks: Tasks, run: RunText, run_state: RunState, deployment: Deployment, owner_deployment: OwnerDeployment, owner_accounts: OwnerAccounts, settings: SettingsDocument }
+record OriginRevision { revision: u32 }
+enum SettingOrigin { default: OriginRevision, change: OriginRevision, not_offered }
+enum ReviewValue { value: SettingSet, too_large: Size, none }
+record ReviewItem { setting: Setting edit: RevisionItemEdit now: ReviewValue origin: SettingOrigin would_be: ReviewValue }

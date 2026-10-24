@@ -181,6 +181,10 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.owner_inbox_page_selection_some = u32::try_from(client.document_bytes).ok()?;
     wire.owner_inbox_page_rows = u32::try_from(client.document_bytes).ok()?;
     wire.subject_chips_tasks = client.rows;
+    wire.propose_settings_items = u32::try_from(client.ask_bytes).ok()?.min(w::CEILINGS.propose_settings_items);
+    wire.settings_review_items = u32::try_from(client.document_bytes).ok()?.min(w::CEILINGS.settings_review_items);
+    wire.owner_proposal_action_settings_items = w::CEILINGS.owner_proposal_action_settings_items;
+    wire.owner_retained_action_settings_items = w::CEILINGS.owner_retained_action_settings_items;
     // Whole settings share the existing receiving text, rows and message envelopes.
     wire.charter_instructions = u32::try_from(client.document_bytes).ok()?.min(w::CEILINGS.charter_instructions);
     wire.change_settings_items = u32::try_from(client.ask_bytes).ok()?.min(w::CEILINGS.change_settings_items);

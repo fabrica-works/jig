@@ -267,6 +267,9 @@ pub(crate) fn owner_proposal_action_fields(
     limits: &Limits,
 ) -> Result<c::OwnerProposalAction, w::Problem> {
     Ok(match value {
+        w::OwnerProposalAction::Settings(row) => c::OwnerProposalAction::Settings(Box::new(
+            crate::translate::settings_proposals::restore_owner_proposal_action_settings(row, limits)?,
+        )),
         w::OwnerProposalAction::Batch(row) => {
             c::OwnerProposalAction::Batch(proposed_task_piece(row.value(), limits, limits.client.rows)?)
         }

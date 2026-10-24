@@ -266,3 +266,53 @@ pub struct RevisionsPage {
     pub next: Option<u32>,
     pub forgotten: bool,
 }
+
+/// A deployment-scoped proposal; its accepter chooses whether running work moves.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProposeSettings {
+    pub against: u32,
+    pub items: List<SettingItem>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OriginRevision {
+    pub revision: u32,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SettingOrigin {
+    Default(OriginRevision),
+    Change(OriginRevision),
+    NotOffered,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ReviewValue {
+    Value(SettingSet),
+    TooLarge(Size),
+    None,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ReviewItem {
+    pub setting: Setting,
+    pub edit: RevisionItemEdit,
+    pub now: ReviewValue,
+    pub origin: SettingOrigin,
+    pub would_be: ReviewValue,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SettingsReview {
+    pub newest: u32,
+    pub items: List<ReviewItem>,
+    pub cut: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OwnerProposalActionSettings {
+    pub against: u32,
+    pub items: List<RevisionItemHead>,
+    pub review: Option<SettingsReview>,
+    pub made: Option<u32>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OwnerRetainedActionSettings {
+    pub against: u32,
+    pub items: List<RevisionItemHead>,
+    pub made: Option<u32>,
+}

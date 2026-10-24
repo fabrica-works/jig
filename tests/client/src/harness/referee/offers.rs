@@ -102,6 +102,7 @@ impl Offers {
                     return;
                 };
                 let bit = match kind {
+                    OwnerMessageProposalKind::Settings => return,
                     OwnerMessageProposalKind::Batch => 1,
                     OwnerMessageProposalKind::Effect => 2,
                     OwnerMessageProposalKind::Widen => 4,

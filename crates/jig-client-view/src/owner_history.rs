@@ -104,6 +104,7 @@ fn proposal_fits(proposal: &OwnerProposalHistory, limits: &Limits) -> Option<()>
         | OwnerProposalHistoryState::Withdrawn => {}
     }
     match &proposal.action {
+        OwnerRetainedAction::Settings(_) => return None,
         OwnerRetainedAction::Batch(tasks) => {
             if tasks.capacity() > limits.rows {
                 return None;
@@ -209,6 +210,7 @@ pub(crate) fn holder(b: &mut Builder, value: OwnerHistoryHolder, words: &Words) 
         OwnerHistoryHolder::Policy { project, kind } => {
             saying(b, words, P::HolderPolicy, &[Hole::Number(u64::from(project))]);
             let phrase = match kind {
+                OwnerMessageProposalKind::Settings => return,
                 OwnerMessageProposalKind::Batch => P::Batch,
                 OwnerMessageProposalKind::Effect => P::Effect,
                 OwnerMessageProposalKind::Amend => P::Amend,
@@ -280,6 +282,7 @@ fn retained_amendment(b: &mut Builder, value: &OwnerRetainedAmendment, words: &W
 fn action(b: &mut Builder, value: &OwnerRetainedAction, words: &Words, bindings: &mut JigBindings, rows: u32) {
     let text_limit = bindings.text_limit();
     match value {
+        OwnerRetainedAction::Settings(_) => {}
         OwnerRetainedAction::Batch(tasks) => {
             saying(b, words, P::Batch, &[]);
             for task in tasks {

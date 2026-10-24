@@ -136,6 +136,7 @@ fn identity(b: &mut Builder, value: OwnerRequester, words: &Words) {
 }
 fn proposal_kind(b: &mut Builder, value: OwnerMessageProposalKind, words: &Words) {
     let phrase = match value {
+        OwnerMessageProposalKind::Settings => return,
         OwnerMessageProposalKind::Batch => P::Batch,
         OwnerMessageProposalKind::Effect => P::Effect,
         OwnerMessageProposalKind::Amend => P::Amend,

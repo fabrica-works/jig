@@ -68,6 +68,7 @@ pub fn required(value: &OwnerProposal, limits: &Limits, words: &Words) -> Option
         return None;
     }
     match &value.action {
+        OwnerProposalAction::Settings(_) => return None,
         OwnerProposalAction::Batch(tasks) => {
             if tasks.capacity() > limits.rows {
                 return None;
@@ -158,6 +159,7 @@ pub fn action(
 ) {
     let text_limit = bindings.text_limit();
     match value {
+        OwnerProposalAction::Settings(_) => {}
         OwnerProposalAction::Batch(tasks) => {
             saying(b, words, P::Batch, &[]);
             for task in tasks {

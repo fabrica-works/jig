@@ -66,6 +66,7 @@ pub fn store_asks() -> List<c::Ask> {
             on: c::DecideOn::Proposal {
                 proposal: c::ProposalKey { proposer: c::Proposer::Party(7), number: u64::MAX },
                 decision: c::Decision::Rejected { reason: store_text() },
+                running: None,
             },
         },
         c::Ask::Decide {

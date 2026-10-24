@@ -15,6 +15,7 @@ pub enum Operation {
 /// Why the request is malformed; its refusal names the place.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Malformed {
+    Running,
     Settings(super::MalformedSettings),
     SettingsUnchanged,
     ProjectMismatch,
@@ -103,6 +104,7 @@ pub struct CreatedGiven {
 /// A party's explicitly proposed batch or amendment.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ProposeAction {
+    Settings(super::ProposeSettings),
     Batch { tasks: skein_lib::List<NewTask> },
     Amendment { task: u64, revision: Revision, change: Box<Amendment> },
 }

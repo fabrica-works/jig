@@ -63,6 +63,7 @@ pub fn retained_action(
     limits: &w::Limits,
 ) -> Result<w::OwnerRetainedAction, w::Problem> {
     Ok(match value {
+        // task E: add the retained settings action with the accepted revision when the domain produces it.
         d::RetainedAction::Batch(rows) => {
             let mut copied = List::with_capacity(rows.len());
             for row in rows {

@@ -673,7 +673,10 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
         .engine
         .script(jig_client_scripted_engine::Rule {
             party: Some(7),
-            ask: Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted } },
+            ask: Ask::Decide {
+                project: 1,
+                on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted, running: None },
+            },
             answer: Answer::Done(Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH }),
             changes,
         })
