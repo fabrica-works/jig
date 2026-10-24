@@ -23,6 +23,7 @@ pub(crate) fn charters() -> Box<[crate::CharterModels]> {
     Box::new([crate::CharterModels { number: 1, models: Box::new([0]) }])
 }
 
+mod decision_reads;
 mod hold_origin;
 mod kept;
 mod keys;
