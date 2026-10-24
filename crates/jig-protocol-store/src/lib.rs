@@ -14,7 +14,7 @@ pub mod intervals;
 mod loads;
 mod open;
 mod pages;
-pub mod patching;
+mod patching;
 pub use patching::sets::{KeptFamily, Keys, Owner, PatchSet, PatchSets};
 mod reads;
 mod restore;
@@ -198,6 +198,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)?
         .checked_add(generations::worst_case()?)?
         .checked_add(generations::operations_worst_case(limits.store.chunk)?)?
+        .checked_add(u64::try_from(size_of::<patching::phase::Patching>()).ok()?)?
+        .checked_add(u64::try_from(size_of::<patching::phase::Pending>()).ok()?)?
         .checked_add(names_worst_case()?)
 }
 
