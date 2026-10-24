@@ -51,16 +51,7 @@ fn arbitrary(seed: u64, check: fn(&[u8])) {
     }
 }
 fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
-    let version = match family {
-        "core" => "v6",
-        "tasks" => "v9",
-        "people" => "v13",
-        "component" => "v3",
-        "accounts" => "v2",
-        _ => "v1",
-    };
-    let root =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store/golden").join(family).join(version);
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-protocol-store/golden").join(family);
     mutate_goldens(&root, seed, check);
 }
 fn mutate_goldens(root: &Path, seed: u64, check: fn(&[u8])) {
@@ -231,7 +222,7 @@ fn arbitrary_test_connector_rows_never_panic_and_round_trip_when_they_decode() {
 
 #[test]
 fn mutated_test_connector_goldens_never_panic() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-store/golden/v2");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/jig-test-store/golden");
     mutate_goldens(&root, 0x5702_e018, test_connector);
 }
 

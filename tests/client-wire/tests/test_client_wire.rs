@@ -8,7 +8,7 @@ fn test_client_wire_schema_matches_generated_code_and_goldens() {
     let source = fs::read_to_string(root.join("schema/test-client-v2.schema")).expect("client schema");
     let output = generate(&parse(&source).expect("schema valid"));
     let code = root.join("src/generated/v2.rs");
-    let goldens = root.join("golden/v2");
+    let goldens = root.join("golden");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world --test test_client_wire";
     if write {

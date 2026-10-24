@@ -321,16 +321,21 @@ section 6); accounts version 1 stores refuse to open likewise.
 Settings (`../domain/engine.md`, section 17) add the core's two
 settings families (4.4), under a schema of their own, `settings`, whose
 version the format row names beside the others' (5.3), so that their
-records change with no new version of the core's; and a revision on
-each task's record and claim, a new version of the tasks family. Each
-version is taken from main's constants when its milestone lands. The
-settings' first version defines every record of 17.7, charter versions
+records change independently of the core's; and a revision on each task's
+record and claim changes the tasks family's schema. Until the first
+release, each family's version keeps its current number, and its schema,
+generated code and one set of golden bytes change in place. Versions
+move at a release, not when a milestone lands (skein's `codec.md`,
+section 5). The settings' first version defines every record of 17.7,
+charter versions
 and pending proposals' sets among them, whichever milestone first
 writes them. As every family's: each record stored at the top is
 versioned; a bytes field that holds a record or pieces of one says so;
 the keys' root type is jig's own and explicit. A store of an earlier
-version refuses to open under the format check (5.3), as every change
-of format before the baseline does; nothing is translated. A deployment made again from the same document,
+version refuses to open under the format check (5.3). Before the baseline,
+a store from an older build is started afresh when its families change:
+its version does not distinguish the changed layout, and nothing is
+translated. A deployment made again from the same document,
 with no change stored, behaves as it did. Each record of a setting
 holds its value whole, a charter's instructions as text; their sizes
 follow from the limits that bound each kind (5.4).
@@ -406,8 +411,9 @@ schema remains v4. These are the versions the format row requires.
   section 6). People's retained answers keep the refusals for added
   dependencies as the client's contract has them
   (`../client/domain/contract.md`, section 4).
-- **Golden bytes** per family and version; a fuzz target per family's
-  decoder; bounds at their limit and one past it.
+- **Golden bytes** in one set per family, for its current schema until
+  the first release (skein's `codec.md`, section 5); a fuzz target per
+  family's decoder; bounds at their limit and one past it.
 
 ### 5.2 The application's records
 
@@ -415,8 +421,9 @@ schema remains v4. These are the versions the format row requires.
   encodes each record and key before the component sees it, and decodes
   each row the component hands back, before its root sees it.
 - **Its store version,** one number the application gives the component
-  when it makes it, which moves whenever an encoding of its records
-  changes, as its payload version does for the channel
+  when it makes it. Until the first release it stays fixed while its
+  encodings change in place; it moves at a release (skein's `codec.md`,
+  section 5), as its payload version does for the channel
   (`channel.md`, 4.1).
 
 ### 5.3 The format row

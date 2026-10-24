@@ -247,12 +247,18 @@ no credential's keeping: jig mints, verifies, expires and revokes them.
 ## 7. Versions
 
 - **Pre-release: one version at a time.** Each of jig's encodings has one
-  current version. A reader refuses another, saying so, and nothing is
-  translated (skein's `codec.md`, section 5).
+  current version. Until the first release, the baseline, its number stays
+  fixed: changes to its schema, generated code and golden bytes are made
+  in place. Each family keeps one set of golden bytes, its current
+  schema's. Versions move at a release, not at a landing (skein's
+  `codec.md`, section 5). A reader refuses another version, saying so,
+  and nothing is translated.
 - **No upgrade in place.** Everything that crosses a boundary or
   outlives a process carries its version, which an upgrade will need; an
   upgrade stops the engine and its workers together, and a store written
-  by another version refuses to open (section 14).
+  by another version refuses to open (section 14). Until the baseline,
+  a store from an older build is started afresh when its families change:
+  the unchanged version numbers do not distinguish those layouts.
 - **The channel** is versioned whole, agreed at its opening; the
   application's payloads inside it by the payload version a worker's
   credential carries (`channel.md`, 4.1 and 6.2).
@@ -272,9 +278,9 @@ no credential's keeping: jig mints, verifies, expires and revokes them.
     not served*, naming the owner and the ranges served, never a bare
     failure of the transport (`client.md`, section 9).
   - *One jig pin:* an application takes `jig-client` and the engine's
-    components from one revision of jig, so a change to jig's
-    operations moves jig's wire version, and before a release every
-    range is one version.
+    components from one revision of jig. Before the first release,
+    changes to jig's operations change its wire schema in place, keeping
+    its version, and every served range is one version.
   - *How jig itself is released and pinned* is open (`../README.md`,
     section 14).
 - **Configuration** has no version: unknown fields refuse the start

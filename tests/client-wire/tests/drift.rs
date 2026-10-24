@@ -31,7 +31,7 @@ fn check(root: &Path, source: &str, version: &str) {
         _ => "src/generated/records_v1.rs",
     };
     let code = root.join(file);
-    let goldens = root.join("golden").join(version);
+    let goldens = root.join("golden");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world --test drift";
     if write {

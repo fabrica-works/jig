@@ -1540,7 +1540,7 @@ section 5).
   recorded in the release's revision. Default: refused, as a document
   naming a charter it lacks is. The refusal is the backstop: a release
   that drops such a default carries its own patch for the stored
-  changes that name it, as every landing that changes what is stored
+  changes that name it, as every release that changes what is stored
   does from the baseline on (temper's draft `upgrades.md`, section 4),
   so only a release that forgot its patch meets the refusal.
 - **An application's kinds pinned,** a value read from a task's
