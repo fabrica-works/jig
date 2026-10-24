@@ -1,0 +1,4 @@
+# Fixture owners and their command driver are ordinary Rust (programming-model.md 10.2).
+disallowed-types = []
+disallowed-macros = []
+disallowed-methods = []

@@ -110,8 +110,9 @@ skein-io                        files: the ring, or the simulator's disk
 - **A first start** is a directory with no `active`, and none of
   `store/`, `secrets/` and `transcripts/` at its top (today's layout,
   below). A `generations/` that holds only a `1/` whose `store/` and
-  `secrets/` hold no file is a first start a cut stopped before
-  `active` named it (the stores' first open, which makes their files,
+  `secrets/` hold no file, beside at most its manifest or the manifest's temporary
+  (`manifest.skein-<16 hex>`), is a first start a cut stopped before `active`
+  named it (the stores' first open, which makes their files,
   comes after `active`): it is removed, with any temporary io's durable replace
   left beside `active` (`active.skein-<16 hex>`; skein's `io.md`, 5.2).
   A `generations/` that holds anything else, with no `active`, is
@@ -137,15 +138,20 @@ skein-io                        files: the ring, or the simulator's disk
   (`Manifest`, beside the format row in the component's family, 5.1,
   added to `component-v3.schema` in place, as the levels are: 5.3),
   encoded and versioned as every record. It names:
-  - the generation's number, and the one it was patched from, none for a
-    first start's;
-  - each owner's level before and after (5.3), none before its
-    baseline; a first start's before levels are none;
+  - `generation`, the generation's number, and `from`, the one it was
+    patched from, none for a first start's;
+  - `before` and `after`, each owner's levels (5.3), none before its
+    baseline; a first start's before levels are all none, and its after
+    levels the binary's;
   - each family's count of records before and after;
-  - the last commit of each map when patching ended: the store's,
-    which the deployment's header names (section 6), and the secrets'
-    store's, none for a first start's;
-  - the wall-clock time it was written.
+  - `store` and `secrets`, the last commit of each map when patching
+    ended: the store's, which the deployment's header names (section 6),
+    and the secrets' store's; for a first start, 0 and none respectively;
+  - `written`, the wall-clock time it was written, `env.wall` in its own
+    unit.
+
+  (M3 writes all but the counts, which come with the check before the
+  switch, 10.2 step 5.)
 
   Nothing at open reads it: it is the operator's record of what an
   upgrade did, and what temper's `upgrade --check` and `versions`
@@ -468,17 +474,20 @@ schema remains v4. These are the versions the format row requires.
     (section 10, step 2):
     - both none: the versions and the layouts decide, as before the
       baseline;
-    - the store's none and the binary's a level: for jig, always a
-      store from before the baseline, `OlderBuild` with
-      `Older::Unleveled` (temper's `draft/upgrades.md`, 4.1);
-    - another owner's none, in a row whose jig level is set (an owner
-      whose baseline came after the store was made): level 0 when its
-      families' layouts are its baseline's, once those are recorded
-      (section 16), and `Older::Unleveled` otherwise;
-    - the store's past the binary's: `Ahead { owner, found, wanted }`,
-      since no patch runs backwards (a level is past none);
-    - the store's behind: the patch path (10.2), the families' versions
-      and layouts held to those the store's levels imply;
+    - first, any owner's store level past the binary's: `Ahead { owner,
+      found: Some(level), wanted }`, since no patch runs backwards (a
+      level is past none); the first in `Owner`'s order, upstream first;
+    - then any owner's store level none where the binary's is set:
+      `OlderBuild` with `Older::Unleveled`, including another owner's
+      none in a row whose jig level is set (temper's `draft/upgrades.md`,
+      4.1; the baseline layouts remain open, section 16);
+    - then any owner's store level behind: the patch path (10.2).
+      No jig patch moves a family of jig's own yet, so jig's families'
+      versions and layouts are held to the binary's. The application's
+      version is not compared: its patches rewrite it to the binary's
+      in the sealing commit. The deployment and the header's commits
+      are checked as before; both version checks, the row's own and
+      the header's deployment's, follow this rule;
     - equal: the versions and the layouts must be the binary's, or
       `OlderBuild`.
 
@@ -1097,6 +1106,26 @@ one that stands; an older build's is moved aside (section 2). Each
   backup of `<deployment>`, or write `active` to name the generation
   under `generations/` to open, and start again."
 
+- `OlderBuild { why: Unleveled }`: "`<deployment>` holds a store from before
+  the first release, which records no patch levels, and this start has
+  changed nothing in it. A store from before the first release is not
+  translated, so every start refuses this one until it is moved. To start
+  afresh, stop the service, move `active`, `generations/` and `transcripts/`
+  out of `<deployment>` together, and start again: nothing is deleted, and
+  the next start makes a new, empty store. The new store has no tasks,
+  sign-ins, accounts or keys, and every client signs in again."
+- `Ahead`: "`<deployment>` holds a store from a later build, at patch levels
+  past this build's, and this start has changed nothing in it. No patch runs
+  backwards: start the later build again, or restore `<deployment>` from a
+  backup this build made."
+- `Patch`: "A patch refused a record while this start patched a copy of the
+  store in `<deployment>`, and the generation it patched from stays active,
+  unchanged. Every start of this build refuses the same record: start the
+  build before it again, which opens that generation as it was."
+- `Set`: "This build's patches do not plan, and this start has changed
+  nothing in `<deployment>`. The build is wrong: start the build before it
+  again."
+
 The refusals at open, beside section 3's others:
 
 ```rust
@@ -1154,8 +1183,9 @@ generation `A` to `A + 1`:
    its key; a record at another version refuses, `Patch` with its key.
    Each page is one commit through the component's own path, within
    skein-kv's bounds (5.4); one past the map's budget refuses, `Check`
-   naming the limit. The secrets' store is patched the same way, in its
-   own commits (section 9). The store's last commit writes the format
+   naming the limit (with the check, M4; until then `Failed`). The secrets'
+   store is patched the same way, in its own commits (section 9). The store's
+   last commit, one of its own after the last page's, writes the format
    row's levels and versions and the layouts, the binary's (5.3), and
    the deployment's header as patched, naming that commit's number
    (section 6). The commits before it leave the header naming `A`'s
@@ -1210,7 +1240,6 @@ generation `A` to `A + 1`:
 ```rust
 // jig_protocol_store
 pub enum Owner { Skein, Smith, Jig, Application }   // upstream first
-pub enum Map { Store, Secrets }
 pub struct PatchSet {
     pub owner: Owner,
     pub name: &'static str,               // the owner as its patches' headers spell it
@@ -1220,12 +1249,12 @@ pub struct PatchSet {
 pub struct KeptFamily {
     pub name: &'static str,               // the family, as its texts spell it
     pub texts: &'static [&'static str],   // `patches::kept::<family>::TEXTS`, in version order
-    pub map: Map,                         // the map its records are in
     pub keys: &'static [Keys],            // its records' keys, and no other's
 }
 pub struct Keys {
     pub from: &'static [u8],              // inclusive
     pub to: &'static [u8],                // exclusive
+    pub root: &'static str,               // the declaration its records are, where its machine starts
 }
 pub struct PatchSets {
     pub sets: &'static [PatchSet],        // at most one per owner
@@ -1235,6 +1264,15 @@ impl PatchSets {
 }
 ```
 
+  `map` (the store's or the secrets') comes with the secrets' walk
+  (section 9, M4); until then every kept family is the store map's.
+  A family's ranges hold records of different declarations (the
+  core's tasks beside their turns), and a machine starts each record at a
+  declaration (skein's `codec.md`, 11.4: `start(plan, root, record)`), so
+  each range names its records' own. Keys' bytes: the application's are
+  its own keys, relative to its tag, as its rows are (4.2: the component
+  adds the tag); every other owner's are the map's whole keys.
+
   A family's `keys` hold its own records and leave out what lies among
   them but is another's (the installation's identifier at `01 04 03`
   among the accounts', the settings' records among the core's): jig's
@@ -1243,8 +1281,10 @@ impl PatchSets {
   before its baseline, level none; otherwise its level is its patches'
   count. Every real set is empty until the baseline (temper's
   `draft/upgrades.md`, 4.1), so no store is behind and open runs as it
-  always has; the component's tests hand it a fixture owner's sets. The
-  names, texts and keys are `&'static`, the binary's own constants,
+  always has; the component's tests hand it two fixture owners' sets:
+  `jig-test-patches` in the application's slot and `jig-test-patches-jig`
+  in jig's, so that the order across owners is shown; no test owner reaches
+  a production schema. The names, texts and keys are `&'static`, the binary's own constants,
   never state: the only references in fields the component holds
   (programming-model.md, 10.3), read by its plan alone, since `keep`
   and `plan` copy what they need into each machine's tables.
@@ -1266,8 +1306,11 @@ impl PatchSets {
   11.4 and 11.6), made at the plan, on the patch path alone, with its
   capacity from the family's limits and texts, each kept text kept and
   each of its owner's patches planned. In a patch's walk a record is
-  one block behind; a held value `k` versions behind runs `k` plans,
-  `next_pass` after the first.
+  one block behind; a held value `k` versions behind runs `k` plans
+  to the version its family has after the patch, `next_pass` after the
+  first. In a patch's walk, its families' records run its plan,
+  and a family the patch leaves alone whose records hold one it moves runs
+  its identity plan (codec.md 11.3), which reaches the held fields alone.
 - **A written site goes up.** Step code holds no function (codec.md,
   11.4; programming-model.md, 10.3), so at `Step::Written` the
   component answers `Site` with the owner, the record's key, the site,
@@ -1289,14 +1332,16 @@ Event::Site {                              Request::Site {
     patcher: Box<Patcher>,
 }
 Event::Patched { owner: Token, of: Owner, patch: u32, counts: Counts }
+pub struct Counts { pub records: u64, pub commits: u64 }
 ```
 
 - **The shell that answers** is the store's shell, the one that names
   the owners' crates and drives the store's open: the application's
   (temper's `temper-service`, its `Store`); jig has no production
-  shell of its own. In jig's tests, `jig-test-service`'s, the store
-  world's (`tests/store`) and `jig-test-store-files`' answer a fixture
-  owner's.
+  shell of its own. In jig's tests the store world's (`tests/store`) answers
+  the fixture owners'; `jig-test-service`'s and `jig-test-store-files`' hand
+  no sets, and would answer a site `Halt::NoSite` (skein's `codec.md`,
+  11.4: a site its caller has no function for).
 - **What a shell downstream sees** (temper's `temper-service`, its
   domain world's driver, `temper-github-app`): open's signature stays
   as it is. The component holds `PatchSets::NONE` until a shell hands
@@ -1315,8 +1360,10 @@ Event::Patched { owner: Token, of: Owner, patch: u32, counts: Counts }
   family's own machine patches the held bytes, its own sites going up
   as above, and its bytes are put into the holder's (`put_content`),
   or carried where that family does not move; the holder's machine
-  waits meanwhile. No family holds itself through another, so one
-  machine per family suffices; the plan refuses a set that would.
+  waits meanwhile. No family holds itself through another, so one machine
+  per family suffices; a walk that meets such a hold halts `Order`, refused
+  as a patch's halt (10.2). Refusing it at the plan, from the kept texts,
+  is open (section 16).
 - **Keys do not move** by patch: a key is its owner's code (4.1), and a
   patch's text has no line that moves one (skein's `codec.md`, 11.1). A
   moved key would need its function's answer up and back, and a check
@@ -1416,7 +1463,8 @@ was made (`../domain/tasks.md`, section 3):
   the three drivers' (skein's `io.md`, section 5). Patching's peak (10.2:
   one map open, one machine per kept family, the copy's chunk) is the
   larger of it and serving's, since the root never serves while it
-  patches.
+  patches. The sets are the shell's, so `worst_case_with_patches(limits, sets)`
+  prices their machines, and `worst_case(limits)` prices `PatchSets::NONE`.
 - **Checked whole at startup** with the root's and every component's
   (`configuration.md`, section 6).
 
@@ -1544,6 +1592,13 @@ section 2).
     on (10.3);
   - a copy made by the file system (a reflink, or btrfs's snapshot:
     skein's `io.md`, section 5) in place of one written file by file.
+- **A hold through another family, refused at the plan.** As built, a set
+  whose families hold each other in a cycle plans, and its walk halts `Order`
+  at the first record that meets it, after the copy; the plan could find it
+  from the kept texts' holds before anything is written.
+- **The header by its own level's text.** A jig behind decodes the header
+  by the binary's core text, which every store holds until jig's first patch
+  moves the core; that patch brings the kept text's decode with it.
 - **Backups:** copying the deployment's directory whole while the engine
   is stopped works. An online backup would copy `active`, the generation
   it names and `transcripts/`, in that order (section 2), and rest on

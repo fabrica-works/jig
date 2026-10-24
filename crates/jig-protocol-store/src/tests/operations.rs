@@ -142,7 +142,12 @@ fn a_copy_holds_the_same_files_and_bytes() {
             .any(|(p, kind, mode, _)| p.as_ref() == b"generations/2" && *kind == Kind::Directory && *mode == 0o700)
     );
     assert_eq!(after.iter().filter(|(p, ..)| !p.starts_with(b"generations/2")).cloned().collect::<Vec<_>>(), before);
-    for (path, kind, _, bytes) in before.iter().filter(|(p, ..)| p.starts_with(b"generations/1/")) {
+    // The copy takes the maps; the copy's own manifest is written later (store.md 10.2).
+    assert!(before.iter().any(|(p, ..)| p.as_ref() == b"generations/1/manifest"));
+    assert!(!after.iter().any(|(p, ..)| p.as_ref() == b"generations/2/manifest"));
+    for (path, kind, _, bytes) in
+        before.iter().filter(|(p, ..)| p.starts_with(b"generations/1/store") || p.starts_with(b"generations/1/secrets"))
+    {
         let target = [b"generations/2/", path.strip_prefix(b"generations/1/").expect("source prefix")].concat();
         let (_, found_kind, mode, found_bytes) =
             after.iter().find(|(p, ..)| p.as_ref() == target).expect("copied entry");

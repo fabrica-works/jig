@@ -18,11 +18,17 @@ jig-domain-brief.workspace = true
 jig-domain-accounts.workspace = true
 jig-domain-views.workspace = true
 jig-protocol-store.workspace = true
+jig-test-patches.workspace = true
+jig-test-patches-jig.workspace = true
+skein-codec.workspace = true
 skein-kv.workspace = true
 skein-lib.workspace = true
 skein-io.workspace = true
 skein-fake-machine.workspace = true
 skein-sim.workspace = true
+
+[dev-dependencies]
+skein-heap.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"

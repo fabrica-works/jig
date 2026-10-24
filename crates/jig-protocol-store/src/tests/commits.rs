@@ -91,6 +91,7 @@ fn a_first_commit_puts_format_layouts_and_installation_with_its_header() {
             settings: 1,
             application: 1,
             deployment: fixtures::DEPLOYMENT,
+            levels: crate::format::recorded(crate::format::NONE),
         },
     );
     let layouts = fixtures::get_kv(&mut store, &[0, 3]).expect("layouts row exists");
@@ -334,4 +335,23 @@ fn later_commits_write_none_of_the_three_creation_rows() {
     assert_eq!(pending.ops.len(), 1);
     let header_key = keys::encode(&Key::Core(CoreKey::Deployment), fixtures::KEY_LIMIT).expect("header key fits");
     assert_eq!(pending.ops[0].key(), header_key.as_ref());
+}
+
+#[test]
+fn only_the_first_commit_records_the_binarys_levels_and_layouts() {
+    use super::patching::{BASE, SETS, levels};
+    for (first_sets, later_sets, expected) in [(BASE, SETS, levels(0, 0)), (SETS, BASE, levels(2, 1))] {
+        let mut store = fixtures::opened();
+        store.patch_sets(first_sets);
+        assert_committed(&commit(&mut store, 1, Box::new([fixtures::header(1)])), 1);
+        let first = format_row(&mut store);
+        assert_eq!(crate::format::levels(first.levels), expected);
+        let key = keys::encode_own(&keys::Own::Layouts, store.limits.store.key).expect("layouts key");
+        let layouts = fixtures::get_kv(&mut store, &key).expect("layouts");
+        store.patch_sets(later_sets);
+        store.layouts.core[0] ^= 1;
+        assert_committed(&commit(&mut store, 2, Box::new([fixtures::header(2)])), 2);
+        assert_eq!(format_row(&mut store), first);
+        assert_eq!(fixtures::get_kv(&mut store, &key), Some(layouts));
+    }
 }

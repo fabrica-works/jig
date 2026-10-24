@@ -314,6 +314,8 @@ impl Store {
                     self.held.push_back(number);
                 }
             }
+            // Worlds have no printed open progress lines.
+            Event::Patched { .. } => {}
             Event::Failed { .. } | Event::OpenRefused { .. } => self.failed = true,
             event @ (Event::Restored { .. } | Event::Loaded { .. } | Event::Read { .. })
                 if self.page_delay != 0 || self.pages_paused =>
@@ -324,7 +326,9 @@ impl Store {
                 self.failed = true;
                 self.route(event, requests);
             }
-            event @ (Event::Restored { .. }
+            // This shell never hands patch sets; routing answers Site with NoSite.
+            event @ (Event::Site { .. }
+            | Event::Restored { .. }
             | Event::Loaded { .. }
             | Event::Read { .. }
             | Event::Got { .. }

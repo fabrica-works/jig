@@ -1,0 +1,2 @@
+family fixture-note 2
+versioned record Note { text: text 32, pinned: bool }

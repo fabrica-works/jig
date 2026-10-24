@@ -45,6 +45,7 @@ fn the_format_row_reads_back_with_its_versions_and_deployment() {
         settings: 9,
         application: 6,
         deployment: [7; 16],
+        levels: crate::format::recorded(crate::format::NONE),
     };
     let bytes = row.encode().expect("fixed width fields fit");
     assert_eq!(component::Format::decode(&bytes), Ok(row));

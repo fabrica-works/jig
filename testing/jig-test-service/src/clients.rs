@@ -706,6 +706,8 @@ impl Clients {
             Event::SecretsLoaded { .. }
             | Event::Opened { .. }
             | Event::OpenRefused { .. }
+            | Event::Site { .. }
+            | Event::Patched { .. }
             | Event::Committed { .. }
             | Event::Failed { .. }
             | Event::Restored { .. }

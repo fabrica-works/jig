@@ -11,6 +11,7 @@ mod intervals;
 mod keys;
 mod open;
 mod pages;
+mod patching;
 mod reads;
 mod restore;
 mod secrets;
@@ -19,4 +20,5 @@ mod transcripts;
 mod settings;
 
 mod operations;
+mod phase;
 mod words;

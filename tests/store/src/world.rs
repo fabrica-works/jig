@@ -2,7 +2,8 @@
 use crate::{model::Model, root};
 use jig_domain_core as core;
 use jig_protocol_store::{
-    Arrived, Below, Event, Get, Io, Load, Request, Restore, Root, Row, Secrets, Store, TranscriptRead, Write,
+    Arrived, Below, Counts, Event, Get, Io, Load, OpenRefusal, Owner, PatchSets, Request, Restore, Root, Row, Secrets,
+    Store, TranscriptRead, Write,
 };
 use skein_fake_machine::{Machine, serve};
 use skein_io::{
@@ -11,7 +12,7 @@ use skein_io::{
     kernel::{Complete, Submit},
 };
 use skein_lib::{Env, Queue, Time, Token, Wall};
-use skein_sim::{Config, Handle, Pid, Sim};
+use skein_sim::{Ask, Config, Handle, Pid, Sim};
 use std::collections::BTreeMap;
 const OWNER: Token = Token::new(900);
 const QUEUE: u32 = 128;
@@ -32,6 +33,13 @@ impl Restored {
 }
 
 pub struct World {
+    observer: Option<fn(Step)>,
+    sets: PatchSets,
+    patched: Vec<(Owner, u32, Counts)>,
+    refusal: Option<OpenRefusal>,
+    kernel_cuts: bool,
+    changes: Vec<(u32, Change)>,
+    halted: bool,
     machine: Machine,
     sim: Sim,
     pid: Pid,
@@ -53,6 +61,75 @@ pub struct World {
     pub drawn: [u8; 16],
     /// The installation's identifier the last open answered (store.md 4.4).
     pub installation: [u8; 16],
+}
+
+/// Optional ordinary-Rust observation seam, around store calls only.
+#[derive(Clone, Copy, Debug)]
+pub enum Step {
+    Construct,
+    Begin { input: u64 },
+    End,
+}
+
+/// Disk-changing kernel calls, including durable replace's internal steps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Change {
+    Create,
+    Write,
+    Sync,
+    Rename,
+    Remove,
+    Truncate,
+    Make,
+}
+
+fn change(ask: &Ask) -> Option<Change> {
+    use skein_io::kernel::OpenHow;
+    match ask {
+        Ask::Open { how: OpenHow::Create { .. } | OpenHow::CreateNoFollow { .. }, .. } => Some(Change::Create),
+        Ask::Write { .. } | Ask::Append { .. } => Some(Change::Write),
+        Ask::Sync { .. } => Some(Change::Sync),
+        Ask::Rename { .. } => Some(Change::Rename),
+        Ask::Remove { .. } => Some(Change::Remove),
+        Ask::Truncate { .. } => Some(Change::Truncate),
+        Ask::MakeDirectory { .. } => Some(Change::Make),
+        Ask::Lock { .. }
+        | Ask::Spawn { .. }
+        | Ask::Open { .. }
+        | Ask::Read { .. }
+        | Ask::Stat { .. }
+        | Ask::List { .. }
+        | Ask::Close { .. } => None,
+    }
+}
+
+// Incoming file buffers were allocated by io, outside a measured store
+// call. Transfer their heap into the observation before the store takes it.
+fn file_heap(event: &file::Event) -> u64 {
+    let bytes = match event {
+        file::Event::Loaded { bytes, .. } | file::Event::Read { bytes, .. } => bytes.len(),
+        file::Event::Listed { entries, .. } | file::Event::Scanned { entries, .. } => {
+            size_of_val(entries.as_ref()) + entries.iter().map(|entry| entry.name.len()).sum::<usize>()
+        }
+        file::Event::Locked { .. }
+        | file::Event::Busy { .. }
+        | file::Event::Made { .. }
+        | file::Event::Refused { .. }
+        | file::Event::Opened { .. }
+        | file::Event::Stored { .. }
+        | file::Event::Conflict { .. }
+        | file::Event::TooLarge { .. }
+        | file::Event::Stated { .. }
+        | file::Event::Written { .. }
+        | file::Event::Cut { .. }
+        | file::Event::Synced { .. }
+        | file::Event::Closed { .. }
+        | file::Event::Renamed { .. }
+        | file::Event::Removed { .. }
+        | file::Event::Failed { .. }
+        | file::Event::Cancelled { .. } => 0,
+    };
+    u64::try_from(bytes).expect("input heap fits")
 }
 
 fn drivers(root: skein_io::kernel::Fd, limits: &jig_protocol_store::Limits) -> [FileIo; 3] {
@@ -90,23 +167,42 @@ impl World {
     }
 
     fn unopened_with_joins(seed: u64, joins: u32) -> World {
+        let mut limits = root::limits();
+        limits.joins = joins;
+        Self::unopened_observed(seed, limits, None)
+    }
+
+    #[must_use]
+    pub fn unopened_observed(seed: u64, limits: jig_protocol_store::Limits, observer: Option<fn(Step)>) -> World {
         let mut machine = Machine::for_user(0);
         let handle = machine.lay(&[]);
         let mut sim = Sim::new(seed, Config::calm());
         let pid = sim.spawn_process();
         let fd = sim.root(pid, Handle::new(handle.raw()));
-        let mut limits = root::limits();
-        limits.joins = joins;
         let mut io = drivers(fd, &limits);
         let [store, secrets, transcripts] = &mut io;
         let seeded = jig_protocol_store::seed([store, secrets, transcripts], seed);
+        if let Some(observe) = observer {
+            observe(Step::Construct);
+        }
+        let component = Store::on_directory(&limits, root::APPLICATION, &[], seeded);
+        if let Some(observe) = observer {
+            observe(Step::End);
+        }
         World {
+            observer,
+            sets: PatchSets::NONE,
+            patched: Vec::new(),
+            refusal: None,
+            kernel_cuts: false,
+            changes: Vec::new(),
+            halted: false,
             machine,
             sim,
             pid,
             root: Root { token: Token::new(1), fd },
             io,
-            store: Store::on_directory(&limits, root::APPLICATION, &[], seeded),
+            store: component,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(QUEUE),
             below: below(),
@@ -127,6 +223,37 @@ impl World {
     #[must_use]
     pub fn into_stores(self) -> jig_protocol_store::Stores {
         self.store.into_stores()
+    }
+
+    pub fn patch_sets(&mut self, sets: PatchSets) {
+        self.sets = sets;
+        self.store.patch_sets(sets);
+    }
+
+    #[must_use]
+    pub fn patched(&self) -> &[(Owner, u32, Counts)] {
+        &self.patched
+    }
+
+    #[must_use]
+    pub const fn refusal(&self) -> Option<&OpenRefusal> {
+        self.refusal.as_ref()
+    }
+
+    /// Count and cut kernel calls, exposing writes inside durable replace.
+    pub fn trace_writes(&mut self) {
+        self.kernel_cuts = true;
+    }
+
+    #[must_use]
+    pub fn changes(&self) -> &[(u32, Change)] {
+        &self.changes
+    }
+
+    fn observe(&self, step: Step) {
+        if let Some(observe) = self.observer {
+            observe(step);
+        }
     }
 
     pub fn cut_at(&mut self, operation: u32) {
@@ -178,6 +305,11 @@ impl World {
             seed ^ 0xd1b5_4a32_d192_ed03_u64.wrapping_mul(self.starts),
         );
         self.store = Store::on_directory(&self.env.limits, root::APPLICATION, &[], seeded);
+        self.store.patch_sets(self.sets);
+        self.patched.clear();
+        self.refusal = None;
+        self.changes.clear();
+        self.halted = false;
         self.above = Queue::with_capacity(QUEUE);
         self.below = below();
         self.subs = Queue::with_capacity(QUEUE);
@@ -236,7 +368,9 @@ impl World {
     }
 
     pub fn request(&mut self, request: Request) -> Vec<Event> {
+        self.observe(Step::Begin { input: 0 });
         jig_protocol_store::down(&mut self.store, &self.env, request, &mut self.above, &mut self.below);
+        self.observe(Step::End);
         self.drive();
         let mut events = Vec::new();
         while let Some(event) = self.above.pop() {
@@ -246,13 +380,95 @@ impl World {
     }
 
     pub fn open(&mut self) -> Option<u64> {
-        let events = self.request(Request::Open { owner: OWNER, root: self.root, installation: self.drawn });
-        if events.is_empty() {
-            return None;
+        self.patched.clear();
+        self.refusal = None;
+        let mut application = jig_test_patches::patches::Context::default();
+        let mut jig = jig_test_patches_jig::patches::Context::default();
+        let mut events = self.request(Request::Open { owner: OWNER, root: self.root, installation: self.drawn });
+        for _ in 0..10_000 {
+            let mut answer = None;
+            for event in events {
+                match event {
+                    Event::Site { owner, of, key, site, at, mut patcher } => {
+                        let (old, new) = patcher.parts();
+                        let result = match of {
+                            Owner::Application => {
+                                application.key = key;
+                                jig_test_patches::patches::written(site, old, new, at, &mut application)
+                            }
+                            Owner::Jig => jig_test_patches_jig::patches::written(site, old, new, at, &mut jig),
+                            Owner::Skein | Owner::Smith => panic!("no fixture for {of:?}"),
+                        };
+                        answer = Some(Request::Site { owner, patcher, result });
+                    }
+                    Event::Patched { of, patch, counts, .. } => self.patched.push((of, patch, counts)),
+                    Event::Opened { last, installation, .. } => {
+                        self.installation = installation;
+                        if !self.patched.is_empty() {
+                            self.model.patched(last);
+                        }
+                        self.next = last + 1;
+                        return Some(last);
+                    }
+                    Event::OpenRefused { why, .. } => {
+                        self.refusal = Some(why);
+                        return None;
+                    }
+                    other @ (Event::Committed { .. }
+                    | Event::Failed { .. }
+                    | Event::Restored { .. }
+                    | Event::Loaded { .. }
+                    | Event::Read { .. }
+                    | Event::Got { .. }
+                    | Event::Turns { .. }
+                    | Event::Unread { .. }
+                    | Event::Kept { .. }
+                    | Event::Carried { .. }
+                    | Event::Stale { .. }
+                    | Event::Erased { .. }
+                    | Event::Secret { .. }
+                    | Event::SecretsLoaded { .. }
+                    | Event::Corrupt { .. }) => panic!("open terminal: {other:?}"),
+                }
+            }
+            if let Some(request) = answer {
+                events = self.request(request);
+            } else {
+                if self.halted || self.cut.is_some_and(|cut| self.operations >= cut) {
+                    return None;
+                }
+                // Patching may have ready in-memory work between file asks.
+                // Keep firing until its next site, file ask or terminal.
+                self.drive();
+                events = Vec::new();
+                while let Some(event) = self.above.pop() {
+                    events.push(event);
+                }
+            }
         }
-        let [Event::Opened { last, installation, .. }] = events.as_slice() else { panic!("open terminal: {events:?}") };
-        self.installation = *installation;
-        Some(*last)
+        panic!("open did not settle");
+    }
+
+    /// All paths, with file bytes, for byte-for-byte refusal checks.
+    #[must_use]
+    pub fn contents(&mut self) -> BTreeMap<Vec<u8>, Option<Vec<u8>>> {
+        use skein_fake_machine::{How, Is};
+        let paths = self.paths();
+        let root = self.machine.reopen_root(0);
+        let mut result = BTreeMap::new();
+        for path in paths {
+            let file = self.machine.open(root, &path, How::ReadNoFollow).expect("listed path");
+            let kind = self.machine.stat(file).is;
+            let bytes = if kind == Is::Directory {
+                None
+            } else {
+                Some(self.machine.read(file, 0, u32::MAX).expect("file bytes"))
+            };
+            self.machine.close(file);
+            result.insert(path, bytes);
+        }
+        self.machine.close(root);
+        result
     }
 
     /// Lay durable scenario entries beneath the existing deployment.
@@ -310,8 +526,10 @@ impl World {
 
     fn drive(&mut self) {
         for _ in 0..10_000 {
+            self.observe(Step::Begin { input: 0 });
             jig_protocol_store::fire(&mut self.store, &self.env, &mut self.above, &mut self.below);
-            if self.cut.is_some_and(|cut| self.operations >= cut) {
+            self.observe(Step::End);
+            if self.halted || self.cut.is_some_and(|cut| self.operations >= cut) {
                 return;
             }
             let next = self
@@ -326,7 +544,12 @@ impl World {
             };
             let synced = driver == 2 && matches!(&request, file::Request::Sync { .. });
             self.file(driver, request);
-            self.operations += 1;
+            if self.halted {
+                return;
+            }
+            if !self.kernel_cuts {
+                self.operations += 1;
+            }
             if synced {
                 self.transcript_sync = Some(self.operations);
             }
@@ -342,7 +565,25 @@ impl World {
         for _ in 0..100 {
             if !self.subs.is_empty() {
                 self.sim.submit(self.pid, &mut self.subs);
-                serve(&mut self.machine, &mut self.sim);
+                if self.kernel_cuts {
+                    let mut calls = Queue::with_capacity(QUEUE);
+                    let mut answers = Queue::with_capacity(QUEUE);
+                    self.sim.calls(&mut calls);
+                    while let Some(call) = calls.pop() {
+                        if let Some(change) = change(&call.ask) {
+                            self.changes.push((self.operations, change));
+                        }
+                        if self.cut == Some(self.operations) {
+                            self.halted = true;
+                            return;
+                        }
+                        self.operations += 1;
+                        skein_fake_machine::step(&mut self.machine, call, &mut answers);
+                    }
+                    self.sim.answer(&mut answers);
+                } else {
+                    serve(&mut self.machine, &mut self.sim);
+                }
             }
             self.sim.reap(self.pid, &mut self.completions);
             while let Some(complete) = self.completions.pop() {
@@ -356,6 +597,7 @@ impl World {
         assert!(!events.is_empty(), "one file terminal");
         while let Some(event) = events.pop() {
             let fd = if let file::Event::Opened { file, .. } = &event { io.descriptor(*file) } else { None };
+            let input = if self.observer.is_some() { file_heap(&event) } else { 0 };
             let arrived = Arrived { event, fd };
             let event = match driver {
                 0 => Io::Store(arrived),
@@ -363,7 +605,13 @@ impl World {
                 2 => Io::Transcripts(arrived),
                 _ => panic!("three drivers"),
             };
+            if let Some(observe) = self.observer {
+                observe(Step::Begin { input });
+            }
             jig_protocol_store::up(&mut self.store, &self.env, event, &mut self.above, &mut self.below);
+            if let Some(observe) = self.observer {
+                observe(Step::End);
+            }
         }
     }
 

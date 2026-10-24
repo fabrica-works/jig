@@ -13,6 +13,16 @@ pub const CEILINGS: Limits = Limits {
 /// A field or tag that caused a codec problem.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Path {
+    /// The `skein` field of `Levels`.
+    LevelsSkein,
+    /// The `smith` field of `Levels`.
+    LevelsSmith,
+    /// The `jig` field of `Levels`.
+    LevelsJig,
+    /// The `application` field of `Levels`.
+    LevelsApplication,
+    /// Bytes after `Levels`.
+    LevelsTail,
     /// The `component` field of `Format`.
     FormatComponent,
     /// The `core` field of `Format`.
@@ -31,10 +41,30 @@ pub enum Path {
     FormatApplication,
     /// The `deployment` field of `Format`.
     FormatDeployment,
+    /// The `levels` field of `Format`.
+    FormatLevels,
     /// The version of `Format`.
     FormatVersion,
     /// Bytes after `Format`.
     FormatTail,
+    /// The `generation` field of `Manifest`.
+    ManifestGeneration,
+    /// The `from` field of `Manifest`.
+    ManifestFrom,
+    /// The `before` field of `Manifest`.
+    ManifestBefore,
+    /// The `after` field of `Manifest`.
+    ManifestAfter,
+    /// The `store` field of `Manifest`.
+    ManifestStore,
+    /// The `secrets` field of `Manifest`.
+    ManifestSecrets,
+    /// The `written` field of `Manifest`.
+    ManifestWritten,
+    /// The version of `Manifest`.
+    ManifestVersion,
+    /// Bytes after `Manifest`.
+    ManifestTail,
     /// The `length` field of `Transcript`.
     TranscriptLength,
     /// The `window` field of `Transcript`.
@@ -81,6 +111,58 @@ pub fn check_limits(_limits: &Limits) -> Result<(), Problem> {
     Ok(())
 }
 
+/// Movable fields of `Levels`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LevelsParts {
+    /// The `skein` field.
+    pub skein: Option<u32>,
+    /// The `smith` field.
+    pub smith: Option<u32>,
+    /// The `jig` field.
+    pub jig: Option<u32>,
+    /// The `application` field.
+    pub application: Option<u32>,
+}
+
+/// `Levels` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Levels {
+    skein: Option<u32>,
+    smith: Option<u32>,
+    jig: Option<u32>,
+    application: Option<u32>,
+}
+
+impl Levels {
+    /// Makes a value; this family has no adjustable bounds.
+    #[must_use]
+    pub fn new(_limits: &Limits, parts: LevelsParts) -> Self {
+        let LevelsParts { skein, smith, jig, application } = parts;
+        Self { skein, smith, jig, application }
+    }
+
+    /// Reads the `skein` field.
+    #[must_use]
+    pub fn skein(&self) -> &Option<u32> { &self.skein }
+
+    /// Reads the `smith` field.
+    #[must_use]
+    pub fn smith(&self) -> &Option<u32> { &self.smith }
+
+    /// Reads the `jig` field.
+    #[must_use]
+    pub fn jig(&self) -> &Option<u32> { &self.jig }
+
+    /// Reads the `application` field.
+    #[must_use]
+    pub fn application(&self) -> &Option<u32> { &self.application }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> LevelsParts { LevelsParts { skein: self.skein, smith: self.smith, jig: self.jig, application: self.application } }
+
+}
+
 /// Movable fields of `Format`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FormatParts {
@@ -102,6 +184,8 @@ pub struct FormatParts {
     pub application: u32,
     /// The `deployment` field.
     pub deployment: [u8; 16],
+    /// The `levels` field.
+    pub levels: Levels,
 }
 
 /// `Format` in this codec family.
@@ -116,14 +200,15 @@ pub struct Format {
     settings: u16,
     application: u32,
     deployment: [u8; 16],
+    levels: Levels,
 }
 
 impl Format {
     /// Makes a value; this family has no adjustable bounds.
     #[must_use]
     pub fn new(_limits: &Limits, parts: FormatParts) -> Self {
-        let FormatParts { component, core, tasks, people, notes, accounts, settings, application, deployment } = parts;
-        Self { component, core, tasks, people, notes, accounts, settings, application, deployment }
+        let FormatParts { component, core, tasks, people, notes, accounts, settings, application, deployment, levels } = parts;
+        Self { component, core, tasks, people, notes, accounts, settings, application, deployment, levels }
     }
 
     /// Reads the `component` field.
@@ -162,9 +247,86 @@ impl Format {
     #[must_use]
     pub fn deployment(&self) -> &[u8; 16] { &self.deployment }
 
+    /// Reads the `levels` field.
+    #[must_use]
+    pub fn levels(&self) -> &Levels { &self.levels }
+
     /// Moves the fields out without copying.
     #[must_use]
-    pub fn into_parts(self) -> FormatParts { FormatParts { component: self.component, core: self.core, tasks: self.tasks, people: self.people, notes: self.notes, accounts: self.accounts, settings: self.settings, application: self.application, deployment: self.deployment } }
+    pub fn into_parts(self) -> FormatParts { FormatParts { component: self.component, core: self.core, tasks: self.tasks, people: self.people, notes: self.notes, accounts: self.accounts, settings: self.settings, application: self.application, deployment: self.deployment, levels: self.levels } }
+
+}
+
+/// Movable fields of `Manifest`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ManifestParts {
+    /// The `generation` field.
+    pub generation: u64,
+    /// The `from` field.
+    pub from: Option<u64>,
+    /// The `before` field.
+    pub before: Levels,
+    /// The `after` field.
+    pub after: Levels,
+    /// The `store` field.
+    pub store: u64,
+    /// The `secrets` field.
+    pub secrets: Option<u64>,
+    /// The `written` field.
+    pub written: u64,
+}
+
+/// `Manifest` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Manifest {
+    generation: u64,
+    from: Option<u64>,
+    before: Levels,
+    after: Levels,
+    store: u64,
+    secrets: Option<u64>,
+    written: u64,
+}
+
+impl Manifest {
+    /// Makes a value; this family has no adjustable bounds.
+    #[must_use]
+    pub fn new(_limits: &Limits, parts: ManifestParts) -> Self {
+        let ManifestParts { generation, from, before, after, store, secrets, written } = parts;
+        Self { generation, from, before, after, store, secrets, written }
+    }
+
+    /// Reads the `generation` field.
+    #[must_use]
+    pub fn generation(&self) -> u64 { self.generation }
+
+    /// Reads the `from` field.
+    #[must_use]
+    pub fn from(&self) -> &Option<u64> { &self.from }
+
+    /// Reads the `before` field.
+    #[must_use]
+    pub fn before(&self) -> &Levels { &self.before }
+
+    /// Reads the `after` field.
+    #[must_use]
+    pub fn after(&self) -> &Levels { &self.after }
+
+    /// Reads the `store` field.
+    #[must_use]
+    pub fn store(&self) -> u64 { self.store }
+
+    /// Reads the `secrets` field.
+    #[must_use]
+    pub fn secrets(&self) -> &Option<u64> { &self.secrets }
+
+    /// Reads the `written` field.
+    #[must_use]
+    pub fn written(&self) -> u64 { self.written }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> ManifestParts { ManifestParts { generation: self.generation, from: self.from, before: self.before, after: self.after, store: self.store, secrets: self.secrets, written: self.written } }
 
 }
 
@@ -310,6 +472,87 @@ impl Layouts {
 
 }
 
+impl Levels {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        let field_skein = &self.skein;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if field_skein.is_some() {
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        }
+        let field_smith = &self.smith;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if field_smith.is_some() {
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        }
+        let field_jig = &self.jig;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if field_jig.is_some() {
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        }
+        let field_application = &self.application;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if field_application.is_some() {
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        }
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_skein = &self.skein;
+        match field_skein {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        writer.put(&some_0.to_be_bytes())?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
+        let field_smith = &self.smith;
+        match field_smith {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        writer.put(&some_0.to_be_bytes())?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
+        let field_jig = &self.jig;
+        match field_jig {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        writer.put(&some_0.to_be_bytes())?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
+        let field_application = &self.application;
+        match field_application {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        writer.put(&some_0.to_be_bytes())?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::LevelsTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_skein = match reader.u8().ok_or(Problem { path: Path::LevelsSkein, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(reader.u32().ok_or(Problem { path: Path::LevelsSkein, reason: skein_codec::Reason::Short })?), _ => return Err(Problem { path: Path::LevelsSkein, reason: skein_codec::Reason::Tag }) };
+        let decoded_smith = match reader.u8().ok_or(Problem { path: Path::LevelsSmith, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(reader.u32().ok_or(Problem { path: Path::LevelsSmith, reason: skein_codec::Reason::Short })?), _ => return Err(Problem { path: Path::LevelsSmith, reason: skein_codec::Reason::Tag }) };
+        let decoded_jig = match reader.u8().ok_or(Problem { path: Path::LevelsJig, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(reader.u32().ok_or(Problem { path: Path::LevelsJig, reason: skein_codec::Reason::Short })?), _ => return Err(Problem { path: Path::LevelsJig, reason: skein_codec::Reason::Tag }) };
+        let decoded_application = match reader.u8().ok_or(Problem { path: Path::LevelsApplication, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(reader.u32().ok_or(Problem { path: Path::LevelsApplication, reason: skein_codec::Reason::Short })?), _ => return Err(Problem { path: Path::LevelsApplication, reason: skein_codec::Reason::Tag }) };
+        Ok(Self { skein: decoded_skein, smith: decoded_smith, jig: decoded_jig, application: decoded_application })
+    }
+}
+
 impl Format {
     /// Measures this record's wire encoding.
     #[must_use]
@@ -325,6 +568,8 @@ impl Format {
         size = size.checked_add(2).expect("schema ceilings fit u32");
         size = size.checked_add(4).expect("schema ceilings fit u32");
         size = size.checked_add(16).expect("schema ceilings fit u32");
+        let field_levels = &self.levels;
+        size = size.checked_add(field_levels.measure()).expect("schema ceilings fit u32");
         size
     }
 
@@ -349,6 +594,8 @@ impl Format {
         writer.put(&field_application.to_be_bytes())?;
         let field_deployment = &self.deployment;
         writer.put(field_deployment)?;
+        let field_levels = &self.levels;
+        field_levels.encode(writer)?;
         Ok(())
     }
 
@@ -359,7 +606,7 @@ impl Format {
         Ok(value)
     }
 
-    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
         let version = reader.u16().ok_or(Problem { path: Path::FormatVersion, reason: skein_codec::Reason::Short })?;
         if version != 3 { return Err(Problem { path: Path::FormatVersion, reason: skein_codec::Reason::Version }); }
         let decoded_component = reader.u16().ok_or(Problem { path: Path::FormatComponent, reason: skein_codec::Reason::Short })?;
@@ -371,7 +618,87 @@ impl Format {
         let decoded_settings = reader.u16().ok_or(Problem { path: Path::FormatSettings, reason: skein_codec::Reason::Short })?;
         let decoded_application = reader.u32().ok_or(Problem { path: Path::FormatApplication, reason: skein_codec::Reason::Short })?;
         let decoded_deployment = { let bytes = reader.bytes(16).ok_or(Problem { path: Path::FormatDeployment, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
-        Ok(Self { component: decoded_component, core: decoded_core, tasks: decoded_tasks, people: decoded_people, notes: decoded_notes, accounts: decoded_accounts, settings: decoded_settings, application: decoded_application, deployment: decoded_deployment })
+        let decoded_levels = Levels::decode_from(limits, reader)?;
+        Ok(Self { component: decoded_component, core: decoded_core, tasks: decoded_tasks, people: decoded_people, notes: decoded_notes, accounts: decoded_accounts, settings: decoded_settings, application: decoded_application, deployment: decoded_deployment, levels: decoded_levels })
+    }
+}
+
+impl Manifest {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        size = size.checked_add(2).expect("schema ceilings fit u32");
+        size = size.checked_add(8).expect("schema ceilings fit u32");
+        let field_from = &self.from;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if field_from.is_some() {
+        size = size.checked_add(8).expect("schema ceilings fit u32");
+        }
+        let field_before = &self.before;
+        size = size.checked_add(field_before.measure()).expect("schema ceilings fit u32");
+        let field_after = &self.after;
+        size = size.checked_add(field_after.measure()).expect("schema ceilings fit u32");
+        size = size.checked_add(8).expect("schema ceilings fit u32");
+        let field_secrets = &self.secrets;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if field_secrets.is_some() {
+        size = size.checked_add(8).expect("schema ceilings fit u32");
+        }
+        size = size.checked_add(8).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        writer.put(&3_u16.to_be_bytes())?;
+        let field_generation = &self.generation;
+        writer.put(&field_generation.to_be_bytes())?;
+        let field_from = &self.from;
+        match field_from {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        writer.put(&some_0.to_be_bytes())?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
+        let field_before = &self.before;
+        field_before.encode(writer)?;
+        let field_after = &self.after;
+        field_after.encode(writer)?;
+        let field_store = &self.store;
+        writer.put(&field_store.to_be_bytes())?;
+        let field_secrets = &self.secrets;
+        match field_secrets {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        writer.put(&some_0.to_be_bytes())?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
+        let field_written = &self.written;
+        writer.put(&field_written.to_be_bytes())?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::ManifestTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let version = reader.u16().ok_or(Problem { path: Path::ManifestVersion, reason: skein_codec::Reason::Short })?;
+        if version != 3 { return Err(Problem { path: Path::ManifestVersion, reason: skein_codec::Reason::Version }); }
+        let decoded_generation = reader.u64().ok_or(Problem { path: Path::ManifestGeneration, reason: skein_codec::Reason::Short })?;
+        let decoded_from = match reader.u8().ok_or(Problem { path: Path::ManifestFrom, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(reader.u64().ok_or(Problem { path: Path::ManifestFrom, reason: skein_codec::Reason::Short })?), _ => return Err(Problem { path: Path::ManifestFrom, reason: skein_codec::Reason::Tag }) };
+        let decoded_before = Levels::decode_from(limits, reader)?;
+        let decoded_after = Levels::decode_from(limits, reader)?;
+        let decoded_store = reader.u64().ok_or(Problem { path: Path::ManifestStore, reason: skein_codec::Reason::Short })?;
+        let decoded_secrets = match reader.u8().ok_or(Problem { path: Path::ManifestSecrets, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(reader.u64().ok_or(Problem { path: Path::ManifestSecrets, reason: skein_codec::Reason::Short })?), _ => return Err(Problem { path: Path::ManifestSecrets, reason: skein_codec::Reason::Tag }) };
+        let decoded_written = reader.u64().ok_or(Problem { path: Path::ManifestWritten, reason: skein_codec::Reason::Short })?;
+        Ok(Self { generation: decoded_generation, from: decoded_from, before: decoded_before, after: decoded_after, store: decoded_store, secrets: decoded_secrets, written: decoded_written })
     }
 }
 
@@ -502,7 +829,7 @@ impl Layouts {
     }
 }
 
-impl Format {
+impl Levels {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
@@ -511,12 +838,9 @@ impl Format {
     }
 
     pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
-        let mut size = 2_u64;
-        size = size.checked_add(2_u64)?.checked_add(2_u64)?;
-        size = size.checked_add(2_u64)?.checked_add(2_u64)?;
-        size = size.checked_add(2_u64)?.checked_add(2_u64)?;
-        size = size.checked_add(2_u64)?.checked_add(4_u64)?;
-        size = size.checked_add(u64::from(16_u32))?;
+        let mut size = 0_u64;
+        size = size.checked_add(1_u64.checked_add(4_u64)?)?.checked_add(1_u64.checked_add(4_u64)?)?;
+        size = size.checked_add(1_u64.checked_add(4_u64)?)?.checked_add(1_u64.checked_add(4_u64)?)?;
         size.checked_add(0)
     }
 
@@ -531,7 +855,74 @@ impl Format {
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap.checked_add(0)
+    }
+}
+
+impl Format {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 2_u64;
+        size = size.checked_add(2_u64)?.checked_add(2_u64)?;
+        size = size.checked_add(2_u64)?.checked_add(2_u64)?;
+        size = size.checked_add(2_u64)?.checked_add(2_u64)?;
+        size = size.checked_add(2_u64)?.checked_add(4_u64)?;
+        size = size.checked_add(u64::from(16_u32))?.checked_add(Levels::worst_case_bytes_within(limits)?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(Levels::worst_case_heap_within(limits)?)?;
+        heap.checked_add(0)
+    }
+}
+
+impl Manifest {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 2_u64;
+        size = size.checked_add(8_u64)?.checked_add(1_u64.checked_add(8_u64)?)?;
+        size = size.checked_add(Levels::worst_case_bytes_within(limits)?)?.checked_add(Levels::worst_case_bytes_within(limits)?)?;
+        size = size.checked_add(8_u64)?.checked_add(1_u64.checked_add(8_u64)?)?;
+        size = size.checked_add(8_u64)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(Levels::worst_case_heap_within(limits)?)?.checked_add(Levels::worst_case_heap_within(limits)?)?;
         heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?;
         heap.checked_add(0)
@@ -633,7 +1024,9 @@ impl Layouts {
 pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
     if check_limits(limits).is_err() { return None; }
     let mut biggest = 0_u64;
+    biggest = biggest.max(Levels::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Format::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(Manifest::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Transcript::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Attempt::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Layouts::worst_case_bytes_within(limits)?);
@@ -645,7 +1038,9 @@ pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
 pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
     if check_limits(limits).is_err() { return None; }
     let mut biggest = 0_u64;
+    biggest = biggest.max(Levels::worst_case_heap_within(limits)?);
     biggest = biggest.max(Format::worst_case_heap_within(limits)?);
+    biggest = biggest.max(Manifest::worst_case_heap_within(limits)?);
     biggest = biggest.max(Transcript::worst_case_heap_within(limits)?);
     biggest = biggest.max(Attempt::worst_case_heap_within(limits)?);
     biggest = biggest.max(Layouts::worst_case_heap_within(limits)?);
@@ -654,7 +1049,7 @@ pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
 
 #[cfg(test)]
 mod golden_tests {
-    use super::{CEILINGS, Format, FormatParts, Transcript, TranscriptParts, Attempt, AttemptParts, Layouts, LayoutsParts};
+    use super::{CEILINGS, Levels, LevelsParts, Format, FormatParts, Manifest, ManifestParts, Transcript, TranscriptParts, Attempt, AttemptParts, Layouts, LayoutsParts};
 
     use alloc::boxed::Box;
 
@@ -689,9 +1084,13 @@ mod golden_tests {
         encoded && decoded
     }
 
-    static GOLDEN_0: [Case; 8] = [
-        ("record_format_smallest", || { let value = Format::new(&CEILINGS, FormatParts { component: 0_u16, core: 0_u16, tasks: 0_u16, people: 0_u16, notes: 0_u16, accounts: 0_u16, settings: 0_u16, application: 0_u32, deployment: [0_u8; 16] }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_format_full", || { let value = Format::new(&CEILINGS, FormatParts { component: u16::MAX, core: u16::MAX, tasks: u16::MAX, people: u16::MAX, notes: u16::MAX, accounts: u16::MAX, settings: u16::MAX, application: u32::MAX, deployment: [165_u8; 16] }); let bytes: &[u8] = &[0, 3, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+    static GOLDEN_0: [Case; 12] = [
+        ("record_levels_smallest", || { let value = Levels::new(&CEILINGS, LevelsParts { skein: None, smith: None, jig: None, application: None }); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Levels::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_levels_full", || { let value = Levels::new(&CEILINGS, LevelsParts { skein: Some(u32::MAX), smith: Some(u32::MAX), jig: Some(u32::MAX), application: Some(u32::MAX) }); let bytes: &[u8] = &[1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Levels::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_format_smallest", || { let value = Format::new(&CEILINGS, FormatParts { component: 0_u16, core: 0_u16, tasks: 0_u16, people: 0_u16, notes: 0_u16, accounts: 0_u16, settings: 0_u16, application: 0_u32, deployment: [0_u8; 16], levels: Levels::new(&CEILINGS, LevelsParts { skein: None, smith: None, jig: None, application: None }) }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_format_full", || { let value = Format::new(&CEILINGS, FormatParts { component: u16::MAX, core: u16::MAX, tasks: u16::MAX, people: u16::MAX, notes: u16::MAX, accounts: u16::MAX, settings: u16::MAX, application: u32::MAX, deployment: [165_u8; 16], levels: Levels::new(&CEILINGS, LevelsParts { skein: Some(u32::MAX), smith: Some(u32::MAX), jig: Some(u32::MAX), application: Some(u32::MAX) }) }); let bytes: &[u8] = &[0, 3, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_manifest_smallest", || { let value = Manifest::new(&CEILINGS, ManifestParts { generation: 0_u64, from: None, before: Levels::new(&CEILINGS, LevelsParts { skein: None, smith: None, jig: None, application: None }), after: Levels::new(&CEILINGS, LevelsParts { skein: None, smith: None, jig: None, application: None }), store: 0_u64, secrets: None, written: 0_u64 }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Manifest::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_manifest_full", || { let value = Manifest::new(&CEILINGS, ManifestParts { generation: u64::MAX, from: Some(u64::MAX), before: Levels::new(&CEILINGS, LevelsParts { skein: Some(u32::MAX), smith: Some(u32::MAX), jig: Some(u32::MAX), application: Some(u32::MAX) }), after: Levels::new(&CEILINGS, LevelsParts { skein: Some(u32::MAX), smith: Some(u32::MAX), jig: Some(u32::MAX), application: Some(u32::MAX) }), store: u64::MAX, secrets: Some(u64::MAX), written: u64::MAX }); let bytes: &[u8] = &[0, 3, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Manifest::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_transcript_smallest", || { let value = Transcript::new(&CEILINGS, TranscriptParts { length: 0_u64, window: 0_u64 }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_transcript_full", || { let value = Transcript::new(&CEILINGS, TranscriptParts { length: u64::MAX, window: u64::MAX }); let bytes: &[u8] = &[0, 3, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_attempt_smallest", || { let value = Attempt::new(&CEILINGS, AttemptParts { first: 0_u64 }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),

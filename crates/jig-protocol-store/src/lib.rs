@@ -14,6 +14,9 @@ pub mod intervals;
 mod loads;
 mod open;
 mod pages;
+mod patching;
+pub use patching::Counts;
+pub use patching::sets::{KeptFamily, Keys, Owner, PatchSet, PatchSets};
 mod reads;
 mod restore;
 mod secrets;
@@ -68,6 +71,7 @@ pub struct Store {
     /// The installation's identifier (store.md 4.4): drawn by the shell and
     /// kept by an empty store's first commit, or restored from the store.
     installation: [u8; 16],
+    patch_sets: PatchSets,
 }
 
 /// Proof that the store's three file drivers were seeded: io's `Store` names
@@ -121,6 +125,7 @@ impl Store {
             secret_state: secrets::State::new(limits.secrets.queued),
             transcripts: transcripts::State::new(limits),
             installation: [0; 16],
+            patch_sets: PatchSets::NONE,
         }
     }
 
@@ -138,6 +143,12 @@ impl Store {
         store
     }
 
+    /// Supplies the owners' static patch data (store.md 10.3). Price these
+    /// sets with `worst_case_with_patches` when checking startup room.
+    pub fn patch_sets(&mut self, sets: PatchSets) {
+        self.patch_sets = sets;
+    }
+
     #[must_use]
     pub fn into_stores(self) -> Stores {
         self.stores
@@ -150,6 +161,21 @@ pub const MAX_OUT_DOWN: u32 = skein_kv::MAX_OUT.above.saturating_mul(2);
 /// Owned stores, component state and bounded temporary rows and operations.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    worst_case_with_patches(limits, &PatchSets::NONE)
+}
+
+/// Includes the static sets supplied through `Store::patch_sets`. The ordinary
+/// `worst_case` prices `PatchSets::NONE`: limits alone cannot bound an
+/// arbitrary number of kept schemas. Record bytes also bound nodes (at least one wire byte each).
+#[must_use]
+pub fn worst_case_with_patches(limits: &Limits, sets: &PatchSets) -> Option<u64> {
+    let (common, serving) = serving_peak(limits)?;
+    let patching = patching::phase::worst_case(limits, sets)?;
+    common.checked_add(serving.max(patching))
+}
+
+/// Shared resident state and the additional serving peak (store.md 13).
+fn serving_peak(limits: &Limits) -> Option<(u64, u64)> {
     let state = u64::try_from(size_of::<Store>()).ok()?;
     let rows = u64::from(limits.store.value).checked_add(u64::from(limits.store.key))?.checked_mul(2)?;
     let codec = codec::limits(&limits.core)?;
@@ -169,10 +195,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.store.page.bytes))?
         .checked_add(skein_lib::List::<pages::WalkRow>::worst_case(limits.store.page.bytes)?)?
         .checked_add(skein_lib::List::<Row>::worst_case(limits.store.page.bytes)?)?;
-    skein_kv::worst_case(&limits.store)?
+    let common = skein_kv::worst_case(&limits.store)?
         .checked_add(skein_kv::worst_case(&limits.secrets)?)?
         .checked_add(state)?
-        .checked_add(rows)?
+        .checked_add(secrets::worst_case(limits)?)?
+        .checked_add(transcripts::worst_case(limits)?)?
+        .checked_add(generations::worst_case()?)?
+        .checked_add(names_worst_case()?)?;
+    let serving = rows
         .checked_add(page)?
         .checked_add(decoded.checked_mul(u64::from(limits.joins))?)?
         .checked_add(skein_lib::List::<Box<jig_domain_tasks::TaskRecord>>::worst_case(limits.joins)?)?
@@ -185,13 +215,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below)?)?
         .checked_add(Queue::<Event>::worst_case(MAX_OUT_DOWN)?)?
         .checked_add(question_restore_worst_case(limits)?)?
-        .checked_add(commits::worst_case(limits)?)?
-        .checked_add(secrets::worst_case(limits)?)?
-        .checked_add(transcripts::worst_case(limits)?)?
-        .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)?
-        .checked_add(generations::worst_case()?)?
-        .checked_add(generations::operations_worst_case(limits.store.chunk)?)?
-        .checked_add(names_worst_case()?)
+        .checked_add(commits::worst_case(limits)?)?;
+    Some((common, serving))
 }
 
 // The census's exact question keys become point ranges beside the combined
@@ -218,6 +243,9 @@ pub fn down(store: &mut Store, env: &Env<Limits>, request: Request, above: &mut 
     match request {
         Request::Open { owner, root, installation } => {
             directory::open(store, env, owner, root, installation, above, below);
+        }
+        Request::Site { owner, patcher, result } => {
+            patching::phase::site(store, env, owner, patcher, result, above, below);
         }
         Request::Commit { number, writes } => transcripts::write::begin(store, env, number, writes, above, below),
         Request::Restore { owner, range, after, rows, bytes } => {

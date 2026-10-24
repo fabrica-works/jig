@@ -1,7 +1,6 @@
 use jig_protocol_store::{Generations, Older, OpenRefusal};
 use jig_store_world::World;
 use skein_fake_machine::Item;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 
 fn directory(path: &str) -> Item {
     Item::directory(path.as_bytes()).mode(0o700)
@@ -39,17 +38,10 @@ fn absent_tree(paths: &[Vec<u8>], path: &str) {
     );
 }
 
-fn refused_unchanged(world: &mut World, why: OpenRefusal) {
+fn refused_unchanged(world: &mut World, why: &OpenRefusal) {
     let before = world.paths();
-    // World::open exposes a refusal as a panic, and does not expose its Root
-    // for request(Open). Inspect that public adapter's diagnostic, then disk.
-    let panic = catch_unwind(AssertUnwindSafe(|| world.open())).expect_err("open must refuse");
-    let diagnostic = panic
-        .downcast_ref::<String>()
-        .map(String::as_str)
-        .or_else(|| panic.downcast_ref::<&str>().copied())
-        .expect("open's refusal diagnostic");
-    assert!(diagnostic.contains(&format!("why: {why:?}")), "unexpected refusal: {diagnostic}");
+    assert_eq!(world.open(), None, "open must refuse");
+    assert_eq!(world.refusal(), Some(why));
     assert_eq!(world.paths(), before, "refusal changes no paths");
 }
 
@@ -77,7 +69,6 @@ fn clean_first_start(world: &mut World) {
 }
 
 #[test]
-#[ignore = "M3: a first start writes generation 1's manifest (store.md 2), which M3 builds"]
 fn first_start_is_empty_and_durable() {
     // store.md 2: The first start makes generation 1's manifest; the maps are empty until the root's first commit.
     let mut world = World::unopened(802);
@@ -93,7 +84,6 @@ fn first_start_is_empty_and_durable() {
 }
 
 #[test]
-#[ignore = "M3: a first start writes generation 1's manifest (store.md 2), which M3 builds"]
 fn empty_interrupted_generation_restarts() {
     // store.md 2: A lone 1/ whose store/ and secrets/ hold no file is a cut first start, removed and made afresh.
     let mut world = World::unopened(804);
@@ -105,7 +95,6 @@ fn empty_interrupted_generation_restarts() {
 }
 
 #[test]
-#[ignore = "M3: once a first start writes the manifest before active, the leftover rule must accept it beside empty maps (store.md 2)"]
 fn interrupted_manifest_is_replaced() {
     // store.md 2: A lone 1/ with file-free maps is removed before the first start makes generation 1's manifest.
     let mut world = World::unopened(805);
@@ -122,7 +111,7 @@ fn each_directory_of_todays_layout_refuses_untouched() {
     for name in ["store", "secrets", "transcripts"] {
         let mut world = World::unopened(806);
         world.lay(&[directory(name), file(&format!("{name}/kept"), b"operator data")]);
-        refused_unchanged(&mut world, OpenRefusal::OlderBuild { why: Older::Directory });
+        refused_unchanged(&mut world, &OpenRefusal::OlderBuild { why: Older::Directory });
     }
 }
 
@@ -133,7 +122,7 @@ fn todays_layout_precedes_an_interrupted_first_start() {
     world.lay(&[directory("generations"), directory("transcripts"), file("transcripts/kept", b"turns")]);
     generation(&mut world, 1);
     world.lay(&[file("active.skein-0123456789abcdef", b"1\n")]);
-    refused_unchanged(&mut world, OpenRefusal::OlderBuild { why: Older::Directory });
+    refused_unchanged(&mut world, &OpenRefusal::OlderBuild { why: Older::Directory });
 }
 
 #[test]
@@ -144,7 +133,7 @@ fn nonempty_unnamed_maps_are_never_a_first_start() {
         world.lay(&[directory("generations")]);
         generation(&mut world, 1);
         world.lay(&[file(&format!("generations/1/{map}/kept"), b"durable data")]);
-        refused_unchanged(&mut world, OpenRefusal::Generations { why: Generations::Unnamed });
+        refused_unchanged(&mut world, &OpenRefusal::Generations { why: Generations::Unnamed });
     }
 }
 
@@ -159,7 +148,7 @@ fn unnamed_other_generations_and_entries_refuse() {
         let mut world = World::unopened(809);
         world.lay(&[directory("generations")]);
         world.lay(&items);
-        refused_unchanged(&mut world, OpenRefusal::Generations { why: Generations::Unnamed });
+        refused_unchanged(&mut world, &OpenRefusal::Generations { why: Generations::Unnamed });
     }
 }
 
@@ -189,7 +178,7 @@ fn malformed_active_refuses_before_cleanup() {
             directory("generations/stray"),
             file("active.skein-0123456789abcdef", b"keep"),
         ]);
-        refused_unchanged(&mut world, OpenRefusal::Generations { why: Generations::Unreadable });
+        refused_unchanged(&mut world, &OpenRefusal::Generations { why: Generations::Unreadable });
     }
 }
 
@@ -221,7 +210,7 @@ fn missing_or_file_maps_refuse_before_removing_strays() {
             file("active.skein-0123456789abcdef", b"keep"),
         ]);
         world.lay(&items);
-        refused_unchanged(&mut world, OpenRefusal::Generations { why: Generations::Missing { generation: 7 } });
+        refused_unchanged(&mut world, &OpenRefusal::Generations { why: Generations::Missing { generation: 7 } });
     }
 }
 
@@ -349,7 +338,6 @@ fn active_layout_keeps_shared_transcripts() {
 }
 
 #[test]
-#[ignore = "M3: a first start writes generation 1's manifest (store.md 2), which M3 builds"]
 fn every_first_start_cut_recovers_one_whole_generation() {
     // store.md 10.4: Before active's rename remove the partial first start; after it open 1 and make transcripts/.
     let mut baseline = World::unopened(811);

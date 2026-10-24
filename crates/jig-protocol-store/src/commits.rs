@@ -80,9 +80,11 @@ pub(crate) fn operations(
     }
     if format_due {
         let id = deployment.expect("the first root commit saves its deployment header");
+        let mut row = format::current(store.application.version, id);
+        row.levels = format::recorded(crate::patching::plan::binary(&store.patch_sets));
         ops.push(skein_kv::Op::Put {
             key: keys::encode_own(&keys::Own::Format, store.limits.store.key)?,
-            value: format::current(store.application.version, id).encode().ok()?,
+            value: row.encode().ok()?,
         })
         .ok()?;
         ops.push(skein_kv::Op::Put {

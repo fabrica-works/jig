@@ -156,6 +156,7 @@ impl Store {
                 }
             }
             request @ (protocol::Request::Open { .. }
+            | protocol::Request::Site { .. }
             | protocol::Request::Commit { .. }
             | protocol::Request::Restore { .. }
             | protocol::Request::Load { .. }
@@ -478,6 +479,8 @@ pub(super) fn answer(engine: &mut crate::Engine) {
                 engine.store.opened = true;
                 engine.store.installation = installation;
             }
+            // This shell prints no per-open progress lines.
+            protocol::Event::Patched { .. } => {}
             protocol::Event::OpenRefused { .. } => crate::stop::unavailable(engine, b"deployment"),
             event @ (protocol::Event::Kept { owner }
             | protocol::Event::Stale { owner }
@@ -491,7 +494,9 @@ pub(super) fn answer(engine: &mut crate::Engine) {
                     engine.store.secrets.push(event);
                 }
             }
-            other @ (protocol::Event::Committed { .. }
+            // This shell never hands patch sets; routing answers Site with NoSite.
+            other @ (protocol::Event::Site { .. }
+            | protocol::Event::Committed { .. }
             | protocol::Event::Failed { .. }
             | protocol::Event::Restored { .. }
             | protocol::Event::Loaded { .. }

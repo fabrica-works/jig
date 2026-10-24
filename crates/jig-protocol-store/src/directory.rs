@@ -1,5 +1,6 @@
 //! Deployment generations and independent stores (protocol/store.md, 2 and 10.1).
-use crate::generations::{self, Active, Map, PAGE, Progress, Removing};
+use crate::generations::{self, Active, Manifesting, Map, PAGE, Progress, Removing};
+use crate::patching::phase::{self, Patching, Pending};
 use crate::{Arrived, Below, Event, Generations, Io, Limits, Older, OpenRefusal, Phase, Root, Store, open, secrets};
 use alloc::boxed::Box;
 use skein_io::{
@@ -50,6 +51,7 @@ pub(crate) enum Opening {
     LeftoverClose,
     Making(Making),
     FirstSecrets,
+    FirstManifest(Manifesting),
     FirstActive,
     CheckingOpen,
     CheckingPage { root: Root, maps: u8 },
@@ -65,6 +67,7 @@ pub(crate) enum Opening {
     SweepClose(Closing),
     TranscriptsMade,
     TranscriptsOpen,
+    Patching(Box<Patching>),
 }
 #[derive(Debug)]
 pub(crate) struct Closing {
@@ -80,6 +83,7 @@ pub(crate) struct Swept {
 #[derive(Debug)]
 pub(crate) struct Directory {
     pub disk: bool,
+    pub patch: Option<Box<Pending>>,
     pub active: Option<Active>,
     pub transcripts: Option<Root>,
     pub root: Option<Root>,
@@ -91,12 +95,14 @@ pub(crate) struct Directory {
     pub generations_kind: Option<Kind>,
     pub leftover: bool,
     pub survey_maps: u8,
+    pub survey_manifest: bool,
     pub swept: Option<Swept>,
 }
 impl Directory {
     pub fn new() -> Directory {
         Directory {
             disk: false,
+            patch: None,
             active: None,
             transcripts: None,
             root: None,
@@ -108,6 +114,7 @@ impl Directory {
             generations_kind: None,
             leftover: false,
             survey_maps: 0,
+            survey_manifest: false,
             swept: None,
         }
     }
@@ -174,7 +181,7 @@ fn made(event: file::Event) -> bool {
         | file::Event::Cancelled { .. } => false,
     }
 }
-fn opened(arrived: Arrived) -> Option<Root> {
+pub(crate) fn opened(arrived: Arrived) -> Option<Root> {
     let file::Event::Opened { file, .. } = arrived.event else {
         return None;
     };
@@ -287,6 +294,10 @@ fn survey_page(store: &mut Store, kind: Survey, root: Root, entries: Box<[file::
                 store.directory.leftover = true;
             }
             Survey::First => {
+                if entry.kind == Kind::File && first_manifest(&entry.name) && !store.directory.survey_manifest {
+                    store.directory.survey_manifest = true;
+                    continue;
+                }
                 let bit = if entry.name.as_ref() == b"store" {
                     1
                 } else if entry.name.as_ref() == b"secrets" {
@@ -311,6 +322,24 @@ fn survey_page(store: &mut Store, kind: Survey, root: Root, entries: Box<[file::
         store.directory.opening = Opening::SurveyPage { kind, root };
         list(root, &mut below.store);
     }
+}
+/// The one file a cut first start can leave beside its empty maps (store.md 2).
+fn first_manifest(name: &[u8]) -> bool {
+    if name == b"manifest" {
+        return true;
+    }
+    let Some(hex) = name.strip_prefix(b"manifest.skein-") else {
+        return false;
+    };
+    if hex.len() != 16 {
+        return false;
+    }
+    for byte in hex {
+        if !byte.is_ascii_digit() && !(b'a'..=b'f').contains(byte) {
+            return false;
+        }
+    }
+    true
 }
 /// The checks in open.rs have passed. Only now may strays and transcripts change.
 pub(crate) fn checked(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
@@ -394,7 +423,8 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
         Opening::LeftoverRemoving { root, removing } => leftover_removed(store, root, removing, arrived, above, below),
         Opening::LeftoverClose => leftover_closed(store, arrived, above, below),
         Opening::Making(kind) => made_generation(store, kind, arrived, above, below),
-        Opening::FirstSecrets => first_secrets_opened(store, arrived, above, below),
+        Opening::FirstSecrets => first_secrets_opened(store, env, arrived, above, below),
+        Opening::FirstManifest(manifesting) => first_manifest_stored(store, manifesting, arrived, above, below),
         Opening::FirstActive => first_active_stored(store, arrived, above, below),
         Opening::CheckingOpen => checking_opened(store, arrived, above, below),
         Opening::CheckingPage { root, maps } => checking_listed(store, root, maps, arrived, above, below),
@@ -407,19 +437,22 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
         Opening::SweepRemoving { sweep, removing } => sweep_tree_removed(store, sweep, removing, arrived, above, below),
         Opening::SweepSync { root } => sweep_synced(store, root, arrived, above, below),
         Opening::SweepClose(closing) => sweep_closed(store, closing, arrived, above, below),
-        Opening::TranscriptsMade => transcripts_made(store, arrived, above, below),
+        Opening::TranscriptsMade => transcripts_made(store, env, arrived, above, below),
         Opening::TranscriptsOpen => transcripts_opened(store, arrived, above, below),
-        Opening::Idle | Opening::Stores => refuse(store, above),
+        Opening::Idle | Opening::Stores | Opening::Patching(_) => refuse(store, above),
     }
 }
 fn locked(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
-    let root = deployment(store);
     if let file::Event::Busy { .. } = arrived.event {
         return generation_refusal(store, Generations::Busy, above);
     }
     let file::Event::Locked { .. } = arrived.event else {
         return refuse(store, above);
     };
+    read_active(store, below);
+}
+fn read_active(store: &mut Store, below: &mut Below) {
+    let root = deployment(store);
     store.directory.opening = Opening::Reading;
     below.store.push(file::Request::Load {
         owner: OWNER,
@@ -526,12 +559,45 @@ fn made_generation(store: &mut Store, kind: Making, arrived: Arrived, above: &mu
         }
     }
 }
-fn first_secrets_opened(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
-    let root = deployment(store);
+fn first_secrets_opened(
+    store: &mut Store,
+    env: &Env<Limits>,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
     let Some(private) = opened(arrived) else {
         return refuse(store, above);
     };
     store.directory.private_root = Some(private);
+    let bytes = generations::manifest(
+        generations::FIRST,
+        None,
+        crate::format::NONE,
+        crate::patching::plan::binary(&store.patch_sets),
+        0,
+        None,
+        env.wall,
+    );
+    let manifesting = generations::store_manifest(deployment(store), generations::FIRST, bytes, below);
+    store.directory.opening = Opening::FirstManifest(manifesting);
+}
+fn first_manifest_stored(
+    store: &mut Store,
+    mut manifesting: Manifesting,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    match generations::manifested(&mut manifesting, arrived) {
+        Progress::Pending => {
+            store.directory.opening = Opening::FirstManifest(manifesting);
+            return;
+        }
+        Progress::Failed => return refuse(store, above),
+        Progress::Done => {}
+    }
+    let root = deployment(store);
     store.directory.opening = Opening::FirstActive;
     below.store.push(file::Request::Store {
         owner: OWNER,
@@ -709,10 +775,20 @@ fn sweep_closed(store: &mut Store, closing: Closing, arrived: Arrived, above: &m
         }
     }
 }
-fn transcripts_made(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+fn transcripts_made(
+    store: &mut Store,
+    env: &Env<Limits>,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
     let root = deployment(store);
     if !made(arrived.event) {
         return refuse(store, above);
+    }
+    if let Some(pending) = store.directory.patch.take() {
+        phase::begin(store, env, pending, above, below);
+        return;
     }
     store.directory.opening = Opening::TranscriptsOpen;
     open_directory(root, Box::from(generations::TRANSCRIPTS), &mut below.transcripts);
@@ -725,6 +801,7 @@ fn transcripts_opened(store: &mut Store, arrived: Arrived, above: &mut Queue<Eve
     crate::transcripts::cut::begin(store, above, below);
 }
 fn open_stores(store: &mut Store, env: &Env<Limits>, opened: Root, above: &mut Queue<Event>, below: &mut Below) {
+    store.directory.private_root = Some(opened);
     store.directory.opening = Opening::Stores;
     let kv_env = self::env(store, env, false);
     let mut events = Queue::with_capacity(skein_kv::MAX_OUT.above);
@@ -750,6 +827,10 @@ fn open_stores(store: &mut Store, env: &Env<Limits>, opened: Root, above: &mut Q
 }
 pub(crate) fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue<Event>, below: &mut Below) {
     if store.phase == Phase::Stopped {
+        return;
+    }
+    if patching(store).is_some() {
+        phase::up(store, env, io, above, below);
         return;
     }
     let (arrived, secret) = match io {
@@ -800,6 +881,10 @@ pub(crate) fn events_up(
         let Some(event) = events.pop() else {
             break;
         };
+        if patching(store).is_some() {
+            phase::event(store, secret, event, above, below);
+            continue;
+        }
         match event {
             skein_kv::Event::Opened { .. } => {
                 store.directory.opened |= if secret { 2 } else { 1 };
@@ -850,5 +935,52 @@ pub(crate) fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event
             skein_kv::fire(&mut store.stores.store, &kv_env, &mut events, &mut below.store);
         }
         events_up(store, secret, &mut events, above, below);
+        phase::resume(store, env, above, below);
+    }
+}
+
+/// Restart at 10.1 step 2, retaining the deployment lock after the switch.
+pub(crate) fn reopen(store: &mut Store, _env: &Env<Limits>, _above: &mut Queue<Event>, below: &mut Below) {
+    store.directory.opened = 0;
+    store.directory.store_root = None;
+    store.directory.private_root = None;
+    store.stores.store = skein_kv::Store::new(&store.limits.store);
+    store.stores.secrets = skein_kv::Store::new(&store.limits.secrets);
+    // The switch supplied Active; read it afresh, exactly as a normal start.
+    read_active(store, below);
+}
+
+/// The one fork shared by file and KV routing.
+pub(crate) fn patching(store: &Store) -> Option<&Patching> {
+    match &store.directory.opening {
+        Opening::Patching(phase) => Some(phase),
+        Opening::Idle
+        | Opening::Locking
+        | Opening::Reading
+        | Opening::SurveyOpen(_)
+        | Opening::SurveyPage { .. }
+        | Opening::SurveyClose(_)
+        | Opening::Refusing(_)
+        | Opening::LeftoverOpen
+        | Opening::LeftoverRemoving { .. }
+        | Opening::LeftoverClose
+        | Opening::Making(_)
+        | Opening::FirstSecrets
+        | Opening::FirstManifest(_)
+        | Opening::FirstActive
+        | Opening::CheckingOpen
+        | Opening::CheckingPage { .. }
+        | Opening::CheckingClose
+        | Opening::StoreOpen
+        | Opening::SecretsOpen
+        | Opening::Stores
+        | Opening::SweepOpen { .. }
+        | Opening::SweepPage(_)
+        | Opening::SweepFile(_)
+        | Opening::SweepRemoving { .. }
+        | Opening::SweepSync { .. }
+        | Opening::SweepClose(_)
+        | Opening::TranscriptsMade
+        | Opening::TranscriptsOpen => None,
     }
 }

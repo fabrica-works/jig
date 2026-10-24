@@ -32,6 +32,8 @@ pub enum Request {
     Transcript { owner: Token, read: TranscriptRead, rows: u32, bytes: u64 },
     /// The secrets' store (store.md 9).
     Secrets { owner: Token, request: Secrets },
+    /// A written site's answer (store.md 10.3), with its machine handed back.
+    Site { owner: Token, patcher: Box<skein_codec::patch::Patcher>, result: Result<(), skein_codec::patch::Halt> },
 }
 
 /// One write of a commit (store.md 6).
@@ -208,7 +210,7 @@ pub enum Family {
 }
 
 /// Why a store refuses to open, saying which (store.md 5.3, 6, 10).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum OpenRefusal {
     /// The format row names another version of `family`.
     Format { family: Family, found: u32, wanted: u32 },
@@ -222,6 +224,14 @@ pub enum OpenRefusal {
     OlderBuild { why: Older },
     /// The deployment's generations refuse (store.md 10.1).
     Generations { why: Generations },
+    /// A level past the binary's (5.3); `found: None` for a component
+    /// version past the binary's, its levels unread.
+    Ahead { owner: crate::Owner, found: Option<u32>, wanted: Option<u32> },
+    /// A patch refused a record of the copy (10.2): the key as the walk
+    /// handed it to the owner (`Event::Site`'s).
+    Patch { owner: crate::Owner, patch: u32, key: Box<[u8]>, halt: skein_codec::patch::Halt },
+    /// The binary's sets do not plan (10.3).
+    Set { owner: crate::Owner, patch: u32 },
 }
 /// An older build's refusal whose fix moves the generations (store.md 2), `why`
 /// saying which build.
@@ -248,6 +258,24 @@ impl OpenRefusal {
         match self {
             // o/configuring-2's L gives these their words.
             Self::Format { .. } | Self::Deployment | Self::Numbers { .. } | Self::Failed => &[],
+            Self::OlderBuild { why: Older::Unleveled } => &[
+                "",
+                " holds a store from before the first release, which records no patch levels, and this start has changed nothing in it. A store from before the first release is not translated, so every start refuses this one until it is moved. To start afresh, stop the service, move `active`, `generations/` and `transcripts/` out of ",
+                " together, and start again: nothing is deleted, and the next start makes a new, empty store. The new store has no tasks, sign-ins, accounts or keys, and every client signs in again.",
+            ],
+            Self::Ahead { .. } => &[
+                "",
+                " holds a store from a later build, at patch levels past this build's, and this start has changed nothing in it. No patch runs backwards: start the later build again, or restore ",
+                " from a backup this build made.",
+            ],
+            Self::Patch { .. } => &[
+                "A patch refused a record while this start patched a copy of the store in ",
+                ", and the generation it patched from stays active, unchanged. Every start of this build refuses the same record: start the build before it again, which opens that generation as it was.",
+            ],
+            Self::Set { .. } => &[
+                "This build's patches do not plan, and this start has changed nothing in ",
+                ". The build is wrong: start the build before it again.",
+            ],
             Self::OlderBuild { why: Older::Unrecorded } => older!("made before its families' layouts were recorded"),
             Self::OlderBuild { why: Older::Layout(family) } => match family {
                 Family::Settings => older!("whose settings family's layout differs from this build's"),
@@ -289,6 +317,8 @@ impl OpenRefusal {
 /// Which older build (store.md 5.3 and 10.1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Older {
+    /// A store before an owner's baseline, which records no patch level (5.3).
+    Unleveled,
     /// A store with no layouts row, made before they were recorded (store.md 5.3).
     Unrecorded,
     /// A family's fingerprint is not this build's at its version (store.md 5.3).
@@ -395,6 +425,25 @@ pub enum Event {
     /// stops (store.md 7.1).
     Corrupt {
         owner: Token,
+    },
+    /// The shell sets this record's key in `of`'s Context, runs its generated
+    /// written function over `patcher.parts()`, and answers `Request::Site`
+    /// (store.md 10.3). Application keys are relative to their tag; every
+    /// other owner's keys are the map's whole keys.
+    Site {
+        owner: Token,
+        of: crate::Owner,
+        key: Box<[u8]>,
+        site: skein_codec::patch::Site,
+        at: skein_codec::value::Node,
+        patcher: Box<skein_codec::patch::Patcher>,
+    },
+    /// A patch's walk is done and committed (store.md 10.2, step 4).
+    Patched {
+        owner: Token,
+        of: crate::Owner,
+        patch: u32,
+        counts: crate::Counts,
     },
 }
 

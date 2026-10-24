@@ -1,4 +1,5 @@
 //! Checks before a memory restart (protocol/store.md, 5.3, 6 and 10).
+mod levels;
 use super::fixtures;
 use crate::{Event, Family, Older, OpenRefusal, Phase, Request, Store, Stores, codec, keys};
 use alloc::boxed::Box;

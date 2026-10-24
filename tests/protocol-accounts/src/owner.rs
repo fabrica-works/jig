@@ -805,6 +805,8 @@ impl Owner {
                 }
                 store::Event::Opened { .. }
                 | store::Event::OpenRefused { .. }
+                | store::Event::Site { .. }
+                | store::Event::Patched { .. }
                 | store::Event::Committed { .. }
                 | store::Event::Failed { .. }
                 | store::Event::Restored { .. }
