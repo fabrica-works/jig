@@ -46,7 +46,8 @@ pub const BASE: PatchSets = PatchSets {
 };
 
 /// Fixture rows need 64 bytes; 1024 also leaves room for the component's
-/// format, layouts and deployment header. Two-row walks exercise paging.
+/// format, layouts and deployment header. A walk's page holds at most
+/// `journal.writes` puts: at 32, each family's range is one page.
 #[must_use]
 pub fn limits() -> jig_protocol_store::Limits {
     let mut limits = root::limits();
@@ -63,7 +64,7 @@ pub fn limits() -> jig_protocol_store::Limits {
     limits
 }
 
-/// Two labels, three shelves and two notes cross two-record page boundaries.
+/// Two labels, three shelves and two notes: two-put pages split the shelves.
 pub const STORY_LABELS: u32 = 2;
 pub const STORY_SHELVES: u32 = 3;
 pub const STORY_NOTES: u32 = 2;
