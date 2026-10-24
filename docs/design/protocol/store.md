@@ -853,6 +853,19 @@ first by time is keyed reversed. skein-kv's load runs forwards only
   number, its spend, the last message it read, its time, whether it opens
   a window, then smith's bytes, with a checksum, and the frame's length
   at both ends, so the file can be walked from either end.
+- **A frame keeps the versions it was written in,** with no field of its
+  own. Its body is the core's `TurnRecord`, a versioned record, so its
+  first two bytes are the core family's version; its `transcript` is
+  smith's turn, versioned on its own (smith's `protocol/transcript.md`,
+  section 6), so its first two bytes are smith-transcript's version, and
+  the core's schema says so: `transcript: bytes 8388608 holds
+  smith-transcript Turn` (skein's `codec.md`, section 3). No frame is
+  rewritten: one behind the binary's versions is patched each time it is
+  read (8.6). The word is core-v6's in place, before the baseline: it
+  moves the family's layout and no byte (skein's `codec.md`, section 9),
+  so a store of the build before it is older (5.3) and starts afresh, as
+  every store before the baseline does (temper's `draft/upgrades.md`,
+  4.1).
 - **The map keeps each transcript's places,** in the component's own
   family: its committed length and the offset of its current window's
   first turn, one row per task with a transcript; and each attempt's
@@ -861,7 +874,11 @@ first by time is keyed reversed. skein-kv's load runs forwards only
 - **Windows.** A frame whose turn opens a window moves the task's
   current window to it, in the same commit. A run that starts fresh opens
   a new conversation, whose first turn opens a window (smith's
-  `protocol/transcript.md`, section 3).
+  `protocol/transcript.md`, section 3). A patch marked fresh closes
+  every live task's window, in the patched copy (10.2, step 4): the run
+  proof's window says so (core-v6's `record Window { attempt: u64 turn:
+  u32 closed: bool }`, the flag in place before the baseline, beside the
+  holds word and with it).
 
 ### 8.2 Written before its commit
 
@@ -907,9 +924,13 @@ the committed length. The next open cuts the file to its committed length
   each rendered by the host's protocol layer when loaded, and each turn's
   text at most the tail's own budget, as the core's memory prices it.
 - **Never past what is committed.**
-- **A frame that fails its checksum** fails the read as unread. The core
+- **Current bytes only:** each kind hands on a frame at the binary's
+  versions, one behind patched as it is read (8.6).
+- **A frame that fails its checksum** fails the read as unread, and so
+  does one its machines refuse (8.6). The core
   treats the transcript as one the agent cannot use: the run fails as
-  transient and the next starts fresh (`../domain/engine.md`, 7.2).
+  transient and the next starts fresh (`../domain/engine.md`, 7.2); a
+  closed window's tail it cannot read, it leaves out.
 - **Open files are bounded:** the component keeps a bounded set open,
   live tasks' first, and opens others to read them.
 
@@ -936,6 +957,107 @@ nothing, and go in the commits that follow, a bounded number each
 before the commit leaves places whose file is gone: a read of it answers
 as for a dropped transcript, and retention's next pass drops it again.
 Removing a missing file is not a failure.
+
+### 8.6 Patched as read
+
+Patching never writes a transcript (10.2): the transcripts are most of
+what a deployment holds, and a frame is only ever read. So a frame
+behind the binary's versions is patched each time it is read, and
+nothing is written.
+
+- **The machines** are the frames' families' (10.3,
+  `KeptFamily::frames`): one `Patcher` each, the body's family in jig's
+  set and the turn's in smith's, made at every open that serves (10.1)
+  from the sets it was handed, after the frames' checks of 10.3, each
+  kept text kept and each of its owner's patches planned, and held by
+  the transcripts' part for the whole run. They are not patching's
+  (10.3), which go with the copy's open. A family with no kept text has
+  none: every real set is empty until the baseline, so no machine is
+  made and every read runs as it does today.
+- **A frame's versions** are read with its head, past the frame's
+  length: the body's first two bytes, and the turn's first two, past the
+  `transcript` field's length, after the fields the head reads already.
+  With smith's machine, a turn of fewer than two bytes is unread.
+- **A body behind** (its version kept by jig's machine, before the
+  binary's) runs jig's plans from its version to the binary's, from the
+  frames' root (found in the frame's version by the kept texts' renames,
+  as a held root is, `patching/walk.rs`), `next_pass` after the first.
+  At its held turn the machine stops (`Step::Held`): at the first pass,
+  smith's machine patches the turn from its version to smith's last
+  kept, and its bytes go back with `put_content`; the passes after carry
+  them (`carry`). A body at the binary's version is decoded as before,
+  by the binary's codec, and its turn, if behind, is patched by smith's
+  machine alone, from smith's frames' root.
+- **One rule for versions.** Where a family has a machine, a version
+  among its kept texts and before its last is patched, its last goes on
+  as it is, and any other, older than its first or past its last, is a
+  halt (`Decode` or `Order`), so the frame is unread. Where a family has
+  none, its bytes go on as they are, as today: a body its codec cannot
+  read is unread (8.3), and a turn's reader refuses a version not its
+  own (smith's `protocol/transcript.md`, section 4).
+- **Owners' order.** The copy runs owners' patches in their pins' order
+  (10.3); a frame runs jig's first and smith's at the held turn. The two
+  agree because neither reads the other's bytes: jig's written functions
+  on a frame's body never read its `transcript`, and smith's read their
+  turn alone (smith's `protocol/transcript.md`, section 12).
+- **Nothing is written.** The read hands on the patched bytes and the
+  file keeps the frame's own, so its lengths, its checksum and the map's
+  places stay true, and the frame is patched again at its next read. A
+  cut anywhere in a read leaves every file as it was.
+- **Every read kind** of 8.3 (resuming, a turn, a page's turns, a page
+  of turns and a fresh run's tail, the last read as resuming's is) reads
+  its frames through one step, the frame's decode, and the machines run
+  there. The core, a party's read and a host's protocol layer are handed
+  current bytes alone: `jig-protocol-transcript` reads smith's current
+  version only, as smith's agent does.
+- **Bounds on patched bytes.** A frame behind is read whole and patched
+  before anything is judged: its size, against a page's bound, a turn's
+  (a party's charge, the page's row and the turn's bytes) and the resume
+  limit, is its patched body's and its 12 bytes of framing. The head
+  alone (a turn past a page's bound, 8.3) serves a frame at the binary's
+  versions only. A patched record past its machine's bytes or nodes
+  halts (`Room`).
+- **A halt is an unread frame.** A frame the machines refuse (any
+  `Halt` of skein's `codec.md`, 11.4, a site's `NoSite` among them) is
+  read as one that fails its checksum (8.3), in every read kind.
+- **A written site goes up,** as patching's do (10.3): at
+  `Step::Written` the component answers `Site` to the read's own token,
+  `of` the site's owner, its `key` the frame's name (the task's key in
+  the component's places, 4.4, then the frame's offset in its file,
+  eight bytes big-endian), the site, the node and the machine, moved;
+  the read waits for `Request::Site` with the result. A shell answers a
+  site at once, by its owner's generated `written`, with a `Default`
+  `Context`, its key set: reads come in any order and a frame is patched
+  at each, so a frame's patch reads that frame alone (skein's
+  `codec.md`, 11.5). The component's routing of `Request::Site` follows
+  its phase: a walk's while patching, as today, and the read waiting at
+  a site while serving, its token the read's; any other is refused, as
+  a site no walk waits for is today. No new variant: a shell that hands
+  sets answers `Site` while serving as while patching, and one that
+  hands none never sees it.
+- **One read at a time,** as today (`transcripts/read.rs`): a read
+  waiting at a site holds the component's read, commits wait behind it
+  as behind any read (`transcripts/write.rs`), and a machine serves one
+  frame from `start` to `finish`.
+- **Memory:** each machine's `Patcher::worst_case_heap` of its capacity,
+  in serving's worst case (section 13), priced at startup; none for sets
+  with no kept text. A capacity's versions, patches and text are its
+  owner's kept versions, patches and largest text. Its bytes and nodes
+  are its frames' bounds, never the map's: jig's, the frames' largest
+  body and the most nodes any kept body takes, its held turn one node;
+  smith's, the `transcript` field's bytes and the store's bound on a
+  turn's nodes (`FRAME_NODES`, section 13), since a turn's bytes alone
+  would let its nodes, and its machine's tables with them, run to
+  millions. A turn past it halts `Room` and is unread.
+- **Windows across a mark.** A patched turn is the same conversation in
+  current bytes, as smith's patch makes it; one of smith's patches may
+  say instead that a window across it starts fresh (`mark
+  fresh-windows`). Its plan closes the live tasks' windows in the copy
+  (10.2, step 4), so no run resumes from turns patched across it; a tail,
+  a party's read and a page read them patched as any others. No attempt
+  is live across such a patch: its upgrade is a full one, the workers
+  stopped first (temper's `draft/upgrades.md`, 7.2), which temper's
+  section 9 is to say of a pending patch marked fresh (section 16).
 
 ## 9. Secrets
 
@@ -1253,7 +1375,8 @@ generation `A` to `A + 1`:
    between them and their order across owners (10.3), a set that does
    not plan refused; the header decoded by the kept text of its own
    level and checked, as is the deployment; one machine per kept family
-   made (10.3); the room (below) against the limits. Every refusal of
+   made (10.3); whether a pending patch is marked fresh (10.3); the room
+   (below) against the limits. Every refusal of
    5.3, and an effect in flight that a pending patch changes (temper's
    `draft/upgrades.md`, section 8), comes here. Then `A`'s stores
    close: no transcript has been cut, which the open after the switch
@@ -1279,7 +1402,17 @@ generation `A` to `A + 1`:
    Each page is one commit through the component's own path, within
    skein-kv's bounds (5.4); a record a page cannot hold alone refuses,
    `Check { why: Large }` with its key. The secrets' store is patched the
-   same way, in its own commits, within its own limits (section 9). The store's
+   same way, in its own commits, within its own limits (section 9).
+   **Windows closed:** where a pending patch is marked fresh, a walk of
+   its own after the plan's last patch, over the core's run proofs (4.4),
+   one for each live task ever claimed, by pages, each page a commit as
+   a patch's are: each proof with a window not yet closed is decoded by
+   the binary's codec, since every core record is at the binary's version
+   by then, and put back at its key with its window closed (core-v6's
+   `Window.closed`), every other field as it was. Nothing else is
+   written, and no transcript: the frames are read patched (8.6), and the
+   closed window is the core's to act on (`../domain/engine.md`, 7.2).
+   The store's
    last commit, one of its own after the last page's, writes the format
    row's levels and versions and the layouts, the binary's (5.3), and
    the deployment's header as patched, naming that commit's number
@@ -1330,7 +1463,8 @@ generation `A` to `A + 1`:
   copy's opens) and one machine per kept family (10.3), each
   `Patcher::worst_case_heap` of its capacity. Section 13's worst case
   counts the larger of patching's peak and serving's, never both.
-- **The domain sees nothing of it** but the check's restore (step 5).
+- **The domain sees nothing of it** but the check's restore (step 5),
+  and, after the switch, the windows a fresh mark closed (step 4).
 
 ### 10.3 Patch sets, the plan and written sites
 
@@ -1346,6 +1480,7 @@ pub struct PatchSet {
     pub name: &'static str,               // the owner as its patches' headers spell it
     pub families: &'static [KeptFamily],
     pub patches: &'static [&'static str], // `patches::PATCHES`, in number order
+    pub fresh: Option<&'static str>,      // the mark across which windows start fresh, as its owner spells it
 }
 pub enum KeptMap { Store, Secrets }       // the map its records live in (section 9)
 pub struct KeptFamily {
@@ -1353,6 +1488,7 @@ pub struct KeptFamily {
     pub texts: &'static [&'static str],   // `patches::kept::<family>::TEXTS`, in version order
     pub map: KeptMap,
     pub keys: &'static [Keys],            // its records' keys, and no other's
+    pub frames: Option<&'static str>,     // the declaration it is in transcripts' frames, where their machine starts
 }
 pub struct Keys {
     pub from: &'static [u8],              // inclusive
@@ -1376,6 +1512,18 @@ impl PatchSets {
   adds the tag), and in the secrets' map relative to its secrets' prefix
   `[2, 0]` (section 9); every other owner's are the map's whole keys.
 
+  **The frames' families** (8.6) are the two whose `frames` names a
+  root: in jig's set, the core's, whose `TurnRecord` is a frame's body;
+  in smith's, smith-transcript, whose `Turn` the body's `transcript`
+  holds, with no `keys`, since none of its records is a map's. Every
+  other family's is `None`. A set with a frames' family in another slot,
+  or two in one, is refused, `Set` with patch 0; so is a body whose held
+  turn names a family other than smith's frames' one, judged from the
+  kept texts, at the plan and at every open that serves, before its
+  machines are made (8.6). Smith's set is smith-transcript's constants
+  in the `Smith` slot (smith's `protocol/transcript.md`, section 12),
+  its `map` `Store` and unused, its `keys` empty.
+
   A family's `keys` hold its own records and leave out what lies among
   them but is another's (the installation's identifier at `01 04 03`
   among the accounts', the settings' records among the core's): jig's
@@ -1384,10 +1532,16 @@ impl PatchSets {
   before its baseline, level none; otherwise its level is its patches'
   count. Every real set is empty until the baseline (temper's
   `draft/upgrades.md`, 4.1), so no store is behind and open runs as it
-  always has; the component's tests hand it two fixture owners' sets:
+  always has; the component's tests hand it fixture owners' sets:
   `jig-test-patches` in the application's slot and `jig-test-patches-jig`
-  in jig's, so that the order across owners is shown; no test owner reaches
-  a production schema. The names, texts and keys are `&'static`, the binary's own constants,
+  in jig's, so that the order across owners is shown, and
+  `jig-test-patches-smith` in smith's, a fixture turn family whose frames
+  are patched as read, with a patch marked fresh. No test owner names a
+  production family. A fixture body family's last text is the core's
+  `TurnRecord` at the binary's version under its own name, its
+  `transcript` holding the fixture turn, since a patched body is decoded
+  by the binary's codec; the fixture turn's last is its own, since the
+  component hands a turn's bytes on undecoded. The names, texts and keys are `&'static`, the binary's own constants,
   never state: the only references in fields the component holds
   (programming-model.md, 10.3), read by its plan alone, since `keep`
   and `plan` copy what they need into each machine's tables.
@@ -1410,6 +1564,16 @@ impl PatchSets {
   refuses the set: under the pins that is a binary built wrongly
   (section 16). The plan is a list of (owner, patch), its length the
   patches' count, made by a loop bounded by it.
+- **The fresh mark** is a set's word (`PatchSet::fresh`), its owner's to
+  spell and to mean: smith's `fresh-windows` (skein's `codec.md`, 11.1;
+  smith's `protocol/transcript.md`, section 12), handed in by the shell
+  as data, so the component names no owner's constant. The plan reads
+  it with each pending patch's header (`Header::marked`): a set's
+  patches past its level in the store and up to the binary's, one marked
+  by its set's word enough. Then the copy's windows are closed (10.2,
+  step 4); a set whose `fresh` is `None` marks nothing, and a patch's
+  other marks are its owner's alone. A patch may carry a mark and change
+  no family.
 - **One machine per kept family,** a `Patcher` (skein's `codec.md`,
   11.4 and 11.6), made at the plan, on the patch path alone, with its
   capacity from the family's limits and texts, each kept text kept and
@@ -1419,6 +1583,8 @@ impl PatchSets {
   first. In a patch's walk, its families' records run its plan,
   and a family the patch leaves alone whose records hold one it moves runs
   its identity plan (codec.md 11.3), which reaches the held fields alone.
+  The frames' machines are others, made at each open that serves
+  (8.6).
 - **A written site goes up.** Step code holds no function (codec.md,
   11.4; programming-model.md, 10.3), so at `Step::Written` the
   component answers `Site` with the owner, the record's key, the site,
@@ -1427,7 +1593,9 @@ impl PatchSets {
   it keeps for the whole patching (`Default` at its start), runs the
   owner's generated `written` over `parts()`, and hands the `Patcher`
   back in a `Site` request with the result; the component then calls
-  `next()`. One record's walk waits on at most one site at a time.
+  `next()`. One record's walk waits on at most one site at a time. A
+  frame read while serving sends its sites up the same way, to the
+  read's token, with a `Default` `Context` for each frame (8.6).
 
 ```rust
 // up                                      // down
@@ -1447,9 +1615,11 @@ pub struct Counts { pub records: u64, pub commits: u64 }
   the owners' crates and drives the store's open: the application's
   (temper's `temper-service`, its `Store`); jig has no production
   shell of its own. In jig's tests the store world's (`tests/store`) answers
-  the fixture owners'; `jig-test-service`'s and `jig-test-store-files`' hand
+  the fixture owners', while patching and while serving; `jig-test-service`'s
+  and `jig-test-store-files`' hand
   no sets, and would answer a site `Halt::NoSite` (skein's `codec.md`,
-  11.4: a site its caller has no function for).
+  11.4: a site its caller has no function for), as their routes already
+  do for any token.
 - **What a shell downstream sees** (temper's `temper-service`, its
   domain world's driver, `temper-github-app`): open's signature stays
   as it is. The component holds `PatchSets::NONE` until a shell hands
@@ -1463,15 +1633,20 @@ pub struct Counts { pub records: u64, pub commits: u64 }
   either exhaustively gains their arms with the build that adds them.
   These shells are temper's store shell, engine, store route, accounts
   and clients, and its domain world's driver; and jig's test service,
-  test stores and accounts worlds.
+  test stores and accounts worlds. Sets' new fields (`PatchSet::fresh`,
+  `KeptFamily::frames`) reach no shell downstream, since none builds a
+  set before the baseline; reads patched as they are read add no
+  variant. The closed window is the core's (`../domain/engine.md`,
+  section 6), and reaches temper's sources as no change.
 - **Held fields** are the component's: at `Step::Held`, the held
   family's own machine patches the held bytes, its own sites going up
   as above, and its bytes are put into the holder's (`put_content`),
   or carried where that family does not move; the holder's machine
   waits meanwhile. No family holds itself through another, so one machine
-  per family suffices; a walk that meets such a hold halts `Order`, refused
-  as a patch's halt (10.2). Refusing it at the plan, from the kept texts,
-  is open (section 16).
+  per family suffices: the plan refuses sets whose kept texts' holds
+  close a cycle, `Set` with patch 0, before anything is written, and a
+  walk that meets one still halts `Order`, refused as a patch's halt
+  (10.2).
 - **Keys do not move** by patch: a key is its owner's code (4.1), and a
   patch's text has no line that moves one (skein's `codec.md`, 11.1). A
   moved key would need its function's answer up and back, and a check
@@ -1492,7 +1667,7 @@ partial one removed, or the new.
 | removing strays | part of a stray | removes the rest |
 | the drop of `A - 1`, before its rename | `active` is `A`; `A - 1` whole | patches again, its plan dropping `A - 1` |
 | the drop, after its rename | `active` is `A`; part of `generations/dropped` | removes the rest as a stray; patches again |
-| the copy, a patch commit, the check, the manifest | `active` is `A`; `A + 1` partial or whole | removes `A + 1`; patches again from a fresh copy |
+| the copy, a patch commit, a closing commit, the check, the manifest | `active` is `A`; `A + 1` partial or whole | removes `A + 1`; patches again from a fresh copy |
 | the switch, before its rename | `active` is `A` | as above |
 | the switch, after its rename | `active` is `A`, or `A + 1` whole | as above, or opens `A + 1` |
 
@@ -1502,6 +1677,14 @@ partial one removed, or the new.
   their directories and its manifest are synced before the rename that
   names it, and nothing writes a generation once a later one is
   active.
+- **Windows closed with the copy:** the closing commits are `A + 1`'s,
+  cut as a patch commit is, so the generation that the switch makes
+  active holds every live window closed, and a crash after it keeps
+  them so; `A`, which going back opens (temper's `draft/upgrades.md`,
+  3.2), holds them as they were.
+- **A read writes nothing,** patched or not (8.6): a cut anywhere in a
+  read leaves every file as it was, and the next read patches the same
+  frame the same way.
 
 
 ## 11. Growth
@@ -1575,6 +1758,18 @@ was made (`../domain/tasks.md`, section 3):
   larger of it and serving's, since the root never serves while it
   patches. The sets are the shell's, so `worst_case_with_patches(limits, sets)`
   prices their machines, and `worst_case(limits)` prices `PatchSets::NONE`.
+  Serving's holds the frames' machines (8.6), at most two, each its
+  `Patcher::worst_case_heap`, and none for sets with no kept text: their
+  bytes the frames' bounds, jig's nodes its body's, and smith's a turn's
+  at most `FRAME_NODES`, a constant of the component's that its tests
+  price, chosen so that the machines' worst case stays a small part of
+  serving's.
+- **Whole files:** the manifest (section 2) is read and written whole,
+  and at its bounds, 64 kept families each named in 64 bytes, it is 5464
+  bytes (88, and 84 for each family). The store's file driver's
+  whole-file bound is at least that, checked at startup with the worst
+  case, or the start is refused naming it; a test world's drivers are
+  made with such a bound (skein-io's `FileIo::with_whole_limit`).
 - **Checked whole at startup** with the root's and every component's
   (`configuration.md`, section 6).
 
@@ -1614,6 +1809,28 @@ section 2).
   run from its own start, the referee finding one whole generation
   active, the other strays removed, and its records the patched or the
   old, never a mix.
+- **Transcripts patched as read,** most of it at the lowest layer. Step
+  tests in `jig-protocol-store` over `jig-test-patches-smith` (and a
+  fixture body family in `jig-test-patches-jig`): frames written at each
+  fixture version, read by every kind of 8.3, each handing on the bytes
+  its patches' goldens give (skein's `codec.md`, 12.3) and the file's
+  bytes unchanged; bounds judged on patched sizes; each halt, a
+  `NoSite` and a turn past `FRAME_NODES` among them, an unread frame; a
+  version before a machine's first or past its last unread; a site up
+  and back on a read, a commit waiting behind it, and a stray `Site`
+  refused in each phase; the frames' checks refusing at a serving open;
+  no machine and today's path with sets that keep no text; each
+  machine's worst case against its measured peak; over skein-io's fault
+  points, a cut at each step of a read changes no file. Fuzzed: a frame's decode with
+  machines, over random fixture frames. One story in the store's world:
+  a fixture store behind, patched with a fresh-marked patch, its live
+  windows closed in the copy, a cut at each closing commit run from its
+  own start, and after the switch a window read patched and a closed one
+  found closed, going back finding them as they were. The core's side
+  (a closed window starting fresh with its tail, counted as a
+  transition) is the core's tests' (`../domain/engine.md`, 7.2), in its
+  world. The QA of each milestone is an independent tester's from this
+  design, committed as `qa_*` tests the gate skips.
 - **Step tests:** each key encoder against the derived order; each
   range's intervals against its predicate; each codec both ways, with
   golden bytes; refusals at open (format, deployment, sizes, numbers).
@@ -1686,8 +1903,31 @@ section 2).
   - values nested in another owner's family as they run across owners'
     levels (skein's `codec.md`, section 13);
   - effects in flight that a patch changes (temper's
-    `draft/upgrades.md`, section 8), and transcripts patched as they
-    are read;
+    `draft/upgrades.md`, section 8). Transcripts are patched as they
+    are read (8.6), and a fresh mark closes the live windows (10.2,
+    step 4);
+  - pieces held by a frame's turn (smith's `Found.hits`, `pieces Hit`)
+    are copied, not opened, so a smith patch that changes `Hit` is
+    refused `Pieces` until they open (skein's `codec.md`, 11.3 and
+    section 13);
+  - the channel's records the core keeps as bytes, a settled call's
+    `name` and a delivery's `evidence` (core-v6), which from the
+    baseline say what they hold (skein's `codec.md`, section 3): smith's
+    channel records are versioned with the channel whole, not each, so
+    they take a word only once smith keeps them as a family of its own,
+    or jig keeps them in its own vocabulary (smith's
+    `protocol/transcript.md`, section 12);
+  - the core's records walked by a smith patch: the core's `Row` reaches
+    `TurnRecord`, which holds smith's turn, so each smith patch runs the
+    core's identity plan over every core record, though no row in the
+    map holds a turn; a frames' root kept out of `Row`'s `Value` would
+    spare that walk;
+  - an upgrade across a patch marked fresh is a full one (8.6), which
+    temper's `draft/upgrades.md`, section 9, is to say: a pending patch
+    so marked keeps the workers from staying, though it moves no
+    version;
+  - `FRAME_NODES` (section 13) refuses a turn whose nodes pass it, read
+    as unread, until a turn's nodes have a bound of smith's own;
   - the children's rules, strictly, their live sets' limits, and the
     rows the core's census chooses, in the check before the switch
     (10.2, step 5; `../domain/engine.md`, section 6). The rules live in
@@ -1722,10 +1962,10 @@ section 2).
     on (10.3);
   - a copy made by the file system (a reflink, or btrfs's snapshot:
     skein's `io.md`, section 5) in place of one written file by file.
-- **A hold through another family, refused at the plan.** As built, a set
-  whose families hold each other in a cycle plans, and its walk halts `Order`
-  at the first record that meets it, after the copy; the plan could find it
-  from the kept texts' holds before anything is written.
+- **A hold through another family** is refused at the plan, from the
+  kept texts' holds (10.3). As built until that check lands, a set whose
+  families hold each other in a cycle plans, and its walk halts `Order`
+  at the first record that meets it, after the copy.
 - **The header by its own level's text.** A jig behind decodes the header
   by the binary's core text, which every store holds until jig's first patch
   moves the core; that patch brings the kept text's decode with it.

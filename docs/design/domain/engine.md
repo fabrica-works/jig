@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-23. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-24. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -349,7 +349,7 @@ answers to a run's reads.
 | the indexes of ended tasks: by requester, every ended task a party requested; by project, the ended tasks flagged listed; each saved in the decision that ends its task (11.2; `../protocol/store.md`, 7.4) | tasks | on demand |
 | parties' read positions over conversations: a live one's; an ended one's, moved by the decision that ends the task and erased with it (11.4) | people | live ones at start; ended ones on demand |
 | calls committed since each live task's last turn, by attempt and name, with the core's part of their answers | the core | with their task |
-| each live agent task's conversation: its first attempt, and where its current window starts (7.2) | the core | with their task |
+| each live agent task's conversation: its first attempt, where its current window starts, and whether an upgrade closed it (7.2) | the core | with their task |
 | funders' numbers: each party's pool and each project's spend, per period; a period's beginning, and when the next begins if its source said | tasks | at start |
 | a task's history: made, amended, held, released, cancelled, by whom, why; and its activity: words written to it, runs begun and ended, what it heard (7.2) | tasks | on demand |
 | inboxes: messages not yet taken | tasks | with their task |
@@ -486,7 +486,10 @@ patched record a child refuses makes the restart after the switch
 refuse, as any restart's does, with the generation patched from kept on
 disk as `active` − 1 for the operator to go back to; one the accounts
 child counts and leaves stays. The restart then runs over the switched
-generation as any restart does.
+generation as any restart does. A patch marked fresh has closed every
+live task's window in the copy before the switch (store.md, 10.2, step
+4), so the restart restores them closed, and each task's next attempt
+starts fresh (7.2).
 
 ### 6.1 Stopping
 
@@ -683,6 +686,32 @@ the per-run charter routes by them.
   (`../client/domain/contract.md`, section 6), and are never sent to a
   run. A transcript the agent cannot use fails its run as transient,
   saying so, and the next run is prepared fresh.
+- **A window closed by an upgrade.** A turn is handed to a run in its
+  current version, patched as read when it was written in an older one
+  (`../protocol/store.md`, 8.6), and a run resumes from it. A patch
+  marked fresh says instead that windows across it start fresh: smith's,
+  when what its turns mean to an agent changes. Patching then closes
+  each live task's current window in the copy, before the switch
+  (`../protocol/store.md`, 10.2, step 4): its run proof's window keeps
+  its attempt and turn, and is closed. The core restores it closed, and
+  the task's next attempt starts fresh from a brief carrying the
+  transcript's tail, as one past the resume limit does: the closed
+  window's turns are loaded for their text alone, none is resumed, and
+  the new attempt is its conversation's first. It is a transition, never
+  a failure: the attempt counts as any attempt does, its brief's tail
+  within the tail's budget, and no transient try, failure, refusal or
+  unread transcript is counted; its activity shows a run begun fresh,
+  as one past the limit. A closed window's tail the store cannot read
+  (a frame unread, `../protocol/store.md`, 8.3) is left out: the attempt
+  starts fresh without it, and nothing is counted. However the upgrade's
+  stop classes the attempt it ends (temper's `draft/upgrades.md`, 7.2),
+  a closed window is kept for its tail's load, where a transient try
+  drops an open one. No attempt is live across the switch: an upgrade
+  across a fresh mark is a full one, its workers stopped first, so every
+  window the next attempt opens is its own, and open. The run proof
+  keeps the window as a `CurrentWindow` (its attempt, its turn, whether
+  it is closed: core-v6's `Window`); the transcript a run prepares keeps
+  the pair it loads from, and whether it is closed beside it.
 - **Turns are numbered within their attempt,** from one. The task keeps
   the last turn committed for its live attempt, restored with the fleet's
   adoption of the claim, so a copy already committed is acknowledged
