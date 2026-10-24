@@ -101,3 +101,44 @@ impl Attempt {
         Ok(Self { first })
     }
 }
+
+/// Each jig family's layout fingerprint, kept by the first commit (store.md, 5.3).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Layouts {
+    pub component: [u8; 32],
+    pub core: [u8; 32],
+    pub tasks: [u8; 32],
+    pub people: [u8; 32],
+    pub notes: [u8; 32],
+    pub accounts: [u8; 32],
+    pub settings: [u8; 32],
+}
+
+impl Layouts {
+    /// Encode the seven fixed digests with the component family's version.
+    #[must_use]
+    pub fn encode(&self) -> Box<[u8]> {
+        let row = wire::Layouts::new(
+            &wire::CEILINGS,
+            wire::LayoutsParts {
+                component: self.component,
+                core: self.core,
+                tasks: self.tasks,
+                people: self.people,
+                notes: self.notes,
+                accounts: self.accounts,
+                settings: self.settings,
+            },
+        );
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded row fits usize"));
+        row.encode(&mut writer).expect("measured room");
+        writer.finish()
+    }
+
+    /// Decode one complete row, refusing another version or trailing bytes.
+    pub fn decode(bytes: &[u8]) -> Result<Self, wire::Problem> {
+        let wire::LayoutsParts { component, core, tasks, people, notes, accounts, settings } =
+            wire::Layouts::decode(&wire::CEILINGS, &mut Reader::new(bytes))?.into_parts();
+        Ok(Self { component, core, tasks, people, notes, accounts, settings })
+    }
+}

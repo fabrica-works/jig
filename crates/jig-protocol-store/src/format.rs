@@ -37,3 +37,28 @@ pub fn check(found: &component::Format, wanted: &component::Format) -> Result<()
     }
     Ok(())
 }
+
+/// This build's layouts (store.md, 5.3): computed from the schemas built in,
+/// committed beside the generated codecs, and checked against them by the drift test.
+#[must_use]
+pub fn layouts() -> component::Layouts {
+    crate::layouts::LAYOUTS
+}
+
+/// Compare in Family's order, before any family's header is decoded.
+pub fn check_layouts(found: &component::Layouts, wanted: &component::Layouts) -> Result<(), OpenRefusal> {
+    for (family, found, wanted) in [
+        (Family::Settings, found.settings, wanted.settings),
+        (Family::Component, found.component, wanted.component),
+        (Family::Core, found.core, wanted.core),
+        (Family::Tasks, found.tasks, wanted.tasks),
+        (Family::People, found.people, wanted.people),
+        (Family::Notes, found.notes, wanted.notes),
+        (Family::Accounts, found.accounts, wanted.accounts),
+    ] {
+        if found != wanted {
+            return Err(OpenRefusal::OlderBuild { why: crate::Older::Layout(family) });
+        }
+    }
+    Ok(())
+}

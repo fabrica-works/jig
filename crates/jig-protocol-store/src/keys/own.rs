@@ -5,9 +5,13 @@ pub enum Own {
     Format,
     Transcript { task: u64 },
     Attempt { task: u64, attempt: u64 },
+    Layouts,
 }
 pub(super) fn write(writer: &mut KeyWriter, key: &Own) {
     match key {
+        Own::Layouts => {
+            writer.tag(3);
+        }
         Own::Format => {
             writer.tag(0);
         }
@@ -25,6 +29,7 @@ pub(super) fn write(writer: &mut KeyWriter, key: &Own) {
 pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Own> {
     Some(match reader.tag()? {
         0 => Own::Format,
+        3 => Own::Layouts,
         1 => Own::Transcript { task: reader.u64()? },
         2 => Own::Attempt { task: reader.u64()?, attempt: reader.u64()? },
         _ => return None,

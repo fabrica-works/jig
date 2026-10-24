@@ -123,6 +123,12 @@ impl World {
         }
     }
 
+    /// Consume a settled world to inspect the component's durable rows.
+    #[must_use]
+    pub fn into_stores(self) -> jig_protocol_store::Stores {
+        self.store.into_stores()
+    }
+
     pub fn cut_at(&mut self, operation: u32) {
         self.cut = Some(operation);
     }

@@ -77,7 +77,7 @@ fn committed_note() -> Store {
 }
 
 #[test]
-fn a_first_commit_puts_the_format_row_and_the_installation_with_its_header() {
+fn a_first_commit_puts_format_layouts_and_installation_with_its_header() {
     let mut store = committed_header();
     assert_eq!(
         format_row(&mut store),
@@ -93,6 +93,8 @@ fn a_first_commit_puts_the_format_row_and_the_installation_with_its_header() {
             deployment: fixtures::DEPLOYMENT,
         },
     );
+    let layouts = fixtures::get_kv(&mut store, &[0, 3]).expect("layouts row exists");
+    assert_eq!(codec::component::Layouts::decode(&layouts), Ok(store.layouts));
     let installation = fixtures::get_kv(&mut store, &[1, 4, 3]).expect("installation row exists");
     assert_eq!(
         codec::accounts::Installation::decode(&installation),
@@ -322,4 +324,14 @@ fn archiving_a_settings_revision_copies_its_items_before_erasing_the_held_row() 
         jig_row(&mut store, &Key::Core(CoreKey::Settings(s::Key::History(1)))),
         Some(Record::Core(CoreRecord::Settings(s::Record::Revision { history: true, revision })))
     );
+}
+
+#[test]
+fn later_commits_write_none_of_the_three_creation_rows() {
+    let mut store = committed_header();
+    let pending =
+        crate::commits::operations(&mut store, 2, Box::new([fixtures::header(2)]), false).expect("later commit fits");
+    assert_eq!(pending.ops.len(), 1);
+    let header_key = keys::encode(&Key::Core(CoreKey::Deployment), fixtures::KEY_LIMIT).expect("header key fits");
+    assert_eq!(pending.ops[0].key(), header_key.as_ref());
 }

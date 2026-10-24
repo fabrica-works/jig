@@ -489,10 +489,36 @@ schema remains v4. These are the versions the format row requires.
     wanted }`, its levels unread.
 - **The layouts,** in a row of their own beside it (`Layouts`, the
   component's): each of jig's families' fingerprint, the digest of its
-  layout skein's generator computes at build. Written with the levels,
-  by the first commit and patching's last; a store with no such row is
-  `Older::Unrecorded`, and one whose fingerprint of a family is not the
-  binary's at its version `Older::Layout(family)`.
+  layout, computed from the schemas built in and committed beside their
+  generated codecs, which the drift test checks against them, so a
+  build holds them as constants. Written with the
+  levels, by the first commit and patching's last; a store with no such
+  row is `Older::Unrecorded`, and one whose fingerprint of a family is
+  not the binary's at its version `Older::Layout(family)`, the first
+  in `Family`'s order. Both refuse before the root starts, and the
+  store is left as it is (section 2); the refusal's text names the
+  directory. `Unrecorded`'s:
+
+  > `<deployment>` holds a store from an older build, made before its
+  > families' layouts were recorded, and this start has changed nothing
+  > in it. Before the first release a store is not translated, so every
+  > start refuses this one until it is moved. To start afresh, stop the
+  > service, move `active`, `generations/` and `transcripts/` out of
+  > `<deployment>` together, and start again: nothing is deleted, and
+  > the next start makes a new, empty store. The new store has no
+  > tasks, sign-ins, accounts or keys, and every client signs in again.
+
+  `Layout`'s, for the settings family (the others name theirs):
+
+  > `<deployment>` holds a store from an older build, whose settings
+  > family's layout differs from this build's, and this start has
+  > changed nothing in it. Before the first release a store is not
+  > translated, so every start refuses this one until it is moved. To
+  > start afresh, stop the service, move `active`, `generations/` and
+  > `transcripts/` out of `<deployment>` together, and start again:
+  > nothing is deleted, and the next start makes a new, empty store.
+  > The new store has no tasks, sign-ins, accounts or keys, and every
+  > client signs in again.
 
 ### 5.4 Sizes
 

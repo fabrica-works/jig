@@ -11,6 +11,11 @@ fn notes(bytes: &[u8]) {
     }
 }
 fn component(bytes: &[u8]) {
+    if let Ok(row) = component_v3::Layouts::decode(&component_v3::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
     if let Ok(row) = component_v3::Format::decode(&component_v3::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");

@@ -381,16 +381,16 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
     value: 1_567_829,
-    // Two operations per journal write plus three metadata operations: 2 * 18,608 + 3.
-    ops: 37_219,
-    // 256 MiB values + 37,219 operations * (2,079 key + 9 framing) + 26 frame bytes.
-    commit: 346_148_754,
+    // Two operations per journal write, three creation rows and an orphan erase: 2 * 18,608 + 4.
+    ops: 37_220,
+    // 256 MiB values + 37,220 operations * (2,079 key + 9 framing) + 26 frame bytes.
+    commit: 346_150_842,
     queued: 3,
     // Three queued commits; segment holds two, snapshot follows one.
-    queued_bytes: 1_038_446_262,
+    queued_bytes: 1_038_452_526,
     budget: 268_435_456,
-    segment: 692_297_508,
-    snapshot_after: 346_148_754,
+    segment: 692_301_684,
+    snapshot_after: 346_150_842,
     chunk: 1_569_928,
     page: skein_kv::Page { rows: 2, bytes: 1_569_908 },
     deadline: Duration::from_secs(30),

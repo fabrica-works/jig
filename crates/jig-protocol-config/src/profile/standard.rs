@@ -186,11 +186,11 @@ const JOURNAL: skein_lib::JournalLimits =
 // its recurring members and its proposed creations with their recurring members.
 const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     value: 10_664_757,
-    ops: 285_875,
-    commit: 865_342_482,
-    queued_bytes: 2_596_027_446,
-    segment: 1_730_684_964,
-    snapshot_after: 865_342_482,
+    ops: 285_876,
+    commit: 865_344_570,
+    queued_bytes: 2_596_033_710,
+    segment: 1_730_689_140,
+    snapshot_after: 865_344_570,
     chunk: 10_666_856,
     page: skein_kv::Page { rows: 2, bytes: 10_666_836 },
     ..small::STORE_KV

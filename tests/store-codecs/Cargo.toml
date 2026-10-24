@@ -13,6 +13,7 @@ jig-domain-people.workspace = true
 jig-protocol-config.workspace = true
 jig-protocol-store.workspace = true
 jig-test-store.workspace = true
+skein-codec.workspace = true
 skein-codegen.workspace = true
 skein-lib.workspace = true
 skein-kv.workspace = true

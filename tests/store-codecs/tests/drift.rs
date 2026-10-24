@@ -1,5 +1,6 @@
 //! The committed codecs and golden bytes against their schemas (skein's codec.md, 6).
 use skein_codegen::{generate, parse};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -88,4 +89,45 @@ fn the_test_connectors_code_and_goldens_have_no_drift() {
 #[test]
 fn the_settings_familys_code_and_goldens_have_no_drift() {
     check("settings", 1);
+}
+
+/// The layouts' fingerprints the store keeps (store.md 5.3), from the schemas.
+fn layouts() -> String {
+    let mut code = String::from(
+        "//! Each jig family's layout fingerprint in this build's schemas (store.md 5.3).\n\
+         //! Written and checked by `SKEIN_CODEGEN_WRITE=1 cargo nextest run -p jig-store-codecs-world --test drift`.\n\
+         use crate::codec::component::Layouts;\n\
+         \n\
+         pub(crate) const LAYOUTS: Layouts = Layouts {\n",
+    );
+    for (field, family, version) in [
+        ("component", "component", 3),
+        ("core", "core", 6),
+        ("tasks", "tasks", 9),
+        ("people", "people", 13),
+        ("notes", "notes", 1),
+        ("accounts", "accounts", 2),
+        ("settings", "settings", 1),
+    ] {
+        let source = fs::read(store().join(format!("schema/{family}-v{version}.schema"))).expect("schema readable");
+        let digest = skein_codec::schema::parse(&source).expect("schema valid").fingerprints().family().digest();
+        let bytes: Vec<String> = digest.iter().map(|byte| format!("0x{byte:02x}")).collect();
+        writeln!(code, "    {field}: [{}],", bytes.join(", ")).expect("a String takes the line");
+    }
+    code.push_str("};\n");
+    code
+}
+
+#[test]
+fn the_stores_layouts_have_no_drift() {
+    let path = store().join("src/generated/layouts.rs");
+    if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
+        fs::write(&path, layouts()).expect("write layouts");
+    } else {
+        assert_eq!(
+            fs::read_to_string(&path).expect("layouts committed"),
+            layouts(),
+            "run SKEIN_CODEGEN_WRITE=1 cargo nextest run -p jig-store-codecs-world --test drift"
+        );
+    }
 }

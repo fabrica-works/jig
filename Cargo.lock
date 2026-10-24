@@ -1302,6 +1302,7 @@ dependencies = [
  "jig-protocol-config",
  "jig-protocol-store",
  "jig-test-store",
+ "skein-codec",
  "skein-codegen",
  "skein-heap",
  "skein-kv",

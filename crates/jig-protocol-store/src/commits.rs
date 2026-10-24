@@ -86,6 +86,11 @@ pub(crate) fn operations(
         })
         .ok()?;
         ops.push(skein_kv::Op::Put {
+            key: keys::encode_own(&keys::Own::Layouts, store.limits.store.key)?,
+            value: store.layouts.encode(),
+        })
+        .ok()?;
+        ops.push(skein_kv::Op::Put {
             key: keys::installation(store.limits.store.key)?,
             value: codec::accounts::Installation { id: store.installation }.encode(),
         })
@@ -173,10 +178,10 @@ fn unique(ops: Box<[skein_kv::Op]>, capacity: u32) -> Option<Box<[skein_kv::Op]>
 }
 
 /// A commit's most operations: two turn places per write, the first commit's
-/// own rows (the format row and the installation's identifier), and the
+/// own rows (Format, Layouts and the installation's identifier), and the
 /// orphans' erases it carries.
 pub(crate) fn most_ops(writes: u32, orphan_erases: u32) -> Option<u32> {
-    writes.checked_mul(2)?.checked_add(2)?.checked_add(orphan_erases)
+    writes.checked_mul(2)?.checked_add(3)?.checked_add(orphan_erases)
 }
 
 pub(crate) fn worst_case(limits: &crate::Limits) -> Option<u64> {

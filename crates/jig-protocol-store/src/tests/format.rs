@@ -103,17 +103,17 @@ fn a_page_smaller_than_one_row_is_refused() {
 }
 #[test]
 fn fixture_limits_fit_their_store() {
-    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 369_330, ops: 10, commit: 17_620 }));
+    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 369_330, ops: 11, commit: 17_741 }));
 }
 fn too_few_operations_are_refused() {
     let mut limits = store();
-    limits.ops = 9;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Ops { needs: 10, has: 9 }));
+    limits.ops = 10;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Ops { needs: 11, has: 10 }));
 }
 fn too_few_commit_bytes_are_refused() {
     let mut limits = store();
-    limits.commit = 17_619;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 17_620, has: 17_619 }));
+    limits.commit = 17_740;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 17_741, has: 17_740 }));
 }
 fn too_few_in_flight_slots_are_refused() {
     let mut limits = store();
@@ -129,8 +129,8 @@ fn a_journal_bound_past_the_queue_is_refused_at_start() {
 }
 fn too_few_queued_bytes_are_refused() {
     let mut limits = store();
-    limits.queued_bytes = 35_239;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 35_240, has: 35_239 }));
+    limits.queued_bytes = 35_481;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 35_482, has: 35_481 }));
 }
 #[test]
 fn a_domain_limit_past_its_family_ceiling_is_refused_at_start() {
@@ -199,7 +199,7 @@ fn larger_application_encodings_are_included_in_the_bounds() {
     let application = sizes::Application { version: 1, key: 256, value: 9_000_000 };
     assert_eq!(
         sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store(), 0),
-        Ok(sizes::Sizes { key: 257, value: 9_000_000, ops: 10, commit: 19_070 }),
+        Ok(sizes::Sizes { key: 257, value: 9_000_000, ops: 11, commit: 19_336 }),
     );
 }
 #[test]
@@ -214,8 +214,8 @@ fn a_journal_whose_operation_count_overflows_is_refused() {
 #[test]
 fn a_map_budget_past_the_commit_envelope_is_refused() {
     for (label, budget, expected) in [
-        ("exact_u32_commit", 4_294_966_059, Ok(sizes::Sizes { key: 112, value: 369_330, ops: 10, commit: u32::MAX })),
-        ("one_byte_past_u32", 4_294_966_060, Err(sizes::SizeRefusal::Ceiling)),
+        ("exact_u32_commit", 4_294_965_938, Ok(sizes::Sizes { key: 112, value: 369_330, ops: 11, commit: u32::MAX })),
+        ("one_byte_past_u32", 4_294_965_939, Err(sizes::SizeRefusal::Ceiling)),
         ("u64_sum_overflows", u64::MAX, Err(sizes::SizeRefusal::Ceiling)),
     ] {
         let limits = skein_kv::Limits { budget, commit: u32::MAX, queued_bytes: u64::MAX, ..store() };
@@ -253,4 +253,39 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+#[expect(clippy::disallowed_macros, reason = "ordinary tests embed the seven schema fixtures independently")]
+fn current_layouts_are_the_seven_distinct_runtime_schema_fingerprints() {
+    let layouts = format::layouts();
+    let current = wanted();
+    let families = [
+        (layouts.component, current.component, include_bytes!("../../schema/component-v3.schema").as_slice()),
+        (layouts.core, current.core, include_bytes!("../../schema/core-v6.schema").as_slice()),
+        (layouts.tasks, current.tasks, include_bytes!("../../schema/tasks-v9.schema").as_slice()),
+        (layouts.people, current.people, include_bytes!("../../schema/people-v13.schema").as_slice()),
+        (layouts.notes, current.notes, include_bytes!("../../schema/notes-v1.schema").as_slice()),
+        (layouts.accounts, current.accounts, include_bytes!("../../schema/accounts-v2.schema").as_slice()),
+        (layouts.settings, current.settings, include_bytes!("../../schema/settings-v1.schema").as_slice()),
+    ];
+    let mut digests = skein_lib::Set::with_capacity(u32::try_from(families.len()).expect("seven families"));
+    for (digest, version, text) in families {
+        let schema = skein_codec::schema::parse(text).expect("current schema parses");
+        assert_eq!(schema.version(), version);
+        assert_eq!(digest, schema.fingerprints().family().digest());
+        assert!(digests.insert(digest).expect("seven families fit"), "families have distinct layouts");
+    }
+}
+
+#[test]
+fn differing_layouts_name_the_first_family_in_family_order() {
+    let wanted = format::layouts();
+    let mut found = wanted;
+    found.settings[0] ^= 1;
+    found.component[0] ^= 1;
+    assert_eq!(
+        format::check_layouts(&found, &wanted),
+        Err(OpenRefusal::OlderBuild { why: crate::Older::Layout(Family::Settings) })
+    );
 }

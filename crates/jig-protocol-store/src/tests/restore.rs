@@ -258,6 +258,7 @@ fn corrupt_people_store() -> Store {
         &mut stores,
         &[
             fixtures::format_put(fixtures::DEPLOYMENT),
+            fixtures::layouts_put(),
             fixtures::header_put(fixtures::DEPLOYMENT, 1),
             fixtures::installation_put(fixtures::INSTALLATION),
             skein_kv::Op::Put {

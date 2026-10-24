@@ -15,13 +15,15 @@ fn empty(seed: u64) -> World {
     world
 }
 
+fn first_commit_operations() -> u32 {
+    let mut world = empty(18);
+    assert_eq!(world.commit(root::first()), Some(1));
+    world.operation_count()
+}
+
 #[test]
 fn the_identifier_survives_a_crash_at_the_first_commit_and_is_never_redrawn_once_kept() {
-    let count = {
-        let mut world = empty(18);
-        assert_eq!(world.commit(root::first()), Some(1));
-        world.operation_count()
-    };
+    let count = first_commit_operations();
     assert!(count > 0, "the first commit writes");
     for cut in 0..=count {
         let mut world = empty(u64::from(cut));
@@ -46,5 +48,47 @@ fn the_identifier_survives_a_crash_at_the_first_commit_and_is_never_redrawn_once
         let restored = world.reopen();
         assert_eq!(restored.last, 1);
         assert_eq!(world.installation, kept, "a later start restores the kept identifier, cut {cut}");
+    }
+}
+
+#[test]
+fn every_first_commit_crash_keeps_the_three_creation_rows_or_none() {
+    use jig_protocol_store::{codec, format};
+    use skein_lib::{Env, Queue, Time, Token, Wall};
+    let count = first_commit_operations();
+    for cut in 0..=count {
+        let mut world = empty(u64::from(cut));
+        world.cut_at(cut);
+        let _acknowledged = world.commit(root::first());
+        world.crash(u64::from(cut));
+        let restored = world.reopen();
+        let mut stores = world.into_stores();
+        let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: root::limits().store };
+        let expected = [
+            (
+                Box::from([0, 0]),
+                format::current(root::APPLICATION.version, root::DEPLOYMENT).encode().expect("format fits"),
+            ),
+            (Box::from([0, 3]), format::layouts().encode()),
+            (Box::from([1, 4, 3]), codec::accounts::Installation { id: FIRST }.encode()),
+        ];
+        for (key, value) in expected {
+            let mut above = Queue::with_capacity(skein_kv::MAX_OUT.above);
+            let mut below = Queue::with_capacity(skein_kv::MAX_OUT.below);
+            skein_kv::down(
+                &mut stores.store,
+                &env,
+                skein_kv::Request::Get { owner: Token::new(0), key },
+                &mut above,
+                &mut below,
+            );
+            let Some(skein_kv::Event::Got { value: found, .. }) = above.pop() else { panic!("memory get") };
+            assert_eq!(
+                found,
+                if restored.last == 0 { None } else { Some(value) },
+                "creation rows are atomic, cut {cut}"
+            );
+            assert!(below.is_empty());
+        }
     }
 }

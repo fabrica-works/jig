@@ -216,7 +216,8 @@ pub fn limits() -> Limits {
         key: 1024,
         // The people family's policy row keeps up to 64 model names (protocol/store.md, 5.1).
         value: 524_288,
-        ops: 4003,
+        // Two places per journal write, three creation rows and one orphan erase.
+        ops: 4004,
         commit: 1_073_741_824,
         queued: 2,
         queued_bytes: 2_147_483_648,

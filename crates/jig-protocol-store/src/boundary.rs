@@ -223,6 +223,22 @@ pub enum OpenRefusal {
     /// The deployment's generations refuse (store.md 10.1).
     Generations { why: Generations },
 }
+/// An older build's refusal whose fix moves the generations (store.md 2), `why`
+/// saying which build.
+macro_rules! older {
+    ($why:literal) => {
+        &[
+            "",
+            concat!(
+                " holds a store from an older build, ",
+                $why,
+                ", and this start has changed nothing in it. Before the first release a store is not translated, so every start refuses this one until it is moved. To start afresh, stop the service, move `active`, `generations/` and `transcripts/` out of ",
+            ),
+            " together, and start again: nothing is deleted, and the next start makes a new, empty store. The new store has no tasks, sign-ins, accounts or keys, and every client signs in again.",
+        ]
+    };
+}
+
 impl OpenRefusal {
     /// The refusal's text in pieces, in order: the deployment's directory goes
     /// between each two consecutive pieces, wherever store.md has `<deployment>`.
@@ -232,6 +248,17 @@ impl OpenRefusal {
         match self {
             // o/configuring-2's L gives these their words.
             Self::Format { .. } | Self::Deployment | Self::Numbers { .. } | Self::Failed => &[],
+            Self::OlderBuild { why: Older::Unrecorded } => older!("made before its families' layouts were recorded"),
+            Self::OlderBuild { why: Older::Layout(family) } => match family {
+                Family::Settings => older!("whose settings family's layout differs from this build's"),
+                Family::Component => older!("whose component family's layout differs from this build's"),
+                Family::Core => older!("whose core family's layout differs from this build's"),
+                Family::Tasks => older!("whose tasks family's layout differs from this build's"),
+                Family::People => older!("whose people family's layout differs from this build's"),
+                Family::Notes => older!("whose notes family's layout differs from this build's"),
+                Family::Accounts => older!("whose accounts family's layout differs from this build's"),
+                Family::Application => older!("whose application family's layout differs from this build's"),
+            },
             Self::OlderBuild { why: Older::Directory } => &[
                 "",
                 " holds a store from an older build, in the layout before generations (`store/`, `secrets/` or `transcripts/` at its top), and this start has changed nothing in it. Before the first release a store is not translated, so every start refuses this one until it is moved. To start afresh, stop the service, move `store/`, `secrets/` and `transcripts/` out of ",
@@ -259,9 +286,13 @@ impl OpenRefusal {
         }
     }
 }
-/// Which older build (store.md 10.1).
+/// Which older build (store.md 5.3 and 10.1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Older {
+    /// A store with no layouts row, made before they were recorded (store.md 5.3).
+    Unrecorded,
+    /// A family's fingerprint is not this build's at its version (store.md 5.3).
+    Layout(Family),
     /// The layout before generations, with no active file (store.md 2).
     Directory,
 }

@@ -57,6 +57,7 @@ pub struct Store {
     limits: Limits,
     application: sizes::Application,
     codec: codec::Limits,
+    layouts: codec::component::Layouts,
     /// The configured models' names, which the people family keeps a role's models by.
     names: Box<[jig_domain_core::settings::ModelName]>,
     stores: Stores,
@@ -112,6 +113,7 @@ impl Store {
             limits: *limits,
             application,
             codec,
+            layouts: format::layouts(),
             names: codec::names(models),
             stores,
             phase: Phase::Closed,
@@ -291,3 +293,6 @@ pub mod settings_v1;
 #[rustfmt::skip]
 #[path = "generated/component_v3.rs"]
 pub mod component_v3;
+#[rustfmt::skip]
+#[path = "generated/layouts.rs"]
+mod layouts;

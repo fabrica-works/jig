@@ -49,6 +49,24 @@ pub enum Path {
     AttemptVersion,
     /// Bytes after `Attempt`.
     AttemptTail,
+    /// The `component` field of `Layouts`.
+    LayoutsComponent,
+    /// The `core` field of `Layouts`.
+    LayoutsCore,
+    /// The `tasks` field of `Layouts`.
+    LayoutsTasks,
+    /// The `people` field of `Layouts`.
+    LayoutsPeople,
+    /// The `notes` field of `Layouts`.
+    LayoutsNotes,
+    /// The `accounts` field of `Layouts`.
+    LayoutsAccounts,
+    /// The `settings` field of `Layouts`.
+    LayoutsSettings,
+    /// The version of `Layouts`.
+    LayoutsVersion,
+    /// Bytes after `Layouts`.
+    LayoutsTail,
 }
 
 /// A decoding or bound failure at a schema path.
@@ -219,6 +237,79 @@ impl Attempt {
 
 }
 
+/// Movable fields of `Layouts`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LayoutsParts {
+    /// The `component` field.
+    pub component: [u8; 32],
+    /// The `core` field.
+    pub core: [u8; 32],
+    /// The `tasks` field.
+    pub tasks: [u8; 32],
+    /// The `people` field.
+    pub people: [u8; 32],
+    /// The `notes` field.
+    pub notes: [u8; 32],
+    /// The `accounts` field.
+    pub accounts: [u8; 32],
+    /// The `settings` field.
+    pub settings: [u8; 32],
+}
+
+/// `Layouts` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Layouts {
+    component: [u8; 32],
+    core: [u8; 32],
+    tasks: [u8; 32],
+    people: [u8; 32],
+    notes: [u8; 32],
+    accounts: [u8; 32],
+    settings: [u8; 32],
+}
+
+impl Layouts {
+    /// Makes a value; this family has no adjustable bounds.
+    #[must_use]
+    pub fn new(_limits: &Limits, parts: LayoutsParts) -> Self {
+        let LayoutsParts { component, core, tasks, people, notes, accounts, settings } = parts;
+        Self { component, core, tasks, people, notes, accounts, settings }
+    }
+
+    /// Reads the `component` field.
+    #[must_use]
+    pub fn component(&self) -> &[u8; 32] { &self.component }
+
+    /// Reads the `core` field.
+    #[must_use]
+    pub fn core(&self) -> &[u8; 32] { &self.core }
+
+    /// Reads the `tasks` field.
+    #[must_use]
+    pub fn tasks(&self) -> &[u8; 32] { &self.tasks }
+
+    /// Reads the `people` field.
+    #[must_use]
+    pub fn people(&self) -> &[u8; 32] { &self.people }
+
+    /// Reads the `notes` field.
+    #[must_use]
+    pub fn notes(&self) -> &[u8; 32] { &self.notes }
+
+    /// Reads the `accounts` field.
+    #[must_use]
+    pub fn accounts(&self) -> &[u8; 32] { &self.accounts }
+
+    /// Reads the `settings` field.
+    #[must_use]
+    pub fn settings(&self) -> &[u8; 32] { &self.settings }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> LayoutsParts { LayoutsParts { component: self.component, core: self.core, tasks: self.tasks, people: self.people, notes: self.notes, accounts: self.accounts, settings: self.settings } }
+
+}
+
 impl Format {
     /// Measures this record's wire encoding.
     #[must_use]
@@ -354,6 +445,63 @@ impl Attempt {
     }
 }
 
+impl Layouts {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        size = size.checked_add(2).expect("schema ceilings fit u32");
+        size = size.checked_add(32).expect("schema ceilings fit u32");
+        size = size.checked_add(32).expect("schema ceilings fit u32");
+        size = size.checked_add(32).expect("schema ceilings fit u32");
+        size = size.checked_add(32).expect("schema ceilings fit u32");
+        size = size.checked_add(32).expect("schema ceilings fit u32");
+        size = size.checked_add(32).expect("schema ceilings fit u32");
+        size = size.checked_add(32).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        writer.put(&3_u16.to_be_bytes())?;
+        let field_component = &self.component;
+        writer.put(field_component)?;
+        let field_core = &self.core;
+        writer.put(field_core)?;
+        let field_tasks = &self.tasks;
+        writer.put(field_tasks)?;
+        let field_people = &self.people;
+        writer.put(field_people)?;
+        let field_notes = &self.notes;
+        writer.put(field_notes)?;
+        let field_accounts = &self.accounts;
+        writer.put(field_accounts)?;
+        let field_settings = &self.settings;
+        writer.put(field_settings)?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::LayoutsTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let version = reader.u16().ok_or(Problem { path: Path::LayoutsVersion, reason: skein_codec::Reason::Short })?;
+        if version != 3 { return Err(Problem { path: Path::LayoutsVersion, reason: skein_codec::Reason::Version }); }
+        let decoded_component = { let bytes = reader.bytes(32).ok_or(Problem { path: Path::LayoutsComponent, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
+        let decoded_core = { let bytes = reader.bytes(32).ok_or(Problem { path: Path::LayoutsCore, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
+        let decoded_tasks = { let bytes = reader.bytes(32).ok_or(Problem { path: Path::LayoutsTasks, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
+        let decoded_people = { let bytes = reader.bytes(32).ok_or(Problem { path: Path::LayoutsPeople, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
+        let decoded_notes = { let bytes = reader.bytes(32).ok_or(Problem { path: Path::LayoutsNotes, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
+        let decoded_accounts = { let bytes = reader.bytes(32).ok_or(Problem { path: Path::LayoutsAccounts, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
+        let decoded_settings = { let bytes = reader.bytes(32).ok_or(Problem { path: Path::LayoutsSettings, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
+        Ok(Self { component: decoded_component, core: decoded_core, tasks: decoded_tasks, people: decoded_people, notes: decoded_notes, accounts: decoded_accounts, settings: decoded_settings })
+    }
+}
+
 impl Format {
     /// Maximum encoded bytes under these limits.
     #[must_use]
@@ -446,6 +594,40 @@ impl Attempt {
     }
 }
 
+impl Layouts {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
+        let mut size = 2_u64;
+        size = size.checked_add(u64::from(32_u32))?.checked_add(u64::from(32_u32))?;
+        size = size.checked_add(u64::from(32_u32))?.checked_add(u64::from(32_u32))?;
+        size = size.checked_add(u64::from(32_u32))?.checked_add(u64::from(32_u32))?;
+        size = size.checked_add(u64::from(32_u32))?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?;
+        heap.checked_add(0)
+    }
+}
+
 /// Maximum wire bytes among this family's top-level types.
 #[must_use]
 pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
@@ -454,6 +636,7 @@ pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
     biggest = biggest.max(Format::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Transcript::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Attempt::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(Layouts::worst_case_bytes_within(limits)?);
     Some(biggest)
 }
 
@@ -465,12 +648,13 @@ pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
     biggest = biggest.max(Format::worst_case_heap_within(limits)?);
     biggest = biggest.max(Transcript::worst_case_heap_within(limits)?);
     biggest = biggest.max(Attempt::worst_case_heap_within(limits)?);
+    biggest = biggest.max(Layouts::worst_case_heap_within(limits)?);
     Some(biggest)
 }
 
 #[cfg(test)]
 mod golden_tests {
-    use super::{CEILINGS, Format, FormatParts, Transcript, TranscriptParts, Attempt, AttemptParts};
+    use super::{CEILINGS, Format, FormatParts, Transcript, TranscriptParts, Attempt, AttemptParts, Layouts, LayoutsParts};
 
     use alloc::boxed::Box;
 
@@ -505,13 +689,15 @@ mod golden_tests {
         encoded && decoded
     }
 
-    static GOLDEN_0: [Case; 6] = [
+    static GOLDEN_0: [Case; 8] = [
         ("record_format_smallest", || { let value = Format::new(&CEILINGS, FormatParts { component: 0_u16, core: 0_u16, tasks: 0_u16, people: 0_u16, notes: 0_u16, accounts: 0_u16, settings: 0_u16, application: 0_u32, deployment: [0_u8; 16] }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_format_full", || { let value = Format::new(&CEILINGS, FormatParts { component: u16::MAX, core: u16::MAX, tasks: u16::MAX, people: u16::MAX, notes: u16::MAX, accounts: u16::MAX, settings: u16::MAX, application: u32::MAX, deployment: [165_u8; 16] }); let bytes: &[u8] = &[0, 3, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_transcript_smallest", || { let value = Transcript::new(&CEILINGS, TranscriptParts { length: 0_u64, window: 0_u64 }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_transcript_full", || { let value = Transcript::new(&CEILINGS, TranscriptParts { length: u64::MAX, window: u64::MAX }); let bytes: &[u8] = &[0, 3, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_attempt_smallest", || { let value = Attempt::new(&CEILINGS, AttemptParts { first: 0_u64 }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_attempt_full", || { let value = Attempt::new(&CEILINGS, AttemptParts { first: u64::MAX }); let bytes: &[u8] = &[0, 3, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_layouts_smallest", || { let value = Layouts::new(&CEILINGS, LayoutsParts { component: [0_u8; 32], core: [0_u8; 32], tasks: [0_u8; 32], people: [0_u8; 32], notes: [0_u8; 32], accounts: [0_u8; 32], settings: [0_u8; 32] }); let bytes: &[u8] = &[0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Layouts::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_layouts_full", || { let value = Layouts::new(&CEILINGS, LayoutsParts { component: [165_u8; 32], core: [165_u8; 32], tasks: [165_u8; 32], people: [165_u8; 32], notes: [165_u8; 32], accounts: [165_u8; 32], settings: [165_u8; 32] }); let bytes: &[u8] = &[0, 3, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Layouts::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
     ];
 
     #[test]

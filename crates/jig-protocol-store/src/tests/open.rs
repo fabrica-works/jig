@@ -1,6 +1,6 @@
 //! Checks before a memory restart (protocol/store.md, 5.3, 6 and 10).
 use super::fixtures;
-use crate::{Event, Family, OpenRefusal, Phase, Request, Store, Stores, codec, keys};
+use crate::{Event, Family, Older, OpenRefusal, Phase, Request, Store, Stores, codec, keys};
 use alloc::boxed::Box;
 use jig_domain_core::{CoreKey, Key};
 use skein_lib::Token;
@@ -19,9 +19,13 @@ fn planted(ops: &[skein_kv::Op]) -> Store {
     fixtures::over(stores)
 }
 
-fn opened_rows() -> [skein_kv::Op; 3] {
+// Format, Layouts, deployment header and installation identifier.
+const OPENED_ROWS: usize = 4;
+
+fn opened_rows() -> [skein_kv::Op; OPENED_ROWS] {
     [
         fixtures::format_put(fixtures::DEPLOYMENT),
+        fixtures::layouts_put(),
         fixtures::header_put(fixtures::DEPLOYMENT, 1),
         fixtures::installation_put(fixtures::INSTALLATION),
     ]
@@ -116,8 +120,11 @@ fn a_store_answers_its_kept_installation_not_the_drawn_one() {
 
 #[test]
 fn a_checked_store_without_its_installation_is_corrupt() {
-    let mut store =
-        planted(&[fixtures::format_put(fixtures::DEPLOYMENT), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    let mut store = planted(&[
+        fixtures::format_put(fixtures::DEPLOYMENT),
+        fixtures::layouts_put(),
+        fixtures::header_put(fixtures::DEPLOYMENT, 1),
+    ]);
     assert_corrupt(&open(&mut store));
     assert_eq!(store.phase, Phase::Stopped);
 }
@@ -126,6 +133,7 @@ fn a_checked_store_without_its_installation_is_corrupt() {
 fn an_undecodable_installation_is_corrupt() {
     let mut store = planted(&[
         fixtures::format_put(fixtures::DEPLOYMENT),
+        fixtures::layouts_put(),
         fixtures::header_put(fixtures::DEPLOYMENT, 1),
         skein_kv::Op::Put { key: keys::installation(fixtures::KEY_LIMIT).expect("key fits"), value: Box::new([0, 1]) },
     ]);
@@ -151,8 +159,11 @@ fn a_store_of_another_accounts_version_refuses_naming_accounts() {
 
 #[test]
 fn a_store_of_another_deployment_refuses_to_open() {
-    let mut store =
-        planted(&[fixtures::format_put(fixtures::OTHER_DEPLOYMENT), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    let mut store = planted(&[
+        fixtures::format_put(fixtures::OTHER_DEPLOYMENT),
+        fixtures::layouts_put(),
+        fixtures::header_put(fixtures::DEPLOYMENT, 1),
+    ]);
     assert_refusal(&open(&mut store), OpenRefusal::Deployment);
 }
 
@@ -191,7 +202,7 @@ fn a_header_equal_to_the_last_commit_opens_with_it() {
 
 #[test]
 fn a_format_row_without_its_header_refuses_as_numbers() {
-    let mut store = planted(&[fixtures::format_put(fixtures::DEPLOYMENT)]);
+    let mut store = planted(&[fixtures::format_put(fixtures::DEPLOYMENT), fixtures::layouts_put()]);
     assert_refusal(&open(&mut store), OpenRefusal::Numbers { store: 1, header: 0 });
 }
 
@@ -203,7 +214,7 @@ fn an_unknown_core_version_is_refused_before_decoding_its_header() {
 
 #[test]
 fn a_corrupt_header_stops_the_open() {
-    let mut store = planted(&[fixtures::format_put(fixtures::DEPLOYMENT), corrupt_header()]);
+    let mut store = planted(&[fixtures::format_put(fixtures::DEPLOYMENT), fixtures::layouts_put(), corrupt_header()]);
     assert_corrupt(&open(&mut store));
     assert_eq!(store.phase, Phase::Stopped);
 }
@@ -226,7 +237,7 @@ fn a_stopped_open_answers_nothing_further() {
 }
 
 #[test]
-fn opening_checks_no_row_beyond_the_format_header_and_installation() {
+fn opening_checks_no_row_beyond_format_layouts_header_and_installation() {
     let mut stores = stores_with_header();
     fixtures::plant(&mut stores, &[skein_kv::Op::Put { key: Box::new([1, 0, 255]), value: Box::new([]) }]);
     fixtures::plant(&mut stores, &[fixtures::header_put(fixtures::DEPLOYMENT, 3)]);
@@ -243,4 +254,118 @@ fn the_callers_two_stores_are_handed_back_without_changes() {
     assert_eq!(stores.store.used(), expected);
     assert_eq!(stores.secrets.last(), 0);
     assert!(stores.secrets.is_empty());
+}
+
+#[test]
+fn a_store_without_recorded_layouts_refuses_before_decoding_its_header() {
+    let mut store = planted(&[fixtures::format_put(fixtures::DEPLOYMENT), corrupt_header()]);
+    assert_refusal(&open(&mut store), OpenRefusal::OlderBuild { why: Older::Unrecorded });
+}
+
+fn layouts_put(layouts: &codec::component::Layouts) -> skein_kv::Op {
+    skein_kv::Op::Put {
+        key: keys::encode_own(&keys::Own::Layouts, fixtures::KEY_LIMIT).expect("layouts key fits"),
+        value: layouts.encode(),
+    }
+}
+
+#[test]
+fn each_different_family_layout_refuses_before_decoding_its_header() {
+    let layouts = crate::format::layouts();
+    let mut component = layouts;
+    component.component[0] ^= 1;
+    let mut core = layouts;
+    core.core[0] ^= 1;
+    let mut tasks = layouts;
+    tasks.tasks[0] ^= 1;
+    let mut people = layouts;
+    people.people[0] ^= 1;
+    let mut notes = layouts;
+    notes.notes[0] ^= 1;
+    let mut accounts = layouts;
+    accounts.accounts[0] ^= 1;
+    let mut settings = layouts;
+    settings.settings[0] ^= 1;
+    for (family, changed) in [
+        (Family::Settings, settings),
+        (Family::Component, component),
+        (Family::Core, core),
+        (Family::Tasks, tasks),
+        (Family::People, people),
+        (Family::Notes, notes),
+        (Family::Accounts, accounts),
+    ] {
+        let mut store = planted(&[fixtures::format_put(fixtures::DEPLOYMENT), layouts_put(&changed), corrupt_header()]);
+        assert_refusal(&open(&mut store), OpenRefusal::OlderBuild { why: Older::Layout(family) });
+    }
+}
+
+#[test]
+fn undecodable_component_rows_refuse_as_an_older_component_layout() {
+    for (key, value) in [
+        (keys::Own::Layouts, Box::from([])),
+        (keys::Own::Layouts, Box::from([0, 3])),
+        (keys::Own::Format, Box::from([0, 3])),
+    ] {
+        let mut store = replacing(skein_kv::Op::Put {
+            key: keys::encode_own(&key, fixtures::KEY_LIMIT).expect("own key fits"),
+            value,
+        });
+        assert_refusal(&open(&mut store), OpenRefusal::OlderBuild { why: Older::Layout(Family::Component) });
+    }
+}
+
+fn replacing(replacement: skein_kv::Op) -> Store {
+    let capacity = u32::try_from(OPENED_ROWS).expect("fixture row count").checked_add(1).expect("one replacement");
+    let mut ops = skein_lib::List::with_capacity(capacity);
+    for row in opened_rows() {
+        ops.push(row).expect("fixture row fits");
+    }
+    ops.push(replacement).expect("replacement fits");
+    planted(ops.as_slice())
+}
+
+fn rows(store: &mut Store) -> Box<[skein_kv::Op]> {
+    let mut rows = skein_lib::List::with_capacity(u32::try_from(OPENED_ROWS).expect("fixture row count"));
+    let mut start = Box::from([]);
+    for _ in 0..=OPENED_ROWS {
+        let page = crate::pages::load(store, skein_kv::Range { start, end: None }).expect("memory page");
+        if page.rows.is_empty() {
+            return rows.into_boxed();
+        }
+        start = crate::pages::past(&page.rows.last().expect("nonempty page").key).expect("past key");
+        for row in page.rows {
+            rows.push(skein_kv::Op::Put { key: row.key, value: row.value }).expect("fixture row fits");
+        }
+    }
+    panic!("fixture rows fit");
+}
+
+#[test]
+fn older_build_refusals_leave_every_row_and_commit_unchanged() {
+    let mut changed = crate::format::layouts();
+    changed.core[0] ^= 1;
+    let key = keys::encode_own(&keys::Own::Layouts, fixtures::KEY_LIMIT).expect("own key fits");
+    for replacement in [
+        skein_kv::Op::Erase { key: key.clone() },
+        skein_kv::Op::Put { key, value: Box::from([]) },
+        layouts_put(&changed),
+        skein_kv::Op::Put {
+            key: keys::encode_own(&keys::Own::Format, fixtures::KEY_LIMIT).expect("own key fits"),
+            value: Box::from([0, 3]),
+        },
+    ] {
+        let mut store = replacing(replacement);
+        let before = rows(&mut store);
+        let last = store.stores.store.last();
+        let used = store.stores.store.used();
+        let events = open(&mut store);
+        let [Event::OpenRefused { why: OpenRefusal::OlderBuild { .. }, .. }] = &*events else {
+            panic!("older build refusal: {events:?}");
+        };
+        assert_eq!(rows(&mut store), before);
+        assert_eq!(store.stores.store.last(), last);
+        assert_eq!(store.stores.store.used(), used);
+        assert!(store.stores.secrets.is_empty());
+    }
 }

@@ -13,3 +13,12 @@ versioned record Format {
 }
 versioned record Transcript { length: u64 window: u64 }
 versioned record Attempt { first: u64 }
+versioned record Layouts {
+    component: fixed 32
+    core: fixed 32
+    tasks: fixed 32
+    people: fixed 32
+    notes: fixed 32
+    accounts: fixed 32
+    settings: fixed 32
+}

@@ -596,8 +596,10 @@ fn a_read_waiting_on_a_writer_keeps_its_durable_places() {
 }
 fn cut_open(length: Option<u64>, claimed: bool) -> (Store, Box<[Event]>, Below) {
     let mut store = fixtures::over(fixtures::stores());
-    let mut ops = skein_lib::List::with_capacity(5);
+    // Three creation rows, the header, a run proof and a transcript place.
+    let mut ops = skein_lib::List::with_capacity(6);
     ops.push(fixtures::format_put(fixtures::DEPLOYMENT)).expect("format");
+    ops.push(fixtures::layouts_put()).expect("layouts");
     ops.push(fixtures::header_put(fixtures::DEPLOYMENT, 1)).expect("header");
     ops.push(fixtures::installation_put(fixtures::INSTALLATION)).expect("installation");
     if claimed {
@@ -781,7 +783,7 @@ fn orphan_erases_are_included_in_the_commits_operation_bound() {
     let limits = fixtures::store_limits();
     let sizes =
         crate::sizes::check(&limits.core, &fixtures::APPLICATION, &limits.journal, &limits.store, 1).expect("fits");
-    assert_eq!(sizes.ops, 11);
+    assert_eq!(sizes.ops, 12);
 }
 #[test]
 fn dropping_a_transcript_fails_without_submitting_the_commit() {

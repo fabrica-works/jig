@@ -76,6 +76,13 @@ pub fn format_put(deployment: [u8; 16]) -> skein_kv::Op {
     }
 }
 
+pub fn layouts_put() -> skein_kv::Op {
+    skein_kv::Op::Put {
+        key: keys::encode_own(&keys::Own::Layouts, KEY_LIMIT).expect("layouts key fits"),
+        value: format::layouts().encode(),
+    }
+}
+
 pub fn header_put(deployment: [u8; 16], commits: u64) -> skein_kv::Op {
     let record = deployment_record(deployment, commits);
     skein_kv::Op::Put {

@@ -1,5 +1,5 @@
 //! The format row and header checked before restart (protocol/store.md, 5.3 and 10).
-use crate::{Event, Family, OpenRefusal, Phase, Store, codec, format, keys};
+use crate::{Event, Family, Older, OpenRefusal, Phase, Store, codec, format, keys};
 use alloc::boxed::Box;
 use jig_domain_core::{CoreKey, CoreRecord, Key, Record};
 use skein_lib::{Queue, Token};
@@ -49,13 +49,18 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, be
                 OpenRefusal::Format { family: Family::Component, found: u32::from(version), wanted: u32::from(wanted) },
                 above,
             ),
-            Some(_) | None => corrupt(store, owner, above),
+            Some(_) => refuse(store, owner, OpenRefusal::OlderBuild { why: Older::Layout(Family::Component) }, above),
+            None => corrupt(store, owner, above),
         }
         return;
     };
     // Refuse another family's version before decoding its header.
     let wanted = format::current(store.application.version, found.deployment);
     if let Err(why) = format::check(&found, &wanted) {
+        refuse(store, owner, why, above);
+        return;
+    }
+    if let Err(why) = check_layouts(store, owner) {
         refuse(store, owner, why, above);
         return;
     }
@@ -93,6 +98,15 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, be
         | Record::Notes(_)
         | Record::Accounts(_) => corrupt(store, owner, above),
     }
+}
+
+fn check_layouts(store: &mut Store, owner: Token) -> Result<(), OpenRefusal> {
+    let key = keys::encode_own(&keys::Own::Layouts, store.limits.store.key).expect("layouts key fits");
+    let bytes = get(store, owner, key)?.ok_or(OpenRefusal::OlderBuild { why: Older::Unrecorded })?;
+    let Ok(found) = codec::component::Layouts::decode(&bytes) else {
+        return Err(OpenRefusal::OlderBuild { why: Older::Layout(Family::Component) });
+    };
+    format::check_layouts(&found, &store.layouts)
 }
 
 /// The identifier kept by the first commit replaces the drawn one (4.4); a

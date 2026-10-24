@@ -36,3 +36,29 @@ fn a_missing_refusal_says_to_restore_or_name_a_generation() {
 fn an_unnamed_refusal_says_to_name_its_generation() {
     says(OpenRefusal::Generations { why: Generations::Unnamed }, "- `Unnamed`: \"", "\"");
 }
+#[test]
+fn an_unrecorded_refusal_says_to_move_the_generations() {
+    says(OpenRefusal::OlderBuild { why: Older::Unrecorded }, "`Unrecorded`'s:\n\n  > ", "\n\n  `Layout`'s");
+}
+#[test]
+fn a_layout_refusal_names_its_family_and_says_to_move_the_generations() {
+    use crate::Family;
+    says(
+        OpenRefusal::OlderBuild { why: Older::Layout(Family::Settings) },
+        "(the others name theirs):\n\n  > ",
+        "\n\n### 5.4",
+    );
+    let settings = unwrapped("(the others name theirs):\n\n  > ", "\n\n### 5.4");
+    for (family, name) in [
+        (Family::Component, "component"),
+        (Family::Core, "core"),
+        (Family::Tasks, "tasks"),
+        (Family::People, "people"),
+        (Family::Notes, "notes"),
+        (Family::Accounts, "accounts"),
+        (Family::Application, "application"),
+    ] {
+        let words = OpenRefusal::OlderBuild { why: Older::Layout(family) }.words().join("`<deployment>`");
+        assert_eq!(words, settings.replacen("whose settings", &["whose ", name].concat(), 1), "{family:?}");
+    }
+}

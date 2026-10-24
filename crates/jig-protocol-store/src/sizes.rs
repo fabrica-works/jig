@@ -102,7 +102,7 @@ fn largest(
     )
     .ok()?;
     // Each journal write can produce two turn places; the first commit also
-    // inserts the format row and the installation's identifier. Each put
+    // inserts Format, Layouts and the installation's identifier. Each put
     // costs a tag and two u32 lengths; a skein-kv frame costs 22 header bytes
     // and four checksum bytes.
     let ops = crate::commits::most_ops(journal.writes, orphan_erases)?;
