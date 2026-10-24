@@ -1008,3 +1008,23 @@ pub(super) fn dependency_rows(limits: &Limits, row: &tasks::TaskRecord) -> List<
     }
     facts
 }
+
+/// A retained ended root has no live subtree (client/domain/contract.md, 7.2).
+pub(crate) fn ended_tree(core: &Core, limits: &Limits, party: u64, row: &tasks::TaskRecord) -> Result<Tree, Missing> {
+    if core.people.role(party, row.project).is_none() {
+        return Err(Missing::NotAllowed);
+    }
+    match row.phase {
+        tasks::Phase::Ended(_) => {}
+        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => {
+            return Err(Missing::Unknown);
+        }
+    }
+    Ok(Tree {
+        root: super::small::chip_with_core(core, limits, row)?,
+        rows: List::with_capacity(0),
+        folded: List::with_capacity(0),
+        held_below: 0,
+        next: None,
+    })
+}

@@ -23,6 +23,9 @@ pub use vocabulary::{
 };
 pub(crate) mod activity;
 mod answers;
+mod watches;
+pub(crate) use watches::start_watch;
+use watches::watch_loaded;
 pub mod ended;
 pub mod indexed;
 mod rows;
@@ -109,11 +112,27 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
 
 #[derive(Debug)]
 pub(crate) struct Pending {
-    reply: Option<ReplyTo>,
+    destination: Destination,
     sign_in: u64,
     party: u64,
     range: Range,
     tasks: Option<Box<TaskPage>>,
+}
+
+#[derive(Debug)]
+enum Destination {
+    Read(ReplyTo),
+    Watch(Token),
+    Done,
+}
+
+impl Pending {
+    fn take_reply(&mut self) -> ReplyTo {
+        match core::mem::replace(&mut self.destination, Destination::Done) {
+            Destination::Read(reply) => reply,
+            Destination::Watch(_) | Destination::Done => unreachable!("a pending read owns its reply"),
+        }
+    }
 }
 
 fn terminal(reply: ReplyTo, answer: Answer) -> Requests {
@@ -493,10 +512,10 @@ fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, p
         bytes: env.limits.load_bytes,
     };
     let emitted = range.clone();
-    let pending = Pending { reply: Some(reply), sign_in, party, range, tasks };
+    let pending = Pending { destination: Destination::Read(reply), sign_in, party, range, tasks };
     let load = match core.reads.insert(pending) {
         Ok(load) => load.token(),
-        Err(pending) => return terminal(pending.reply.expect("new read owns its reply"), Answer::None(Why::Busy)),
+        Err(mut pending) => return terminal(pending.take_reply(), Answer::None(Why::Busy)),
     };
     let mut out = Queue::with_capacity(2);
     out.push(Request::Held(Box::new(Held::ReadLoad { load, range: Box::new(emitted) })));
@@ -509,8 +528,10 @@ pub(crate) fn loaded(core: &mut Core, env: &Env<Limits>, load: Token, result: Lo
     let Some(pending) = core.reads.get(name) else {
         return Requests::Out(Queue::with_capacity(0));
     };
-    if pending.reply.is_none() {
-        return Requests::Out(Queue::with_capacity(0));
+    match &pending.destination {
+        Destination::Watch(watcher) => return watch_loaded(core, env, name, *watcher, result),
+        Destination::Read(_) => {}
+        Destination::Done => return Requests::Out(Queue::with_capacity(0)),
     }
     let answer = if core.people.person(pending.sign_in, env.now, env.wall) != Some(pending.party) {
         Answer::None(Why::SignedOut)
@@ -538,7 +559,7 @@ pub(crate) fn loaded(core: &mut Core, env: &Env<Limits>, load: Token, result: Lo
         }
         (_, answer) => answer,
     };
-    let reply = core.reads.get_mut(name).expect("live read").reply.take().expect("terminal consumes its reply");
+    let reply = core.reads.get_mut(name).expect("live read").take_reply();
     core.reads.retire(name);
     terminal(reply, answer)
 }
@@ -642,10 +663,10 @@ pub(super) fn load_settings(
         return terminal(reply, Answer::None(Why::Busy));
     }
     let emitted = range.clone();
-    let pending = Pending { reply: Some(reply), sign_in, party: range.party, range, tasks: None };
+    let pending = Pending { destination: Destination::Read(reply), sign_in, party: range.party, range, tasks: None };
     let load = match core.reads.insert(pending) {
         Ok(load) => load.token(),
-        Err(pending) => return terminal(pending.reply.expect("new read reply"), Answer::None(Why::Busy)),
+        Err(mut pending) => return terminal(pending.take_reply(), Answer::None(Why::Busy)),
     };
     let mut out = Queue::with_capacity(2);
     out.push(Request::Held(Box::new(Held::ReadLoad { load, range: Box::new(emitted) })));

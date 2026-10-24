@@ -49,6 +49,19 @@ impl Domain {
     pub fn retained_run_states(&self) -> alloc::collections::btree_map::Iter<'_, Token, crate::RetainedRun> {
         self.runs.iter()
     }
+    /// Whether the parent still owes this watch a construction terminal.
+    #[must_use]
+    pub fn is_making(&self, watcher: Token) -> bool {
+        let Some(id) = self.names.get(&watcher) else { return false };
+        match self.watchers.get(*id).expect("named watch").state {
+            watch::State::Making { .. } | watch::State::ClosingMake { .. } => true,
+            watch::State::Idle
+            | watch::State::Sending { .. }
+            | watch::State::ClosingDelivery { .. }
+            | watch::State::ClosingStream { .. } => false,
+        }
+    }
+
     /// Whether an admitted watch awaits construction, delivery or stream
     /// acknowledgement after its ending has already been requested.
     #[must_use]

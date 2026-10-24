@@ -2009,7 +2009,7 @@ fn signed_out_unknown_and_full_watches_are_refused_without_keyed_work() {
     let (mut core, limits) = watch_core();
     for (label, sign_in, subject, why) in [
         ("SignedOut", 99, Watched::Frame, WatchRefusal::SignedOut),
-        ("Unknown", 10, Watched::Task { task: 99 }, WatchRefusal::Unknown),
+        ("Unknown", 10, Watched::Run { task: 99 }, WatchRefusal::Unknown),
     ] {
         let out = watch_outputs(
             &mut core,
@@ -3607,3 +3607,5 @@ fn a_restored_policy_cannot_pass_the_deployments_projects_mark() {
     core.counters.deployment.projects = 1;
     assert!(core.restore_policy(&limits, 1, Box::from("Project 1"), value));
 }
+
+mod ended_watches;

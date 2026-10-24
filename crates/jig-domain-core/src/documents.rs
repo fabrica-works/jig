@@ -64,7 +64,7 @@ pub use project_note::{
 };
 mod live_delegates;
 pub use live_delegates::LiveDelegate;
-mod task_tree;
+pub(crate) mod task_tree;
 mod task_wait;
 pub use task_tree::{
     AuthorityLine, BudgetLine, ContractLine, Dependency, Ending, EscalationState, FoldedCount, GrantLine, HoldLine,

@@ -79,7 +79,7 @@ use turns::route_accepted_turn;
 #[path = "tasks.rs"]
 mod task_routes;
 #[path = "views.rs"]
-mod view_routes;
+pub(crate) mod view_routes;
 mod vocabulary;
 pub(crate) mod watch_marks;
 

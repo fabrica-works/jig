@@ -958,11 +958,12 @@ party reads is therefore never lost by a crash.
 | `settings`; `setting{kind, scope, number, revision}`: one setting's value whole, as the newest reads it, or, for a charter, as a held revision reads it; `revision{n}`: a revision's record and its items, as it set them; `revisions`: its records, a page, newest first | live state; the store's history, for a revision no longer held (`../../domain/engine.md`, 17.7) |
 | an application's read, naming its owner, its scope and its window (7.5) | its owner, the connector, through the engine's root |
 
-- **An ended subject is read, not watched.** A watch on a subject that
-  has ended is refused `Unknown` (7.2); a client wanting the end reads
-  the subject. `Unknown` says there is no live subject, never that the
-  task ended successfully. A task read returns its live state or retained
-  terminal history under the party's current visibility. A retained load
+- **An ended task is a finished read.** Opening its task or tree watch
+  delivers its retained document once, then ends the watch (7.2). A
+  client waiting for a condition tests this first document too: a condition
+  already true answers at once, and an ending alone proves no condition.
+  A task read returns its live state or retained terminal history under
+  the party's current visibility. A retained load
   waits for the preceding commits to be durable and checks current
   sign-in and visibility when it completes; it never restores a retired
   row into the live set (`../../domain/engine.md`, 5.2 and 5.3).
@@ -1101,10 +1102,15 @@ new `me` watch, including after restart.
   up, and what the engine keeps per watch is a mark and a window, never a
   backlog.
 - **The first delivery** is the subject's document when the watch is
-  admitted. A watch on a subject that has ended is refused `Unknown`;
-  a client wanting the end reads the subject (section 6). `Unknown` is
-  not terminal success and does not distinguish ended from absent or
-  hidden history.
+  admitted. For a task or tree whose root has ended, the core loads its
+  retained task facts through the bounded durable read path, checks the
+  current sign-in and visibility, and delivers once. A tree still means
+  the live subtree (5.1): its retained ended root has no live descendants,
+  folded counts or continuation, whether it was a root or a delegate.
+  The watch ends with the existing subject-gone reason after that delivery
+  is taken or dropped. Missing or hidden retained facts end it without a
+  delivery; an ending alone is never terminal success. Other ended
+  subjects are refused `Unknown`. No retired task is restored to serve it.
 - **Ended,** each saying why: the client left; its subject ended and left
   the engine; the party may no longer see it; the sign-in ended; the
   engine is stopping.

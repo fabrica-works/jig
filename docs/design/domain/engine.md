@@ -1056,6 +1056,13 @@ computes for them is said below (11.1 to 11.5).
   repeating its ending is not finishing work. Sign-in expiry reaches the
   core through the people's timer (people.md, section 3); stopping still
   completes watch endings and the drain notification (section 6.1).
+- **An ended task or tree opens as a finished read**
+  (`../client/domain/contract.md`, 7.2). Construction uses one of the
+  existing bounded task loads, held behind preceding commits. The core
+  checks the sign-in and retained row's project on completion, makes the
+  final document without restoring the row, and closes the watch after
+  its delivery terminal. A close during the load drains construction
+  without delivering. Live watches keep their existing pacing.
 - **Watches are never stored.** A restart (section 6) starts with none,
   and is told nothing of the deliveries made before it; each client
   opens its watches again (`../protocol/client.md`, section 4).

@@ -44,6 +44,10 @@ pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<
                         assert!(previous.is_none(), "one construction per watcher");
                         views::Made::Ready
                     }
+                    Err(views::End::Gone) if retained_task(core, watcher).is_some() => {
+                        append_stream(crate::reads::start_watch(core, env, watcher), &mut out);
+                        continue;
+                    }
                     Err(why) => views::Made::Gone { why },
                 };
                 views::step(
@@ -306,6 +310,9 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
         | Subject::Note { .. } => match documents::make(core, &env.limits, party, subject, window, env.wall) {
             Ok(_) => None,
             Err(Missing::NotAllowed) => Some(WatchRefusal::NotAllowed),
+            Err(Missing::Unknown | Missing::Ended) if retained_subject(subject).is_some() => {
+                if core.reads.len() >= env.limits.load_slots { Some(WatchRefusal::Busy) } else { None }
+            }
             Err(Missing::Unknown | Missing::Ended | Missing::TooLarge) => Some(WatchRefusal::Unknown),
         },
     }
@@ -590,4 +597,71 @@ fn append_stream(requests: Requests, out: &mut Queue<Request>) {
             }
         }
     }
+}
+
+// Task facts serve both final task and final tree documents, through the same load.
+pub(crate) fn retained_task(core: &Core, watcher: Token) -> Option<u64> {
+    let binding = core.view_subjects.get(&watcher)?;
+    retained_subject(&core.view_names.get(binding.subject)?.subject)
+}
+
+fn retained_subject(subject: &Subject) -> Option<u64> {
+    match subject {
+        Subject::Task { task } | Subject::Tree { task } => Some(*task),
+        Subject::Frame { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Accounts { .. }
+        | Subject::Query { .. }
+        | Subject::Run { .. }
+        | Subject::Settings
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. }
+        | Subject::Application { .. } => None,
+    }
+}
+
+pub(crate) fn retained_made(
+    core: &mut Core,
+    env: &Env<Limits>,
+    watcher: Token,
+    document: Result<documents::Document, views::End>,
+) -> Requests {
+    let mut child = Queue::with_capacity(views::max_out(&env.limits.views));
+    let view_env = Env { now: env.now, wall: env.wall, limits: env.limits.views };
+    let outcome = match &document {
+        Ok(_) => views::Made::Ready,
+        Err(why) => views::Made::Gone { why: *why },
+    };
+    views::step(&mut core.views, &view_env, views::Event::Made { watcher, outcome }, &mut child);
+    if document.is_ok() {
+        views::step(&mut core.views, &view_env, views::Event::EndWatch { watcher, end: views::End::Gone }, &mut child);
+    }
+    let mut out = Queue::with_capacity(views::max_out(&env.limits.views).checked_add(1).expect("watch load output"));
+    for _ in 0..child.len() {
+        match child.pop().expect("made output count") {
+            views::Request::Deliver { .. } => {
+                let document = document.expect("ready retained document");
+                out.push(Request::Held(Box::new(Held::Delivery { watcher, document: Box::new(document) })));
+                out.push(Request::Decided);
+                return Requests::Out(out);
+            }
+            views::Request::Ended { end, .. } => {
+                forget_watch(core, watcher);
+                out.push(Request::Held(Box::new(Held::WatchEnded { watcher, why: end })));
+            }
+            views::Request::Watching { .. }
+            | views::Request::Refused { .. }
+            | views::Request::Make { .. }
+            | views::Request::Stream { .. } => unreachable!("construction emits delivery or ending"),
+        }
+    }
+    out.push(Request::Decided);
+    Requests::Out(out)
 }

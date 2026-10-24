@@ -430,32 +430,32 @@ pub(crate) fn retention_owed(core: &Core) -> bool {
     false
 }
 
-fn timeless_ending(core: &Core, binding: &crate::WatchBinding) -> Option<views::End> {
+fn timeless_ending(core: &Core, watcher: Token, binding: &crate::WatchBinding) -> Option<views::End> {
     if core.stopping {
         Some(views::End::Stopping)
     } else if core.people.sign_in_person(binding.sign_in) != Some(binding.party) {
         Some(views::End::SignedOut)
     } else {
-        visibility_end(core, binding)
+        visibility_end(core, watcher, binding)
     }
 }
 
 pub(crate) fn endings_owed(core: &Core) -> bool {
     for (watcher, binding) in &core.view_subjects {
-        if !core.views.is_closing(*watcher) && timeless_ending(core, binding).is_some() {
+        if !core.views.is_closing(*watcher) && timeless_ending(core, *watcher, binding).is_some() {
             return true;
         }
     }
     false
 }
 
-fn ending(core: &Core, binding: &crate::WatchBinding, env: &Env<Limits>) -> Option<views::End> {
+fn ending(core: &Core, watcher: Token, binding: &crate::WatchBinding, env: &Env<Limits>) -> Option<views::End> {
     if core.stopping {
         Some(views::End::Stopping)
     } else if core.people.person(binding.sign_in, env.now, env.wall) != Some(binding.party) {
         Some(views::End::SignedOut)
     } else {
-        timeless_ending(core, binding)
+        timeless_ending(core, watcher, binding)
     }
 }
 
@@ -506,7 +506,7 @@ pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
 pub(super) fn end_invalid(core: &mut Core, env: &Env<Limits>) -> Requests {
     let mut any = core.draining == Some(true) && core.view_subjects.is_empty();
     for (watcher, binding) in &core.view_subjects {
-        if !core.views.is_closing(*watcher) && ending(core, binding, env).is_some() {
+        if !core.views.is_closing(*watcher) && ending(core, *watcher, binding, env).is_some() {
             any = true;
             break;
         }
@@ -520,7 +520,7 @@ pub(super) fn end_invalid(core: &mut Core, env: &Env<Limits>) -> Requests {
     let mut watches = List::with_capacity(core.view_subjects.len());
     for (watcher, binding) in &core.view_subjects {
         if !core.views.is_closing(*watcher)
-            && let Some(end) = ending(core, binding, env)
+            && let Some(end) = ending(core, *watcher, binding, env)
         {
             watches.push((*watcher, end)).expect("bounded watch endings");
         }
@@ -549,7 +549,7 @@ fn append(requests: Requests, out: &mut Queue<Request>) {
     }
 }
 
-fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::End> {
+fn visibility_end(core: &Core, watcher: Token, binding: &crate::WatchBinding) -> Option<views::End> {
     let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
     match subject {
         Subject::Application { scope, .. } => {
@@ -560,8 +560,17 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
             }
         }
         Subject::Task { task } | Subject::Tree { task } | Subject::Run { task } => {
-            let Some(row) = core.tasks.task(*task) else { return Some(views::End::Gone) };
+            let Some(row) = core.tasks.task(*task) else {
+                return if core.views.is_making(watcher) { None } else { Some(views::End::Gone) };
+            };
             match row.phase {
+                tasks::Phase::Ended(_) if core.views.is_making(watcher) => {
+                    if core.people.role(binding.party, row.project).is_some() {
+                        None
+                    } else {
+                        Some(views::End::NotAllowed)
+                    }
+                }
                 tasks::Phase::Ended(_) => Some(views::End::Gone),
                 tasks::Phase::Waiting
                 | tasks::Phase::Active(_)
