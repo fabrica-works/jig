@@ -1,7 +1,6 @@
 use jig_protocol_store::{Generations, Older, OpenRefusal};
 use jig_store_world::World;
 use skein_fake_machine::Item;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 
 fn directory(path: &str) -> Item {
     Item::directory(path.as_bytes()).mode(0o700)
@@ -41,15 +40,8 @@ fn absent_tree(paths: &[Vec<u8>], path: &str) {
 
 fn refused_unchanged(world: &mut World, why: &OpenRefusal) {
     let before = world.paths();
-    // World::open exposes a refusal as a panic, and does not expose its Root
-    // for request(Open). Inspect that public adapter's diagnostic, then disk.
-    let panic = catch_unwind(AssertUnwindSafe(|| world.open())).expect_err("open must refuse");
-    let diagnostic = panic
-        .downcast_ref::<String>()
-        .map(String::as_str)
-        .or_else(|| panic.downcast_ref::<&str>().copied())
-        .expect("open's refusal diagnostic");
-    assert!(diagnostic.contains(&format!("why: {why:?}")), "unexpected refusal: {diagnostic}");
+    assert_eq!(world.open(), None, "open must refuse");
+    assert_eq!(world.refusal(), Some(why));
     assert_eq!(world.paths(), before, "refusal changes no paths");
 }
 
