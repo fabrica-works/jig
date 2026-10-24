@@ -33,8 +33,8 @@ const NOTE: KeptFamily = KeptFamily {
 const APPLICATION: PatchSet =
     PatchSet { owner: Owner::Application, name: fixture::NAME, families: &[LABEL, SHELF], patches: app::PATCHES };
 const JIG: PatchSet = PatchSet { owner: Owner::Jig, name: upstream::NAME, families: &[NOTE], patches: jig::PATCHES };
-const SETS: PatchSets = PatchSets { sets: &[APPLICATION, JIG] };
-const BASE: PatchSets = PatchSets {
+pub(super) const SETS: PatchSets = PatchSets { sets: &[APPLICATION, JIG] };
+pub(super) const BASE: PatchSets = PatchSets {
     sets: &[
         PatchSet {
             families: &[
@@ -51,12 +51,12 @@ const BASE: PatchSets = PatchSets {
         },
     ],
 };
-const ROOM: Room = Room { bytes: 128, nodes: 16 };
+pub(super) const ROOM: Room = Room { bytes: 128, nodes: 16 };
 const LABEL_STEP: Planned = Planned { owner: Owner::Application, patch: 1 };
 const SHELF_STEP: Planned = Planned { owner: Owner::Application, patch: 2 };
 const JIG_STEP: Planned = Planned { owner: Owner::Jig, patch: 1 };
 
-fn levels(application: u32, jig: u32) -> Levels {
+pub(super) fn levels(application: u32, jig: u32) -> Levels {
     Levels { skein: None, smith: None, jig: Some(jig), application: Some(application) }
 }
 #[test]
@@ -200,7 +200,7 @@ fn a_patch_must_plan_its_family_changes() {
     }
 }
 
-fn label(version: u16) -> Box<[u8]> {
+pub(super) fn label(version: u16) -> Box<[u8]> {
     let mut out = Writer::new(if version == 1 { 7 } else { 8 });
     out.put(&version.to_be_bytes()).expect("version");
     out.put(&1_u32.to_be_bytes()).expect("caption length");
@@ -210,7 +210,7 @@ fn label(version: u16) -> Box<[u8]> {
     }
     out.finish()
 }
-fn shelf(version: u16, books: u32, label: &[u8]) -> Box<[u8]> {
+pub(super) fn shelf(version: u16, books: u32, label: &[u8]) -> Box<[u8]> {
     let size = 15_usize.checked_add(label.len()).expect("fixture size");
     let size = if version == 2 { size.checked_add(4).expect("weight") } else { size };
     let mut out = Writer::new(size);
@@ -225,7 +225,7 @@ fn shelf(version: u16, books: u32, label: &[u8]) -> Box<[u8]> {
     }
     out.finish()
 }
-fn decoded(text: &str, root: &str, bytes: &[u8]) -> (Schema, Value, Node) {
+pub(super) fn decoded(text: &str, root: &str, bytes: &[u8]) -> (Schema, Value, Node) {
     let schema = schema::parse(text.as_bytes()).expect("kept schema");
     let mut value = Value::with_room(ROOM.nodes);
     let root = schema.find(root.as_bytes()).expect("root");
@@ -383,7 +383,6 @@ fn the_plan_honours_dependencies_through_all_four_owners() {
 #[test]
 fn an_identity_step_reaches_held_fields_without_moving_the_holder() {
     let mut machines = made(levels(0, 0));
-    machines.advance(LABEL_STEP);
     let family = shelf_ix(&machines);
     let (walk, stopped) =
         walk::start(&mut machines, LABEL_STEP, family, "Shelf", shelf(1, 2, &label(1))).expect("identity walk");
@@ -400,7 +399,8 @@ fn an_identity_step_reaches_held_fields_without_moving_the_holder() {
 #[test]
 fn a_written_held_site_names_its_own_machine_then_resumes_the_holder() {
     const WRITTEN: &str = "patch 1\nowner fixture 1 after fixture-jig 0\nfamily fixture-label 1 to 2\nadd Label.color option u8 written\nwritten Label.color\n";
-    const TEST_SETS: PatchSets = PatchSets { sets: &[PatchSet { patches: &[WRITTEN, app::PATCHES[1]], ..APPLICATION }, JIG] };
+    const TEST_SETS: PatchSets =
+        PatchSets { sets: &[PatchSet { patches: &[WRITTEN, app::PATCHES[1]], ..APPLICATION }, JIG] };
     let found = levels(0, 0);
     let plan = plan::plan(&TEST_SETS, &found, &plan::binary(&TEST_SETS)).expect("plan");
     let mut machines = machines::make(&TEST_SETS, &plan, &found, ROOM).expect("machines");
@@ -493,4 +493,54 @@ fn a_held_record_two_versions_behind_runs_each_pass() {
         .content(value.field(root, app::kept::fixture_shelf::v2::shelf::LABEL).expect("held label"))
         .expect("bytes");
     assert_eq!(held, label(2).as_ref());
+}
+
+#[test]
+fn an_identity_walk_of_another_owners_holder_is_allowed() {
+    const HOLDER: &str = "family holder 1\nversioned record Holder { note: bytes 64 holds fixture-note Note }\n";
+    const HOLDER_SET: PatchSet = PatchSet {
+        owner: Owner::Application,
+        name: "holder",
+        patches: &[],
+        families: &[KeptFamily { name: "holder", texts: &[HOLDER], keys: &[] }],
+    };
+    let sets = PatchSets { sets: &[HOLDER_SET, JIG] };
+    let found = plan::binary(&PatchSets { sets: &[HOLDER_SET] });
+    let found = Levels { jig: Some(0), ..found };
+    let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("plan");
+    let mut machines = machines::make(&sets, &plan, &found, ROOM).expect("machines");
+    let mut input = Writer::new(13);
+    input.put(&1_u16.to_be_bytes()).expect("holder version");
+    input.put(&7_u32.to_be_bytes()).expect("held bytes");
+    input.put(&1_u16.to_be_bytes()).expect("note version");
+    input.put(&1_u32.to_be_bytes()).expect("note length");
+    input.put(b"a").expect("note text");
+    let (walk, stop) = walk::start(&mut machines, JIG_STEP, FamilyIx(0), "Holder", input.finish()).expect("identity");
+    assert_eq!(stop, Stop::Done);
+    assert_eq!(skein_codec::version_of(walk::finished(&mut machines, &walk).expect("holder")), Ok(1));
+}
+#[test]
+fn two_families_holding_each_other_halt_order() {
+    const A: &str = "family cycle-a 1\nversioned record A { b: bytes 64 holds cycle-b B }\n";
+    const B1: &str = "family cycle-b 1\nversioned record B { a: bytes 64 holds cycle-a A }\n";
+    const B2: &str = "family cycle-b 2\nversioned record B { a: bytes 64 holds cycle-a A }\n";
+    const PATCH: &str = "patch 1\nowner cycle 1\nfamily cycle-b 1 to 2\n";
+    let sets = PatchSets {
+        sets: &[PatchSet {
+            owner: Owner::Application,
+            name: "cycle",
+            patches: &[PATCH],
+            families: &[
+                KeptFamily { name: "cycle-a", texts: &[A], keys: &[] },
+                KeptFamily { name: "cycle-b", texts: &[B1, B2], keys: &[] },
+            ],
+        }],
+    };
+    let found = Levels { skein: None, smith: None, jig: None, application: Some(0) };
+    let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("plan");
+    let mut machines = machines::make(&sets, &plan, &found, ROOM).expect("machines");
+    // The innermost A need not decode: encountering its active machine halts.
+    let input = Box::from([0, 1, 0, 0, 0, 6, 0, 1, 0, 0, 0, 0]);
+    let result = walk::start(&mut machines, LABEL_STEP, FamilyIx(0), "A", input);
+    assert_eq!(result.expect_err("cycle"), Halt::Order);
 }

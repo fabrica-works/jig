@@ -876,7 +876,7 @@ pub(crate) fn fire(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Event
             skein_kv::fire(&mut store.stores.store, &kv_env, &mut events, &mut below.store);
         }
         events_up(store, secret, &mut events, above, below);
-        phase::resume(store, env, below);
+        phase::resume(store, env, above, below);
     }
 }
 

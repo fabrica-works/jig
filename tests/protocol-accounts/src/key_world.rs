@@ -102,6 +102,8 @@ impl World {
                         store::Event::Stale { .. } => self.keys.kept(exchange, false, Time::ZERO),
                         other @ (store::Event::Opened { .. }
                         | store::Event::OpenRefused { .. }
+                        | store::Event::Site { .. }
+                        | store::Event::Patched { .. }
                         | store::Event::Committed { .. }
                         | store::Event::Failed { .. }
                         | store::Event::Restored { .. }

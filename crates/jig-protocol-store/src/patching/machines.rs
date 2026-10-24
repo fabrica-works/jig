@@ -1,6 +1,6 @@
 //! Kept schemas, plans and reached versions (protocol/store.md 10.3).
 use super::plan::{Levels, Plan, Planned, Unplanned};
-use super::sets::{Owner, PatchSet, PatchSets};
+use super::sets::{Keys, Owner, PatchSet, PatchSets};
 use alloc::boxed::Box;
 use skein_codec::patch::{Capacity, Patcher, PlanIx};
 use skein_lib::List;
@@ -34,6 +34,75 @@ pub(crate) struct Machines {
     room: Room,
 }
 impl Machines {
+    pub(crate) fn keys(&self, family: FamilyIx) -> &'static [Keys] {
+        let machine = self.get(family);
+        self.sets
+            .sets
+            .get(machine.set)
+            .expect("machine's set")
+            .families
+            .get(machine.family)
+            .expect("machine's family")
+            .keys
+    }
+    /// Reverse reachability of blocks through held fields at reached versions.
+    pub(crate) fn walked(&self, step: Planned) -> List<bool> {
+        let mut selected = List::with_capacity(self.len());
+        for ix in 0..self.len() {
+            selected.push(self.get(FamilyIx(ix)).block(step).is_some()).expect("one bit per family");
+        }
+        for _ in 0..self.len() {
+            for ix in 0..self.len() {
+                let machine = self.get(FamilyIx(ix));
+                let schema = machine
+                    .patcher
+                    .as_ref()
+                    .expect("between records")
+                    .schema(machine.reached)
+                    .expect("reached version kept");
+                for decl in 0..schema.declarations() {
+                    match schema.declaration(skein_codec::schema::DeclIx::new(decl)).shape {
+                        skein_codec::schema::Shape::Record { first, count, .. } => {
+                            for offset in 0..count {
+                                let field = skein_codec::schema::FieldIx::new(
+                                    first.index().checked_add(offset).expect("field index"),
+                                );
+                                let mut ty = schema.field(field).ty;
+                                for _ in 0..schema.text().len() {
+                                    use skein_codec::schema::{Held, Type};
+                                    match schema.ty(ty) {
+                                        Type::List { item, .. } | Type::Option(item) => ty = item,
+                                        Type::Bytes { held: Held::Record { family, .. }, .. } => {
+                                            if let Some(held) = self.named(schema.spelled(family))
+                                                && *selected.get(held.0).expect("held family's bit")
+                                            {
+                                                *selected.get_mut(ix).expect("family's bit") = true;
+                                            }
+                                            break;
+                                        }
+                                        Type::U8
+                                        | Type::U16
+                                        | Type::U32
+                                        | Type::U64
+                                        | Type::Bool
+                                        | Type::Duration
+                                        | Type::Fixed(_)
+                                        | Type::Secret(_)
+                                        | Type::Text(_)
+                                        | Type::Named(_)
+                                        | Type::Bytes { held: Held::Opaque | Held::Pieces(_), .. } => break,
+                                    }
+                                }
+                            }
+                        }
+                        skein_codec::schema::Shape::Enum { .. } => {}
+                    }
+                }
+            }
+        }
+        selected
+    }
+
     pub(crate) fn room(&self) -> Room {
         self.room
     }
@@ -49,6 +118,7 @@ impl Machines {
     pub(crate) fn patcher(&mut self, family: FamilyIx) -> &mut Patcher {
         self.get_mut(family).patcher.as_mut().expect("patcher is in the component between sites")
     }
+    #[cfg(test)]
     pub(crate) fn find(&self, set: usize, family: usize) -> Option<FamilyIx> {
         for (ix, machine) in self.families.iter().enumerate() {
             if machine.set == set && machine.family == family {
@@ -79,6 +149,16 @@ impl Machines {
     }
 }
 impl Machine {
+    pub(crate) fn block(&self, step: Planned) -> Option<PlanIx> {
+        if self.owner == step.owner { self.at(step.patch) } else { None }
+    }
+    pub(crate) fn after(&self, step: Planned) -> u16 {
+        match self.block(step) {
+            Some(plan) => self.patcher.as_ref().expect("held machine in component").versions(plan).to,
+            None => self.reached,
+        }
+    }
+
     pub(crate) fn at(&self, patch: u32) -> Option<PlanIx> {
         *self.plans.get(patch.checked_sub(1)?)?
     }
@@ -120,6 +200,7 @@ fn capacity(set: &PatchSet, family: usize, room: Room) -> Option<Capacity> {
     Some(Capacity { versions, patches, text, bytes: room.bytes, nodes: room.nodes })
 }
 
+#[cfg_attr(not(test), expect(dead_code, reason = "the levels task constructs Pending during open"))]
 pub(crate) fn make(sets: &PatchSets, plan: &Plan, found: &Levels, room: Room) -> Result<Machines, Unplanned> {
     if plan.steps().is_empty() {
         return Ok(Machines { families: List::with_capacity(0), sets: *sets, room });
@@ -225,4 +306,17 @@ pub(crate) fn worst_case_heap(sets: &PatchSets, room: Room) -> Option<u64> {
         }
     }
     Some(heap)
+}
+
+/// The schemas and plans are static input; room bounds every record machine.
+pub(crate) fn worst_case(sets: &PatchSets, room: Room) -> Option<u64> {
+    let families = count(sets)?;
+    let mut patches = 0_u32;
+    for set in sets.sets {
+        patches = patches.checked_add(u32::try_from(set.patches.len()).ok()?)?;
+    }
+    worst_case_heap(sets, room)?
+        .checked_add(List::<Planned>::worst_case(patches)?)?
+        .checked_add(List::<bool>::worst_case(families)?.checked_mul(2)?)?
+        .checked_add(super::walk::worst_case(families)?)
 }

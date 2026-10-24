@@ -18,7 +18,7 @@ struct Frame {
     family: FamilyIx,
     plan: PlanIx,
     root: DeclIx,
-    /// Held records run until the family's reached version; the outer record
+    /// Held records run until the family's version after the step; the outer record
     /// runs just this step, including its identity when it has no block.
     target: u16,
     /// At most one stop per old node, then Done, per pass across all resumes.
@@ -34,6 +34,7 @@ enum State {
 #[derive(Debug)]
 pub(crate) struct Walk {
     holder: FamilyIx,
+    step: Planned,
     frames: List<Frame>,
     state: State,
 }
@@ -46,11 +47,8 @@ pub(crate) fn start(
     record: Box<[u8]>,
 ) -> Result<(Walk, Stop), Halt> {
     let machine = machines.get(family);
-    if machine.owner != step.owner {
-        return Err(Halt::Order);
-    }
     let version = machine.reached;
-    let plan = match machine.at(step.patch) {
+    let plan = match machine.block(step) {
         Some(plan) => plan,
         None => machine.identity(version).ok_or(Halt::Order)?,
     };
@@ -65,7 +63,7 @@ pub(crate) fn start(
     patcher.start(plan, root, record)?;
     let mut frames = List::with_capacity(machines.len());
     frames.push(Frame { family, plan, root, target, calls: 0 }).expect("one holder frame");
-    let mut walk = Walk { holder: family, frames, state: State::Running };
+    let mut walk = Walk { holder: family, step, frames, state: State::Running };
     let stopped = settle(machines, &mut walk)?;
     Ok((walk, stopped))
 }
@@ -165,7 +163,7 @@ fn held(
             return Err(Halt::Order);
         }
     }
-    let reached = machines.get(held).reached;
+    let reached = machines.get(held).after(walk.step);
     let version = {
         let (old, _) = machines.patcher(holder).parts();
         match version_of(old.content(at)?) {
@@ -232,4 +230,9 @@ pub(crate) fn give(machines: &mut Machines, family: FamilyIx, patcher: Box<Patch
     let slot = &mut machines.get_mut(family).patcher;
     assert!(slot.is_none(), "the returning patcher was out at a site");
     *slot = Some(patcher);
+}
+
+/// The stack holds no record bytes: each active family's machine owns them.
+pub(crate) fn worst_case(families: u32) -> Option<u64> {
+    List::<Frame>::worst_case(families)?.checked_add(u64::try_from(size_of::<Walk>()).ok()?)
 }

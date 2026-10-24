@@ -712,6 +712,8 @@ impl Accounts {
             }
             store::Event::Opened { .. }
             | store::Event::OpenRefused { .. }
+            | store::Event::Site { .. }
+            | store::Event::Patched { .. }
             | store::Event::Committed { .. }
             | store::Event::Failed { .. }
             | store::Event::Restored { .. }
@@ -917,6 +919,8 @@ impl Accounts {
                 }
                 store::Event::Opened { .. }
                 | store::Event::OpenRefused { .. }
+                | store::Event::Site { .. }
+                | store::Event::Patched { .. }
                 | store::Event::Committed { .. }
                 | store::Event::Failed { .. }
                 | store::Event::Restored { .. }
