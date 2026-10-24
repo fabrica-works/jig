@@ -1,4 +1,7 @@
-//! The owner's per-record inputs to written patch functions (codec.md, 11.5): the command wrote it once; it is the owner's.
+//! The shell sets the record key before each walk (codec.md 11.5).
+use alloc::boxed::Box;
 
-#[derive(Debug, Default)]
-pub struct Context {}
+#[derive(Default, Debug)]
+pub struct Context {
+    pub key: Box<[u8]>,
+}

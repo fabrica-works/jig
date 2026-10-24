@@ -1,0 +1,7 @@
+patch 1
+owner fixture 2 after fixture-jig 1
+
+family fixture-shelf 1 to 2
+add Shelf.weight u32 written
+written Shelf.weight
+refuses empty "a shelf without books"
