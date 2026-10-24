@@ -32,7 +32,7 @@ pub(super) fn route_accepted_turn(
             proof.outstanding = outstanding.into_boxed();
             proof.turn = Some(crate::TurnProof { turn, cumulative, read });
             if opens_window {
-                proof.window = Some((attempt, turn));
+                proof.window = Some(crate::CurrentWindow { attempt, turn, closed: false });
             }
             out.push(Request::Write(Write::Save(Record::Core(CoreRecord::RunProof(proof.clone())))));
             out.push(Request::Write(Write::Save(Record::Core(CoreRecord::Turn(crate::TurnRecord {

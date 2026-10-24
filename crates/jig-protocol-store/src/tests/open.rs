@@ -376,3 +376,17 @@ fn older_build_refusals_leave_every_row_and_commit_unchanged() {
         assert!(store.stores.secrets.is_empty());
     }
 }
+
+#[test]
+fn a_build_before_held_turns_and_closed_windows_is_refused() {
+    // core-v6 at ae4ec55e0, before the two in-place words of store.md 8.6.
+    const BEFORE: [u8; 32] = [
+        0xd3, 0xe9, 0x3c, 0xe9, 0x13, 0xdd, 0x3c, 0x94, 0x90, 0x47, 0x43, 0xea, 0xe3, 0xf0, 0x87, 0x70, 0x07, 0x52,
+        0xbe, 0x24, 0x99, 0xc3, 0xff, 0xfb, 0x3b, 0x82, 0x65, 0x31, 0x2e, 0xe5, 0xd5, 0x40,
+    ];
+    let mut layouts = crate::layouts::LAYOUTS;
+    layouts.core = BEFORE;
+    let key = keys::encode_own(&keys::Own::Layouts, fixtures::KEY_LIMIT).expect("layouts key");
+    let mut store = replacing(skein_kv::Op::Put { key, value: layouts.encode() });
+    assert_refusal(&open(&mut store), OpenRefusal::OlderBuild { why: Older::Layout(Family::Core) });
+}

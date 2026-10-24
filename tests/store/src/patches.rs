@@ -6,12 +6,14 @@ use jig_test_patches_jig::{self as upstream, patches as jig};
 use skein_lib::Secret;
 use std::collections::BTreeMap;
 const LABEL: KeptFamily = KeptFamily {
+    frames: None,
     name: "fixture-label",
     map: KeptMap::Store,
     texts: app::kept::fixture_label::TEXTS,
     keys: &[Keys { from: fixture::keys::LABELS_FROM, to: fixture::keys::LABELS_TO, root: fixture::keys::LABELS_ROOT }],
 };
 const SHELF: KeptFamily = KeptFamily {
+    frames: None,
     name: "fixture-shelf",
     map: KeptMap::Store,
     texts: app::kept::fixture_shelf::TEXTS,
@@ -22,24 +24,28 @@ const SHELF: KeptFamily = KeptFamily {
     }],
 };
 const TOKEN: KeptFamily = KeptFamily {
+    frames: None,
     name: "fixture-token",
     texts: app::kept::fixture_token::TEXTS,
     map: KeptMap::Secrets,
     keys: &[Keys { from: fixture::keys::TOKENS_FROM, to: fixture::keys::TOKENS_TO, root: fixture::keys::TOKENS_ROOT }],
 };
 const NOTE: KeptFamily = KeptFamily {
+    frames: None,
     name: "fixture-note",
     map: KeptMap::Store,
     texts: jig::kept::fixture_note::TEXTS,
     keys: &[Keys { from: upstream::keys::NOTES_FROM, to: upstream::keys::NOTES_TO, root: upstream::keys::NOTES_ROOT }],
 };
 const APPLICATION: PatchSet = PatchSet {
+    fresh: None,
     owner: Owner::Application,
     name: fixture::NAME,
     families: &[LABEL, SHELF, TOKEN],
     patches: app::PATCHES,
 };
-const JIG: PatchSet = PatchSet { owner: Owner::Jig, name: upstream::NAME, families: &[NOTE], patches: jig::PATCHES };
+const JIG: PatchSet =
+    PatchSet { fresh: None, owner: Owner::Jig, name: upstream::NAME, families: &[NOTE], patches: jig::PATCHES };
 pub const SETS: PatchSets = PatchSets { sets: &[APPLICATION, JIG] };
 pub const BASE: PatchSets = PatchSets {
     sets: &[

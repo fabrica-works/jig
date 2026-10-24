@@ -67,8 +67,8 @@ pub struct World {
 #[derive(Clone, Copy, Debug)]
 pub enum Step {
     Construct,
-    Begin { input: u64 },
-    End,
+    Begin { input: u64, patching: bool },
+    End { patching: bool },
 }
 
 /// Disk-changing kernel calls, including durable replace's internal steps.
@@ -134,7 +134,10 @@ fn file_heap(event: &file::Event) -> u64 {
 
 fn drivers(root: skein_io::kernel::Fd, limits: &jig_protocol_store::Limits) -> [FileIo; 3] {
     std::array::from_fn(|_| {
-        let mut io = FileIo::new(8, limits.store.chunk, 32, limits.store.deadline).with_effective_user(0);
+        let whole = limits.store.chunk.max(jig_protocol_store::sizes::MANIFEST_BYTES);
+        jig_protocol_store::sizes::whole(whole).expect("world drivers hold the largest manifest");
+        let mut io =
+            FileIo::with_whole_limit(8, limits.store.chunk, 32, whole, limits.store.deadline).with_effective_user(0);
         assert_eq!(io.adopt_root(root), Some(Token::new(1)));
         io
     })
@@ -187,7 +190,7 @@ impl World {
         }
         let component = Store::on_directory(&limits, root::APPLICATION, &[], seeded);
         if let Some(observe) = observer {
-            observe(Step::End);
+            observe(Step::End { patching: jig_protocol_store::sizes::is_patching(&component) });
         }
         World {
             observer,
@@ -358,7 +361,7 @@ impl World {
         for record in restored.rows.values() {
             if let core::Record::Core(core::CoreRecord::RunProof(proof)) = record {
                 let turns = match proof.window {
-                    Some((attempt, turn)) => {
+                    Some(core::CurrentWindow { attempt, turn, .. }) => {
                         self.transcript(TranscriptRead::Window { task: proof.task, attempt, turn, after: None })
                     }
                     None => Vec::new(),
@@ -374,9 +377,9 @@ impl World {
     }
 
     pub fn request(&mut self, request: Request) -> Vec<Event> {
-        self.observe(Step::Begin { input: 0 });
+        self.observe(Step::Begin { input: 0, patching: jig_protocol_store::sizes::is_patching(&self.store) });
         jig_protocol_store::down(&mut self.store, &self.env, request, &mut self.above, &mut self.below);
-        self.observe(Step::End);
+        self.observe(Step::End { patching: jig_protocol_store::sizes::is_patching(&self.store) });
         self.drive();
         let mut events = Vec::new();
         while let Some(event) = self.above.pop() {
@@ -542,9 +545,9 @@ impl World {
 
     fn drive(&mut self) {
         for _ in 0..10_000 {
-            self.observe(Step::Begin { input: 0 });
+            self.observe(Step::Begin { input: 0, patching: jig_protocol_store::sizes::is_patching(&self.store) });
             jig_protocol_store::fire(&mut self.store, &self.env, &mut self.above, &mut self.below);
-            self.observe(Step::End);
+            self.observe(Step::End { patching: jig_protocol_store::sizes::is_patching(&self.store) });
             if self.halted || self.cut.is_some_and(|cut| self.operations >= cut) {
                 return;
             }
@@ -622,11 +625,11 @@ impl World {
                 _ => panic!("three drivers"),
             };
             if let Some(observe) = self.observer {
-                observe(Step::Begin { input });
+                observe(Step::Begin { input, patching: jig_protocol_store::sizes::is_patching(&self.store) });
             }
             jig_protocol_store::up(&mut self.store, &self.env, event, &mut self.above, &mut self.below);
             if let Some(observe) = self.observer {
-                observe(Step::End);
+                observe(Step::End { patching: jig_protocol_store::sizes::is_patching(&self.store) });
             }
         }
     }

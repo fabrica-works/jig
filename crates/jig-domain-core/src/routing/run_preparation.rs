@@ -40,6 +40,7 @@ pub(super) fn brief_assembled(core: &mut Core, work: &mut Queue<Event>, task: u6
     clippy::too_many_lines,
     reason = "one fenced preparation builds the exact allowance, grants and claim together"
 )]
+#[expect(clippy::manual_map, reason = "the strict subset translates windows with an explicit match")]
 pub(super) fn workspace_prepared(
     core: &mut Core,
     env: &Env<Limits>,
@@ -129,7 +130,14 @@ pub(super) fn workspace_prepared(
     proof.host = allowance.choice.placement.kind;
     proof.placement = Some(allowance.choice.placement.channel);
     proof.accounts.clone_from(&allowance.choice.accounts);
-    proof.window = if resume { transcript.window } else { None };
+    proof.window = if resume {
+        match transcript.window {
+            Some((attempt, turn)) => Some(crate::CurrentWindow { attempt, turn, closed: false }),
+            None => None,
+        }
+    } else {
+        None
+    };
     proof.credentials = core.workspace_credentials.remove(&task).expect("prepared credentials");
     let previous = core.proofs.insert(task, proof).expect("claim proof reserved before child mutation");
     if let Some(previous) = previous {

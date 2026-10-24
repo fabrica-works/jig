@@ -17,3 +17,8 @@ pub mod keys {
     pub const NOTES_TO: &[u8] = &[0x02, b'o'];
     pub const NOTES_ROOT: &str = "Note";
 }
+
+/// A transcript body has no map key range.
+pub const FRAME_ROOT: &str = "TurnRecord";
+
+pub mod frames;

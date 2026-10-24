@@ -17,6 +17,7 @@ fn old_records_patch_in_order_and_the_root_continues() {
             (Owner::Application, 1, Counts { records: 5, commits: 2 }),
             (Owner::Jig, 1, Counts { records: 2, commits: 1 }),
             (Owner::Application, 2, Counts { records: 6, commits: 3 }),
+            (Owner::Jig, 2, Counts { records: 0, commits: 0 }),
         ]
     );
     assert_eq!(last, 6); // Initial commit, four store patch pages and the seal; two secrets pages have their own numbers.
@@ -48,7 +49,7 @@ fn level_and_set_refusals_leave_every_file_as_it_was() {
         PatchSets { sets: &[PatchSet { patches: &["patch 1\nowner other 1\n"], ..SETS.sets[0] }, SETS.sets[1]] };
     let records = Records::story();
     for (made, version, opened, expected) in [
-        (SETS, 2, BASE, OpenRefusal::Ahead { owner: Owner::Jig, found: Some(1), wanted: Some(0) }),
+        (SETS, 2, BASE, OpenRefusal::Ahead { owner: Owner::Jig, found: Some(2), wanted: Some(0) }),
         (PatchSets::NONE, 1, SETS, OpenRefusal::OlderBuild { why: Older::Unleveled }),
         (BASE, 1, BAD, OpenRefusal::Set { owner: Owner::Application, patch: 1 }),
     ] {

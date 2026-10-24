@@ -11,6 +11,11 @@ fn the_deployment_header_reads_back_with_its_id_and_projects_mark() {
 fn a_run_proof_with_its_terminal_reads_back() {
     core_round_trip(core::CoreRecord::RunProof(fixtures::run()));
 }
+fn a_closed_window_flag_reads_back_as_stored() {
+    let mut run = fixtures::run();
+    run.window.as_mut().expect("fixture window").closed = true;
+    core_round_trip(core::CoreRecord::RunProof(run));
+}
 fn a_claim_before_its_first_turn_reads_back() {
     let mut run = fixtures::run();
     run.host = jig_domain_fleet::HostKind::Engine;
@@ -103,6 +108,7 @@ fn run_proofs_read_back_with_their_optional_fields() {
     table([
         ("a_run_proof_with_its_terminal_reads_back", a_run_proof_with_its_terminal_reads_back),
         ("a_claim_before_its_first_turn_reads_back", a_claim_before_its_first_turn_reads_back),
+        ("a_closed_window_flag_reads_back_as_stored", a_closed_window_flag_reads_back_as_stored),
     ]);
 }
 

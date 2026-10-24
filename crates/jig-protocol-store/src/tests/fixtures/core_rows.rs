@@ -44,7 +44,7 @@ pub fn run() -> core::RunProof {
         attempt: 15,
         conversation: 9,
         credentials: Box::new([2, 3]),
-        window: Some((14, 2)),
+        window: Some(core::CurrentWindow { attempt: 14, turn: 2, closed: false }),
         host: HostKind::Worker,
         offered: Some(13),
         outstanding: Box::new([13]),

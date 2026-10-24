@@ -38,7 +38,7 @@ pub(super) fn header(store: &mut Store, read: &mut Read, turn: &TurnRecord, size
     if turn.turn != number {
         return Ok(false);
     }
-    let probe = Party { activity: None, bytes: u64::MAX, turn: None, problem: None, busy: false };
+    let probe = Party { activity: None, bytes: u64::MAX, turn: None, problem: None, busy: false, frame_bytes: None };
     let result = match reads::finish(store, read.task, probe, Some(turn.clone())) {
         Ok(result) => result,
         Err(reads::Failure::Cut) => {

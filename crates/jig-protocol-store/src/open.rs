@@ -183,6 +183,21 @@ fn ready(
         refuse(store, owner, OpenRefusal::Failed, above);
         return;
     };
+    if let Err(why) = plan::bounds(&store.patch_sets) {
+        refuse(store, owner, OpenRefusal::Set { owner: why.owner, patch: why.patch }, above);
+        return;
+    }
+    // A behind open crosses Ready on its way to the copy. Its map machines
+    // already exist; serving's machines belong only to the reopened result.
+    if store.directory.patch.is_none() {
+        store.transcripts.machines = match crate::transcripts::patches::make(&store.patch_sets, &store.limits) {
+            Ok(machines) => machines,
+            Err(why) => {
+                refuse(store, owner, OpenRefusal::Set { owner: why.owner, patch: 0 }, above);
+                return;
+            }
+        };
+    }
     store.phase = Phase::Ready { next, format_due };
     store.directory.owner = owner;
     crate::directory::checked(store, above, below);

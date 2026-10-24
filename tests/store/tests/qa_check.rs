@@ -445,7 +445,7 @@ fn bounded_sets(families: usize, name_bytes: usize) -> PatchSets {
         let text: &'static str =
             Box::leak(format!("family {name} 1\nversioned record Empty {{ n: u64 }}\n").into_boxed_str());
         let texts = Box::leak(vec![text].into_boxed_slice());
-        kept.push(KeptFamily { name, texts, map: jig_protocol_store::KeptMap::Store, keys: &[] });
+        kept.push(KeptFamily { frames: None, name, texts, map: jig_protocol_store::KeptMap::Store, keys: &[] });
     }
     let kept = Box::leak(kept.into_boxed_slice());
     let sets = Box::leak(vec![PatchSet { families: kept, ..*application }, *upstream].into_boxed_slice());
@@ -453,7 +453,6 @@ fn bounded_sets(families: usize, name_bytes: usize) -> PatchSets {
 }
 
 #[test]
-#[ignore = "backlog: the manifest at both bounds is 5464 B, past this world's 4096-byte whole-file Store; store.md 13 bounds no driver's whole files"]
 fn manifest_family_and_name_bounds_hold_at_first_start() {
     let sets = bounded_sets(FAMILY_BOUND, NAME_BOUND);
     let mut world = World::unopened_observed(SEED, patches::limits(), None);
@@ -504,7 +503,6 @@ fn combined_manifest_bounds_patch_with_larger_file_chunks() {
 }
 
 #[test]
-#[ignore = "backlog: the manifest at both bounds is 5464 B, past this world's 4096-byte whole-file Store; store.md 13 bounds no driver's whole files"]
 fn manifest_family_and_name_bounds_hold_behind() {
     let sets = bounded_sets(FAMILY_BOUND, NAME_BOUND);
     let mut world = empty().committed(SEED, patches::BASE);

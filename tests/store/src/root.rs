@@ -370,7 +370,7 @@ pub fn run_proof(task: u64) -> core::Record {
         attempt: 1,
         conversation: 1,
         credentials: Box::new([]),
-        window: Some((1, 1)),
+        window: Some(core::CurrentWindow { attempt: 1, turn: 1, closed: false }),
         host: jig_domain_fleet::HostKind::Worker,
         offered: None,
         outstanding: Box::new([]),

@@ -28,6 +28,7 @@ skein-fake-machine.workspace = true
 skein-sim.workspace = true
 
 [dev-dependencies]
+jig-test-patches-smith.workspace = true
 skein-heap.workspace = true
 
 [lints.rust]

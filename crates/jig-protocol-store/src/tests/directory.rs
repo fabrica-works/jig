@@ -688,7 +688,7 @@ fn the_first_manifest_records_the_binarys_levels_and_the_write_clock() {
     assert_eq!(
         crate::codec::component::Manifest::decode(&bytes),
         Ok(crate::codec::component::Manifest {
-            after: crate::codec::component::Levels { skein: None, smith: None, jig: Some(1), application: Some(2) },
+            after: crate::codec::component::Levels { skein: None, smith: None, jig: Some(2), application: Some(2) },
             counts: fixtures::manifest_counts(fixtures::FIRST_MANIFEST_COUNTS),
             written: WRITTEN,
             ..first_manifest()

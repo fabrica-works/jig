@@ -1013,9 +1013,14 @@ nothing is written.
 - **Bounds on patched bytes.** A frame behind is read whole and patched
   before anything is judged: its size, against a page's bound, a turn's
   (a party's charge, the page's row and the turn's bytes) and the resume
-  limit, is its patched body's and its 12 bytes of framing. The head
-  alone (a turn past a page's bound, 8.3) serves a frame at the binary's
-  versions only. A patched record past its machine's bytes or nodes
+  limit, is its patched body's and its 12 bytes of framing. Where either
+  machine is made, every frame is charged so, behind or not, so a frame's
+  charge does not hang on its version, and a turn refused past a bound
+  (`TurnFailure::TooLarge`) names that size; with none, a frame is
+  charged its turn's bytes, as today. The head alone (a turn past a
+  page's bound, 8.3) serves a frame at the binary's versions only: a
+  head whose body or turn is behind is read on, whole, from the bytes
+  already read. A patched record past its machine's bytes or nodes
   halts (`Room`).
 - **A halt is an unread frame.** A frame the machines refuse (any
   `Halt` of skein's `codec.md`, 11.4, a site's `NoSite` among them) is
@@ -1045,10 +1050,13 @@ nothing is written.
   owner's kept versions, patches and largest text. Its bytes and nodes
   are its frames' bounds, never the map's: jig's, the frames' largest
   body and the most nodes any kept body takes, its held turn one node;
-  smith's, the `transcript` field's bytes and the store's bound on a
-  turn's nodes (`FRAME_NODES`, section 13), since a turn's bytes alone
-  would let its nodes, and its machine's tables with them, run to
-  millions. A turn past it halts `Room` and is unread.
+  smith's, the `transcript` field's bytes and the most nodes any kept
+  turn takes. Both are counted from the frames' root in each kept text
+  (`transcripts/patches.rs`, `node_bound`), so every frame the kept
+  texts allow is read and none is refused for its nodes. A turn's bytes
+  do not bound its nodes (a list of empty records takes none), so
+  smith's real turn, 16 messages of 64 blocks, takes 2,109,520 nodes
+  and a machine of about 298 MB from the baseline on (section 16).
 - **Windows across a mark.** A patched turn is the same conversation in
   current bytes, as smith's patch makes it; one of smith's patches may
   say instead that a window across it starts fresh (`mark
@@ -1546,7 +1554,8 @@ impl PatchSets {
   by the binary's codec; the fixture turn's last is its own, since the
   component hands a turn's bytes on undecoded. The names, texts and keys are `&'static`, the binary's own constants,
   never state: the only references in fields the component holds
-  (programming-model.md, 10.3), read by its plan alone, since `keep`
+  (programming-model.md, 10.3), read by its plan and by each serving
+  open, which makes the frames' machines from them (8.6), since `keep`
   and `plan` copy what they need into each machine's tables.
 - **The plan** reads each patch's header (skein's `codec.md`, 11.6:
   `header`, `level`, `after`): a patch's owner must be its set's `name`
@@ -1763,10 +1772,10 @@ was made (`../domain/tasks.md`, section 3):
   prices their machines, and `worst_case(limits)` prices `PatchSets::NONE`.
   Serving's holds the frames' machines (8.6), at most two, each its
   `Patcher::worst_case_heap`, and none for sets with no kept text: their
-  bytes the frames' bounds, jig's nodes its body's, and smith's a turn's
-  at most `FRAME_NODES`, a constant of the component's that its tests
-  price, chosen so that the machines' worst case stays a small part of
-  serving's.
+  bytes the frames' bounds and their nodes the most their kept texts
+  allow (8.6). The tests price smith's real turn's machine against
+  serving's (`tests/frame_memory.rs`), from a copy of smith's schema
+  checked against smith-transcript's generated bounds.
 - **Whole files:** the manifest (section 2) is read and written whole,
   and at its bounds, 64 kept families each named in 64 bytes, it is 5464
   bytes (88, and 84 for each family). The store's file driver's
@@ -1818,7 +1827,7 @@ section 2).
   fixture version, read by every kind of 8.3, each handing on the bytes
   its patches' goldens give (skein's `codec.md`, 12.3) and the file's
   bytes unchanged; bounds judged on patched sizes; each halt, a
-  `NoSite` and a turn past `FRAME_NODES` among them, an unread frame; a
+  `NoSite` and a turn past its kept texts among them, an unread frame; a
   version before a machine's first or past its last unread; a site up
   and back on a read, a commit waiting behind it, and a stray `Site`
   refused in each phase; the frames' checks refusing at a serving open;
@@ -1929,8 +1938,12 @@ section 2).
     temper's `draft/upgrades.md`, section 9, is to say: a pending patch
     so marked keeps the workers from staying, though it moves no
     version;
-  - `FRAME_NODES` (section 13) refuses a turn whose nodes pass it, read
-    as unread, until a turn's nodes have a bound of smith's own;
+  - smith's machine is made for the most nodes its kept turn allows
+    (8.6): from the baseline on, about 298 MB of tables per serving
+    store (`Patcher::worst_case_heap` at 2,109,520 nodes), priced and
+    reserved though a typical turn takes a few hundred nodes. The way
+    out is skein's `Patcher` growing its tables in bounded steps up to
+    its capacity (filed with skein);
   - the children's rules, strictly, their live sets' limits, and the
     rows the core's census chooses, in the check before the switch
     (10.2, step 5; `../domain/engine.md`, section 6). The rules live in
@@ -1965,10 +1978,6 @@ section 2).
     on (10.3);
   - a copy made by the file system (a reflink, or btrfs's snapshot:
     skein's `io.md`, section 5) in place of one written file by file.
-- **A hold through another family** is refused at the plan, from the
-  kept texts' holds (10.3). As built until that check lands, a set whose
-  families hold each other in a cycle plans, and its walk halts `Order`
-  at the first record that meets it, after the copy.
 - **The header by its own level's text.** A jig behind decodes the header
   by the binary's core text, which every store holds until jig's first patch
   moves the core; that patch brings the kept text's decode with it.

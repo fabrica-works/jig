@@ -606,9 +606,9 @@ fn a_window_turn_moves_the_tasks_window_in_its_commit() {
     let mut world = World::new(113, false);
     let attempt = world.assigned.as_ref().expect("assigned chat").attempt;
     world.turn(1, 1, None, b"opening turn");
-    assert_eq!(current_window_proof(&world).window, Some((attempt, 1)));
+    assert_eq!(current_window_proof(&world).window, Some(core::CurrentWindow { attempt, turn: 1, closed: false }));
     world.window_turn(2, 2, None, b"compacted window");
-    assert_eq!(current_window_proof(&world).window, Some((attempt, 2)));
+    assert_eq!(current_window_proof(&world).window, Some(core::CurrentWindow { attempt, turn: 2, closed: false }));
     let proof = current_window_proof(&world);
     let key = root::Key::Core(core::Key::Core(core::CoreKey::Turn { task: proof.task, attempt, turn: 2 }));
     let root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = &world.store.rows[&key] else {
@@ -617,7 +617,7 @@ fn a_window_turn_moves_the_tasks_window_in_its_commit() {
     assert!(turn.opens_window);
     world.end(tasks::End::Parked, 2);
     world.say(85);
-    assert_eq!(current_window_proof(&world).window, Some((attempt, 2)));
+    assert_eq!(current_window_proof(&world).window, Some(core::CurrentWindow { attempt, turn: 2, closed: false }));
 }
 
 #[test]
@@ -629,7 +629,7 @@ fn a_fresh_start_clears_the_window_until_its_first_turn() {
     let attempt = current_window_proof(&world).attempt;
     assert_eq!(current_window_proof(&world).window, None);
     world.turn(1, 1, None, b"fresh first turn");
-    assert_eq!(current_window_proof(&world).window, Some((attempt, 1)));
+    assert_eq!(current_window_proof(&world).window, Some(core::CurrentWindow { attempt, turn: 1, closed: false }));
 }
 
 #[test]

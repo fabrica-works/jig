@@ -16,6 +16,8 @@ pub struct PatchSet {
     pub families: &'static [KeptFamily],
     /// Patch texts in number order.
     pub patches: &'static [&'static str],
+    /// The owner's mark across which windows start fresh (M4 reads it).
+    pub fresh: Option<&'static str>,
 }
 /// Which of the deployment's two maps a kept family's records live in (store.md 9, 10.3).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -31,6 +33,8 @@ pub struct KeptFamily {
     pub texts: &'static [&'static str],
     pub map: KeptMap,
     pub keys: &'static [Keys],
+    /// The declaration used as a transcript frame root.
+    pub frames: Option<&'static str>,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Keys {

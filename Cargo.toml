@@ -5,6 +5,7 @@ resolver = "3"
 members = [
     "testing/jig-test-patches",
     "testing/jig-test-patches-jig",
+    "testing/jig-test-patches-smith",
     "testing/jig-client-fake-person-browser",
     "testing/jig-client-test-shell-web",
     "tests/client-browser",
@@ -101,6 +102,7 @@ publish = false
 [workspace.dependencies]
 jig-test-patches = { path = "testing/jig-test-patches" }
 jig-test-patches-jig = { path = "testing/jig-test-patches-jig" }
+jig-test-patches-smith = { path = "testing/jig-test-patches-smith" }
 serde_json = "1"
 skein-fake-person-browser = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-ui-bundle = { git = "https://github.com/fabrig-dev/skein.git" }

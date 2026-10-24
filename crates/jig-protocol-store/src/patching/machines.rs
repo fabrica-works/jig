@@ -215,7 +215,7 @@ fn count(sets: &PatchSets) -> Option<u32> {
     }
     Some(count)
 }
-fn capacity(set: &PatchSet, family: usize, room: Room) -> Option<Capacity> {
+pub(crate) fn capacity(set: &PatchSet, family: usize, room: Room) -> Option<Capacity> {
     let kept = set.families.get(family)?;
     let versions = u32::try_from(kept.texts.len()).ok()?;
     let patches = u32::try_from(set.patches.len()).ok()?.checked_add(versions)?;
@@ -350,4 +350,37 @@ pub(crate) fn worst_case(sets: &PatchSets, rooms: Rooms) -> Option<u64> {
         .checked_add(List::<Planned>::worst_case(patches)?)?
         .checked_add(List::<bool>::worst_case(families)?.checked_mul(2)?)?
         .checked_add(super::walk::worst_case(families)?)
+}
+
+pub(crate) fn kept_patcher(set: &PatchSet, ix: usize, capacity: Capacity) -> Result<Box<Patcher>, Unplanned> {
+    let refusal = Unplanned { owner: set.owner, patch: 0 };
+    let family = set.families.get(ix).ok_or(refusal)?;
+    let mut machine = Box::new(Patcher::new(capacity));
+    let mut previous = None;
+    for text in family.texts {
+        let Ok(version) = machine.keep(text.as_bytes()) else { return Err(refusal) };
+        if let Some(previous) = previous
+            && Some(version) != u16::checked_add(previous, 1)
+        {
+            return Err(refusal);
+        }
+        let schema = machine.schema(version).expect("kept version");
+        if schema.spelled(schema.family()) != family.name.as_bytes() {
+            return Err(refusal);
+        }
+        previous = Some(version);
+    }
+    for text in set.patches {
+        if machine.plan(text.as_bytes()).is_err() {
+            return Err(refusal);
+        }
+    }
+    for text in family.texts {
+        let schema = skein_codec::schema::parse(text.as_bytes()).ok().ok_or(refusal)?;
+        let version = schema.version();
+        if Some(version) != previous && machine.plan_from(version).is_none() {
+            return Err(refusal);
+        }
+    }
+    Ok(machine)
 }

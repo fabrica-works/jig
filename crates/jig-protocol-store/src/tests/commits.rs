@@ -340,7 +340,7 @@ fn later_commits_write_none_of_the_three_creation_rows() {
 #[test]
 fn only_the_first_commit_records_the_binarys_levels_and_layouts() {
     use super::patching::{BASE, SETS, levels};
-    for (first_sets, later_sets, expected) in [(BASE, SETS, levels(0, 0)), (SETS, BASE, levels(2, 1))] {
+    for (first_sets, later_sets, expected) in [(BASE, SETS, levels(0, 0)), (SETS, BASE, levels(2, 2))] {
         let mut store = fixtures::opened();
         store.patch_sets(first_sets);
         assert_committed(&commit(&mut store, 1, Box::new([fixtures::header(1)])), 1);

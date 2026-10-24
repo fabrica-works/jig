@@ -106,7 +106,12 @@ pub(crate) fn bounds(sets: &PatchSets) -> Result<(), Unplanned> {
     let ceilings = &crate::component_v3::CEILINGS;
     let name = usize::try_from(ceilings.count_family).expect("family name ceiling fits usize");
     let mut families = 0_u32;
-    for set in sets.sets {
+    for (index, set) in sets.sets.iter().enumerate() {
+        for previous in sets.sets.get(..index).expect("earlier sets") {
+            if previous.owner == set.owner {
+                return Err(Unplanned { owner: set.owner, patch: 0 });
+            }
+        }
         for family in set.families {
             families = families.checked_add(1).expect("the ceiling stops the count first");
             if families > ceilings.manifest_counts || family.name.len() > name {
@@ -114,7 +119,8 @@ pub(crate) fn bounds(sets: &PatchSets) -> Result<(), Unplanned> {
             }
         }
     }
-    Ok(())
+    frames(sets)?;
+    holds(sets)
 }
 fn validate(sets: &PatchSets, found: &Levels, wanted: &Levels) -> Result<u32, Unplanned> {
     bounds(sets)?;
@@ -223,4 +229,147 @@ pub(crate) fn plan(sets: &PatchSets, found: &Levels, wanted: &Levels) -> Result<
         }
     }
     unreachable!("the pending patches and four owners bound the plan stack's work")
+}
+
+/// The two transcript roots are owners' data, checked even at equal levels.
+pub(crate) fn frames(sets: &PatchSets) -> Result<(), Unplanned> {
+    let mut smith = None;
+    for set in sets.sets {
+        let refusal = Unplanned { owner: set.owner, patch: 0 };
+        let mut seen = false;
+        for family in set.families {
+            if family.frames.is_none() {
+                continue;
+            }
+            if seen || (set.owner != Owner::Jig && set.owner != Owner::Smith) {
+                return Err(refusal);
+            }
+            seen = true;
+            if set.owner == Owner::Smith {
+                smith = Some(family.name.as_bytes());
+            }
+        }
+    }
+    for set in sets.sets {
+        for (ix, family) in set.families.iter().enumerate() {
+            let Some(name) = family.frames else { continue };
+            if family.texts.is_empty() {
+                continue;
+            }
+            let refusal = Unplanned { owner: set.owner, patch: 0 };
+            // Metadata alone resolves a root's spelling back over renames.
+            let empty = super::machines::Room { bytes: 0, nodes: 0 };
+            let capacity = super::machines::capacity(set, ix, empty).ok_or(refusal)?;
+            let machine = super::machines::kept_patcher(set, ix, capacity)?;
+            let latest = family.texts.last().expect("nonempty kept texts");
+            let Ok(latest) = skein_codec::schema::parse(latest.as_bytes()) else { return Err(refusal) };
+            let last = latest.version();
+            for text in family.texts {
+                let Ok(schema) = skein_codec::schema::parse(text.as_bytes()) else { return Err(refusal) };
+                let Ok(root) = super::walk::held_root(&machine, schema.version(), last, name.as_bytes()) else {
+                    return Err(refusal);
+                };
+                let (first, count) = match schema.declaration(root).shape {
+                    skein_codec::schema::Shape::Record { versioned: true, first, count } => (first, count),
+                    skein_codec::schema::Shape::Record { versioned: false, .. }
+                    | skein_codec::schema::Shape::Enum { .. } => return Err(refusal),
+                };
+                if set.owner != Owner::Jig {
+                    continue;
+                }
+                let mut held = false;
+                for offset in 0..count {
+                    let field = skein_codec::schema::FieldIx::new(first.index().checked_add(offset).expect("field"));
+                    if let Some(other) = held_family(&schema, schema.field(field).ty) {
+                        if smith != Some(other) || held {
+                            return Err(refusal);
+                        }
+                        held = true;
+                    }
+                }
+                if !held {
+                    return Err(refusal);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn held_family(schema: &skein_codec::schema::Schema, mut ty: skein_codec::schema::TypeIx) -> Option<&[u8]> {
+    use skein_codec::schema::{Held, Type};
+    for _ in 0..schema.text().len() {
+        match schema.ty(ty) {
+            Type::Option(item) | Type::List { item, .. } => ty = item,
+            Type::Bytes { held: Held::Record { family, .. }, .. } => return Some(schema.spelled(family)),
+            Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::Bool
+            | Type::Duration
+            | Type::Fixed(_)
+            | Type::Secret(_)
+            | Type::Text(_)
+            | Type::Named(_)
+            | Type::Bytes { held: Held::Opaque | Held::Pieces(_), .. } => return None,
+        }
+    }
+    None
+}
+
+/// Incremental transitive closure. Adding i -> j closes a cycle exactly when
+/// j already reaches i; each row is a manifest-bounded, 64-family bit set.
+fn holds(sets: &PatchSets) -> Result<(), Unplanned> {
+    use skein_codec::schema::{self, DeclIx, FieldIx, Shape};
+    let mut families = List::with_capacity(crate::component_v3::CEILINGS.manifest_counts);
+    for set in sets.sets {
+        for family in set.families {
+            families.push(family).expect("bounds checked the manifest count");
+        }
+    }
+    let mut reach = List::with_capacity(families.len());
+    for _ in &families {
+        reach.push(0_u64).expect("one row per family");
+    }
+    let mut index = 0_u32;
+    for set in sets.sets {
+        let refusal = Unplanned { owner: set.owner, patch: 0 };
+        for family in set.families {
+            let own = 1_u64.checked_shl(index).expect("at most 64 families");
+            for text in family.texts {
+                let Ok(schema) = schema::parse(text.as_bytes()) else { return Err(refusal) };
+                for decl in 0..schema.declarations() {
+                    match schema.declaration(DeclIx::new(decl)).shape {
+                        Shape::Enum { .. } => {}
+                        Shape::Record { first, count, .. } => {
+                            for offset in 0..count {
+                                let field = FieldIx::new(first.index().checked_add(offset).expect("schema field"));
+                                let Some(name) = held_family(&schema, schema.field(field).ty) else { continue };
+                                for target in 0..families.len() {
+                                    if families.get(target).expect("family").name.as_bytes() != name {
+                                        continue;
+                                    }
+                                    let to = 1_u64.checked_shl(target).expect("at most 64 families");
+                                    let reached = *reach.get(target).expect("target row");
+                                    if index == target || reached & own != 0 {
+                                        return Err(refusal);
+                                    }
+                                    let added = to | reached;
+                                    for source in 0..families.len() {
+                                        let row = reach.get_mut(source).expect("source row");
+                                        if source == index || *row & own != 0 {
+                                            *row |= added;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            index = index.checked_add(1).expect("manifest-bound families");
+        }
+    }
+    Ok(())
 }

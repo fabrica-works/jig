@@ -204,7 +204,7 @@ fn held(
         .expect("no active family twice: stack bounded by machine count");
     Ok(())
 }
-fn held_root(patcher: &Patcher, version: u16, reached: u16, name: &[u8]) -> Result<DeclIx, Halt> {
+pub(crate) fn held_root(patcher: &Patcher, version: u16, reached: u16, name: &[u8]) -> Result<DeclIx, Halt> {
     if let Some(schema) = patcher.schema(version)
         && let Some(root) = schema.find(name)
     {

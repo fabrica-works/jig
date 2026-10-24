@@ -1,0 +1,17 @@
+[package]
+name = "jig-test-patches-smith"
+description = "Fixture owner for store patching"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-codec.workspace = true
+
+[dev-dependencies]
+skein-codegen.workspace = true
+
+[lints]
+workspace = true

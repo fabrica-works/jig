@@ -107,11 +107,11 @@ record ProjectionMilestoneRow { goal: u64 milestone: ProjectionMilestone }
 enum ProjectionRecord { goal: ProjectionGoalRow, task: ProjectionTaskRow, milestone: ProjectionMilestoneRow }
 record TerminalRecord { task: u64 attempt: u64 cumulative: u64 end: EndBytes }
 record TurnProof { turn: u32 cumulative: u64 read: option u64 }
-record Window { attempt: u64 turn: u32 }
+record Window { attempt: u64 turn: u32 closed: bool }
 record Credential { value: u32 }
 record AccountBinding { provider: u32 account: u32 source: u32 }
 record RunProof { task: u64 attempt: u64 conversation: u64 accounts: list 64 AccountBinding placement: option u64 account_failure: option u32 account_terminal: bool credentials: list 1024 Credential window: option Window host: HostKind offered: option u64 outstanding: list 64 Number turn: option TurnProof terminal: option TerminalRecord }
-versioned record TurnRecord { opens_window: bool task: u64 attempt: u64 turn: u32 spent: u64 read: option u64 at: u64 transcript: bytes 8388608 }
+versioned record TurnRecord { opens_window: bool task: u64 attempt: u64 turn: u32 spent: u64 read: option u64 at: u64 transcript: bytes 8388608 holds smith-transcript Turn }
 record Created { first: u64 last: u64 }
 record ProposalDecisionRecord { project: u32 proposer: Proposer proposal: u64 kind: ProposalKind by: u64 at: u64 choice: ProposalChoice created: option Created }
 record EscalationDecisionRecord { project: u32 requester: u64 task: u64 revision: u64 by: u64 at: u64 decision: EscalationDecision }

@@ -527,7 +527,9 @@ pub enum Event {
     /// The shell sets this record's key in `of`'s Context, runs its generated
     /// written function over `patcher.parts()`, and answers `Request::Site`
     /// (store.md 10.3). Application keys are relative to their tag; every
-    /// other owner's keys are the map's whole keys.
+    /// other owner's keys are the map's whole keys. While serving, a frame's
+    /// key is its task's places key followed by its eight-byte big-endian
+    /// file offset (store.md 8.6).
     Site {
         owner: Token,
         of: crate::Owner,

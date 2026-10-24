@@ -80,12 +80,12 @@ fn any_unleveled_owner_refuses_even_when_jig_is_leveled() {
 #[test]
 fn levels_refuse_before_versions_and_layouts_are_considered() {
     let (key, mut row) = fixture_format();
-    row.levels = format::recorded(Levels { jig: Some(2), ..format::NONE });
+    row.levels = format::recorded(Levels { jig: Some(3), ..format::NONE });
     row.tasks = 1;
     let mut store = replacing(skein_kv::Op::Put { key, value: row.encode().expect("format") });
     store.patch_sets(SETS);
     store.limits.store.value = ROOM.bytes;
-    refused(&mut store, OpenRefusal::Ahead { owner: Owner::Jig, found: Some(2), wanted: Some(1) });
+    refused(&mut store, OpenRefusal::Ahead { owner: Owner::Jig, found: Some(3), wanted: Some(2) });
 }
 #[test]
 fn a_later_component_version_refuses_ahead_without_reading_its_levels() {
@@ -146,6 +146,7 @@ fn behind_plans_before_ready_and_ignores_only_the_application_version() {
             Planned { owner: Owner::Application, patch: 1 },
             Planned { owner: Owner::Jig, patch: 1 },
             Planned { owner: Owner::Application, patch: 2 },
+            Planned { owner: Owner::Jig, patch: 2 },
         ]
     );
     assert_eq!(pending.machines.len(), 4);

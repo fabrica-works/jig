@@ -143,7 +143,14 @@ pub(super) fn reply(
             store,
             token,
             TranscriptRead::Turn { task, attempt, turn },
-            read::Party { activity: Some(activity), bytes: range.bytes, turn: None, problem: None, busy: false },
+            read::Party {
+                activity: Some(activity),
+                bytes: range.bytes,
+                turn: None,
+                problem: None,
+                busy: false,
+                frame_bytes: None,
+            },
             above,
             below,
         ),
@@ -177,7 +184,14 @@ pub(super) fn turn(
         store,
         owner,
         TranscriptRead::Turn { task, attempt, turn },
-        read::Party { activity: None, bytes: range.bytes, turn: Some((attempt, turn)), problem: None, busy: false },
+        read::Party {
+            activity: None,
+            bytes: range.bytes,
+            turn: Some((attempt, turn)),
+            problem: None,
+            busy: false,
+            frame_bytes: None,
+        },
         above,
         below,
     )
@@ -230,11 +244,27 @@ pub(crate) fn finish(
     let Some(owner) = joins::owner(store, task, &mut spent)? else { return Ok(empty()) };
     let mut row = joins::row(store, value, Some(&owner), None, &mut spent)?;
     row.related = related;
-    if row.owned_bytes().ok_or(Failure::Corrupt)? > party.bytes {
+    let mut charged = row.owned_bytes().ok_or(Failure::Corrupt)?;
+    if let Some(size) = party.frame_bytes {
+        let evidence = match &row.related {
+            Some(record) => record,
+            None => &row.value,
+        };
+        let payload = turn_bytes(evidence)?;
+        charged = charged
+            .checked_sub(payload)
+            .ok_or(Failure::Corrupt)?
+            .checked_add(u64::from(size))
+            .ok_or(Failure::Corrupt)?;
+    }
+    if charged > party.bytes {
         if party.turn.is_some() {
             let core::Record::Core(core::CoreRecord::Turn(turn)) = &row.value else { return Err(Failure::Corrupt) };
-            let why =
-                reads::TurnFailure::TooLarge { bytes: u64::try_from(turn.transcript.len()).or(Err(Failure::Corrupt))? };
+            let bytes = match party.frame_bytes {
+                Some(size) => u64::from(size),
+                None => u64::try_from(turn.transcript.len()).or(Err(Failure::Corrupt))?,
+            };
+            let why = reads::TurnFailure::TooLarge { bytes };
             let owner = row.owner.take().ok_or(Failure::Corrupt)?;
             return problem(task, &party, owner, why);
         }
@@ -265,4 +295,23 @@ pub(crate) fn proposal_key(owner: &tasks::TaskRecord, proposal: u64) -> Option<c
         }
     }
     None
+}
+
+fn turn_bytes(record: &core::Record) -> Result<u64, Failure> {
+    match record {
+        core::Record::Core(record) => match record {
+            core::CoreRecord::Turn(turn) => u64::try_from(turn.transcript.len()).or(Err(Failure::Corrupt)),
+            core::CoreRecord::Settings(_)
+            | core::CoreRecord::Deployment(_)
+            | core::CoreRecord::Projection(_)
+            | core::CoreRecord::Call(_)
+            | core::CoreRecord::RunProof(_)
+            | core::CoreRecord::Terminal(_)
+            | core::CoreRecord::ProposalDecision(_)
+            | core::CoreRecord::EscalationDecision(_) => Err(Failure::Corrupt),
+        },
+        core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) | core::Record::Accounts(_) => {
+            Err(Failure::Corrupt)
+        }
+    }
 }

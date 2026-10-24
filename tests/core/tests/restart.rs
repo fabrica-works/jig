@@ -446,7 +446,7 @@ fn a_restart_keeps_the_window_a_turn_opened() {
     let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &world.store.rows[&key] else {
         panic!("restored conversation proof")
     };
-    assert_eq!(proof.window, Some((attempt, 2)));
+    assert_eq!(proof.window, Some(core::CurrentWindow { attempt, turn: 2, closed: false }));
 }
 
 #[test]

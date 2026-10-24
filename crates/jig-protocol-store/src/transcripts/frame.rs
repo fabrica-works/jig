@@ -1,7 +1,9 @@
 //! A versioned turn with lengths and CRC-32C (protocol/store.md, 8.1).
+mod patch;
 use crate::codec;
 use alloc::boxed::Box;
 use jig_domain_core as core;
+pub(crate) use patch::{Decode, Patch, Progress};
 use skein_lib::{Reader, Writer};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Unread {
@@ -23,6 +25,13 @@ pub fn encode(turn: &core::TurnRecord, limits: &codec::Limits) -> Option<Box<[u8
 }
 /// Decode exactly one whole frame, refusing trailing bytes as well.
 pub fn decode(bytes: &[u8], limits: &codec::Limits) -> Result<core::TurnRecord, Unread> {
+    let body = body(bytes)?;
+    match codec::core::read_turn(body, &codec::core_limits(limits)) {
+        Ok(turn) => Ok(turn),
+        Err(_) => Err(Unread::Record),
+    }
+}
+pub(crate) fn body(bytes: &[u8]) -> Result<&[u8], Unread> {
     if u32::try_from(bytes.len()).is_err() {
         return Err(Unread::Lengths);
     }
@@ -38,10 +47,7 @@ pub fn decode(bytes: &[u8], limits: &codec::Limits) -> Result<core::TurnRecord, 
     if crc32c(body) != checksum {
         return Err(Unread::Checksum);
     }
-    match codec::core::read_turn(body, &codec::core_limits(limits)) {
-        Ok(turn) => Ok(turn),
-        Err(_) => Err(Unread::Record),
-    }
+    Ok(body)
 }
 /// CRC-32C's reflected polynomial, `0x82f6_3b78`, advanced eight bits per entry.
 #[rustfmt::skip]

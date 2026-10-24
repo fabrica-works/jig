@@ -36,6 +36,7 @@ fn both_jig_profiles_have_a_bounded_service() {
         .expect(label);
         assert_eq!((sizes.key, sizes.value, sizes.commit, sizes.ops), (2079, value, commit, ops), "{label}");
         assert!(crate::limits::worst_case(&limits).is_some(), "{label}");
+        crate::store::limits(&limits.root, &limits.store).expect(label);
     }
 }
 

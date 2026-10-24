@@ -408,6 +408,7 @@ pub fn component_limits(root: &root::Limits) -> Limits {
     kv.snapshot_after = u64::from(sizes.commit);
     kv.chunk = sizes.key.checked_add(sizes.value).and_then(|sum| sum.checked_add(20)).expect("bounded largest row");
     kv.page.bytes = sizes.key.checked_add(sizes.value).expect("one largest row fits");
+    protocol::sizes::whole(kv.chunk).expect("the largest row chunk also holds the whole manifest");
     Limits {
         core: root.core,
         store: kv,

@@ -12,12 +12,14 @@ use skein_codec::value::{Node, Value};
 use skein_lib::{Writer, bytes};
 
 const LABEL: KeptFamily = KeptFamily {
+    frames: None,
     name: "fixture-label",
     map: KeptMap::Store,
     texts: app::kept::fixture_label::TEXTS,
     keys: &[Keys { from: fixture::keys::LABELS_FROM, to: fixture::keys::LABELS_TO, root: fixture::keys::LABELS_ROOT }],
 };
 const SHELF: KeptFamily = KeptFamily {
+    frames: None,
     name: "fixture-shelf",
     map: KeptMap::Store,
     texts: app::kept::fixture_shelf::TEXTS,
@@ -28,24 +30,28 @@ const SHELF: KeptFamily = KeptFamily {
     }],
 };
 const TOKEN: KeptFamily = KeptFamily {
+    frames: None,
     name: "fixture-token",
     texts: app::kept::fixture_token::TEXTS,
     map: KeptMap::Secrets,
     keys: &[Keys { from: fixture::keys::TOKENS_FROM, to: fixture::keys::TOKENS_TO, root: fixture::keys::TOKENS_ROOT }],
 };
 const NOTE: KeptFamily = KeptFamily {
+    frames: None,
     name: "fixture-note",
     map: KeptMap::Store,
     texts: jig::kept::fixture_note::TEXTS,
     keys: &[Keys { from: upstream::keys::NOTES_FROM, to: upstream::keys::NOTES_TO, root: upstream::keys::NOTES_ROOT }],
 };
 const APPLICATION: PatchSet = PatchSet {
+    fresh: None,
     owner: Owner::Application,
     name: fixture::NAME,
     families: &[LABEL, SHELF, TOKEN],
     patches: app::PATCHES,
 };
-const JIG: PatchSet = PatchSet { owner: Owner::Jig, name: upstream::NAME, families: &[NOTE], patches: jig::PATCHES };
+const JIG: PatchSet =
+    PatchSet { fresh: None, owner: Owner::Jig, name: upstream::NAME, families: &[NOTE], patches: jig::PATCHES };
 pub(super) const SETS: PatchSets = PatchSets { sets: &[APPLICATION, JIG] };
 pub(super) const BASE: PatchSets = PatchSets {
     sets: &[
@@ -70,6 +76,7 @@ pub(super) const ROOMS: Rooms = Rooms { store: ROOM, secrets: ROOM };
 const LABEL_STEP: Planned = Planned { owner: Owner::Application, patch: 1 };
 const SHELF_STEP: Planned = Planned { owner: Owner::Application, patch: 2 };
 const JIG_STEP: Planned = Planned { owner: Owner::Jig, patch: 1 };
+const FRAME_STEP: Planned = Planned { owner: Owner::Jig, patch: 2 };
 
 pub(super) fn levels(application: u32, jig: u32) -> Levels {
     Levels { skein: None, smith: None, jig: Some(jig), application: Some(application) }
@@ -87,7 +94,7 @@ fn the_binary_is_before_baseline_only_without_any_kept_text() {
             Levels { skein: None, smith: None, jig: None, application: None },
         ),
         (BASE, levels(0, 0)),
-        (SETS, levels(2, 1)),
+        (SETS, levels(2, 2)),
     ] {
         assert_eq!(plan::binary(&sets), expected);
     }
@@ -95,10 +102,11 @@ fn the_binary_is_before_baseline_only_without_any_kept_text() {
 #[test]
 fn patches_wait_for_exact_upstream_levels() {
     for (found, expected) in [
-        (levels(0, 0), &[LABEL_STEP, JIG_STEP, SHELF_STEP][..]),
-        (levels(1, 0), &[JIG_STEP, SHELF_STEP][..]),
-        (levels(2, 0), &[JIG_STEP][..]),
-        (levels(2, 1), &[][..]),
+        (levels(0, 0), &[LABEL_STEP, JIG_STEP, SHELF_STEP, FRAME_STEP][..]),
+        (levels(1, 0), &[JIG_STEP, SHELF_STEP, FRAME_STEP][..]),
+        (levels(2, 0), &[JIG_STEP, FRAME_STEP][..]),
+        (levels(2, 1), &[FRAME_STEP][..]),
+        (levels(2, 2), &[][..]),
     ] {
         let plan = plan::plan(&SETS, &found, &plan::binary(&SETS)).expect("fixture plans");
         assert_eq!(plan.steps(), expected);
@@ -109,12 +117,13 @@ const OWNER_OK: &str = "patch 1\nowner fixture 1\n";
 const LEVEL_TWO: &str = "patch 1\nowner fixture 2\n";
 const UPSTREAM_ONE: &str = "patch 1\nowner fixture 1 after fixture-jig 1\n";
 const UPSTREAM_ZERO: &str = "patch 1\nowner fixture 1 after fixture-jig 0\n";
-const UPSTREAM_TWO: &str = "patch 1\nowner fixture 1 after fixture-jig 2\n";
+const UPSTREAM_THREE: &str = "patch 1\nowner fixture 1 after fixture-jig 3\n";
 const SET_OWNER_OK: PatchSets = PatchSets { sets: &[PatchSet { patches: &[OWNER_OK], ..APPLICATION }, JIG] };
 const SET_LEVEL_TWO: PatchSets = PatchSets { sets: &[PatchSet { patches: &[LEVEL_TWO], ..APPLICATION }, JIG] };
 const SET_UPSTREAM_ZERO: PatchSets = PatchSets { sets: &[PatchSet { patches: &[UPSTREAM_ZERO], ..APPLICATION }, JIG] };
 const SET_UPSTREAM_ONE: PatchSets = PatchSets { sets: &[PatchSet { patches: &[UPSTREAM_ONE], ..APPLICATION }, JIG] };
-const SET_UPSTREAM_TWO: PatchSets = PatchSets { sets: &[PatchSet { patches: &[UPSTREAM_TWO], ..APPLICATION }, JIG] };
+const SET_UPSTREAM_THREE: PatchSets =
+    PatchSets { sets: &[PatchSet { patches: &[UPSTREAM_THREE], ..APPLICATION }, JIG] };
 #[test]
 fn duplicate_owners_are_refused_beside_a_single_owner() {
     let sets = PatchSets { sets: &[APPLICATION, APPLICATION, JIG] };
@@ -122,7 +131,7 @@ fn duplicate_owners_are_refused_beside_a_single_owner() {
         plan::plan(&sets, &levels(0, 0), &levels(2, 1)).expect_err("duplicate owner"),
         Unplanned { owner: Owner::Application, patch: 0 }
     );
-    assert_eq!(plan::plan(&SETS, &levels(0, 0), &levels(2, 1)).expect("single owners").steps().len(), 3);
+    assert_eq!(plan::plan(&SETS, &levels(0, 0), &levels(2, 2)).expect("single owners").steps().len(), 4);
 }
 #[test]
 fn a_header_must_read_and_name_its_owner_and_place() {
@@ -136,14 +145,14 @@ fn a_header_must_read_and_name_its_owner_and_place() {
         if refusal {
             assert_eq!(result.expect_err("bad header"), Unplanned { owner: Owner::Application, patch: 1 });
         } else {
-            assert_eq!(result.expect("valid header").steps().len(), 2);
+            assert_eq!(result.expect("valid header").steps().len(), 3);
         }
     }
 }
 #[test]
 fn after_cannot_pass_the_binary_or_precede_the_store() {
     for (sets, found_jig, expected) in [
-        (SET_UPSTREAM_TWO, 0, Err(Unplanned { owner: Owner::Application, patch: 1 })),
+        (SET_UPSTREAM_THREE, 0, Err(Unplanned { owner: Owner::Application, patch: 1 })),
         (SET_UPSTREAM_ONE, 0, Ok(())),
         (SET_UPSTREAM_ZERO, 1, Err(Unplanned { owner: Owner::Application, patch: 1 })),
         (SET_UPSTREAM_ONE, 1, Ok(())),
@@ -182,14 +191,14 @@ fn an_unkept_text_is_refused_beside_a_valid_kept_text() {
         (SETS, Ok(())),
     ] {
         let found = levels(0, 0);
-        let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("headers plan");
-        assert_eq!(
-            match machines::make(&sets, &plan, &found, ROOMS) {
+        let result = match plan::plan(&sets, &found, &plan::binary(&sets)) {
+            Ok(plan) => match machines::make(&sets, &plan, &found, ROOMS) {
                 Ok(_) => Ok(()),
                 Err(error) => Err(error),
             },
-            expected
-        );
+            Err(error) => Err(error),
+        };
+        assert_eq!(result, expected);
     }
 }
 #[test]
@@ -204,14 +213,14 @@ fn a_patch_must_plan_its_family_changes() {
         (PatchSets { sets: &[PatchSet { families: &[LABEL], patches: &[GOOD], ..APPLICATION }, JIG] }, Ok(())),
     ] {
         let found = levels(0, 0);
-        let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("headers plan");
-        assert_eq!(
-            match machines::make(&sets, &plan, &found, ROOMS) {
+        let result = match plan::plan(&sets, &found, &plan::binary(&sets)) {
+            Ok(plan) => match machines::make(&sets, &plan, &found, ROOMS) {
                 Ok(_) => Ok(()),
                 Err(error) => Err(error),
             },
-            expected
-        );
+            Err(error) => Err(error),
+        };
+        assert_eq!(result, expected);
     }
 }
 
@@ -406,24 +415,28 @@ fn the_machine_heap_bound_grows_with_record_room() {
 #[test]
 fn the_plan_honours_dependencies_through_all_four_owners() {
     const SKEIN: PatchSet = PatchSet {
+        fresh: None,
         owner: Owner::Skein,
         name: "first",
         families: &[NOTE],
         patches: &["patch 1\nowner first 1\n", "patch 1\nowner first 2\n"],
     };
     const SMITH: PatchSet = PatchSet {
+        fresh: None,
         owner: Owner::Smith,
         name: "second",
         families: &[NOTE],
         patches: &["patch 1\nowner second 1 after first 1\n"],
     };
     const THIRD: PatchSet = PatchSet {
+        fresh: None,
         owner: Owner::Jig,
         name: "third",
         families: &[NOTE],
         patches: &["patch 1\nowner third 1 after second 1\n"],
     };
     const LAST: PatchSet = PatchSet {
+        fresh: None,
         owner: Owner::Application,
         name: "last",
         families: &[NOTE],
@@ -562,10 +575,11 @@ fn a_held_record_two_versions_behind_runs_each_pass() {
 fn an_identity_walk_of_another_owners_holder_is_allowed() {
     const HOLDER: &str = "family holder 1\nversioned record Holder { note: bytes 64 holds fixture-note Note }\n";
     const HOLDER_SET: PatchSet = PatchSet {
+        fresh: None,
         owner: Owner::Application,
         name: "holder",
         patches: &[],
-        families: &[KeptFamily { map: KeptMap::Store, name: "holder", texts: &[HOLDER], keys: &[] }],
+        families: &[KeptFamily { frames: None, map: KeptMap::Store, name: "holder", texts: &[HOLDER], keys: &[] }],
     };
     let sets = PatchSets { sets: &[HOLDER_SET, JIG] };
     let found = plan::binary(&PatchSets { sets: &[HOLDER_SET] });
@@ -583,27 +597,26 @@ fn an_identity_walk_of_another_owners_holder_is_allowed() {
     assert_eq!(skein_codec::version_of(walk::finished(&mut machines, &walk).expect("holder")), Ok(1));
 }
 #[test]
-fn two_families_holding_each_other_halt_order() {
+fn two_families_holding_each_other_refuse_the_plan() {
     const A: &str = "family cycle-a 1\nversioned record A { b: bytes 64 holds cycle-b B }\n";
     const B1: &str = "family cycle-b 1\nversioned record B { a: bytes 64 holds cycle-a A }\n";
     const B2: &str = "family cycle-b 2\nversioned record B { a: bytes 64 holds cycle-a A }\n";
     const PATCH: &str = "patch 1\nowner cycle 1\nfamily cycle-b 1 to 2\n";
     let sets = PatchSets {
         sets: &[PatchSet {
+            fresh: None,
             owner: Owner::Application,
             name: "cycle",
             patches: &[PATCH],
             families: &[
-                KeptFamily { map: KeptMap::Store, name: "cycle-a", texts: &[A], keys: &[] },
-                KeptFamily { map: KeptMap::Store, name: "cycle-b", texts: &[B1, B2], keys: &[] },
+                KeptFamily { frames: None, map: KeptMap::Store, name: "cycle-a", texts: &[A], keys: &[] },
+                KeptFamily { frames: None, map: KeptMap::Store, name: "cycle-b", texts: &[B1, B2], keys: &[] },
             ],
         }],
     };
     let found = Levels { skein: None, smith: None, jig: None, application: Some(0) };
-    let plan = plan::plan(&sets, &found, &plan::binary(&sets)).expect("plan");
-    let mut machines = machines::make(&sets, &plan, &found, ROOMS).expect("machines");
-    // The innermost A need not decode: encountering its active machine halts.
-    let input = Box::from([0, 1, 0, 0, 0, 6, 0, 1, 0, 0, 0, 0]);
-    let result = walk::start(&mut machines, LABEL_STEP, FamilyIx(0), "A", input);
-    assert_eq!(result.expect_err("cycle"), Halt::Order);
+    assert_eq!(
+        plan::plan(&sets, &found, &plan::binary(&sets)).expect_err("hold cycle"),
+        Unplanned { owner: Owner::Application, patch: 0 }
+    );
 }

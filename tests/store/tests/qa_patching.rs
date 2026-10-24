@@ -10,9 +10,10 @@ use skein_fake_machine::Item;
 const SEED: u64 = 0x5141;
 const UNPATCHED: u16 = 1;
 const PATCHED: u16 = 2;
-// The fixture has two application patches, one jig patch, and two-put pages where a test lowers the journal's writes.
+// The fixture has two application patches, two jig patches (the second patches fixture-frame alone, which the world's
+// sets leave out), and two-put pages where a test lowers the journal's writes.
 const APPLICATION_LEVEL: u32 = 2;
-const JIG_LEVEL: u32 = 1;
+const JIG_LEVEL: u32 = 2;
 const PAGE_ROWS: u64 = 2;
 const APP_ONLY: PatchSets = PatchSets { sets: &[SETS.sets[0]] };
 const JIG_ONLY: PatchSets = PatchSets { sets: &[BASE.sets[1]] };
@@ -42,7 +43,7 @@ const PIN_TOO_FAR: PatchSets = PatchSets {
     sets: &[
         PatchSet {
             patches: &[
-                "patch 1\nowner fixture 1 after fixture-jig 2\n\nfamily fixture-label 1 to 2\nadd Label.color option u8 none\n",
+                "patch 1\nowner fixture 1 after fixture-jig 3\n\nfamily fixture-label 1 to 2\nadd Label.color option u8 none\n",
             ],
             ..SETS.sets[0]
         },
@@ -96,6 +97,8 @@ fn pinned_order_reports_exact_walk_counts() {
             (Owner::Application, 1, app_first, app_first.div_ceil(PAGE_ROWS)),
             (Owner::Jig, 1, jig, jig.div_ceil(PAGE_ROWS)),
             (Owner::Application, 2, app_last, app_last.div_ceil(PAGE_ROWS)),
+            // Jig's second patch walks fixture-frame alone, which the world's sets leave out.
+            (Owner::Jig, 2, 0, 0),
         ]
     );
 }

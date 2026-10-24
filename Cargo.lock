@@ -1242,14 +1242,18 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
+ "jig-protocol-config",
+ "jig-store-world",
  "jig-test-patches",
  "jig-test-patches-jig",
+ "jig-test-patches-smith",
  "skein-codec",
  "skein-fake-machine",
  "skein-io",
  "skein-kv",
  "skein-lib",
  "skein-sim",
+ "smith-transcript",
 ]
 
 [[package]]
@@ -1327,6 +1331,7 @@ dependencies = [
  "jig-protocol-store",
  "jig-test-patches",
  "jig-test-patches-jig",
+ "jig-test-patches-smith",
  "skein-codec",
  "skein-fake-machine",
  "skein-heap",
@@ -1432,6 +1437,14 @@ dependencies = [
 
 [[package]]
 name = "jig-test-patches-jig"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-codegen",
+]
+
+[[package]]
+name = "jig-test-patches-smith"
 version = "0.0.0"
 dependencies = [
  "skein-codec",

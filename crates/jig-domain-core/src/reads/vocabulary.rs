@@ -289,7 +289,8 @@ pub enum Loaded {
 /// A selected frame could not be supplied; visibility is checked before its reason leaves.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TurnFailure {
-    /// Original opaque payload length, past the read budget.
+    /// Size charged past the read budget: opaque bytes without frame machines,
+    /// or a complete frame when frame machines are configured (protocol/store.md 8.6).
     TooLarge { bytes: u64 },
     /// The frame could not be read whole.
     Malformed,

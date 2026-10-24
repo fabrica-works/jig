@@ -105,7 +105,7 @@ pub use run::{
     reserve_floor,
 };
 pub use stored::{
-    CallKey, CallPart, CallRecord, CallReplay, CoreKey, CoreRecord, EscalationDecisionRecord, Key, Made,
+    CallKey, CallPart, CallRecord, CallReplay, CoreKey, CoreRecord, CurrentWindow, EscalationDecisionRecord, Key, Made,
     ProposalDecisionRecord, Record, Restored, RunProof, TerminalRecord, TurnProof, TurnRecord,
 };
 pub use translate::task_authority;
@@ -916,7 +916,8 @@ fn valid_proof(proof: &RunProof, expected: &RestoringProof, result_bytes: u32) -
         None => 0,
     };
     if let Some(window) = proof.window
-        && (window < (proof.conversation, 1) || window > (proof.attempt, last_turn))
+        && ((window.attempt, window.turn) < (proof.conversation, 1)
+            || (window.attempt, window.turn) > (proof.attempt, last_turn))
     {
         return false;
     }

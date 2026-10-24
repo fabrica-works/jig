@@ -1,4 +1,4 @@
-use jig_protocol_store::worst_case_with_patches;
+use jig_protocol_store::sizes;
 use jig_store_world::{
     World,
     patches::{BASE, Records, SETS, limits},
@@ -18,10 +18,16 @@ struct Measuring {
     meter: Meter,
     outside: Option<Span>,
     net: i64,
+    phases: [Phase; 2],
+    patching: bool,
+}
+#[derive(Clone, Copy)]
+struct Phase {
     peak: u64,
     bound: u64,
     steps: u64,
 }
+
 thread_local! {
     static MEASURING: RefCell<Option<Measuring>> = const { RefCell::new(None) };
 }
@@ -29,26 +35,41 @@ thread_local! {
 fn observe(step: Step) {
     MEASURING.with_borrow_mut(|slot| match step {
         Step::Construct => {
-            let bound = worst_case_with_patches(&limits(), &SETS).expect("patching bound");
-            let measuring = Measuring { meter: Meter::new(), outside: None, net: 0, peak: 0, bound, steps: 0 };
+            let phases = [
+                Phase { peak: 0, bound: sizes::serving_peak(&limits(), &SETS).expect("serving bound"), steps: 0 },
+                Phase { peak: 0, bound: sizes::patching_peak(&limits(), &SETS).expect("patching bound"), steps: 0 },
+            ];
+            let measuring = Measuring { meter: Meter::new(), outside: None, net: 0, phases, patching: false };
             measuring.meter.start();
             *slot = Some(measuring);
         }
-        Step::Begin { input } => {
+        Step::Begin { input, patching } => {
             let measuring = slot.as_mut().expect("constructed");
+            measuring.patching = patching;
             measuring.net += measuring.outside.take().expect("between steps").end().net;
             measuring.net -= i64::try_from(input).expect("input heap fits");
             measuring.meter.start();
         }
-        Step::End => {
+        Step::End { patching } => {
             let measuring = slot.as_mut().expect("constructed");
             let measured = measuring.meter.end();
-            let bound = u64::try_from(i64::try_from(measuring.bound).expect("finite bound") + measuring.net)
+            // Planning starts when the store retains Pending; the directory's
+            // Patching state lasts through the switch. Check transition calls
+            // under the patch term if either side owns that state. Construction,
+            // the ordinary open before planning and the reopen after the switch
+            // use serving's term, including during the SETS open.
+            let patching = measuring.patching || patching;
+            let phase = &mut measuring.phases[usize::from(patching)];
+            let bound = u64::try_from(i64::try_from(phase.bound).expect("finite bound") + measuring.net)
                 .expect("positive adjusted bound");
-            let own = measuring.meter.check(measured, bound, &"store construction/down/up/fire");
+            let own = measuring.meter.check(
+                measured,
+                bound,
+                &(if patching { "patching" } else { "serving" }, phase.steps, phase.bound),
+            );
             let own = u64::try_from(i64::try_from(own).expect("finite heap") - measuring.net).expect("store held");
-            measuring.peak = measuring.peak.max(own);
-            measuring.steps += 1;
+            phase.peak = phase.peak.max(own);
+            phase.steps += 1;
             measuring.outside = Some(Span::start());
         }
     });
@@ -66,21 +87,21 @@ fn a_whole_patching_open_stays_within_its_priced_peak() {
             None => skein_fake_machine::Item::directory(&path).mode(0o700),
         })
         .collect();
-    let mut peaks = Vec::new();
+    let mut peaks = [0; 2];
     for sets in [BASE, SETS] {
         let mut world = World::unopened_observed(920, limits(), Some(observe));
         world.lay(&items);
         world.patch_sets(sets);
         assert!(world.open().is_some(), "measured open: {:?}", world.refusal());
-        let (peak, steps) = MEASURING.with_borrow(|slot| {
-            let measuring = slot.as_ref().expect("measured");
-            (measuring.peak, measuring.steps)
-        });
-        eprintln!("store peak {peak} bytes over {steps} steps");
-        peaks.push(peak);
+        let phases = MEASURING.with_borrow(|slot| slot.as_ref().expect("measured").phases);
         MEASURING.with_borrow_mut(|slot| {
             *slot = None;
         });
+        for (index, phase) in phases.into_iter().enumerate() {
+            let name = if index == 0 { "serving" } else { "patching" };
+            eprintln!("{name}: measured {} / priced {} bytes over {} steps", phase.peak, phase.bound, phase.steps);
+            peaks[index] = peaks[index].max(phase.peak);
+        }
     }
     assert!(peaks[1] > peaks[0], "patching peak must exceed serving: {peaks:?}");
 }

@@ -512,7 +512,15 @@ fn memory_below_the_components_sum_is_refused() {
         + 5_810_584
         // Run proofs' outstanding read fences (tasks.md 9): (4 proofs per task + 2) at
         // 8 run-inbox ids, a routed payload's id list, and the wider inline RunProof.
-        + 1_490_224;
+        // M3's CurrentWindow uses bool's niche: Option<(u64, u32)> 24 ->
+        // Option<CurrentWindow> 16; RunProof, Record and Request 256 -> 248.
+        // The routed Request queue saves (18,590 + 1) * 8 = 148,728 bytes.
+        // Read Row holds value and related Record carriers: 680 -> 664. Each load
+        // saves 4 rows * (16 Row + 8 Record) = 96; the incoming page and two
+        // answer copies save 3 * 96 = 288 (the settings load still exceeds 65,536).
+        // Core: 18,789,463,490 -> 18,789,314,474; hub/provider terms unchanged.
+        // 1,490,224 - 148,728 - 288 = 1,341,208; no store share enters this sum.
+        + 1_341_208;
     // Regenerate this charge with JIG_MEMORY_WRITE=1 through heavy, then run
     // normally to check it. The unchanged terms above keep the act saving local.
     let charge_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/deployment_act_growth.txt");

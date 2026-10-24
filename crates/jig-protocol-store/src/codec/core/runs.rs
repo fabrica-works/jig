@@ -309,15 +309,17 @@ pub(super) fn decode_escalation_decision_record(
         decision: super::decode_escalation_decision(decision, limits),
     }
 }
-fn encode_window(value: Option<(u64, u32)>, limits: &Limits) -> Result<Option<wire::Window>, wire::Problem> {
+fn encode_window(value: Option<domain::CurrentWindow>, limits: &Limits) -> Result<Option<wire::Window>, wire::Problem> {
     Ok(match value {
-        Some((attempt, turn)) => Some(wire::Window::new(&limits.core, wire::WindowParts { attempt, turn })?),
+        Some(domain::CurrentWindow { attempt, turn, closed }) => {
+            Some(wire::Window::new(&limits.core, wire::WindowParts { attempt, turn, closed })?)
+        }
         None => None,
     })
 }
-fn read_window(value: wire::Window) -> (u64, u32) {
-    let wire::WindowParts { attempt, turn } = value.into_parts();
-    (attempt, turn)
+fn read_window(value: wire::Window) -> domain::CurrentWindow {
+    let wire::WindowParts { attempt, turn, closed } = value.into_parts();
+    domain::CurrentWindow { attempt, turn, closed }
 }
 fn encode_created(value: Option<(u64, u64)>, limits: &Limits) -> Result<Option<wire::Created>, wire::Problem> {
     Ok(match value {

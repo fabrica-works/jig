@@ -63,7 +63,7 @@ pub(super) fn limits(root: &root::Limits, profile: &protocol::Limits) -> Option<
     kv.snapshot_after = u64::from(sizes.commit);
     kv.chunk = sizes.key.checked_add(sizes.value)?.checked_add(20)?;
     kv.page.bytes = sizes.key.checked_add(sizes.value)?;
-    Some(protocol::Limits {
+    let limits = protocol::Limits {
         core: root.core,
         store: kv,
         secrets: kv,
@@ -74,7 +74,9 @@ pub(super) fn limits(root: &root::Limits, profile: &protocol::Limits) -> Option<
         reads: root.core.load_slots.checked_add(root.core.tasks.tasks)?,
         orphan_erases: profile.orphan_erases,
         held: profile.held,
-    })
+    };
+    protocol::sizes::whole(max_whole(&limits)).ok()?;
+    Some(limits)
 }
 impl Store {
     pub(super) fn new(
@@ -441,8 +443,11 @@ fn max_read(limits: &protocol::Limits) -> u32 {
         .max(limits.core.resume_bytes)
         .max(u32::try_from(limits.core.load_bytes.min(u64::from(u32::MAX))).expect("file read length"))
 }
+fn max_whole(limits: &protocol::Limits) -> u32 {
+    max_read(limits).max(protocol::sizes::MANIFEST_BYTES)
+}
 fn driver(limits: &protocol::Limits, capacity: u32) -> Driver {
-    let io = FileIo::new(handles(limits), max_read(limits), 32, limits.store.deadline);
+    let io = FileIo::with_whole_limit(handles(limits), max_read(limits), 32, max_whole(limits), limits.store.deadline);
     Driver { io, above: Queue::with_capacity(capacity), handles: Map::with_capacity(handles(limits)) }
 }
 fn close(file: Token) -> file::Request {
@@ -541,7 +546,7 @@ pub(super) fn worst_case(limits: &protocol::Limits, room: u32) -> Option<u64> {
     let room = room.checked_mul(2)?;
     protocol::worst_case(limits)?
         .checked_add(u64::try_from(size_of::<Store>()).ok()?)?
-        .checked_add(FileIo::worst_case(handles(limits), max_read(limits), 32, max_read(limits))?.checked_mul(3)?)?
+        .checked_add(FileIo::worst_case(handles(limits), max_read(limits), 32, max_whole(limits))?.checked_mul(3)?)?
         .checked_add(Queue::<file::Request>::worst_case(room)?.checked_mul(3)?)?
         .checked_add(Queue::<file::Event>::worst_case(room)?.checked_mul(3)?)?
         .checked_add(Queue::<protocol::Event>::worst_case(room)?.checked_mul(3)?)?

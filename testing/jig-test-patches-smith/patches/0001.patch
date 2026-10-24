@@ -1,0 +1,9 @@
+patch 1
+owner fixture-smith 1
+mark fresh-windows
+
+family fixture-turn 1 to 2
+add Turn.tokens u32 written
+drop Turn.replay
+written Turn.tokens
+refuses empty "a turn with no replay"

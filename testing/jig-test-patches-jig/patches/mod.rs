@@ -6,9 +6,44 @@ pub use context::Context;
 use skein_codec::patch::{Build, Halt, Old, Site};
 use skein_codec::value::Node;
 
-pub const PATCHES: &[&str] = &[include_str!("0001.patch")];
+pub const PATCHES: &[&str] = &[include_str!("0001.patch"), include_str!("0002.patch")];
 
 pub mod kept {
+    pub mod fixture_frame {
+        pub const TEXTS: &[&str] = &[
+            include_str!("../schema/kept/fixture-frame-v5.schema"),
+            include_str!("../schema/kept/fixture-frame-v6.schema"),
+        ];
+        pub mod v5 {
+            pub mod turn_record {
+                use skein_codec::schema::FieldIx;
+                pub const OPENS_WINDOW: FieldIx = FieldIx::new(0);
+                pub const TASK: FieldIx = FieldIx::new(1);
+                pub const ATTEMPT: FieldIx = FieldIx::new(2);
+                pub const TURN: FieldIx = FieldIx::new(3);
+                pub const SPENT: FieldIx = FieldIx::new(4);
+                pub const AT: FieldIx = FieldIx::new(5);
+                pub const TRANSCRIPT: FieldIx = FieldIx::new(6);
+            }
+        }
+        pub mod v6 {
+            pub mod turn_record {
+                use skein_codec::schema::FieldIx;
+                pub const OPENS_WINDOW: FieldIx = FieldIx::new(0);
+                pub const TASK: FieldIx = FieldIx::new(1);
+                pub const ATTEMPT: FieldIx = FieldIx::new(2);
+                pub const TURN: FieldIx = FieldIx::new(3);
+                pub const SPENT: FieldIx = FieldIx::new(4);
+                pub const READ: FieldIx = FieldIx::new(5);
+                pub const AT: FieldIx = FieldIx::new(6);
+                pub const TRANSCRIPT: FieldIx = FieldIx::new(7);
+            }
+        }
+        pub mod p0002 {
+            pub use super::v5 as old;
+            pub use super::v6 as new;
+        }
+    }
     pub mod fixture_note {
         pub const TEXTS: &[&str] = &[
             include_str!("../schema/kept/fixture-note-v1.schema"),
@@ -58,5 +93,12 @@ mod tests {
         skein_codegen::patch::goldens(owner(), 1, super::written)
             .map_err(|error| error.to_string())
             .expect("patch 0001 goldens");
+    }
+
+    #[test]
+    fn p0002_goldens() {
+        skein_codegen::patch::goldens(owner(), 2, super::written)
+            .map_err(|error| error.to_string())
+            .expect("patch 0002 goldens");
     }
 }

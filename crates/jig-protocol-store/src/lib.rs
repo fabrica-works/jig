@@ -172,6 +172,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
 #[must_use]
 pub fn worst_case_with_patches(limits: &Limits, sets: &PatchSets) -> Option<u64> {
     let (common, serving) = serving_peak(limits)?;
+    let serving = serving.checked_add(transcripts::patches::worst_case(limits, sets)?)?;
     let patching = patching::phase::worst_case(limits, sets)?;
     common.checked_add(serving.max(patching))
 }
@@ -251,9 +252,10 @@ pub fn down(store: &mut Store, env: &Env<Limits>, request: Request, above: &mut 
         Request::Open { owner, root, installation } => {
             directory::open(store, env, owner, root, installation, above, below);
         }
-        Request::Site { owner, patcher, result } => {
-            patching::phase::site(store, env, owner, patcher, result, above, below);
-        }
+        Request::Site { owner, patcher, result } => match store.phase {
+            Phase::Ready { .. } => transcripts::read::site(store, env, owner, patcher, result, above, below),
+            Phase::Closed | Phase::Stopped => patching::phase::site(store, env, owner, patcher, result, above, below),
+        },
         Request::Commit { number, writes } => transcripts::write::begin(store, env, number, writes, above, below),
         Request::Restore { owner, range, after, rows, bytes } => {
             restore::restore(store, env, owner, restore::Page { range, after, rows, bytes }, above, below);

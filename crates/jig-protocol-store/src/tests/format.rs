@@ -289,3 +289,57 @@ fn differing_layouts_name_the_first_family_in_family_order() {
         Err(OpenRefusal::OlderBuild { why: crate::Older::Layout(Family::Settings) })
     );
 }
+
+#[test]
+fn the_manifest_at_both_bounds_reaches_its_whole_file_price() {
+    let ceilings = &crate::component_v3::CEILINGS;
+    let mut counts = skein_lib::List::with_capacity(ceilings.manifest_counts);
+    for _ in 0..ceilings.manifest_counts {
+        counts
+            .push(
+                codec::component::Count::new(
+                    ceilings,
+                    codec::component::CountParts {
+                        family: Box::from(
+                            "f".repeat(usize::try_from(ceilings.count_family).expect("name fits")).as_bytes(),
+                        ),
+                        before: u64::MAX,
+                        after: u64::MAX,
+                    },
+                )
+                .expect("family name at its bound"),
+            )
+            .expect("families at their bound");
+    }
+    let levels = crate::patching::plan::Levels {
+        skein: Some(u32::MAX),
+        smith: Some(u32::MAX),
+        jig: Some(u32::MAX),
+        application: Some(u32::MAX),
+    };
+    let manifest = crate::generations::manifest(
+        u64::MAX,
+        Some(u64::MAX),
+        levels,
+        levels,
+        &counts.into_boxed(),
+        u64::MAX,
+        Some(u64::MAX),
+        skein_lib::Wall::EPOCH,
+    );
+    assert_eq!(sizes::MANIFEST_BYTES, 5464);
+    assert_eq!(manifest.len(), usize::try_from(sizes::MANIFEST_BYTES).expect("manifest fits"));
+}
+
+#[test]
+fn whole_file_admission_checks_the_manifests_exact_bound() {
+    for (bound, expected) in [
+        (
+            sizes::MANIFEST_BYTES - 1,
+            Err(sizes::SizeRefusal::Whole { needs: sizes::MANIFEST_BYTES, has: sizes::MANIFEST_BYTES - 1 }),
+        ),
+        (sizes::MANIFEST_BYTES, Ok(())),
+    ] {
+        assert_eq!(sizes::whole(bound), expected, "whole-file bound {bound}");
+    }
+}

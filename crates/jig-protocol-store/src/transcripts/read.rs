@@ -15,6 +15,7 @@ pub(crate) struct Party {
     pub turn: Option<(u64, u32)>,
     pub problem: Option<domain::reads::TurnFailure>,
     pub busy: bool,
+    pub frame_bytes: Option<u32>,
 }
 #[derive(Debug)]
 enum Scan {
@@ -31,6 +32,14 @@ enum Step {
     Header { offset: u64, length: u32, bytes: Writer },
     Sized { offset: u64, length: u32, turn: TurnRecord, size: u32, bytes: Writer },
     Frame { offset: u64, length: u32, bytes: Writer },
+    Site { offset: u64, length: u32, patch: frame::Patch, of: crate::Owner },
+}
+struct Decoded {
+    offset: u64,
+    length: u32,
+    size: u32,
+    charge_frame: bool,
+    turn: TurnRecord,
 }
 #[derive(Debug)]
 pub(crate) struct Read {
@@ -322,12 +331,18 @@ pub(crate) fn arrived(store: &mut Store, arrived: Arrived, above: &mut Queue<Eve
     let Some(owner) = store.transcripts.reading else { return };
     let mut read = store.transcripts.reads.remove(&owner).expect("active reader");
     let result = match arrival(arrived.event) {
-        Some(event) => advance(store, &mut read, event, below),
+        Some(event) => advance(store, &mut read, event, above, below),
         None => Err(()),
     };
     settle(store, owner, read, result, above);
 }
-fn advance(store: &mut Store, read: &mut Read, event: Arrival, below: &mut Below) -> Result<bool, ()> {
+fn advance(
+    store: &mut Store,
+    read: &mut Read,
+    event: Arrival,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) -> Result<bool, ()> {
     let step = core::mem::replace(&mut read.step, Step::Waiting);
     match step {
         Step::Opening => {
@@ -400,12 +415,19 @@ fn advance(store: &mut Store, read: &mut Read, event: Arrival, below: &mut Below
                 read.step = Step::Frame { offset, length, bytes };
                 return Ok(false);
             }
-            let Ok(turn) = frame::decode(&bytes.finish(), &store.codec) else {
-                return Err(());
-            };
-            accept(store, read, offset, length, turn, below)
+            match frame::Decode::begin(&bytes.finish(), &mut store.transcripts.machines, &store.codec).or(Err(()))? {
+                frame::Decode::Done { turn, size } => {
+                    let charged_frame =
+                        store.transcripts.machines.body.is_some() || store.transcripts.machines.turn.is_some();
+                    if charged_frame && let Some(party) = &mut read.party {
+                        party.frame_bytes = Some(size);
+                    }
+                    accept(store, read, Decoded { offset, length, turn, size, charge_frame: charged_frame }, below)
+                }
+                frame::Decode::Patching(patch) => patching(store, read, offset, length, patch, above, below),
+            }
         }
-        Step::Waiting => Err(()),
+        Step::Waiting | Step::Site { .. } => Err(()),
     }
 }
 fn length(
@@ -434,6 +456,12 @@ fn length(
     }
     if read.activity.is_some() || party::single(read) {
         if length < 48 {
+            if store.transcripts.machines.body.is_some() {
+                read.step =
+                    Step::Frame { offset: start, length, bytes: Writer::new(usize::try_from(length).expect("frame")) };
+                demand(store, read, start, length, below)?;
+                return Ok(false);
+            }
             return Err(());
         }
         read.step = Step::Header { offset: start, length, bytes: Writer::new(36) };
@@ -454,35 +482,45 @@ fn header(
     below: &mut Below,
 ) -> Result<bool, ()> {
     if bytes.len() == 36 {
-        let header_size = match *bytes.get(35).ok_or(())? {
-            0 => 48_u32,
-            1 => 56_u32,
-            _ => return Err(()),
-        };
-        if length < header_size.checked_add(8).ok_or(())? {
-            return Err(());
-        }
-        let tail = header_size.checked_sub(36).expect("fixed header");
-        let mut header = Writer::new(usize::try_from(header_size).expect("fixed header"));
-        header.put(&bytes).or(Err(()))?;
-        read.step = Step::Header { offset, length, bytes: header };
-        demand(store, read, offset.checked_add(36).ok_or(())?, tail, below)?;
-        return Ok(false);
+        return extend_header(store, read, offset, length, bytes, below);
     }
     let mut prefix = Reader::new(&bytes);
     if prefix.u32() != Some(length) {
         return Err(());
     }
-    let fields = bytes.len().checked_sub(8).ok_or(())?;
+    let versions = if store.transcripts.machines.turn.is_some() { 2 } else { 0 };
+    let fields = bytes.len().checked_sub(8).ok_or(())?.checked_sub(versions).ok_or(())?;
     let mut body = Writer::new(fields.checked_add(4).ok_or(())?);
     body.put(prefix.bytes(u32::try_from(fields).or(Err(()))?).ok_or(())?).or(Err(()))?;
     body.put(&0_u32.to_be_bytes()).or(Err(()))?;
     let turn = codec::core::read_turn(&body.finish(), &codec::core_limits(&store.codec)).or(Err(()))?;
     let size = prefix.u32().ok_or(())?;
-    let expected =
-        u64::try_from(bytes.len()).or(Err(()))?.checked_add(u64::from(size)).ok_or(())?.checked_add(8).ok_or(())?;
+    if let Some(machine) = &store.transcripts.machines.turn {
+        if size < 2 {
+            return Err(());
+        }
+        let version = prefix.u16().ok_or(())?;
+        let patcher = machine.patcher.as_ref().ok_or(())?;
+        if patcher.schema(version).is_none() || version > machine.last {
+            return Err(());
+        }
+        if version < machine.last {
+            return whole_from_head(store, read, offset, length, &bytes, below);
+        }
+    }
+    let expected = u64::try_from(bytes.len().checked_sub(versions).ok_or(())?)
+        .or(Err(()))?
+        .checked_add(u64::from(size))
+        .ok_or(())?
+        .checked_add(8)
+        .ok_or(())?;
     if u64::from(length) != expected || size > store.codec.core.turn_record_transcript {
         return Err(());
+    }
+    let charged_frame = store.transcripts.machines.body.is_some() || store.transcripts.machines.turn.is_some();
+    let size = if charged_frame { length } else { size };
+    if charged_frame && let Some(party) = &mut read.party {
+        party.frame_bytes = Some(length);
     }
     if party::single(read) {
         if party::header(store, read, &turn, size)? {
@@ -503,6 +541,17 @@ fn header(
         demand(store, read, offset, length, below)?;
         return Ok(false);
     }
+    activity_header(store, read, offset, length, turn, size, below)
+}
+fn activity_header(
+    store: &mut Store,
+    read: &mut Read,
+    offset: u64,
+    length: u32,
+    turn: TurnRecord,
+    size: u32,
+    below: &mut Below,
+) -> Result<bool, ()> {
     let page = read.activity.as_mut().expect("activity header only");
     let identity = (turn.task, turn.attempt, turn.turn);
     let sought = page.identity().ok_or(())?;
@@ -593,14 +642,8 @@ fn append(event: Arrival, buffer: &mut Writer) -> Result<bool, ()> {
     }
     Ok(buffer.room() == 0)
 }
-fn accept(
-    store: &mut Store,
-    read: &mut Read,
-    offset: u64,
-    length: u32,
-    turn: TurnRecord,
-    below: &mut Below,
-) -> Result<bool, ()> {
+fn accept(store: &mut Store, read: &mut Read, frame: Decoded, below: &mut Below) -> Result<bool, ()> {
+    let Decoded { offset, length, size, charge_frame, turn } = frame;
     if turn.task != read.task {
         return Err(());
     }
@@ -633,8 +676,12 @@ fn accept(
             return Err(());
         }
         let row = page.rows.get_mut(page.index).expect("pending turn row");
+        let payload = u64::try_from(turn.transcript.len()).or(Err(()))?;
         row.related = Some(domain::Record::Core(domain::CoreRecord::Turn(turn)));
-        let bytes = row.owned_bytes().ok_or(())?;
+        let mut bytes = row.owned_bytes().ok_or(())?;
+        if charge_frame {
+            bytes = bytes.checked_sub(payload).ok_or(())?.checked_add(u64::from(size)).ok_or(())?;
+        }
         if bytes > page.bytes {
             row.related = None;
             return Ok(true);
@@ -645,11 +692,11 @@ fn accept(
     }
     if found {
         let single = party::single(read);
-        if read.turns.room() == 0 || (!single && u64::from(length) > read.budget) {
+        if read.turns.room() == 0 || (!single && u64::from(size) > read.budget) {
             return Ok(true);
         }
         if !single {
-            read.budget = read.budget.checked_sub(u64::from(length)).expect("frame within budget");
+            read.budget = read.budget.checked_sub(u64::from(size)).expect("frame within budget");
         }
         read.turns.push(turn).expect("next checked row capacity");
     }
@@ -749,4 +796,181 @@ fn arrival(event: file::Event) -> Option<Arrival> {
         | file::Event::Failed { .. }
         | file::Event::Cancelled { .. } => None,
     }
+}
+
+/// Continue from the bytes already read: a behind head is never reread.
+fn whole_from_head(
+    store: &mut Store,
+    read: &mut Read,
+    offset: u64,
+    length: u32,
+    head: &[u8],
+    below: &mut Below,
+) -> Result<bool, ()> {
+    let mut bytes = Writer::new(usize::try_from(length).expect("u32 frame"));
+    bytes.put(head).or(Err(()))?;
+    let consumed = u64::try_from(bytes.written()).or(Err(()))?;
+    let max = u32::try_from(bytes.room()).or(Err(()))?;
+    if max == 0 {
+        return Err(());
+    }
+    read.step = Step::Frame { offset, length, bytes };
+    demand(store, read, offset.checked_add(consumed).ok_or(())?, max, below)?;
+    Ok(false)
+}
+
+fn patching(
+    store: &mut Store,
+    read: &mut Read,
+    offset: u64,
+    length: u32,
+    mut patch: frame::Patch,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) -> Result<bool, ()> {
+    match patch.next(&mut store.transcripts.machines, &store.codec).or(Err(()))? {
+        frame::Progress::Written { of, site, at } => {
+            let key = keys::encode_own(&keys::Own::Transcript { task: read.task }, store.limits.store.key).ok_or(())?;
+            let mut name = Writer::new(key.len().checked_add(8).ok_or(())?);
+            name.put(&key).or(Err(()))?;
+            name.put(&offset.to_be_bytes()).or(Err(()))?;
+            let machine = match of {
+                crate::Owner::Jig => store.transcripts.machines.body.as_mut(),
+                crate::Owner::Smith => store.transcripts.machines.turn.as_mut(),
+                crate::Owner::Skein | crate::Owner::Application => return Err(()),
+            }
+            .ok_or(())?;
+            let patcher = machine.patcher.take().ok_or(())?;
+            let owner = store.transcripts.reading.expect("active read owns the frame machine");
+            above.push(Event::Site { owner, of, key: name.finish(), site, at, patcher });
+            read.step = Step::Site { offset, length, patch, of };
+            Ok(false)
+        }
+        frame::Progress::Done { mut turn, size } => {
+            if let Some(party) = &mut read.party {
+                party.frame_bytes = Some(size);
+            }
+            // Fixed metadata is judged exactly as a head's, after patching.
+            let transcript = core::mem::replace(&mut turn.transcript, Box::new([]));
+            if party::single(read) && party::header(store, read, &turn, size)? {
+                return Ok(true);
+            }
+            if let Some(page) = &mut read.activity {
+                let selected = match read.scan {
+                    Scan::Turn { attempt, turn: number } => turn.attempt == attempt && turn.turn == number,
+                    Scan::Page => true,
+                    Scan::Window { .. } => return Err(()),
+                };
+                if selected {
+                    if page.identity() != Some((turn.task, turn.attempt, turn.turn)) {
+                        return Err(());
+                    }
+                    let row = page.rows.get_mut(page.index).expect("pending row");
+                    row.related = Some(domain::Record::Core(domain::CoreRecord::Turn(turn.clone())));
+                    let cost = row.owned_bytes().ok_or(())?.checked_add(u64::from(size)).ok_or(())?;
+                    row.related = None;
+                    if cost > page.bound {
+                        return sized(store, read, offset, turn, size, below);
+                    }
+                    if cost > page.bytes {
+                        return Ok(true);
+                    }
+                }
+            }
+            turn.transcript = transcript;
+            accept(store, read, Decoded { offset, length, turn, size, charge_frame: true }, below)
+        }
+    }
+}
+
+/// A serving site belongs to the active read alone. A stray goes through the
+/// existing open-refusal path, including its fail-stop in Ready.
+pub(crate) fn site(
+    store: &mut Store,
+    env: &skein_lib::Env<Limits>,
+    owner: Token,
+    patcher: Box<skein_codec::patch::Patcher>,
+    result: Result<(), skein_codec::patch::Halt>,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    let waiting = if store.transcripts.reading == Some(owner) {
+        match store.transcripts.reads.get(&owner) {
+            Some(read) => match read.step {
+                Step::Site { .. } => true,
+                Step::Waiting
+                | Step::Opening
+                | Step::Evicting { .. }
+                | Step::Length { .. }
+                | Step::Header { .. }
+                | Step::Sized { .. }
+                | Step::Frame { .. } => false,
+            },
+            None => false,
+        }
+    } else {
+        false
+    };
+    if !waiting {
+        crate::patching::phase::site(store, env, owner, patcher, result, above, below);
+        return;
+    }
+    let mut read = store.transcripts.reads.remove(&owner).expect("site's active reader");
+    let step = core::mem::replace(&mut read.step, Step::Waiting);
+    let resumed = match step {
+        Step::Site { offset, length, patch, of } => {
+            let machine = match of {
+                crate::Owner::Jig => store.transcripts.machines.body.as_mut(),
+                crate::Owner::Smith => store.transcripts.machines.turn.as_mut(),
+                crate::Owner::Skein | crate::Owner::Application => unreachable!("only frames' owners stop"),
+            }
+            .expect("site's machine");
+            assert!(machine.patcher.is_none(), "one outstanding site on the machine");
+            machine.patcher = Some(patcher);
+            if result.is_err() { Err(()) } else { patching(store, &mut read, offset, length, patch, above, below) }
+        }
+        Step::Waiting
+        | Step::Opening
+        | Step::Evicting { .. }
+        | Step::Length { .. }
+        | Step::Header { .. }
+        | Step::Sized { .. }
+        | Step::Frame { .. } => unreachable!("checked waiting site"),
+    };
+    settle(store, owner, read, resumed, above);
+}
+
+fn extend_header(
+    store: &mut Store,
+    read: &mut Read,
+    offset: u64,
+    length: u32,
+    bytes: Box<[u8]>,
+    below: &mut Below,
+) -> Result<bool, ()> {
+    if let Some(machine) = &store.transcripts.machines.body {
+        let version = skein_codec::version_of(bytes.get(4..).ok_or(())?).or(Err(()))?;
+        if version != machine.last {
+            return whole_from_head(store, read, offset, length, &bytes, below);
+        }
+    }
+    let header_size = match *bytes.get(35).ok_or(())? {
+        0 => 48_u32,
+        1 => 56_u32,
+        _ => return Err(()),
+    };
+    if length < header_size.checked_add(8).ok_or(())? {
+        return Err(());
+    }
+    let header_size =
+        if store.transcripts.machines.turn.is_some() { header_size.checked_add(2).ok_or(())? } else { header_size };
+    if length < header_size.checked_add(8).ok_or(())? {
+        return Err(());
+    }
+    let tail = header_size.checked_sub(36).expect("fixed header");
+    let mut header = Writer::new(usize::try_from(header_size).expect("fixed header"));
+    header.put(&bytes).or(Err(()))?;
+    read.step = Step::Header { offset, length, bytes: header };
+    demand(store, read, offset.checked_add(36).ok_or(())?, tail, below)?;
+    Ok(false)
 }

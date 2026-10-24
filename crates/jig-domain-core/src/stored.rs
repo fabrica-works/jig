@@ -657,7 +657,7 @@ pub struct RunProof {
     pub account_terminal: bool,
     /// The current window's first turn: the last committed turn of this
     /// conversation that opened a window, by attempt and turn.
-    pub window: Option<(u64, u32)>,
+    pub window: Option<CurrentWindow>,
     /// Host selected for this claim; engine claims cannot survive a restart.
     pub host: jig_domain_fleet::HostKind,
     /// Highest inbox message offered to this attempt in an assignment or committed relay.
@@ -671,6 +671,14 @@ pub struct RunProof {
     /// child answered this current attempt. At most twice task result bytes before normalization;
     /// cleared on replacement/end.
     pub terminal: Option<TerminalRecord>,
+}
+
+/// Durable current-window position (protocol/store.md 8.6).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct CurrentWindow {
+    pub attempt: u64,
+    pub turn: u32,
+    pub closed: bool,
 }
 
 /// Root-owned immutable first accepted decision for one held-chat revision.
