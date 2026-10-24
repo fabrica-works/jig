@@ -9,7 +9,7 @@
 
 [profile.default]
 # The gate reads live configurations; the live tests themselves need a person.
-default-filter = "not binary(/^fuzzy_/) & (not binary(/^(process|live)$/) | (binary(=live) & test(=the_live_configurations_are_ones_jig_test_reads))) & not binary(/^browser_/)"
+default-filter = "not binary(/^fuzzy_/) & (not binary(/^(process|live)$/) | (binary(=live) & test(=the_live_configurations_are_ones_jig_test_reads))) & not binary(/^browser_/) & not binary(/^qa_/)"
 global-timeout = "30s"
 slow-timeout = { period = "1000ms" }
 
@@ -20,7 +20,13 @@ filter = "kind(test)"
 priority = 10
 
 [profile.fuzzy]
-default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^browser_/)"
+default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^browser_/) & not binary(/^qa_/)"
+global-timeout = "120s"
+slow-timeout = { period = "10s" }
+
+# The QA passes' tests (skein's docs/foundation/owners.md, 4.6): the binaries named qa_*, which the gate builds and does not run.
+[profile.qa]
+default-filter = "binary(/^qa_/)"
 global-timeout = "120s"
 slow-timeout = { period = "10s" }
 
