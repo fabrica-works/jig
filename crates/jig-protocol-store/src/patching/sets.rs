@@ -1,0 +1,43 @@
+//! Static owner data handed in by the shell (protocol/store.md 5.3 and 10.3).
+
+/// Whose patch levels the format row keeps, upstream first.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Owner {
+    Skein,
+    Smith,
+    Jig,
+    Application,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PatchSet {
+    pub owner: Owner,
+    pub name: &'static str,
+    pub families: &'static [KeptFamily],
+    /// Patch texts in number order.
+    pub patches: &'static [&'static str],
+}
+#[derive(Clone, Copy, Debug)]
+pub struct KeptFamily {
+    pub name: &'static str,
+    /// Kept texts in version order.
+    pub texts: &'static [&'static str],
+    pub keys: &'static [Keys],
+}
+#[derive(Clone, Copy, Debug)]
+pub struct Keys {
+    /// Inclusive; application's own bytes, whole map keys for other owners.
+    pub from: &'static [u8],
+    /// Exclusive, in the same key space as `from`.
+    pub to: &'static [u8],
+    /// Declaration of the records in this range.
+    pub root: &'static str,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct PatchSets {
+    /// At most one set per owner.
+    pub sets: &'static [PatchSet],
+}
+impl PatchSets {
+    pub const NONE: PatchSets = PatchSets { sets: &[] };
+}

@@ -1242,6 +1242,8 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
+ "jig-test-patches",
+ "jig-test-patches-jig",
  "skein-codec",
  "skein-fake-machine",
  "skein-io",
