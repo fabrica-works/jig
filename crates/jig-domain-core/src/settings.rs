@@ -93,6 +93,7 @@ pub fn model_names_worst_case() -> Option<u64> {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Revision {
+    pub models: Box<[ModelName]>,
     pub head: Head,
     pub items: Box<[Item]>,
 }
@@ -335,7 +336,8 @@ pub fn set_worst_case(limits: &crate::Limits) -> Option<u64> {
 pub fn revision_worst_case(limits: &crate::Limits) -> Option<u64> {
     set_worst_case(limits)?
         .checked_add(List::<Item>::worst_case(capacity(limits)?.checked_mul(2)?)?)?
-        .checked_add(u64::try_from(size_of::<Head>()).ok()?)
+        .checked_add(u64::try_from(size_of::<Revision>()).ok()?)?
+        .checked_add(model_names_worst_case()?)
 }
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {

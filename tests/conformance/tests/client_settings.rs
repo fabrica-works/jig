@@ -189,7 +189,7 @@ fn engine_settings_reads_and_deliveries_decode_at_the_client_end() {
     ] {
         let wire = w::ReadRevisionAnswer::new(
             t,
-            w::ReadRevisionAnswerParts { value: engine::revision(&source, &[], t).expect("engine revision answer") },
+            w::ReadRevisionAnswerParts { value: engine::revision(&source, t).expect("engine revision answer") },
         )
         .expect("revision answer");
         let bytes = encoded!(&w::ReadValue::Revision(wire));

@@ -901,9 +901,15 @@ fn inbox_context_memory_prices_every_reserved_container_and_complete_document_en
     }
     assert!(held <= bound);
     assert!(roots > u64::try_from(size_of_val(contexts.get(0).unwrap().goals.as_slice())).unwrap());
+    // The settings inventory adds both key sets, template names and one held head.
+    let inventory = List::<crate::documents::SettingLine>::worst_case(crate::settings::capacity(&limits).unwrap() * 2)
+        .unwrap()
+        + u64::from(limits.templates) * 2 * u64::from(limits.documents.text_bytes)
+        + List::<crate::documents::HeldRevision>::worst_case(1).unwrap()
+        + u64::try_from(size_of::<crate::documents::Settings>()).unwrap();
     assert_eq!(
         document_with_context_worst_case(&limits),
-        Some(document_worst_case(&limits.documents).unwrap() + bound + TEMPLATE_ENVELOPES)
+        Some(document_worst_case(&limits.documents).unwrap() + inventory + bound + TEMPLATE_ENVELOPES)
     );
     assert!(reads::answer_worst_case(&limits).unwrap() >= document_with_context_worst_case(&limits).unwrap());
     assert!(worst_case(&limits).is_some());

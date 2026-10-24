@@ -592,7 +592,12 @@ pub(crate) fn providers_document() -> Vec<u8> {
         .replace(r#""alternatives": []"#, r#""alternatives": ["other"]"#).into_bytes()
 }
 
-pub(crate) fn providers_store_names() -> &'static [Box<[u8]>] {
+pub(crate) fn providers_store_names() -> &'static [jig_domain_core::settings::ModelName] {
     static NAMES: std::sync::OnceLock<Box<[jig_domain_core::settings::ModelName]>> = std::sync::OnceLock::new();
-    NAMES.get_or_init(|| Box::new([b"fake".as_slice().into(), b"other".as_slice().into()]))
+    NAMES.get_or_init(|| {
+        Box::new([
+            jig_domain_core::settings::ModelName { name: b"fake".as_slice().into(), efforts: Box::new([]) },
+            jig_domain_core::settings::ModelName { name: b"other".as_slice().into(), efforts: Box::new([]) },
+        ])
+    })
 }

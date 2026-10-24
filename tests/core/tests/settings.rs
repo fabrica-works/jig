@@ -574,8 +574,7 @@ fn a_revision_item_past_the_single_read_budget_answers_its_encoded_size() {
     };
     let reads::RevisionAnswer::Revision { value_bytes, .. } = answer.as_ref() else { panic!("revision") };
     assert_eq!(*value_bytes, SINGLE_READ_BYTES);
-    let w::RevisionAnswer::Revision(document) = wire::revision(&answer, &[], &w::CEILINGS).expect("revision answer")
-    else {
+    let w::RevisionAnswer::Revision(document) = wire::revision(&answer, &w::CEILINGS).expect("revision answer") else {
         panic!("revision record")
     };
     let mut pieces = skein_lib::Reader::new(document.items());
@@ -584,4 +583,95 @@ fn a_revision_item_past_the_single_read_budget_answers_its_encoded_size() {
     let item = w::RevisionItem::decode(&w::CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("revision item");
     let w::RevisionEdit::TooLarge(size) = item.edit() else { panic!("item size") };
     assert_eq!(size.bytes(), ENCODED_TEMPLATE_BYTES);
+}
+
+#[test]
+fn a_release_keeps_live_effort_names_and_reads_old_choices_from_their_recorded_catalogue() {
+    use jig_client_protocol_wire::v19 as w;
+    use jig_domain_tasks as tasks;
+    use jig_protocol_engine_clients::translate::settings as translate;
+    use skein_lib::Reader;
+    let (mut config, limits) = configuration();
+    let mut model = config.core.settings.models[0].clone();
+    model.efforts = Box::new([Box::from(b"low".as_slice()), Box::from(b"high".as_slice())]);
+    model.effort = Some(Box::from(b"high".as_slice()));
+    let mut retired = model.clone();
+    retired.name = Box::from(b"retired".as_slice());
+    retired.efforts = Box::new([]);
+    retired.effort = None;
+    config.core.settings.models = Box::new([model.clone(), retired.clone()]);
+    config.core.defaults.charters[0].policy.model = model;
+    config.core.defaults.charters[0].policy.alternatives = Box::new([retired]);
+    let main = tasks::ModelEffort { model: 0, effort: Some(1) };
+    config.core.defaults.templates[0].llm = Some(tasks::LlmChoice { account: None, main, subagents: Box::new([]) });
+    let old_models = config.core.settings.models.clone();
+    let mut world = World::first_start_with_accounts(config, &limits);
+    world.client_peer = Some(ClientPeer::default());
+    assert!(world.domain.ready());
+
+    let (mut release, _) = configuration();
+    // Use the configuration actually running, including the old catalogue.
+    release.core.settings.models = old_models;
+    release.core.defaults.charters[0].policy.model = release.core.settings.models[0].clone();
+    release.core.defaults.charters[0].policy.alternatives = Box::new([release.core.settings.models[1].clone()]);
+    release.core.defaults.templates[0].llm = Some(tasks::LlmChoice {
+        account: None,
+        main,
+        subagents: Box::new([tasks::ModelEffort { model: 1, effort: None }]),
+    });
+    let mut changed = release.core.defaults.templates[1].clone();
+    changed.llm = Some(tasks::LlmChoice { account: None, main, subagents: Box::new([]) });
+    let (mut next, _) = configuration();
+    next.core.settings.models = release.core.settings.models.clone();
+    next.core.defaults.charters = release.core.defaults.charters.clone();
+    next.core.defaults.templates = release.core.defaults.templates.clone();
+    restart(&mut world, release);
+    assert_eq!(world.domain.settings().newest(), 2);
+    world.seed(Box::new([record(settings::Record::Changed {
+        setting: settings::Setting::Template(changed.number),
+        changed: settings::Changed { value: Some(settings::Value::Template(Box::new(changed))), revision: 2 },
+    })]));
+    next.core.settings.models = Box::new([next.core.settings.models[0].clone()]);
+    next.core.settings.models[0].efforts.swap(0, 1);
+    next.core.defaults.charters[0].policy.model = next.core.settings.models[0].clone();
+    next.core.defaults.charters[0].policy.alternatives = Box::new([]);
+    next.core.defaults.templates[0].llm.as_mut().unwrap().main.effort = Some(0);
+    next.core.defaults.templates[0].llm.as_mut().unwrap().subagents = Box::new([]);
+    restart(&mut world, next);
+    assert_eq!(world.domain.settings().newest(), 3);
+    let signed = sign_in(&mut world);
+    let reads::Answer::Setting(live) =
+        client_read(&mut world, signed, reads::Read::Setting { setting: settings::Setting::Template(2), revision: 3 })
+    else {
+        panic!("live setting")
+    };
+    let settings::Value::Template(live) = live.value else { panic!("template") };
+    assert_eq!(live.llm.unwrap().main, tasks::ModelEffort { model: 0, effort: Some(0) });
+    let reads::Answer::Revision(answer) = client_read(&mut world, signed, reads::Read::Revision { number: 2 }) else {
+        panic!("stored revision")
+    };
+    let w::RevisionAnswer::Revision(old) = translate::revision(&answer, &w::CEILINGS).unwrap() else {
+        panic!("old revision")
+    };
+    let mut pieces = Reader::new(old.items());
+    let mut saw_template = false;
+    while let Some(piece) = skein_codec::piece::split(&mut pieces).unwrap() {
+        let item = w::RevisionItem::decode(&w::CEILINGS, &mut Reader::new(&piece)).unwrap();
+        if let w::RevisionEdit::Set(value) = item.edit()
+            && let w::SettingValue::Template(value) = value.value()
+        {
+            let choice = value.llm().as_ref().unwrap();
+            assert_eq!(choice.main().model(), b"scripted");
+            assert_eq!(choice.main().effort().as_deref(), Some(b"high".as_slice()));
+            assert_eq!(choice.subagents().get(0).unwrap().model(), b"retired");
+            saw_template = true;
+        }
+    }
+    assert!(saw_template);
+    let reads::Answer::Revisions(page) = client_read(&mut world, signed, reads::Read::Revisions { before: Some(3) })
+    else {
+        panic!("history page")
+    };
+    assert_eq!(page.rows.get(0).unwrap().head.number, 2);
+    assert_eq!(page.rows.get(0).unwrap().items.get(0).unwrap().setting, settings::Setting::Template(1));
 }

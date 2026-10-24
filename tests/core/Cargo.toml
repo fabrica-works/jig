@@ -34,6 +34,7 @@ skein-lib.workspace = true
 skein-world.workspace = true
 
 [dev-dependencies]
+skein-codec.workspace = true
 jig-protocol-engine-clients.workspace = true
 jig-client-protocol-wire.workspace = true
 jig-protocol-config.workspace = true

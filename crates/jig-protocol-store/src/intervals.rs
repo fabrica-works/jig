@@ -99,12 +99,14 @@ pub fn scope(party: u64, scope: &core::reads::Scope) -> Option<Box<[Range]>> {
     Some(match scope {
         Scope::SettingsHistory { first, last, newest, .. } => {
             let mut ranges = List::with_capacity(2);
-            if first < newest {
+            // The selected newest may have been archived after admission.
+            // One atomic commit keeps it under exactly one of these keys.
+            if first <= newest {
                 ranges
                     .push(Range {
                         start: encoded(&core::Key::Core(core::CoreKey::Settings(core::settings::Key::History(*first)))),
                         end: point(&core::Key::Core(core::CoreKey::Settings(core::settings::Key::History(
-                            (*last).min(newest.saturating_sub(1)),
+                            (*last).min(*newest),
                         ))))
                         .end,
                     })

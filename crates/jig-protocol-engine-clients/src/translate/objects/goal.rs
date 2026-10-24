@@ -32,6 +32,18 @@ pub fn authority(
     value: &t::Authority,
     limits: &w::Limits,
 ) -> Result<w::OwnerAuthority, w::Problem> {
+    let models = super::super::llm::authority(
+        jig_domain_authority::Models::from_parts(value.models.bits(), value.models.is_all()),
+        models,
+        limits,
+    )?;
+    authority_with_models(value, models, limits)
+}
+pub fn authority_with_models(
+    value: &t::Authority,
+    models: Option<w::ModelSet>,
+    limits: &w::Limits,
+) -> Result<w::OwnerAuthority, w::Problem> {
     let mut grants = List::with_capacity(super::super::count(value.grants.len())?);
     for row in &value.grants {
         grants
@@ -65,11 +77,7 @@ pub fn authority(
     w::OwnerAuthority::new(
         limits,
         w::OwnerAuthorityParts {
-            models: super::super::llm::authority(
-                jig_domain_authority::Models::from_parts(value.models.bits(), value.models.is_all()),
-                models,
-                limits,
-            )?,
+            models,
             tools: value.tools.0,
             grants,
             delegation: w::OwnerDelegation::new(

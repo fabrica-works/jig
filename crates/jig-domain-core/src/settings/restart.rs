@@ -229,7 +229,11 @@ impl Core {
             items.push(Item { setting, edit }).expect("release item count");
         }
         let revision = match self.settings_restore.release {
-            Some(_) => Some(Revision { head: self.current.head.clone(), items: items.into_boxed() }),
+            Some(_) => Some(Revision {
+                models: super::model_names(&self.settings.models),
+                head: self.current.head.clone(),
+                items: items.into_boxed(),
+            }),
             None => None,
         };
         let (writes, oldest) = revision_writes(
@@ -314,7 +318,11 @@ pub(crate) fn first_start(core: &mut Core, env: &Env<Limits>, out: &mut Queue<Re
     }
     out.push(Request::Write(save(Record::Revision {
         history: false,
-        revision: Revision { head: core.current.head.clone(), items: Box::new([]) },
+        revision: Revision {
+            models: super::model_names(&core.settings.models),
+            head: core.current.head.clone(),
+            items: Box::new([]),
+        },
     })));
     out.push(Request::Write(save(Record::Extent { oldest: 0 })));
     true

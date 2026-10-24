@@ -1,5 +1,6 @@
 //! Settings' whole values and bounded history on client wire 19 (contract.md, 6).
 use super::{me, objects, owner, w};
+mod names;
 use alloc::boxed::Box;
 use jig_domain_authority as a;
 use jig_domain_core::{self as core, documents as d, reads, settings as s};
@@ -149,10 +150,14 @@ fn charter(value: &core::Charter, limits: &w::Limits) -> Result<w::Charter, w::P
 }
 fn authority(
     value: &a::Authority,
-    models: &[crate::Model],
+    models: &[s::ModelName],
     limits: &w::Limits,
 ) -> Result<w::OwnerAuthority, w::Problem> {
-    objects::goal::authority(models, &core::task_authority(value), limits)
+    objects::goal::authority_with_models(
+        &core::task_authority(value),
+        names::authority(value.models, models, limits)?,
+        limits,
+    )
 }
 fn pattern(value: &a::Pattern, limits: &w::Limits) -> Result<w::OwnerPattern, w::Problem> {
     objects::goal::pattern(
@@ -205,7 +210,7 @@ fn requirements(values: &[a::Requirement], limits: &w::Limits) -> Result<List<w:
 }
 fn policy(
     value: &core::ConfiguredPolicy,
-    models: &[crate::Model],
+    models: &[s::ModelName],
     limits: &w::Limits,
 ) -> Result<w::SettingPolicy, w::Problem> {
     let p = &value.policy;
@@ -255,7 +260,7 @@ fn policy(
         },
     )
 }
-fn rules(value: &a::Rules, models: &[crate::Model], limits: &w::Limits) -> Result<w::Rules, w::Problem> {
+fn rules(value: &a::Rules, models: &[s::ModelName], limits: &w::Limits) -> Result<w::Rules, w::Problem> {
     let mut implies = List::with_capacity(super::count(value.implies.entries().len())?);
     for v in value.implies.entries() {
         implies
@@ -278,9 +283,16 @@ fn rules(value: &a::Rules, models: &[crate::Model], limits: &w::Limits) -> Resul
     )
 }
 pub fn value(value: &s::Value, models: &[crate::Model], limits: &w::Limits) -> Result<w::SettingValue, w::Problem> {
+    whole(value, &names::live(models), limits)
+}
+fn whole(value: &s::Value, models: &[s::ModelName], limits: &w::Limits) -> Result<w::SettingValue, w::Problem> {
     Ok(match value {
         s::Value::Charter(v) => w::SettingValue::Charter(Box::new(charter(v, limits)?)),
-        s::Value::Template(v) => w::SettingValue::Template(Box::new(me::template(v, models, limits)?)),
+        s::Value::Template(v) => w::SettingValue::Template(Box::new(me::template_with_llm(
+            v,
+            names::choice(v.llm.as_ref(), models, limits)?,
+            limits,
+        )?)),
         s::Value::Policy(v) => w::SettingValue::Policy(Box::new(policy(v, models, limits)?)),
         s::Value::Rules(v) => w::SettingValue::Rules(Box::new(rules(v, models, limits)?)),
     })
@@ -299,11 +311,7 @@ pub fn setting_document(
         },
     )
 }
-pub fn revision(
-    v: &reads::RevisionAnswer,
-    models: &[crate::Model],
-    limits: &w::Limits,
-) -> Result<w::RevisionAnswer, w::Problem> {
+pub fn revision(v: &reads::RevisionAnswer, limits: &w::Limits) -> Result<w::RevisionAnswer, w::Problem> {
     Ok(match v {
         reads::RevisionAnswer::Unknown => w::RevisionAnswer::Unknown,
         reads::RevisionAnswer::Forgotten { oldest } => w::RevisionAnswer::Forgotten(w::RevisionForgotten::new(
@@ -315,7 +323,7 @@ pub fn revision(
             for item in &revision.items {
                 let edit = match &item.edit {
                     s::Edit::Set(v) => {
-                        let value = value(v, models, limits)?;
+                        let value = whole(v, &revision.models, limits)?;
                         let bytes = u64::from(value.measure());
                         if bytes > (*value_bytes).min(u64::from(limits.owned_record)) {
                             w::RevisionEdit::TooLarge(w::Size::new(limits, w::SizeParts { bytes })?)

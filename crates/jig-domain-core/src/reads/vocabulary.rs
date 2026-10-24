@@ -62,7 +62,7 @@ pub struct Filter {
 /// Identity of a store query, independent of its continuation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Scope {
-    /// Dense inclusive revision interval; held newest and tag-9 predecessors.
+    /// Dense inclusive revision interval; newest at its held key or archived after admission.
     SettingsHistory { first: u32, last: u32, newest: u32, whole: bool },
     /// A task query's live group and its indexed ended group.
     Tasks { query: documents::TaskQuery },

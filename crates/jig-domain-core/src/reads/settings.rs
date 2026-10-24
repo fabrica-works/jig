@@ -138,6 +138,9 @@ pub fn load_bytes(limits: &Limits, rows: u32) -> Option<u64> {
 /// Its set values occupy at most one whole bounded settings set.
 #[must_use]
 pub fn valid_revision(revision: &settings::Revision, limits: &Limits) -> bool {
+    if !valid_names(&revision.models) {
+        return false;
+    }
     let Some(capacity) = settings::capacity(limits) else { return false };
     let Some(capacity) = capacity.checked_mul(2) else { return false };
     let Ok(count) = u32::try_from(revision.items.len()) else { return false };
@@ -154,7 +157,9 @@ pub fn valid_revision(revision: &settings::Revision, limits: &Limits) -> bool {
         }
         match &item.edit {
             settings::Edit::Set(value) => {
-                if settings::check::shape(item.setting, value, limits).is_err() {
+                if settings::check::shape(item.setting, value, limits).is_err()
+                    || !valid_indices(value, &revision.models)
+                {
                     return false;
                 }
                 match value {
@@ -187,6 +192,67 @@ pub fn valid_revision(revision: &settings::Revision, limits: &Limits) -> bool {
     }
     true
 }
+
+fn valid_names(models: &[settings::ModelName]) -> bool {
+    if models.len() > usize::try_from(jig_domain_tasks::MODELS).expect("model bound") {
+        return false;
+    }
+    for model in models {
+        if model.name.len() > usize::try_from(crate::MODEL_NAME_BYTES).expect("model name bound")
+            || model.efforts.len() > usize::try_from(crate::EFFORTS).expect("effort bound")
+        {
+            return false;
+        }
+        for effort in &model.efforts {
+            if effort.len() > usize::try_from(crate::EFFORT_BYTES).expect("effort name bound") {
+                return false;
+            }
+        }
+    }
+    true
+}
+fn valid_mask(value: jig_domain_authority::Models, models: &[settings::ModelName]) -> bool {
+    value.is_all() || value.bits().checked_shr(u32::try_from(models.len()).expect("model count")).unwrap_or(0) == 0
+}
+fn valid_choice(value: jig_domain_tasks::ModelEffort, models: &[settings::ModelName]) -> bool {
+    let Some(model) = models.get(usize::from(value.model)) else { return false };
+    match value.effort {
+        Some(effort) => usize::from(effort) < model.efforts.len(),
+        None => model.efforts.is_empty(),
+    }
+}
+fn valid_indices(value: &settings::Value, models: &[settings::ModelName]) -> bool {
+    match value {
+        settings::Value::Template(template) => {
+            let Some(choice) = &template.llm else { return true };
+            if choice.subagents.len() > usize::try_from(jig_domain_tasks::MODELS).expect("model bound")
+                || !valid_choice(choice.main, models)
+            {
+                return false;
+            }
+            for chosen in &choice.subagents {
+                if !valid_choice(*chosen, models) {
+                    return false;
+                }
+            }
+            true
+        }
+        settings::Value::Policy(policy) => {
+            if !valid_mask(policy.policy.ceiling.models, models) {
+                return false;
+            }
+            for role in &policy.policy.roles {
+                if !valid_mask(role.authority.models, models) {
+                    return false;
+                }
+            }
+            true
+        }
+        settings::Value::Rules(rules) => valid_mask(rules.ceiling.models, models),
+        settings::Value::Charter(_) => true,
+    }
+}
+
 #[must_use]
 pub fn record_revision(value: &Record) -> Option<&settings::Revision> {
     match value {
@@ -337,6 +403,90 @@ pub(super) fn from_store(
 mod tests {
     use super::*;
     #[test]
+    fn stored_catalogue_names_stay_within_their_priced_bounds() {
+        let model = settings::ModelName {
+            name: vec![b'm'; usize::try_from(crate::MODEL_NAME_BYTES).unwrap()].into_boxed_slice(),
+            efforts: vec![
+                vec![b'e'; usize::try_from(crate::EFFORT_BYTES).unwrap()].into_boxed_slice();
+                usize::try_from(crate::EFFORTS).unwrap()
+            ]
+            .into_boxed_slice(),
+        };
+        let models = vec![model.clone(); usize::try_from(jig_domain_tasks::MODELS).unwrap()];
+        assert!(valid_names(&models));
+        let models = vec![model.clone(); usize::try_from(jig_domain_tasks::MODELS).unwrap() + 1];
+        assert!(!valid_names(&models));
+        let mut too_long = model.clone();
+        too_long.name = vec![b'm'; usize::try_from(crate::MODEL_NAME_BYTES).unwrap() + 1].into_boxed_slice();
+        assert!(!valid_names(&[too_long]));
+        let mut too_many = model.clone();
+        too_many.efforts =
+            vec![Box::from(b"e".as_slice()); usize::try_from(crate::EFFORTS).unwrap() + 1].into_boxed_slice();
+        assert!(!valid_names(&[too_many]));
+        let mut too_long = model;
+        too_long.efforts[0] = vec![b'e'; usize::try_from(crate::EFFORT_BYTES).unwrap() + 1].into_boxed_slice();
+        assert!(!valid_names(&[too_long]));
+    }
+    #[test]
+    fn the_first_revisions_last_page_has_no_forgotten_predecessors() {
+        let (core, limits) = crate::tests::core();
+        let revision =
+            settings::Revision { models: Box::new([]), head: core.current.newest_head().clone(), items: Box::new([]) };
+        let range = Range {
+            party: 1,
+            scope: Scope::SettingsHistory { first: 1, last: 1, newest: 1, whole: false },
+            after: None,
+            backwards: false,
+            rows: 1,
+            bytes: load_bytes(&limits, 1).unwrap(),
+        };
+        let row = Row {
+            value: Record::Core(CoreRecord::Settings(settings::Record::Revision { history: false, revision })),
+            owner: None,
+            ancestors: Box::new([]),
+            related: None,
+            linked: Box::new([]),
+            inbox: None,
+            unjoined: None,
+            ended_read: None,
+        };
+        let Answer::Revisions(page) = from_store(&core, &limits, &range, Box::new([row]), None) else { panic!("page") };
+        assert_eq!(page.rows.len(), 1);
+        assert_eq!(page.next, None);
+        assert!(!page.forgotten);
+    }
+    #[test]
+    fn a_revision_archived_after_admission_keeps_its_original_head() {
+        let (mut core, limits) = crate::tests::core();
+        let head = core.current.newest_head().clone();
+        core.current.head.number = 2;
+        core.current.head.against = 1;
+        let revision = settings::Revision { models: Box::new([]), head: head.clone(), items: Box::new([]) };
+        let range = Range {
+            party: 1,
+            scope: Scope::SettingsHistory { first: 1, last: 1, newest: 1, whole: true },
+            after: None,
+            backwards: false,
+            rows: 1,
+            bytes: load_bytes(&limits, 1).unwrap(),
+        };
+        let row = Row {
+            value: Record::Core(CoreRecord::Settings(settings::Record::Revision { history: true, revision })),
+            owner: None,
+            ancestors: Box::new([]),
+            related: None,
+            linked: Box::new([]),
+            inbox: None,
+            unjoined: None,
+            ended_read: None,
+        };
+        let Answer::Revision(answer) = from_store(&core, &limits, &range, Box::new([row]), None) else {
+            panic!("revision")
+        };
+        let RevisionAnswer::Revision { revision, .. } = *answer else { panic!("kept revision") };
+        assert_eq!(revision.head, head);
+    }
+    #[test]
     fn a_lowered_history_bound_hides_rows_the_commit_could_not_erase() {
         let (mut core, mut limits) = crate::tests::core();
         core.current.head.number = 6;
@@ -389,7 +539,7 @@ mod tests {
             (settings::Key::History(3), false),
             (settings::Key::History(4), true),
             (settings::Key::History(5), true),
-            (settings::Key::History(6), false),
+            (settings::Key::History(6), true),
             (settings::Key::Held(5), false),
             (settings::Key::Held(6), true),
             (settings::Key::Held(7), false),

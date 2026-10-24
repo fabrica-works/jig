@@ -94,7 +94,7 @@ fn forgotten_and_unknown_revision_answers_keep_their_distinction() {
             ),
         ),
     ] {
-        assert_eq!(translate::revision(&answer, &f::models(), &f::wire()).unwrap(), expected);
+        assert_eq!(translate::revision(&answer, &f::wire()).unwrap(), expected);
     }
 }
 #[test]
@@ -224,7 +224,7 @@ fn encoded_value(value: &w::ReadValue) -> Box<[u8]> {
     out.finish()
 }
 #[test]
-fn whole_setting_kinds_reach_the_clients_typed_values() {
+fn whole_setting_kinds_reach_the_client() {
     use jig_client_domain::contract as c;
     let names = [s::Setting::Charter(1), s::Setting::Template(1), s::Setting::Policy(1), s::Setting::Rules];
     for (name, value) in names.into_iter().zip(values()) {
@@ -260,6 +260,7 @@ fn revision_values_past_the_single_read_budget_name_their_encoded_size() {
     let source = s::Value::Charter(Box::new(charter()));
     let bytes = u64::from(translate::value(&source, &f::models(), &w::CEILINGS).unwrap().measure());
     let revision = s::Revision {
+        models: Box::new([]),
         head: head(),
         items: Box::new([
             s::Item { setting: s::Setting::Charter(1), edit: s::Edit::Set(source) },
@@ -269,7 +270,7 @@ fn revision_values_past_the_single_read_budget_name_their_encoded_size() {
     };
     for (budget, large) in [(bytes, false), (bytes - 1, true)] {
         let answer = reads::RevisionAnswer::Revision { revision: revision.clone(), value_bytes: budget };
-        let wire = translate::revision(&answer, &f::models(), &w::CEILINGS).unwrap();
+        let wire = translate::revision(&answer, &w::CEILINGS).unwrap();
         let restored =
             jig_client_protocol_link::translate::settings::restore_revision_answer(&wire, &f::client_limits()).unwrap();
         let c::RevisionAnswer::Revision(document) = restored else { panic!("revision") };
@@ -302,4 +303,77 @@ fn revision_page_heads_and_cursors_reach_the_client_without_values() {
     assert_eq!(page.next, Some(6));
     assert_eq!(page.rows.get(0).unwrap().more, 3);
     assert_eq!(page.rows.get(0).unwrap().items.get(0).unwrap().edit, c::RevisionItemEdit::Set);
+}
+
+#[test]
+fn revision_choices_and_frozen_masks_use_the_recorded_catalogue() {
+    use jig_client_domain::contract as c;
+    use jig_domain_tasks as t;
+    let mut template = f::template();
+    template.llm = Some(t::LlmChoice {
+        account: None,
+        main: t::ModelEffort { model: 0, effort: Some(1) },
+        subagents: Box::new([t::ModelEffort { model: 1, effort: Some(0) }]),
+    });
+    let s::Value::Policy(mut policy) = values()[2].clone() else { panic!("policy") };
+    policy.policy.ceiling.models = jig_domain_authority::Models::Named(1);
+    policy.policy.roles[0].authority.models = jig_domain_authority::Models::Named(2);
+    let s::Value::Rules(mut rules) = values()[3].clone() else { panic!("rules") };
+    rules.ceiling.models = jig_domain_authority::Models::Named(1);
+    let answer = reads::RevisionAnswer::Revision {
+        revision: s::Revision {
+            models: Box::new([
+                s::ModelName {
+                    name: Box::from(b"retired".as_slice()),
+                    efforts: Box::new([Box::from(b"low".as_slice()), Box::from(b"high".as_slice())]),
+                },
+                s::ModelName {
+                    name: Box::from(b"scripted".as_slice()),
+                    efforts: Box::new([Box::from(b"new".as_slice())]),
+                },
+            ]),
+            head: head(),
+            items: Box::new([
+                s::Item {
+                    setting: s::Setting::Template(1),
+                    edit: s::Edit::Set(s::Value::Template(Box::new(template))),
+                },
+                s::Item { setting: s::Setting::Policy(1), edit: s::Edit::Set(s::Value::Policy(policy)) },
+                s::Item { setting: s::Setting::Rules, edit: s::Edit::Set(s::Value::Rules(rules)) },
+            ]),
+        },
+        value_bytes: u64::MAX,
+    };
+    let wire = translate::revision(&answer, &w::CEILINGS).unwrap();
+    let restored =
+        jig_client_protocol_link::translate::settings::restore_revision_answer(&wire, &f::client_limits()).unwrap();
+    let c::RevisionAnswer::Revision(document) = restored else { panic!("revision") };
+    let c::RevisionEdit::Set(c::SettingSet { value: c::SettingValue::Template(template) }) =
+        &document.items.get(0).unwrap().edit
+    else {
+        panic!("template")
+    };
+    let choice = template.llm.as_ref().unwrap();
+    assert_eq!(choice.main.model.bytes(), b"retired");
+    assert_eq!(choice.main.effort.as_ref().unwrap().bytes(), b"high");
+    assert_eq!(choice.subagents.get(0).unwrap().model.bytes(), b"scripted");
+    assert_eq!(choice.subagents.get(0).unwrap().effort.as_ref().unwrap().bytes(), b"new");
+    let c::RevisionEdit::Set(c::SettingSet { value: c::SettingValue::Policy(policy) }) =
+        &document.items.get(1).unwrap().edit
+    else {
+        panic!("policy")
+    };
+    let Some(c::AuthorityModels::Named(names)) = &policy.ceiling.models else { panic!("frozen models") };
+    assert_eq!(names.get(0).unwrap().as_ref(), b"retired");
+    let Some(c::AuthorityModels::Named(names)) = &policy.roles.get(0).unwrap().authority.models else {
+        panic!("frozen role models")
+    };
+    assert_eq!(names.get(0).unwrap().as_ref(), b"scripted");
+    let c::RevisionEdit::Set(c::SettingSet { value: c::SettingValue::Rules(rules) }) =
+        &document.items.get(2).unwrap().edit
+    else {
+        panic!("rules")
+    };
+    let Some(c::AuthorityModels::Named(names)) = &rules.ceiling.models else { panic!("frozen rule models") };
+    assert_eq!(names.get(0).unwrap().as_ref(), b"retired");
 }

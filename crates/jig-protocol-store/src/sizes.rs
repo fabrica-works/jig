@@ -89,15 +89,9 @@ fn largest(
             .max(notes_v1::Row::worst_case_bytes(&limits.notes)?)
             .max(component_v3::worst_case_bytes(&component_v3::CEILINGS)?)
             .max(accounts_v2::worst_case_bytes(&accounts_v2::CEILINGS)?)
-            .max(
-                core::settings::revision_worst_case(domain)?.checked_add(16)?.checked_add(
-                    u64::from(jig_domain_tasks::MODELS)
-                        .checked_mul(u64::from(core::MODEL_NAME_BYTES).checked_add(4)?.checked_add(4)?.checked_add(
-                            u64::from(core::EFFORTS).checked_mul(u64::from(core::EFFORT_BYTES).checked_add(4)?)?,
-                        )?)?
-                        .checked_add(4)?,
-                )?,
-            )
+            // The domain revision bound includes the catalogue snapshot. Its
+            // owned list carriers cover the encoded counts and name lengths.
+            .max(core::settings::revision_worst_case(domain)?.checked_add(16)?)
             .max(u64::from(application.value)),
     )
     .ok()?;

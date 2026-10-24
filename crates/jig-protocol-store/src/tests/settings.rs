@@ -185,12 +185,20 @@ fn each_settings_record_round_trips_its_whole_domain_value() {
         ]);
         rows.push(s::Record::Revision {
             history: false,
-            revision: s::Revision { head: head.clone(), items: items.clone() },
+            revision: s::Revision {
+                models: Box::new([catalogue_name(b"one"), catalogue_name(b"two")]),
+                head: head.clone(),
+                items: items.clone(),
+            },
         })
         .expect("settings fixture count");
         rows.push(s::Record::Revision {
             history: true,
-            revision: s::Revision { head: head.clone(), items: items.clone() },
+            revision: s::Revision {
+                models: Box::new([catalogue_name(b"one"), catalogue_name(b"two")]),
+                head: head.clone(),
+                items: items.clone(),
+            },
         })
         .expect("settings fixture count");
         rows.push(s::Record::Proposal {
@@ -259,7 +267,7 @@ fn live_settings_remap_efforts_by_name_and_refuse_missing_efforts() {
     let limits = codec::limits(&fixtures::CORE_LIMITS).unwrap();
     let before = [catalogue_name(b"one"), catalogue_name(b"two")];
     let mut after = before.clone();
-    after[0].efforts.swap(0, 1);
+    after[0].efforts = Box::new([Box::from(b"high".as_slice()), Box::from(b"low".as_slice())]);
     let value = s::Value::Template(Box::new(template()));
     for original in [
         s::Record::Default {
@@ -318,4 +326,69 @@ fn live_settings_remap_efforts_by_name_and_refuse_missing_efforts() {
     };
     let s::Value::Template(value) = changed.value.unwrap() else { panic!("template") };
     assert_eq!(value.llm.unwrap().main.model, u8::MAX);
+}
+
+#[test]
+fn revisions_keep_their_own_catalogue_even_when_todays_models_and_efforts_differ() {
+    let mut domain = fixtures::CORE_LIMITS;
+    domain.authority.executors = 3;
+    let limits = codec::limits(&domain).unwrap();
+    let before = [catalogue_name(b"one"), catalogue_name(b"two")];
+    let mut after = [catalogue_name(b"one")];
+    after[0].efforts = Box::new([Box::from(b"high".as_slice()), Box::from(b"low".as_slice())]);
+    let row = core::Record::Core(core::CoreRecord::Settings(s::Record::Revision {
+        history: true,
+        revision: s::Revision {
+            models: Box::new(before.clone()),
+            head: s::Head {
+                number: 2,
+                against: 1,
+                at: Wall::EPOCH,
+                by: s::Decider::Release,
+                proposal: None,
+                moved: false,
+            },
+            items: Box::new([
+                s::Item {
+                    setting: s::Setting::Template(1),
+                    edit: s::Edit::Set(s::Value::Template(Box::new(template()))),
+                },
+                s::Item { setting: s::Setting::Rules, edit: s::Edit::Set(s::Value::Rules(Box::new(rules()))) },
+            ]),
+        },
+    }));
+    let bytes = codec::encode(&row, &limits, &before).unwrap();
+    assert_eq!(codec::decode(&row.key(), &bytes, &limits, &after), Some(row.clone()));
+    assert_eq!(codec::encode(&row, &limits, &after), Some(bytes));
+}
+
+#[test]
+#[expect(clippy::disallowed_macros, reason = "the maximum-size codec fixture is ordinary test Rust")]
+fn the_largest_catalogue_encoding_fits_its_domain_snapshot_price() {
+    let limits = codec::limits(&fixtures::CORE_LIMITS).unwrap();
+    let model = s::ModelName {
+        name: vec![b'm'; usize::try_from(core::MODEL_NAME_BYTES).unwrap()].into_boxed_slice(),
+        efforts: vec![
+            vec![b'e'; usize::try_from(core::EFFORT_BYTES).unwrap()].into_boxed_slice();
+            usize::try_from(core::EFFORTS).unwrap()
+        ]
+        .into_boxed_slice(),
+    };
+    let row = core::Record::Core(core::CoreRecord::Settings(s::Record::Revision {
+        history: true,
+        revision: s::Revision {
+            models: vec![model; usize::try_from(tasks::MODELS).unwrap()].into_boxed_slice(),
+            head: s::Head {
+                number: 2,
+                against: 1,
+                at: Wall::EPOCH,
+                by: s::Decider::Release,
+                proposal: None,
+                moved: false,
+            },
+            items: Box::new([]),
+        },
+    }));
+    let bytes = codec::encode(&row, &limits, &[]).unwrap();
+    assert!(u64::try_from(bytes.len()).unwrap() <= s::model_names_worst_case().unwrap());
 }

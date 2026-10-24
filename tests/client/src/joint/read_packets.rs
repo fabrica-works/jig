@@ -91,15 +91,7 @@ pub fn read_with_codec(
             documents::Document::Escalation(value) => escalation(what, value, limits, &transport.models)?,
             documents::Document::Project(value) => project(what, value, limits, &transport.models)?,
             documents::Document::Deployment(value) => deployment(what, value, limits)?,
-            documents::Document::PersonTask(value) => {
-                let client::Read::PersonTask { task } = what else { return Err(Invalid::OwnerRoute) };
-                if *task != value.task.number {
-                    return Err(Invalid::OwnerRoute);
-                }
-                client::ReadResult::Value(
-                    wire::documents::person_task_read(value, limits, &transport.models).map_err(Invalid::Document)?,
-                )
-            }
+            documents::Document::PersonTask(value) => person_task(what, value, limits, &transport.models)?,
             documents::Document::Result(value) => {
                 let client::Read::Result { task } = what else { return Err(Invalid::OwnerRoute) };
                 if *task != value.task.number {
@@ -134,6 +126,19 @@ pub fn read_with_codec(
         client,
         event: crate::test::up(jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) }),
     })
+}
+
+fn person_task(
+    what: &client::Read,
+    value: &documents::PersonTask,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadResult, Invalid> {
+    let client::Read::PersonTask { task } = what else { return Err(Invalid::OwnerRoute) };
+    if *task != value.task.number {
+        return Err(Invalid::OwnerRoute);
+    }
+    Ok(client::ReadResult::Value(wire::documents::person_task_read(value, limits, models).map_err(Invalid::Document)?))
 }
 
 fn proposal(

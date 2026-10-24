@@ -51,7 +51,8 @@ fn settings_reads_and_watch_reach_the_core_while_decisions_wait_for_task_b() {
         assert!(peer.answered(socket).is_none());
         peer.answer_read(reply, jig_domain_core::reads::Answer::None(jig_domain_core::reads::Why::Unknown));
         assert!(matches!(
-            w::ReadAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("read answer"))).unwrap(),
+            w::ReadAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("read answer")))
+                .expect("settings read answer"),
             w::ReadAnswer::None(_)
         ));
     }
@@ -72,7 +73,8 @@ fn settings_reads_and_watch_reach_the_core_while_decisions_wait_for_task_b() {
     assert!(peer.answered(socket).is_none());
     peer.refuse_watch(watcher, jig_domain_core::WatchRefusal::Unknown);
     assert!(matches!(
-        w::OpenAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("watch answer"))).unwrap(),
+        w::OpenAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("watch answer")))
+            .expect("settings watch answer"),
         w::OpenAnswer::Refused(_)
     ));
     assert!(peer.take_core().is_none());

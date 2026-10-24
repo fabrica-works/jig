@@ -731,6 +731,7 @@ dependencies = [
  "jig-test-store",
  "jig-test-store-files",
  "jig-test-system",
+ "skein-codec",
  "skein-lib",
  "skein-world",
  "smith-channel",

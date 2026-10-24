@@ -126,6 +126,14 @@ pub(super) fn template(
     models: &[crate::Model],
     limits: &w::Limits,
 ) -> Result<w::Template, w::Problem> {
+    let llm = super::llm::choice(value.llm.as_ref(), models, limits)?;
+    template_with_llm(value, llm, limits)
+}
+pub(super) fn template_with_llm(
+    value: &jig_domain_core::Template,
+    llm: Option<w::LlmChoice>,
+    limits: &w::Limits,
+) -> Result<w::Template, w::Problem> {
     w::Template::new(
         limits,
         w::TemplateParts {
@@ -143,7 +151,7 @@ pub(super) fn template(
             flags: flags(value.flags, limits)?,
             label: value.label,
             grace: value.grace,
-            llm: super::llm::choice(value.llm.as_ref(), models, limits)?,
+            llm,
         },
     )
 }

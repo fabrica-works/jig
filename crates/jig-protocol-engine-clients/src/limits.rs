@@ -67,6 +67,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         )?
         .checked_add(skein_lib::List::<crate::Served>::worst_case(limits.families)?)?
         .checked_add(skein_lib::List::<u16>::worst_case(limits.providers)?.checked_mul(2)?)?
+        // A live setting translation borrows one bounded name snapshot.
+        .checked_add(jig_domain_core::settings::model_names_worst_case()?)?
         // The configured models, which `Component::new` holds to the core's bounds.
         .checked_add(skein_lib::List::<crate::Model>::worst_case(jig_domain_tasks::MODELS)?)?
         .checked_add(

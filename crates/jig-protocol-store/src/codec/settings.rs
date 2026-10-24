@@ -1473,11 +1473,7 @@ fn decode_changed(
     }
     Ok(settings::Changed { value: field_value, revision: field_revision })
 }
-fn encode_revision(
-    value: &settings::Revision,
-    limits: &wire::Limits,
-    names: &[settings::ModelName],
-) -> Result<wire::Revision, wire::Problem> {
+fn encode_revision(value: &settings::Revision, limits: &wire::Limits) -> Result<wire::Revision, wire::Problem> {
     let field_head = encode_head(&value.head, limits)?;
     let mut list_35 = List::with_capacity(limits.revision_items);
     for entry in &value.items {
@@ -1489,14 +1485,10 @@ fn encode_revision(
     let field_items = list_35;
     wire::Revision::new(
         limits,
-        wire::RevisionParts { models: encode_names(names, limits)?, head: field_head, items: field_items },
+        wire::RevisionParts { models: encode_names(&value.models, limits)?, head: field_head, items: field_items },
     )
 }
-fn decode_revision(
-    value: wire::Revision,
-    limits: &wire::Limits,
-    names: &[settings::ModelName],
-) -> Result<settings::Revision, wire::Problem> {
+fn decode_revision(value: wire::Revision, limits: &wire::Limits) -> Result<settings::Revision, wire::Problem> {
     let wire::RevisionParts { models, head, items } = value.into_parts();
     let field_head = decode_head(head, limits);
     let mut list_36 = List::with_capacity((items).len());
@@ -1505,15 +1497,12 @@ fn decode_revision(
         list_36.push(element).expect("decoded list bound");
     }
     let field_items = list_36.into_boxed();
-    let mut field_items = field_items;
-    let moved = model_moves(&models, names);
-    for item in &mut field_items {
-        match &mut item.edit {
-            settings::Edit::Set(value) => remap_value(value, &moved, &models, names),
-            settings::Edit::Removed | settings::Edit::Reset => {}
-        }
+    let mut names = List::with_capacity(models.len());
+    for model in models.into_boxed() {
+        let wire::ModelNameParts { name, efforts } = model.into_parts();
+        names.push(settings::ModelName { name, efforts: efforts.into_boxed() }).expect("stored catalogue count");
     }
-    Ok(settings::Revision { head: field_head, items: field_items })
+    Ok(settings::Revision { models: names.into_boxed(), head: field_head, items: field_items })
 }
 fn encode_charter_version(
     value: &settings::CharterVersion,
@@ -1634,7 +1623,7 @@ pub fn encode(
             Ok(writer.finish())
         }
         settings::Record::Revision { revision, .. } => {
-            let value = encode_revision(revision, limits, names)?;
+            let value = encode_revision(revision, limits)?;
             let mut writer = Writer::new(usize::try_from(value.measure()).expect("settings row size"));
             value.encode(&mut writer).expect("measured row");
             Ok(writer.finish())
@@ -1687,7 +1676,7 @@ pub fn decode(
             };
             settings::Record::Revision {
                 history,
-                revision: decode_revision(wire::Revision::decode(limits, &mut reader)?, limits, names)?,
+                revision: decode_revision(wire::Revision::decode(limits, &mut reader)?, limits)?,
             }
         }
         settings::Key::Extent => {

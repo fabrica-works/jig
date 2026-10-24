@@ -154,7 +154,7 @@ pub(crate) fn answer(
         }
         reads::Answer::Revision(value) => w::ReadValue::Revision(w::ReadRevisionAnswer::new(
             limits,
-            w::ReadRevisionAnswerParts { value: super::settings::revision(value, models, limits)? },
+            w::ReadRevisionAnswerParts { value: super::settings::revision(value, limits)? },
         )?),
         reads::Answer::Revisions(value) => w::ReadValue::Revisions(super::settings::revisions(value, limits)?),
         reads::Answer::Tasks(page) => pages::tasks(page, limits)?,

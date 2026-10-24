@@ -48,7 +48,7 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
                 n == newest && n >= first && n <= last
             }
             Key::Core(crate::CoreKey::Settings(crate::settings::Key::History(n))) => {
-                n != newest && n >= first && n <= last
+                n <= newest && n >= first && n <= last
             }
             Key::Core(_) | Key::Tasks(_) | Key::People(_) | Key::Notes(_) | Key::Accounts(_) => false,
         },
