@@ -7,17 +7,9 @@ use skein_lib::Reader;
 static HEAP: Counting = Counting;
 
 fn check<T>(family: &str, record: &str, bound: u64, decode: impl FnOnce(&[u8]) -> T) {
-    let version = match family {
-        "core" => 6,
-        "tasks" => 9,
-        "people" => 13,
-        "component" => 3,
-        "accounts" => 2,
-        _ => 1,
-    };
     let golden = std::fs::read(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(format!("../../crates/jig-protocol-store/golden/{family}/v{version}/record_{record}_full.bin")),
+            .join(format!("../../crates/jig-protocol-store/golden/{family}/record_{record}_full.bin")),
     )
     .expect("full golden row");
     let meter = Meter::new();

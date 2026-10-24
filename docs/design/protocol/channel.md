@@ -394,9 +394,10 @@ holds, and neither of its components reads them.
   codecs in its protocol layers (section 3).
 - **Versioned by the application.** Its encodings carry no version of
   their own on the channel. The application's payload version in the
-  opening (4.1) covers all of them, so an engine and a worker that would
-  read each other's parts differently are refused before any part
-  crosses.
+  opening (4.1) covers all of them; another version is refused before
+  any part crosses. Until the first release the version stays fixed
+  while these encodings change in place, so the engine and its workers
+  come from the same build (skein's `codec.md`, section 5).
 
 ### 6.3 Host tools' calls
 

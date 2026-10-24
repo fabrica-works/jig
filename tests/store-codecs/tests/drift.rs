@@ -12,7 +12,7 @@ fn check(family: &str, version: u16) {
         fs::read_to_string(store().join(format!("schema/{family}-v{version}.schema"))).expect("schema readable");
     let output = generate(&parse(&source).expect("schema valid"));
     let code = store().join(format!("src/generated/{family}_v{version}.rs"));
-    let goldens = store().join(format!("golden/{family}/v{version}"));
+    let goldens = store().join(format!("golden/{family}"));
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 cargo nextest run -p jig-store-codecs-world --test drift";
     if write {
@@ -38,7 +38,7 @@ fn the_notes_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_component_familys_code_and_goldens_have_no_drift() {
-    check("component", 2);
+    check("component", 3);
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn the_tasks_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_people_familys_code_and_goldens_have_no_drift() {
-    check("people", 12);
+    check("people", 13);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn the_test_connectors_code_and_goldens_have_no_drift() {
     let source = fs::read_to_string(root.join("schema/test-connector-v2.schema")).expect("schema readable");
     let output = generate(&parse(&source).expect("schema valid"));
     let code = root.join("src/generated/v2.rs");
-    let goldens = root.join("golden/v2");
+    let goldens = root.join("golden");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     if write {
         fs::write(code, &output.rust).expect("write code");
@@ -88,5 +88,4 @@ fn the_test_connectors_code_and_goldens_have_no_drift() {
 #[test]
 fn the_settings_familys_code_and_goldens_have_no_drift() {
     check("settings", 1);
-    check("component", 3);
 }

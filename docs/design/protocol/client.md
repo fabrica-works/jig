@@ -174,8 +174,9 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   within them. A list the client bounds by its rows (a task's
   dependencies, a role's holdings, a pattern's segments) takes at most
   32 items, so 32 is the most the client's `rows` may be, and with it
-  the rows of its pages and windows. More is a new version of the wire
-  (section 9). A client whose rows pass it is unusable: the link
+  the rows of its pages and windows. More changes the wire's schema;
+  until the first release its version stays fixed (section 9; skein's
+  `codec.md`, section 5). A client whose rows pass it is unusable: the link
   refuses its limits at construction, and nothing is cut to fit.
 - **A document's nested collections cross as pieces.** The client bounds
   a document by its bytes in all, not each list by its count times its
@@ -266,7 +267,7 @@ and leaves application-family versions separate. Implementation status
 is in `../STATUS.md`.
 
 The account's move (`../domain/accounts.md`, section 6) adds to jig's
-wire, in the version after v16: the account changes `move_out { account
+wire, in its current schema: the account changes `move_out { account
 }`, `written { number }` and `move_in { digest }`, the last carrying the
 moved file as the keyed request's value (section 5), whose bound grows
 to 128 KiB; the answer `Made::moving_out { account, number, record }`,
@@ -756,10 +757,11 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   read: *version not served*, naming the owner and the ranges the engine
   serves. A keyed request, a read and a watch's opening are each
   answered so; nothing is done.
-- **The template preview's wire** is v12 (section 3); its schema,
-  codec, translations, goldens and served-version range change together.
-  Family owners keep their own versions; core and task store versions
-  do not change for this preview.
+- **Until the first release, versions stay fixed** (skein's `codec.md`,
+  section 5). A change to a record, the template preview's among them
+  (section 3), changes its schema, codec, translations and one set of
+  golden bytes in place. Versions move at a release; family owners keep
+  their own versions.
 - **The client's versions:** jig's is its wire's; each family owner's,
   the application declares as it makes the client, and the client
   judges each hello against them, whole (`../client/domain/client.md`,
