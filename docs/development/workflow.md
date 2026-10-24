@@ -23,7 +23,7 @@ NEXTEST_DOUBLE_SPAWN=0 cargo nextest run --workspace
 NEXTEST_DOUBLE_SPAWN=0 cargo nextest run --workspace --profile fuzzy
 ```
 
-skein's `land` (skein's `docs/foundation/development.md`, section 9) does
+agents' `land` (agents' `roles/owners.md`, 4.4) does
 it all from a clean worktree on the branch: it rebases on `origin/main`,
 runs the gate through the machine's queue, records its result in the tip
 commit's trailers, and pushes the tip to `origin`'s `main`, which only

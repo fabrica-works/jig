@@ -1,6 +1,6 @@
 # Agent guidance for jig
 
-- **main moves only through skein's `land`,** which runs the gate,
+- **main moves only through agents' `land`,** which runs the gate,
   `scripts/check.sh`, and pushes (`docs/development/workflow.md`, section
   1). Do not run the gate yourself before `land`. A change to Markdown
   files only lands with `land --docs`. Run what compiles and the tests of

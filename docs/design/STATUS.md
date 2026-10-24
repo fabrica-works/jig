@@ -2,7 +2,7 @@
 
 Updated 2026-10-23. How far jig's code is from its design, and the
 work that takes it there. Owners keep the rows their work changes
-(skein's owners.md, 4.4).
+(agents' `roles/owners.md`, 4.4).
 
 A cancel grace emits durable `FinishRequested { revision }`, translated to
 smith's finish flag live and in Start; clients still see Amendment. Tasks

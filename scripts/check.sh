@@ -1,7 +1,7 @@
 #!/bin/sh
 # The gate (docs/development/workflow.md, section 1): formatting, lints as
 # errors, then three test suites in full: the default one, then the fuzzy
-# one, then the browser tier. skein's `land` runs it through the machine's queue.
+# one, then the browser tier. agents' `land` runs it through the machine's queue.
 set -eu
 
 cd "$(dirname "$0")/.."

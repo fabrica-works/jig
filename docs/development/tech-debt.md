@@ -414,7 +414,7 @@ numbers, file by file:
 **Resolved.** Building the client, the evidence each merge carried cost
 more machine time than the tests themselves: three serial runs of the
 touched binaries, the workspace's serial totals, and the gate. The
-evidence is now the gate alone, which skein's `land` runs and records in
+evidence is now the gate alone, which agents' `land` runs and records in
 the landing's `Gate-Result` trailer (skein's development.md, section 9).
 The last gated landing, `4e1ab92b`, ran 4,250 focused tests in 15.8 s,
 111 fuzzy ones in 23.2 s and one browser test in 1.3 s, 68 s in all

@@ -24,7 +24,7 @@ default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binar
 global-timeout = "120s"
 slow-timeout = { period = "10s" }
 
-# The QA passes' tests (skein's docs/foundation/owners.md, 4.6): the binaries named qa_*, which the gate builds and does not run.
+# The QA passes' tests (agents' roles/owners.md, 4.6): the binaries named qa_*, which the gate builds and does not run.
 [profile.qa]
 default-filter = "binary(/^qa_/)"
 global-timeout = "120s"
