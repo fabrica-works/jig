@@ -736,6 +736,9 @@ impl World {
                                     people::AccountChange::MoveOut { account } => {
                                         Outcome::AccountMovingOut { account, number: 2, source: 1 }
                                     }
+                                    people::AccountChange::FinishSignIn { source, .. } => {
+                                        Outcome::AccountFinishing { source }
+                                    }
                                     people::AccountChange::MoveIn { .. } => {
                                         Outcome::AccountMovedIn { account: 1, renewed: false }
                                     }

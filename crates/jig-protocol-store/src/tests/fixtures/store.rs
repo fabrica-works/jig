@@ -41,6 +41,7 @@ pub fn limits() -> Limits {
         files: 2,
         reads: 4,
         orphan_erases: 1,
+        held: 2,
     }
 }
 

@@ -543,6 +543,17 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         )?),
         domain::Refusal::NotWaiting => wire::Refusal::NotWaiting,
         domain::Refusal::NoFurther => wire::Refusal::NoFurther,
+        domain::Refusal::SignInRedirect { why } => wire::Refusal::SignInRedirect(wire::RefusalSignInRedirect::new(
+            limits,
+            wire::RefusalSignInRedirectParts {
+                why: match why {
+                    domain::SignInRedirectWhy::NotWaiting => wire::SignInRedirectWhy::NotWaiting,
+                    domain::SignInRedirectWhy::Address => wire::SignInRedirectWhy::Address,
+                    domain::SignInRedirectWhy::State => wire::SignInRedirectWhy::State,
+                    domain::SignInRedirectWhy::TooMany => wire::SignInRedirectWhy::TooMany,
+                },
+            },
+        )?),
         domain::Refusal::AccountMove { why } => wire::Refusal::AccountMove(wire::RefusalAccountMove::new(
             limits,
             wire::RefusalAccountMoveParts { why: encode_account_move_why(*why) },
@@ -563,6 +574,7 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         )?),
     })
 }
+#[expect(clippy::too_many_lines, reason = "one exhaustive translation preserves every stored refusal variant")]
 pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
     match value {
         wire::Refusal::Stale(value) => domain::Refusal::Stale { newest: value.newest() },
@@ -647,6 +659,9 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
         }
         wire::Refusal::NotWaiting => domain::Refusal::NotWaiting,
         wire::Refusal::NoFurther => domain::Refusal::NoFurther,
+        wire::Refusal::SignInRedirect(row) => {
+            domain::Refusal::SignInRedirect { why: decode_sign_in_redirect_why(row.why()) }
+        }
         wire::Refusal::AccountMove(value) => {
             domain::Refusal::AccountMove { why: decode_account_move_why(value.into_parts().why) }
         }
@@ -813,5 +828,14 @@ fn decode_setting_fault(value: &wire::SettingFault) -> domain::SettingFault {
         wire::SettingFault::Budget => domain::SettingFault::Budget,
         wire::SettingFault::Grace => domain::SettingFault::Grace,
         wire::SettingFault::Owner => domain::SettingFault::Owner,
+    }
+}
+
+const fn decode_sign_in_redirect_why(value: &wire::SignInRedirectWhy) -> domain::SignInRedirectWhy {
+    match value {
+        wire::SignInRedirectWhy::NotWaiting => domain::SignInRedirectWhy::NotWaiting,
+        wire::SignInRedirectWhy::Address => domain::SignInRedirectWhy::Address,
+        wire::SignInRedirectWhy::State => domain::SignInRedirectWhy::State,
+        wire::SignInRedirectWhy::TooMany => domain::SignInRedirectWhy::TooMany,
     }
 }

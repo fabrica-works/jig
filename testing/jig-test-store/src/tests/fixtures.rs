@@ -166,6 +166,7 @@ pub fn component() -> Component {
         files: 8,
         reads: 4,
         orphan_erases: 1,
+        held: 2,
     };
     let stores =
         jig_protocol_store::Stores { store: skein_kv::Store::memory(&kv), secrets: skein_kv::Store::memory(&kv) };

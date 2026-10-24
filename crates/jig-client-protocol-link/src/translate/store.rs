@@ -273,6 +273,9 @@ fn account_change(value: &w::AccountChange) -> Result<c::AccountChange, w::Probl
         }
         w::AccountChange::MoveOut(row) => c::AccountChange::MoveOut { account: row.account() },
         w::AccountChange::Written(row) => c::AccountChange::Written { number: row.number() },
+        w::AccountChange::FinishSignIn(row) => {
+            c::AccountChange::FinishSignIn { source: row.source(), digest: *row.digest() }
+        }
         w::AccountChange::MoveIn(row) => c::AccountChange::MoveIn { digest: *row.digest() },
         w::AccountChange::CheckProgram(row) => c::AccountChange::CheckProgram { source: row.source() },
         w::AccountChange::AddKey(row) => {

@@ -36,6 +36,7 @@ pub fn settings() -> Settings {
         stream: 31,
         models: models(),
         key_bytes: 7934,
+        redirect_bytes: 4096,
         moved_bytes: 70000,
     }
 }
@@ -80,6 +81,7 @@ pub fn me_document(needs: u32) -> jig_domain_core::documents::Document {
         providers: skein_lib::List::with_capacity(0),
         providers_cut: false,
         key_bytes: 256,
+        redirect_bytes: 4096,
         party: 7,
         kind: jig_domain_people::Kind::Person,
         login: d::Text { bytes: Box::new([]), cut: false },
@@ -223,6 +225,7 @@ pub fn copy_settings(settings: &Settings) -> Settings {
         stream: settings.stream,
         models: settings.models.clone(),
         key_bytes: settings.key_bytes,
+        redirect_bytes: settings.redirect_bytes,
         moved_bytes: settings.moved_bytes,
     }
 }

@@ -12,7 +12,7 @@ pub use decision::DecisionWord;
 use skein_lib::List;
 use skein_ui::phrases::{HoleKind, HoleShape, Language, PhraseId, PhraseShape};
 /// Phrase count, for a caller composing a bounded phrasebook.
-pub const PHRASES: u32 = 113;
+pub const PHRASES: u32 = 117;
 /// Owner of jig's public enum vocabulary.
 pub const OWNER: skein_ui::Owner = skein_ui::Owner { number: 65_537 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,6 +47,10 @@ pub enum HoldWord {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RefusalWord {
+    SignInRedirectNotWaiting,
+    SignInRedirectAddress,
+    SignInRedirectState,
+    SignInRedirectTooMany,
     Stale,
     Full,
     Circle,
@@ -153,6 +157,12 @@ impl Word {
             Refusal::NotOffered => RefusalWord::NotOffered,
             Refusal::KeyConflict => RefusalWord::KeyConflict,
             Refusal::Llm { .. } => RefusalWord::Llm,
+            Refusal::SignInRedirect { why } => match why {
+                crate::contract::SignInRedirectWhy::NotWaiting => RefusalWord::SignInRedirectNotWaiting,
+                crate::contract::SignInRedirectWhy::Address => RefusalWord::SignInRedirectAddress,
+                crate::contract::SignInRedirectWhy::State => RefusalWord::SignInRedirectState,
+                crate::contract::SignInRedirectWhy::TooMany => RefusalWord::SignInRedirectTooMany,
+            },
             Refusal::AccountMove { why } => match why {
                 crate::contract::AccountMoveWhy::NotSignedIn => RefusalWord::AccountMoveNotSignedIn,
                 crate::contract::AccountMoveWhy::NotOurs => RefusalWord::AccountMoveNotOurs,
@@ -207,7 +217,7 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 113] = [
+pub const ALL: [Word; 117] = [
     Word::Refusal(RefusalWord::Stale),
     Word::Refusal(RefusalWord::Full),
     Word::Hold(HoldWord::Exceeded(Bound::Reasoning)),
@@ -280,6 +290,10 @@ pub const ALL: [Word; 113] = [
     Word::Refusal(RefusalWord::AccountMoveHeld),
     Word::Refusal(RefusalWord::AccountMoveCancelled),
     Word::Refusal(RefusalWord::AccountMoveMoving),
+    Word::Refusal(RefusalWord::SignInRedirectNotWaiting),
+    Word::Refusal(RefusalWord::SignInRedirectAddress),
+    Word::Refusal(RefusalWord::SignInRedirectState),
+    Word::Refusal(RefusalWord::SignInRedirectTooMany),
     Word::Waiting(WaitingWord::Party),
     Word::Waiting(WaitingWord::Delegates),
     Word::Waiting(WaitingWord::News),

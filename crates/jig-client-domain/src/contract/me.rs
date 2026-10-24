@@ -23,6 +23,8 @@ pub struct Me {
     pub providers_cut: bool,
     /// Actual startup key ceiling, including the client carried-value bound.
     pub key_bytes: u32,
+    /// The driver's redirect bound: the most bytes a pasted sign-in address may have.
+    pub redirect_bytes: u32,
 }
 
 /// The authenticated identity, with independently supplied local text loss.

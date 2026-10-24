@@ -183,6 +183,8 @@ pub struct Settings {
     pub llm_providers: accounts::Providers,
     /// Actual client key ceiling, supplied by startup after protocol limits are checked.
     pub key_bytes: u32,
+    /// The driver's redirect bound: the most bytes a pasted sign-in address may have.
+    pub redirect_bytes: u32,
 }
 
 /// Jig's authority bits for the engine's tool families.
@@ -288,7 +290,7 @@ pub struct Core {
     pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
     pub(crate) settings_input: Option<(Result<Box<settings::Change>, settings::Failure>, u32)>,
     pub(crate) key_input: Option<Carried>,
-    pub(crate) keys: Map<Token, Carried>,
+    pub(crate) keys: Map<Token, routing::key_routes::Flight>,
     pub(crate) application_input: Option<routing::application_routes::Input>,
     pub(crate) task_capacity_mark: u64,
     pub(crate) settings_holders: u32,

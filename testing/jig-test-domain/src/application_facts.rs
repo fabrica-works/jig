@@ -16,6 +16,7 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
         | people::Refusal::Circle { .. }
         | people::Refusal::Dependency { .. }
         | people::Refusal::Kept { .. }
+        | people::Refusal::SignInRedirect { .. }
         | people::Refusal::AccountMove { .. } => {
             unreachable!("the application routes only Release, never Create, Amend or Answer")
         }

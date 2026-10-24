@@ -583,6 +583,9 @@ fn account_change(value: &w::AccountChange) -> Result<p::AccountChange, Untransl
         w::AccountChange::CheckProgram(row) => p::AccountChange::CheckProgram { source: row.source() },
         w::AccountChange::MoveOut(row) => p::AccountChange::MoveOut { account: row.account() },
         w::AccountChange::Written(row) => p::AccountChange::Written { number: row.number() },
+        w::AccountChange::FinishSignIn(row) => {
+            p::AccountChange::FinishSignIn { source: row.source(), digest: *row.digest() }
+        }
         w::AccountChange::MoveIn(row) => p::AccountChange::MoveIn { digest: *row.digest() },
         w::AccountChange::AddKey(row) => {
             p::AccountChange::AddKey { provider: row.provider(), join: *row.join(), digest: *row.digest() }

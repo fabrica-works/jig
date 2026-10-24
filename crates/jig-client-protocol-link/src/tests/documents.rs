@@ -255,3 +255,22 @@ fn catalogue_repeated_providers_are_refused() {
 fn catalogue_row_capacity_is_bounded() {
     assert_eq!(documents::frame(repeated_catalogue(3), &fixtures::limits()), Err(Undecodable::TooLarge));
 }
+
+fn redirect_frame(bound: u32) -> w::Me {
+    let mut parts = fixtures::frame_record().into_parts();
+    parts.redirect_bytes = bound;
+    w::Me::new(&fixtures::limits().wire, parts).unwrap()
+}
+#[test]
+fn the_redirect_bound_at_the_wire_bound_is_advertised() {
+    let limits = fixtures::limits();
+    assert_eq!(
+        documents::frame(redirect_frame(limits.wire.keyed_value_some), &limits).unwrap().redirect_bytes,
+        limits.wire.keyed_value_some
+    );
+}
+#[test]
+fn a_redirect_bound_past_the_wire_bound_is_refused() {
+    let limits = fixtures::limits();
+    assert_eq!(documents::frame(redirect_frame(limits.wire.keyed_value_some + 1), &limits), Err(Undecodable::TooLarge));
+}

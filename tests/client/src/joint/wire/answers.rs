@@ -88,6 +88,7 @@ fn refusal(
         | people::Refusal::NoFurther
         | people::Refusal::Unknown
         | people::Refusal::Account { .. }
+        | people::Refusal::SignInRedirect { .. }
         | people::Refusal::AccountMove { .. }
         | people::Refusal::Provider
         | people::Refusal::NameTaken

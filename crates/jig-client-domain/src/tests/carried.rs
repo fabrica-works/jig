@@ -261,3 +261,30 @@ fn a_missing_value_differs_from_an_empty_value() {
     let (mut c, _) = moving();
     c.step(Event::Carry { key: KEY, name: NAME, request: move_out(), value: Some(value(b"")) });
 }
+
+#[test]
+fn a_finish_is_carried_once_never_saved_and_answered_once() {
+    const SOURCE: u32 = 29;
+    let address = b"http://127.0.0.1:1455/auth/callback?code=c&state=s";
+    let request =
+        change(contract::AccountChange::FinishSignIn { source: SOURCE, digest: skein_lib::sha256::digest(address) });
+    let mut c = Client::live();
+    c.step(Event::Carry { key: KEY, name: NAME, request: request.clone(), value: Some(value(address)) });
+    let downs = c.downs();
+    let [Down::Send { attempt, key: NAME, request: sent, value: Some(bytes) }] = downs.as_ref() else {
+        panic!("one send, no save")
+    };
+    assert_eq!(sent, &request);
+    assert_eq!(bytes.expose(), address);
+    c.told();
+    never_sent_again(&mut c);
+    let done =
+        Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(contract::OwnerOutcome::AccountFinishing {
+            source: SOURCE,
+        })));
+    answer(&mut c, *attempt, RequestEnvelope::Final, Some(done.clone()));
+    assert_eq!(c.told().as_ref(), &[Told::Answered { key: KEY, outcome: Outcome::Answered(done.clone()) }]);
+    answer(&mut c, *attempt, RequestEnvelope::Final, Some(done));
+    assert!(c.told().is_empty());
+    assert!(c.downs().is_empty());
+}

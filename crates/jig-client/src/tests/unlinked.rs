@@ -31,6 +31,7 @@ fn live() -> Client {
                 providers: List::with_capacity(0),
                 providers_cut: false,
                 key_bytes: 256,
+                redirect_bytes: 4096,
                 party: contract::MeParty {
                     number: PARTY,
                     kind: contract::PartyKind::Person,

@@ -317,6 +317,7 @@ pub(crate) fn config(seed: u64) -> Config {
             tail_bytes: 128,
             tools: ToolFamilies::JIG,
             key_bytes: 256,
+            redirect_bytes: 4096,
             llm_providers: accounts::Providers {
                 providers: Box::new([accounts::Provider {
                     name: b"Fake".as_slice().into(),

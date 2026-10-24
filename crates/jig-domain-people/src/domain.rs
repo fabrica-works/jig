@@ -669,6 +669,7 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::AccountProgramDeclared { .. }
         | Outcome::AccountKeyKept { .. }
         | Outcome::AccountMovingOut { .. }
+        | Outcome::AccountFinishing { .. }
         | Outcome::AccountMovedIn { .. }
         | Outcome::AccountChanged
         | Outcome::AccountRemoved { .. }
@@ -1433,6 +1434,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         AccountRemoved,
         AccountMovingOut(u32),
         AccountMovedIn,
+        AccountFinishing(u32),
     }
 
     let expected = match ask {
@@ -1483,6 +1485,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
             crate::AccountChange::DeclareProgram { .. } => Expected::AccountProgram,
             crate::AccountChange::Remove { .. } => Expected::AccountRemoved,
             crate::AccountChange::MoveOut { account } => Expected::AccountMovingOut(*account),
+            crate::AccountChange::FinishSignIn { source, .. } => Expected::AccountFinishing(*source),
             crate::AccountChange::MoveIn { .. } => Expected::AccountMovedIn,
             crate::AccountChange::Written { .. }
             | crate::AccountChange::CheckProgram { .. }
@@ -1551,6 +1554,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::AccountMovingOut { account, number, source } => {
             expected == Expected::AccountMovingOut(account) && number != u32::MAX && source != u32::MAX
         }
+        Outcome::AccountFinishing { source } => expected == Expected::AccountFinishing(source),
         Outcome::AccountMovedIn { account, .. } => expected == Expected::AccountMovedIn && account != u32::MAX,
         Outcome::AccountRemoved { .. } => expected == Expected::AccountRemoved,
         Outcome::AccountSignedOut { .. } => expected == Expected::AccountSignOut,
@@ -1815,6 +1819,7 @@ pub(super) fn answer_decided(
         | Outcome::AccountProgramDeclared { .. }
         | Outcome::AccountKeyKept { .. }
         | Outcome::AccountMovingOut { .. }
+        | Outcome::AccountFinishing { .. }
         | Outcome::AccountMovedIn { .. }
         | Outcome::AccountChanged
         | Outcome::AccountRemoved { .. }
@@ -2038,6 +2043,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::AccountProgramDeclared { .. }
             | Outcome::AccountKeyKept { .. }
             | Outcome::AccountMovingOut { .. }
+            | Outcome::AccountFinishing { .. }
             | Outcome::AccountMovedIn { .. }
             | Outcome::AccountChanged
             | Outcome::AccountRemoved { .. }
@@ -2298,6 +2304,7 @@ fn valid_program_outcome(limits: &Limits, outcome: &Outcome) -> bool {
         | Outcome::AccountSignInStarted { .. }
         | Outcome::AccountKeyKept { .. }
         | Outcome::AccountMovingOut { .. }
+        | Outcome::AccountFinishing { .. }
         | Outcome::AccountMovedIn { .. }
         | Outcome::AccountChanged
         | Outcome::SignedOut

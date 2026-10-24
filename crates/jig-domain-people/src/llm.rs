@@ -78,3 +78,16 @@ pub enum AccountMoveWhy {
     Cancelled,
     Moving,
 }
+
+/// Why a finish was refused (client/domain/contract.md, section 4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SignInRedirectWhy {
+    /// No sign-in of this party's waits for its redirect under that number.
+    NotWaiting,
+    /// The address does not match the sign-in's redirect or its required fields.
+    Address,
+    /// The state belongs to another sign-in; this sign-in still waits.
+    State,
+    /// Too many states from other sign-ins; it still waits for its browser.
+    TooMany,
+}

@@ -101,6 +101,9 @@ fn problem() -> w::Problem {
 fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::Problem> {
     Ok(match value {
         p::Outcome::SettingsChanged { .. } | p::Outcome::AccountMovingOut { .. } => return Err(problem()),
+        p::Outcome::AccountFinishing { source } => w::OwnerOutcome::AccountFinishing(
+            w::OwnerOutcomeAccountFinishing::new(limits, w::OwnerOutcomeAccountFinishingParts { source: *source })?,
+        ),
         p::Outcome::AccountMovedIn { account, renewed } => {
             w::OwnerOutcome::AccountMovedIn(w::OwnerOutcomeAccountMovedIn::new(
                 limits,

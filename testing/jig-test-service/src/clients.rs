@@ -154,6 +154,7 @@ impl Clients {
             seed: seeds.crypto.clone(),
             stream: seeds.seed,
             models: config::clients::models(&config.llm),
+            redirect_bytes: config.limits.driver.client.uri_bytes,
             key_bytes: config
                 .limits
                 .driver
@@ -751,6 +752,7 @@ fn secret_request(request: kit::SecretsRequest) -> (Asked, jig_protocol_store::S
             let (kind, number) = place(owner);
             (Asked::Owner(owner), Secrets::Get { owner: kind, number })
         }
+        kit::SecretsRequest::Hold { exchange, value } => (Asked::Carry(exchange), Secrets::Hold { value }),
         kit::SecretsRequest::Carry { exchange, value } => (Asked::Carry(exchange), Secrets::Carry { value }),
     }
 }

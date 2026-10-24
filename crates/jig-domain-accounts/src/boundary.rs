@@ -291,6 +291,10 @@ pub enum Signing {
 /// The child's answer to a holder's sign-in, sign-out or account change.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    /// The sign-in took the address; its end is an accounts-watch fact.
+    Finishing {
+        source: u32,
+    },
     /// Withdrawn and read; the protocol layer hands its bytes to the asking client beside
     /// this answer. Written names the move's own number (accounts.md, section 6).
     MovingOut {
@@ -450,6 +454,11 @@ pub struct Fact {
 /// A holder's account change; an LLM key is named only by its carried number.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Change {
+    /// Finish a sign-in with its person's pasted address, named by its held number (accounts.md, section 5).
+    FinishSignIn {
+        source: u32,
+        carried: u64,
+    },
     /// Move the account's signed-in source out (accounts.md, section 6).
     MoveOut {
         account: u32,

@@ -91,6 +91,7 @@ pub fn frame_record() -> w::Me {
             providers: Box::new([]),
             providers_cut: false,
             key_bytes: 256,
+            redirect_bytes: 4096,
             party: w::MeParty::new(
                 &lim,
                 w::MePartyParts {

@@ -158,6 +158,10 @@ pub fn refusal_values() -> Box<[domain::Refusal]> {
         domain::Refusal::NotOffered,
         domain::Refusal::KeyConflict,
         domain::Refusal::NoEscalationHolder,
+        domain::Refusal::SignInRedirect { why: domain::SignInRedirectWhy::NotWaiting },
+        domain::Refusal::SignInRedirect { why: domain::SignInRedirectWhy::Address },
+        domain::Refusal::SignInRedirect { why: domain::SignInRedirectWhy::State },
+        domain::Refusal::SignInRedirect { why: domain::SignInRedirectWhy::TooMany },
     ])
 }
 pub fn proposal_choice_values() -> Box<[domain::ProposalChoice]> {
@@ -185,6 +189,7 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         domain::Outcome::NoteEdited { name: 2 },
         domain::Outcome::ServiceMade { person: 2 },
         domain::Outcome::AccountSignInStarted { source: 2, address: b"https://issuer.test/visit".as_slice().into() },
+        domain::Outcome::AccountFinishing { source: 2 },
         domain::Outcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) },
         domain::Outcome::Adopted { project: 2 },
         domain::Outcome::Proposed { proposal: 2, to: 0 },

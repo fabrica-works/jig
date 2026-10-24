@@ -34,6 +34,10 @@ pub enum OwnerEscalationChoice {
 /// Facts returned by a committed jig request, including a historical winner.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerOutcome {
+    /// The sign-in took the address; its end shows on the accounts watch.
+    AccountFinishing {
+        source: u32,
+    },
     /// Consecutive task numbers and any resolved `AsAllowed` budget.
     Created {
         first: u64,

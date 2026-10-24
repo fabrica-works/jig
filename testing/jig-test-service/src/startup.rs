@@ -409,8 +409,7 @@ pub(super) fn engine_startup(
             }
         }
     }
-    let store_limits = crate::store::limits(&parsed.limits.root, &parsed.limits.store)
-        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Bound))?;
+    let store_limits = configured_store_limits(&parsed)?;
     parsed.limits.store = store_limits;
     let trust = match &runtime {
         Some(runtime) if runtime.trust_roots > 0 => {
@@ -739,4 +738,17 @@ fn configuration_bytes(engine: &config::Engine) -> Result<u64, Problems> {
     let accounts = crate::accounts::configured_bytes(engine)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
     workers.checked_add(accounts).ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))
+}
+
+/// The store reserves the same number of held values as the clients' carried table.
+fn configured_store_limits(parsed: &Parsed) -> Result<jig_protocol_store::Limits, Problems> {
+    let mut limits = parsed.limits.store;
+    limits.held = parsed
+        .limits
+        .clients
+        .exchanges
+        .checked_mul(2)
+        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Bound))?;
+    crate::store::limits(&parsed.limits.root, &limits)
+        .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Bound))
 }

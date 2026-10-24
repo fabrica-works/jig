@@ -418,5 +418,6 @@ pub fn component_limits(root: &root::Limits) -> Limits {
         files: 8,
         reads: root.core.load_slots.checked_add(root.core.tasks.tasks).expect("bounded readers"),
         orphan_erases: 1,
+        held: 2,
     }
 }

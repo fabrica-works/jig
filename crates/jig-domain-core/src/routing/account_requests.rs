@@ -23,6 +23,7 @@ pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::O
         accounts::Answer::MovedIn { account, renewed } => {
             return people::Outcome::AccountMovedIn { account, renewed };
         }
+        accounts::Answer::Finishing { source } => return people::Outcome::AccountFinishing { source },
         accounts::Answer::Done => return people::Outcome::AccountChanged,
         accounts::Answer::Started { source, address } => {
             return people::Outcome::AccountSignInStarted { source, address };
@@ -48,6 +49,14 @@ pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::O
         }
         accounts::Refusal::Limit { bound } => people::Refusal::Limit { which: limit(bound) },
         accounts::Refusal::Numbers => people::Refusal::Limit { which: people::LimitKind::Arithmetic },
+        accounts::Refusal::SignInRedirect { why } => people::Refusal::SignInRedirect {
+            why: match why {
+                accounts::SignInRedirectWhy::NotWaiting => people::SignInRedirectWhy::NotWaiting,
+                accounts::SignInRedirectWhy::Address => people::SignInRedirectWhy::Address,
+                accounts::SignInRedirectWhy::State => people::SignInRedirectWhy::State,
+                accounts::SignInRedirectWhy::TooMany => people::SignInRedirectWhy::TooMany,
+            },
+        },
         accounts::Refusal::NotSignedIn => people::Refusal::AccountMove { why: people::AccountMoveWhy::NotSignedIn },
         accounts::Refusal::NotOurs => people::Refusal::AccountMove { why: people::AccountMoveWhy::NotOurs },
         accounts::Refusal::Cancelled => people::Refusal::AccountMove { why: people::AccountMoveWhy::Cancelled },
@@ -107,6 +116,7 @@ pub(crate) fn change(
         people::AccountChange::CheckProgram { source } => accounts::Change::CheckProgram { source },
         people::AccountChange::AddKey { .. }
         | people::AccountChange::ReplaceKey { .. }
+        | people::AccountChange::FinishSignIn { .. }
         | people::AccountChange::MoveIn { .. } => {
             return Err(people::Refusal::NotOffered);
         }

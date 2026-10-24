@@ -46,6 +46,7 @@ pub fn settings() -> Settings {
         stream: 31,
         models: models(),
         key_bytes: 7934,
+        redirect_bytes: 4096,
         moved_bytes: 70000,
     }
 }

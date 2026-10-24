@@ -163,7 +163,12 @@ impl Component {
                     | w::Ask::Withdraw(_)) => other,
                 };
                 if let Some(carried) = &keyed.value {
-                    let bound = carried_bound(&value, self.settings.key_bytes, self.settings.moved_bytes);
+                    let bound = carried_bound(
+                        &value,
+                        self.settings.key_bytes,
+                        self.settings.moved_bytes,
+                        self.settings.redirect_bytes,
+                    );
                     if u64::try_from(carried.len()).expect("value size fits u64") > bound
                         && account_key_digest(&value).is_some()
                     {
@@ -248,10 +253,19 @@ impl Component {
                 unreachable!("only a request carries a value")
             }
         };
+        let hold = match &request {
+            CarriedRequest::AccountKey { ask, .. } => held_address(ask),
+            CarriedRequest::Application(_) => false,
+        };
         let waiting = Waiting::Carry { sign_in, family, version, request: Box::new(request) };
         self.pending.carried.insert(exchange, None).expect("carried below its capacity");
         self.pending.exchanges.insert(exchange, waiting).expect("get released slot");
-        out.push(Request::Secrets(crate::SecretsRequest::Carry { exchange, value }));
+        let request = if hold {
+            crate::SecretsRequest::Hold { exchange, value }
+        } else {
+            crate::SecretsRequest::Carry { exchange, value }
+        };
+        out.push(Request::Secrets(request));
     }
 }
 
@@ -289,6 +303,7 @@ fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
     match change {
         w::AccountChange::AddKey(row) => Some(*row.digest()),
         w::AccountChange::ReplaceKey(row) => Some(*row.digest()),
+        w::AccountChange::FinishSignIn(row) => Some(*row.digest()),
         w::AccountChange::MoveIn(row) => Some(*row.digest()),
         w::AccountChange::DeclareProgram(_)
         | w::AccountChange::CheckProgram(_)
@@ -304,7 +319,7 @@ fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
 }
 
 /// Only account key changes and a moved file carry jig values.
-fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64) -> u64 {
+fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64, redirect_bytes: u32) -> u64 {
     let change = match ask {
         w::Ask::AccountChange(row) => row.change(),
         w::Ask::ChangeSettings(_)
@@ -335,6 +350,7 @@ fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64) -> u64 {
         | w::Ask::SignOut(_) => return 0,
     };
     match change {
+        w::AccountChange::FinishSignIn(_) => u64::from(redirect_bytes),
         w::AccountChange::MoveIn(_) => moved_bytes,
         w::AccountChange::AddKey(_) | w::AccountChange::ReplaceKey(_) => u64::from(key_bytes),
         w::AccountChange::DeclareProgram(_)
@@ -386,5 +402,56 @@ fn settings_not_served(ask: &w::Ask) -> bool {
         | w::Ask::Take(_)
         | w::Ask::Withdraw(_)
         | w::Ask::ChangeSettings(_) => false,
+    }
+}
+
+/// The pasted address is the sole jig value held without a durable carry.
+fn held_address(ask: &people::Ask) -> bool {
+    match ask {
+        people::Ask::AccountChange { change, .. } => match change {
+            people::AccountChange::FinishSignIn { .. } => true,
+            people::AccountChange::DeclareProgram { .. }
+            | people::AccountChange::CheckProgram { .. }
+            | people::AccountChange::AddKey { .. }
+            | people::AccountChange::ReplaceKey { .. }
+            | people::AccountChange::RemoveKey { .. }
+            | people::AccountChange::Resume { .. }
+            | people::AccountChange::Remove { .. }
+            | people::AccountChange::MoveAccount { .. }
+            | people::AccountChange::MoveSource { .. }
+            | people::AccountChange::SetUses { .. }
+            | people::AccountChange::MoveOut { .. }
+            | people::AccountChange::Written { .. }
+            | people::AccountChange::MoveIn { .. } => false,
+        },
+        people::Ask::ChangeSettings { .. }
+        | people::Ask::Compound { .. }
+        | people::Ask::Create { .. }
+        | people::Ask::MarkSeen { .. }
+        | people::Ask::Application { .. }
+        | people::Ask::EditNote { .. }
+        | people::Ask::MakeService { .. }
+        | people::Ask::Adopt { .. }
+        | people::Ask::Propose { .. }
+        | people::Ask::Withdraw { .. }
+        | people::Ask::Stop { .. }
+        | people::Ask::Cancel { .. }
+        | people::Ask::Release { .. }
+        | people::Ask::TakePerson { .. }
+        | people::Ask::HandBackPerson { .. }
+        | people::Ask::AnswerPerson { .. }
+        | people::Ask::Move { .. }
+        | people::Ask::DecideProposal { .. }
+        | people::Ask::Say { .. }
+        | people::Ask::AnswerQuestion { .. }
+        | people::Ask::Amend { .. }
+        | people::Ask::SetRoles { .. }
+        | people::Ask::ChangePolicy { .. }
+        | people::Ask::Rename { .. }
+        | people::Ask::MakeProject { .. }
+        | people::Ask::SetPool { .. }
+        | people::Ask::DecideEscalation { .. }
+        | people::Ask::AccountSignIn { .. }
+        | people::Ask::AccountSignOut { .. } => false,
     }
 }

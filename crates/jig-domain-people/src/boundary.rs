@@ -384,6 +384,8 @@ pub enum EscalationChoice {
 /// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
+    /// The sign-in took the address; its end shows on the accounts watch.
+    AccountFinishing { source: u32 },
     /// One whole settings change committed at this revision.
     SettingsChanged { revision: u32 },
     /// All operations were made; their issued messages start here, or at zero for none.
@@ -893,19 +895,59 @@ pub enum Use {
 /// Holder changes to LLM accounts (domain/accounts.md, section 5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AccountChange {
-    DeclareProgram { provider: u32, join: Option<u32>, name: Box<[u8]> },
-    CheckProgram { source: u32 },
-    AddKey { provider: u32, join: Option<u32>, digest: [u8; 32] },
-    ReplaceKey { source: u32, digest: [u8; 32] },
-    RemoveKey { source: u32 },
-    Resume { source: u32 },
-    Remove { account: u32 },
-    MoveAccount { account: u32, place: u32 },
-    MoveSource { account: u32, source: u32, place: u32 },
-    SetUses { account: u32, uses: Option<Box<[Use]>> },
-    MoveOut { account: u32 },
-    Written { number: u32 },
-    MoveIn { digest: [u8; 32] },
+    DeclareProgram {
+        provider: u32,
+        join: Option<u32>,
+        name: Box<[u8]>,
+    },
+    CheckProgram {
+        source: u32,
+    },
+    AddKey {
+        provider: u32,
+        join: Option<u32>,
+        digest: [u8; 32],
+    },
+    ReplaceKey {
+        source: u32,
+        digest: [u8; 32],
+    },
+    RemoveKey {
+        source: u32,
+    },
+    Resume {
+        source: u32,
+    },
+    Remove {
+        account: u32,
+    },
+    MoveAccount {
+        account: u32,
+        place: u32,
+    },
+    MoveSource {
+        account: u32,
+        source: u32,
+        place: u32,
+    },
+    SetUses {
+        account: u32,
+        uses: Option<Box<[Use]>>,
+    },
+    MoveOut {
+        account: u32,
+    },
+    Written {
+        number: u32,
+    },
+    MoveIn {
+        digest: [u8; 32],
+    },
+    /// Finish the party's sign-in under `source`, carrying its browser's address as a key is (domain/accounts.md, section 5).
+    FinishSignIn {
+        source: u32,
+        digest: [u8; 32],
+    },
 }
 
 /// A configured worker that did not confirm the original operation.

@@ -200,6 +200,7 @@ const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {
     store: STORE_KV,
     secrets: STORE_KV,
     journal: JOURNAL,
+    held: CLIENTS.exchanges.checked_mul(2).expect("clients carried capacity"),
     joins: 16,
     reads: 48,
     ..small::STORE

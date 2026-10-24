@@ -70,6 +70,7 @@ fn fixed(refusal: &Refusal) -> bool {
         | Refusal::NotWaiting
         | Refusal::NoFurther
         | Refusal::Limit { .. }
+        | Refusal::SignInRedirect { .. }
         | Refusal::AccountMove { .. }
         | Refusal::Provider
         | Refusal::Unknown

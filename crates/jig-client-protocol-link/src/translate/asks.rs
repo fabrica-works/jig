@@ -711,6 +711,12 @@ fn account_change(value: &c::AccountChange, limits: &w::Limits) -> Result<w::Acc
             limits,
             w::AccountChangeWrittenParts { number: *number },
         )?),
+        c::AccountChange::FinishSignIn { source, digest } => {
+            w::AccountChange::FinishSignIn(w::AccountChangeFinishSignIn::new(
+                limits,
+                w::AccountChangeFinishSignInParts { source: *source, digest: *digest },
+            )?)
+        }
         c::AccountChange::MoveIn { digest } => w::AccountChange::MoveIn(w::AccountChangeMoveIn::new(
             limits,
             w::AccountChangeMoveInParts { digest: *digest },

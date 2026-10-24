@@ -27,6 +27,7 @@ pub fn outcome(value: &people::Outcome, limits: &Limits) -> Result<Outcome, owne
         people::Outcome::AccountMovingOut { account, number, source } => {
             return Ok(Outcome::MovingOut { account: *account, number: *number, source: *source });
         }
+        people::Outcome::AccountFinishing { source } => client::OwnerOutcome::AccountFinishing { source: *source },
         people::Outcome::AccountMovedIn { account, renewed } => {
             client::OwnerOutcome::AccountMovedIn { account: *account, renewed: *renewed }
         }

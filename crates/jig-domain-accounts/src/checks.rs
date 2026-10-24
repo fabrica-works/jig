@@ -15,6 +15,10 @@ pub enum SignIn {
 /// Why a sign-in or a new source is refused, naming what refuses it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// A finish refused while the sign-in may still wait (accounts.md, section 5).
+    SignInRedirect {
+        why: SignInRedirectWhy,
+    },
     /// No signed-in source holding a record that reads (accounts.md, section 6).
     NotSignedIn,
     /// The carried file does not belong to this application.
@@ -187,4 +191,17 @@ pub const fn room_for_sign_in(limits: &Limits, under_way: u32) -> Result<(), Ref
         return Err(Refusal::Limit { bound: Bound::SignIns });
     }
     Ok(())
+}
+
+/// Why a finish was refused (client/domain/contract.md, section 4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SignInRedirectWhy {
+    /// No sign-in of this party's waits for its redirect under that number.
+    NotWaiting,
+    /// The address does not match the sign-in's redirect or its required fields.
+    Address,
+    /// The state belongs to another sign-in; this sign-in still waits.
+    State,
+    /// Too many states from other sign-ins; it still waits for its browser.
+    TooMany,
 }

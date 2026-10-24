@@ -10,6 +10,7 @@ fn account_move_asks_read_back_with_their_numbers_and_digest() {
         domain::AccountChange::MoveOut { account: 3 },
         domain::AccountChange::Written { number: 7 },
         domain::AccountChange::MoveIn { digest: [0xa5; 32] },
+        domain::AccountChange::FinishSignIn { source: 5, digest: [0xa5; 32] },
     ] {
         super::ask_round_trip(domain::Ask::AccountChange { holder: domain::AccountHolder::Own, change });
     }

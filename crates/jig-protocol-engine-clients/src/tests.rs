@@ -54,3 +54,6 @@ mod settings;
 
 #[path = "tests/settings_change.rs"]
 mod settings_change;
+
+#[path = "tests/finishes.rs"]
+mod finishes;

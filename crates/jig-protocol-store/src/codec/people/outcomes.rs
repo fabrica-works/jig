@@ -54,6 +54,9 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
                 wire::OutcomeAccountMovingOutParts { account: *account, number: *number, source: *source },
             )?)
         }
+        domain::Outcome::AccountFinishing { source } => wire::Outcome::AccountFinishing(
+            wire::OutcomeAccountFinishing::new(limits, wire::OutcomeAccountFinishingParts { source: *source })?,
+        ),
         domain::Outcome::AccountMovedIn { account, renewed } => {
             wire::Outcome::AccountMovedIn(wire::OutcomeAccountMovedIn::new(
                 limits,
@@ -193,6 +196,7 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             let wire::OutcomeAccountMovingOutParts { account, number, source } = value.into_parts();
             domain::Outcome::AccountMovingOut { account, number, source }
         }
+        wire::Outcome::AccountFinishing(row) => domain::Outcome::AccountFinishing { source: row.source() },
         wire::Outcome::AccountMovedIn(value) => {
             let wire::OutcomeAccountMovedInParts { account, renewed } = value.into_parts();
             domain::Outcome::AccountMovedIn { account, renewed }

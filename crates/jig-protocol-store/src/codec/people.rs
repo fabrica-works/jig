@@ -40,6 +40,7 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         outcome_account_signed_out_failed_hosts: people.program_hosts,
         outcome_account_removed_failed_hosts: people.program_hosts,
         account_change_move_in_digest: 32,
+        account_change_finish_sign_in_digest: 32,
         account_change_add_key_digest: 32,
         account_change_replace_key_digest: 32,
         account_change_set_uses_uses_some: domain::USES

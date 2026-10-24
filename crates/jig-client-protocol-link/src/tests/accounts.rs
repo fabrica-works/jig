@@ -204,6 +204,7 @@ fn account_move_asks_are_translated_both_ways() {
             c::AccountChange::MoveOut { account: u32::MAX },
             c::AccountChange::Written { number: u32::MAX },
             c::AccountChange::MoveIn { digest: [255; 32] },
+            c::AccountChange::FinishSignIn { source: u32::MAX, digest: [255; 32] },
         ] {
             let ask = c::Ask::AccountChange { holder, change };
             let wire = translate::asks::ask(&ask, &limits.wire).unwrap();
@@ -311,4 +312,32 @@ fn moving_states_cross_into_account_and_task_documents() {
             why: c::TaskWaitWhy::Source(c::TaskSourceState::Moving),
         })
     );
+}
+
+#[test]
+fn a_finishing_outcome_preserves_its_source() {
+    let limits = fixtures::limits();
+    let wire = w::OwnerOutcome::AccountFinishing(
+        w::OwnerOutcomeAccountFinishing::new(&limits.wire, w::OwnerOutcomeAccountFinishingParts { source: u32::MAX })
+            .unwrap(),
+    );
+    assert_eq!(
+        translate::answers::owner_outcome(&wire, &limits),
+        Ok(c::OwnerOutcome::AccountFinishing { source: u32::MAX })
+    );
+}
+#[test]
+fn sign_in_redirect_refusals_keep_each_reason() {
+    let limits = fixtures::limits();
+    for (wire, why) in [
+        (w::SignInRedirectWhy::NotWaiting, c::SignInRedirectWhy::NotWaiting),
+        (w::SignInRedirectWhy::Address, c::SignInRedirectWhy::Address),
+        (w::SignInRedirectWhy::State, c::SignInRedirectWhy::State),
+        (w::SignInRedirectWhy::TooMany, c::SignInRedirectWhy::TooMany),
+    ] {
+        let wire = w::Refusal::SignInRedirect(
+            w::RefusalSignInRedirect::new(&limits.wire, w::RefusalSignInRedirectParts { why: wire }).unwrap(),
+        );
+        assert_eq!(translate::answers::refusal(&wire, &limits), Ok(c::Refusal::SignInRedirect { why }));
+    }
 }

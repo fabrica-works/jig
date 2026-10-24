@@ -73,6 +73,7 @@ fn header(value: &OwnerOutcome) -> P {
                 P::AccountMovedIn
             }
         }
+        OwnerOutcome::AccountFinishing { .. } => P::AccountFinishing,
         OwnerOutcome::AccountChanged => P::AccountChanged,
         OwnerOutcome::AccountRemoved { .. } => P::AccountRemoved,
         OwnerOutcome::AccountSignInStarted { .. } => P::AccountSignInStarted,
@@ -139,6 +140,7 @@ fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
         OwnerOutcome::AccountKeyKept { .. }
         | OwnerOutcome::AccountChanged
         | OwnerOutcome::AccountSignInStarted { .. } => {}
+        OwnerOutcome::AccountFinishing { source } => number(b, words, P::SourceNumber, u64::from(*source)),
         OwnerOutcome::AccountMovedIn { account, .. } => number(b, words, P::AccountNumber, u64::from(*account)),
         OwnerOutcome::AccountProgramDeclared { source, name } => {
             number(b, words, P::SourceNumber, u64::from(*source));

@@ -175,6 +175,7 @@ impl Payload for Ask {
                 jig_client_domain::contract::AccountChange::CheckProgram { .. }
                 | jig_client_domain::contract::AccountChange::MoveOut { .. }
                 | jig_client_domain::contract::AccountChange::Written { .. }
+                | jig_client_domain::contract::AccountChange::FinishSignIn { .. }
                 | jig_client_domain::contract::AccountChange::MoveIn { .. }
                 | jig_client_domain::contract::AccountChange::AddKey { .. }
                 | jig_client_domain::contract::AccountChange::ReplaceKey { .. }
@@ -410,7 +411,8 @@ fields!(Me {
     deployment_role,
     providers,
     providers_cut,
-    key_bytes
+    key_bytes,
+    redirect_bytes
 });
 fields!(MeParty { number, kind, login, name });
 fields!(Needs { questions, proposals, escalations, person_tasks });
@@ -1107,6 +1109,7 @@ impl Payload for Refusal {
             | Self::NotOffered
             | Self::KeyConflict
             | Self::Dependency { .. }
+            | Self::SignInRedirect { .. }
             | Self::AccountMove { .. }
             | Self::Account { .. } => Some(0),
             Self::Llm { model, why: _ } => model.heap(bounds),

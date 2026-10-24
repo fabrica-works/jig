@@ -192,7 +192,7 @@ impl World {
                             self.kept.remove(&owner);
                             SecretsAnswer::Erased { owner }
                         }
-                        SecretsRequest::Carry { .. } => panic!("no carrying request"),
+                        SecretsRequest::Hold { .. } | SecretsRequest::Carry { .. } => panic!("no carrying request"),
                     };
                     self.component.down(&self.env, Event::Secrets(answer), &mut self.out);
                 }

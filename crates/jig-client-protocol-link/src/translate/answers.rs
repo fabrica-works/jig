@@ -99,6 +99,7 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> Result<
             }
             c::OwnerOutcome::AccountProgramDeclared { source: row.source(), name: bytes::copy_of(row.name()) }
         }
+        w::OwnerOutcome::AccountFinishing(row) => c::OwnerOutcome::AccountFinishing { source: row.source() },
         w::OwnerOutcome::AccountMovedIn(row) => {
             c::OwnerOutcome::AccountMovedIn { account: row.account(), renewed: row.renewed() }
         }
@@ -523,6 +524,14 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
                 w::Malformed::Cycle => c::Malformed::Cycle,
                 w::Malformed::ProposedAsAllowed => c::Malformed::ProposedAsAllowed,
                 w::Malformed::ProjectMismatch => c::Malformed::ProjectMismatch,
+            },
+        },
+        w::Refusal::SignInRedirect(row) => c::Refusal::SignInRedirect {
+            why: match row.why() {
+                w::SignInRedirectWhy::NotWaiting => c::SignInRedirectWhy::NotWaiting,
+                w::SignInRedirectWhy::Address => c::SignInRedirectWhy::Address,
+                w::SignInRedirectWhy::State => c::SignInRedirectWhy::State,
+                w::SignInRedirectWhy::TooMany => c::SignInRedirectWhy::TooMany,
             },
         },
         w::Refusal::AccountMove(row) => c::Refusal::AccountMove {

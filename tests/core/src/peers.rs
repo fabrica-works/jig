@@ -570,7 +570,9 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         } => parties::Refusal::Limit { which: parties::LimitKind::Spec },
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,
-        people::Refusal::AccountMove { .. } => unreachable!("fake parties ask for no account moves"),
+        people::Refusal::SignInRedirect { .. } | people::Refusal::AccountMove { .. } => {
+            unreachable!("fake parties ask for no account moves")
+        }
         people::Refusal::Stale { .. }
         | people::Refusal::Full { .. }
         | people::Refusal::NotWellFormed {

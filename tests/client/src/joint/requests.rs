@@ -270,6 +270,7 @@ fn valid_value(ask: &jig_client::contract::Ask, value: Option<&skein_lib::Secret
         match change {
             jig_client::contract::AccountChange::AddKey { digest, .. }
             | jig_client::contract::AccountChange::ReplaceKey { digest, .. }
+            | jig_client::contract::AccountChange::FinishSignIn { digest, .. }
             | jig_client::contract::AccountChange::MoveIn { digest } => Some(*digest),
             jig_client::contract::AccountChange::DeclareProgram { .. }
             | jig_client::contract::AccountChange::CheckProgram { .. }

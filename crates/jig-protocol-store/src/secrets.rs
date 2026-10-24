@@ -1,5 +1,7 @@
 //! Private values kept before their owners use them (store.md, section 9).
-use crate::{Below, CARRIED, Event, Limits, Phase, SecretOwner, SecretRow, Secrets, Store, directory, keys, open};
+use crate::{
+    Below, CARRIED, Event, HELD, Limits, Phase, SecretOwner, SecretRow, Secrets, Store, directory, keys, open,
+};
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Map, Queue, Secret, Token, sha256};
 
@@ -38,9 +40,12 @@ pub(crate) struct State {
     waiting: bool,
     /// The next carried number, once read from its row.
     carried: Option<u64>,
+    /// Memory-only values; Secret redacts its Debug. Neither table nor counter is persisted.
+    held: Map<u64, Secret>,
+    next_held: u64,
 }
 impl State {
-    pub fn new(capacity: u32) -> State {
+    pub fn new(capacity: u32, held: u32) -> State {
         State {
             pending: Map::with_capacity(capacity),
             next: 1,
@@ -49,11 +54,15 @@ impl State {
             after: None,
             waiting: false,
             carried: None,
+            held: Map::with_capacity(held),
+            next_held: HELD,
         }
     }
 }
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     Map::<u64, Pending>::worst_case(limits.secrets.queued)?
+        .checked_add(Map::<u64, Secret>::worst_case(limits.held)?)?
+        .checked_add(u64::from(limits.held).checked_mul(u64::from(limits.secrets.value))?)?
         .checked_add(u64::from(limits.secrets.key).checked_mul(2)?.checked_mul(u64::from(limits.secrets.queued))?)?
         .checked_add(u64::from(limits.secrets.key))?
         .checked_add(List::<SecretRow>::worst_case(limits.secrets.page.rows)?)?
@@ -267,8 +276,14 @@ pub(crate) fn secrets(
         Secrets::AdoptValue { carried, holds, owner: kind, number, value, replaces } => {
             adopt_value(store, env, owner, (kind, number), (carried, holds, replaces, value), above, below);
         }
+        Secrets::Hold { value } => hold(store, owner, value, above),
         Secrets::Carry { value } => carry(store, env, owner, value, above, below),
         Secrets::Erase { owner: kind, number } => {
+            if kind == SecretOwner::Application && number >= HELD {
+                let _removed = store.secret_state.held.remove(&number);
+                above.push(Event::Erased { owner });
+                return;
+            }
             let Some(key) = key(kind, number, store.limits.secrets.key) else {
                 store.phase = Phase::Stopped;
                 return;
@@ -277,6 +292,11 @@ pub(crate) fn secrets(
             submit(store, env, ops, Pending::Write { owner, key, holds: None }, above, below);
         }
         Secrets::Get { owner: kind, number } => {
+            if kind == SecretOwner::Application && number >= HELD {
+                let value = store.secret_state.held.get(&number).cloned();
+                above.push(Event::Secret { owner, value });
+                return;
+            }
             let Some(key) = key(kind, number, store.limits.secrets.key) else {
                 store.phase = Phase::Stopped;
                 return;
@@ -490,6 +510,10 @@ fn carry(
         store.phase = Phase::Stopped;
         return;
     };
+    if number >= HELD {
+        above.push(Event::Stale { owner });
+        return;
+    }
     let Some(after) = number.checked_add(1) else {
         above.push(Event::Stale { owner });
         return;
@@ -575,4 +599,23 @@ pub(crate) fn sweep(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Even
         store.secret_state.waiting = true;
         submit(store, env, ops.into_boxed(), Pending::Sweep, above, below);
     }
+}
+
+/// A held value never enters the kv store or the pending commits (store.md, section 9).
+fn hold(store: &mut Store, owner: Token, value: Secret, above: &mut Queue<Event>) {
+    if too_large(store, &value) {
+        store.phase = Phase::Stopped;
+        return;
+    }
+    let number = store.secret_state.next_held;
+    let Some(next) = number.checked_add(1) else {
+        above.push(Event::Stale { owner });
+        return;
+    };
+    if store.secret_state.held.insert(number, value).is_err() {
+        above.push(Event::Stale { owner });
+        return;
+    }
+    store.secret_state.next_held = next;
+    above.push(Event::Carried { owner, number });
 }

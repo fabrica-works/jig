@@ -73,6 +73,7 @@ pub(super) fn limits(root: &root::Limits, profile: &protocol::Limits) -> Option<
         files: profile.files,
         reads: root.core.load_slots.checked_add(root.core.tasks.tasks)?,
         orphan_erases: profile.orphan_erases,
+        held: profile.held,
     })
 }
 impl Store {
@@ -184,6 +185,7 @@ impl Store {
             | protocol::Secrets::AdoptValue { .. }
             | protocol::Secrets::Replace { .. }
             | protocol::Secrets::Erase { .. }
+            | protocol::Secrets::Hold { .. }
             | protocol::Secrets::Carry { .. } => false,
         };
         protocol::down(

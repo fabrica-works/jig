@@ -57,6 +57,14 @@ pub fn refusal(value: people::Refusal) -> Result<client::Refusal, super::owner::
         people::Refusal::NotWaiting => client::Refusal::NotWaiting,
         people::Refusal::NoFurther => client::Refusal::NoFurther,
         people::Refusal::Unknown => client::Refusal::Unknown,
+        people::Refusal::SignInRedirect { why } => client::Refusal::SignInRedirect {
+            why: match why {
+                people::SignInRedirectWhy::NotWaiting => client::SignInRedirectWhy::NotWaiting,
+                people::SignInRedirectWhy::Address => client::SignInRedirectWhy::Address,
+                people::SignInRedirectWhy::State => client::SignInRedirectWhy::State,
+                people::SignInRedirectWhy::TooMany => client::SignInRedirectWhy::TooMany,
+            },
+        },
         people::Refusal::AccountMove { why } => client::Refusal::AccountMove {
             why: match why {
                 people::AccountMoveWhy::NotSignedIn => client::AccountMoveWhy::NotSignedIn,

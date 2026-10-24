@@ -15,6 +15,12 @@ pub(super) fn encode(
             limits,
             wire::AccountChangeWrittenParts { number: *number },
         )?),
+        domain::AccountChange::FinishSignIn { source, digest } => {
+            wire::AccountChange::FinishSignIn(wire::AccountChangeFinishSignIn::new(
+                limits,
+                wire::AccountChangeFinishSignInParts { source: *source, digest: bytes::copy_of(digest) },
+            )?)
+        }
         domain::AccountChange::MoveIn { digest } => wire::AccountChange::MoveIn(wire::AccountChangeMoveIn::new(
             limits,
             wire::AccountChangeMoveInParts { digest: bytes::copy_of(digest) },
@@ -75,6 +81,13 @@ pub(super) fn decode(value: wire::AccountChange) -> Result<domain::AccountChange
     Ok(match value {
         wire::AccountChange::MoveOut(value) => domain::AccountChange::MoveOut { account: value.account() },
         wire::AccountChange::Written(value) => domain::AccountChange::Written { number: value.number() },
+        wire::AccountChange::FinishSignIn(value) => {
+            let value = value.into_parts();
+            domain::AccountChange::FinishSignIn {
+                source: value.source,
+                digest: digest(value.digest, wire::Path::AccountChangeFinishSignInDigest)?,
+            }
+        }
         wire::AccountChange::MoveIn(value) => domain::AccountChange::MoveIn {
             digest: digest(value.into_parts().digest, wire::Path::AccountChangeMoveInDigest)?,
         },

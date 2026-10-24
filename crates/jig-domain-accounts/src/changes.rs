@@ -49,6 +49,12 @@ pub(crate) fn change(
         return;
     }
     let result = match change {
+        Change::FinishSignIn { .. } => {
+            // Transitional: chatgpt-paste M3 task C ("the finish") replaces this with the
+            // sign-in's own check.
+            refuse(request, Refusal::SignInRedirect { why: crate::SignInRedirectWhy::NotWaiting }, out);
+            return;
+        }
         Change::DeclareProgram { provider, join, name } => {
             if !crate::records::program_name(&name) {
                 refuse(request, Refusal::Uses, out);

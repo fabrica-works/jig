@@ -95,6 +95,7 @@ pub fn frame(
         providers: super::catalogue::offers(&value.providers, limits)?,
         providers_cut: value.providers_cut,
         key_bytes: value.key_bytes,
+        redirect_bytes: value.redirect_bytes,
         party: client::MeParty {
             number: value.party,
             kind: match value.kind {
@@ -888,6 +889,7 @@ pub(super) mod tests {
             providers: skein_lib::List::with_capacity(0),
             providers_cut: false,
             key_bytes: 256,
+            redirect_bytes: 4096,
             party: u64::MAX,
             kind: jig_domain_people::Kind::Service,
             login: documents::Text { bytes: Box::from(UTF8_TEXTS[1]), cut: true },

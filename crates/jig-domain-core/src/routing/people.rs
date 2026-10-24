@@ -219,6 +219,7 @@ pub(super) fn tag_people(
                     | people::Outcome::AccountProgramDeclared { .. }
                     | people::Outcome::AccountKeyKept { .. }
                     | people::Outcome::AccountMovingOut { .. }
+                    | people::Outcome::AccountFinishing { .. }
                     | people::Outcome::AccountMovedIn { .. }
                     | people::Outcome::AccountChanged
                     | people::Outcome::AccountRemoved { .. }

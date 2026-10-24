@@ -20,6 +20,7 @@ pub(super) fn start(
         change:
             people::AccountChange::AddKey { digest, .. }
             | people::AccountChange::ReplaceKey { digest, .. }
+            | people::AccountChange::FinishSignIn { digest, .. }
             | people::AccountChange::MoveIn { digest },
         ..
     } = &ask
@@ -49,6 +50,13 @@ pub(super) fn start(
     super::application_routes::first(unused, routed)
 }
 
+/// A carried account change's cleanup is fixed at admission (store.md, section 9).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Flight {
+    pub number: u64,
+    pub always_unused: bool,
+}
+
 pub(super) fn admitted(
     core: &mut Core,
     request: Token,
@@ -57,15 +65,18 @@ pub(super) fn admitted(
 ) -> Result<accounts::Change, people::Refusal> {
     let change = match change {
         people::AccountChange::AddKey { provider, join, .. } => {
-            let carried = take(core, request)?;
+            let carried = take(core, request, false)?;
             if let Some(account) = join {
                 held(core, holder, account)?;
             }
             accounts::Change::AddKey { provider, join, carried }
         }
-        people::AccountChange::MoveIn { .. } => accounts::Change::MoveIn { carried: take(core, request)? },
+        people::AccountChange::FinishSignIn { source, .. } => {
+            accounts::Change::FinishSignIn { source, carried: take(core, request, true)? }
+        }
+        people::AccountChange::MoveIn { .. } => accounts::Change::MoveIn { carried: take(core, request, false)? },
         people::AccountChange::ReplaceKey { source, .. } => {
-            let carried = take(core, request)?;
+            let carried = take(core, request, false)?;
             if let Some(row) = core.accounts.source(source) {
                 held(core, holder, row.account)?;
             }
@@ -84,15 +95,19 @@ pub(super) fn admitted(
     };
     Ok(change)
 }
-fn take(core: &mut Core, request: Token) -> Result<u64, people::Refusal> {
+fn take(core: &mut Core, request: Token, always_unused: bool) -> Result<u64, people::Refusal> {
     let carried = core.key_input.take().ok_or(people::Refusal::NotOffered)?;
-    assert!(core.keys.insert(request, carried) == Ok(None), "one LLM key per people flight");
+    let flight = Flight { number: carried.number, always_unused };
+    assert!(core.keys.insert(request, flight) == Ok(None), "one LLM key per people flight");
     Ok(carried.number)
 }
 
-/// The component consumed the kept key or moved record; every other outcome returns it unused.
+/// A finish is always unused. Only a kept key or adopted moved record consumes its value.
 pub(super) fn finished(core: &mut Core, request: Token, outcome: &people::Outcome) -> Option<u64> {
     let carried = core.keys.remove(&request)?;
+    if carried.always_unused {
+        return Some(carried.number);
+    }
     if let people::Outcome::AccountKeyKept { .. } | people::Outcome::AccountMovedIn { .. } = outcome {
         None
     } else {

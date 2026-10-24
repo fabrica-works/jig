@@ -274,6 +274,7 @@ fn number(value: &OwnerOutcome, task: u64, place: u32) -> Option<u64> {
         | OwnerOutcome::PolicyChanged { .. }
         | OwnerOutcome::AccountProgramDeclared { .. }
         | OwnerOutcome::AccountKeyKept { .. }
+        | OwnerOutcome::AccountFinishing { .. }
         | OwnerOutcome::AccountMovedIn { .. }
         | OwnerOutcome::AccountChanged
         | OwnerOutcome::AccountRemoved { .. }

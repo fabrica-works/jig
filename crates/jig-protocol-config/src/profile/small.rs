@@ -405,4 +405,5 @@ pub(super) const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits 
     files: 8,
     reads: 12,
     orphan_erases: 1,
+    held: CLIENTS.exchanges.checked_mul(2).expect("clients carried capacity"),
 };

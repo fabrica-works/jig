@@ -97,3 +97,16 @@ pub fn move_in(key: Key, name: RequestKey, holder: AccountHolder, file: Secret) 
         value: Some(file),
     }
 }
+
+/// Finish the party's sign-in with its browser's address (domain/accounts.md, section 5).
+/// Only the digest enters the typed ask; the address is carried once.
+#[must_use]
+pub fn finish_sign_in(key: Key, name: RequestKey, holder: AccountHolder, source: u32, address: Secret) -> Event {
+    let change = AccountChange::FinishSignIn { source, digest: skein_lib::sha256::digest(address.expose()) };
+    Event::Carry {
+        key,
+        name,
+        request: Ask::Jig(Box::new(crate::contract::Ask::AccountChange { holder, change })),
+        value: Some(address),
+    }
+}

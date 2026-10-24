@@ -135,6 +135,9 @@ pub enum SecretsRequest {
     // Keep the value `exchange`'s request carried, under a number the store
     // draws itself (store.md 9): answered `Carried`.
     Carry { exchange: Token, value: Secret },
+    // Hold `exchange`'s value in memory, never written (store.md 9):
+    // answered `Carried` as a carry is.
+    Hold { exchange: Token, value: Secret },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SecretOwner {
@@ -148,8 +151,8 @@ pub enum SecretsAnswer {
     Kept { owner: SecretOwner },
     Erased { owner: SecretOwner },
     Got { owner: SecretOwner, value: Option<Kept> },
-    // `exchange`'s carried value is durable under `number`; none when the
-    // store kept nothing.
+    // `exchange`'s value is kept or held under `number`; none when the
+    // store accepted nothing.
     Carried { exchange: Token, number: Option<u64> },
     Failed,
 }
@@ -185,6 +188,8 @@ pub struct Settings {
     pub models: Box<[Model]>,
     /// The key bound advertised by me, independent of the moved file bound.
     pub key_bytes: u32,
+    /// The driver's redirect bound: the most bytes a pasted sign-in address may have.
+    pub redirect_bytes: u32,
     /// The moved file form's bound under the configured accounts limits.
     pub moved_bytes: u64,
 }

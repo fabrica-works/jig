@@ -116,6 +116,7 @@ pub enum OutcomePhrase {
     AccountKeyKept,
     AccountChanged,
     AccountMovedIn,
+    AccountFinishing,
     AccountRenewed,
     AccountNumber,
     AccountRemoved,
@@ -128,7 +129,7 @@ pub enum OutcomePhrase {
     HostFailed,
 }
 /// Every outcome phrase in stable owner order.
-pub const ALL: [OutcomePhrase; 67] = [
+pub const ALL: [OutcomePhrase; 68] = [
     OutcomePhrase::Created,
     OutcomePhrase::FirstTask,
     OutcomePhrase::LastTask,
@@ -186,6 +187,7 @@ pub const ALL: [OutcomePhrase; 67] = [
     OutcomePhrase::AccountKeyKept,
     OutcomePhrase::AccountChanged,
     OutcomePhrase::AccountMovedIn,
+    OutcomePhrase::AccountFinishing,
     OutcomePhrase::AccountRenewed,
     OutcomePhrase::AccountNumber,
     OutcomePhrase::AccountRemoved,
@@ -258,6 +260,7 @@ impl OutcomePhrase {
             Self::AccountSignedOut => 6458,
             Self::AccountKeyKept => 6459,
             Self::AccountChanged => 6460,
+            Self::AccountFinishing => 6474,
             Self::AccountMovedIn => 6471,
             Self::AccountRenewed => 6472,
             Self::AccountNumber => 6473,
@@ -335,6 +338,7 @@ impl OutcomePhrase {
             | Self::Stale
             | Self::AccountSignInStarted
             | Self::AccountKeyKept
+            | Self::AccountFinishing
             | Self::AccountMovedIn
             | Self::AccountRenewed
             | Self::AccountChanged
@@ -347,7 +351,7 @@ impl OutcomePhrase {
 /// Phrase contracts independent of the selected language's word order.
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut values = List::with_capacity(67);
+    let mut values = List::with_capacity(68);
     for phrase in ALL {
         let holes: Box<[HoleShape]> = match phrase.hole() {
             Some(kind) => Box::new([HoleShape { kind, bytes: 0 }]),
@@ -360,7 +364,7 @@ pub fn shapes() -> Box<[PhraseShape]> {
 /// Explicit English data for composition, never a rendering fallback.
 #[must_use]
 pub fn english() -> Language {
-    let mut values = List::with_capacity(67);
+    let mut values = List::with_capacity(68);
     for phrase in ALL {
         let text: &[u8] = match phrase {
             OutcomePhrase::Created => b"Tasks created",
@@ -417,6 +421,7 @@ pub fn english() -> Language {
             OutcomePhrase::RepliesThrough => b"Replies seen through: ",
             OutcomePhrase::AccountSignInStarted => b"LLM account sign-in started",
             OutcomePhrase::AccountKeyKept => b"LLM account key kept",
+            OutcomePhrase::AccountFinishing => b"LLM account sign-in finishing",
             OutcomePhrase::AccountMovedIn => b"moved in",
             OutcomePhrase::AccountRenewed => b"renewed",
             OutcomePhrase::AccountNumber => b"Account: ",

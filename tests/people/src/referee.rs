@@ -191,6 +191,7 @@ fn filled(why: Refusal) -> bool {
         | Refusal::NotWellFormed { .. }
         | Refusal::NoEscalationHolder
         | Refusal::Llm { .. }
+        | Refusal::SignInRedirect { .. }
         | Refusal::AccountMove { .. }
         | Refusal::Account { .. }
         | Refusal::KeyConflict => true,

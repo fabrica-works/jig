@@ -78,6 +78,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
             tail_bytes: 128,
             tools: core::ToolFamilies::JIG,
             key_bytes: 256,
+            redirect_bytes: 4096,
             llm_providers: jig_domain_accounts::Providers::none(),
         },
         defaults: core::settings::Defaults {

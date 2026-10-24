@@ -19,6 +19,10 @@ pub enum Accepter {
 /// A final reason a keyed request was refused.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// A finish refused while the sign-in may still wait (accounts.md, section 5).
+    SignInRedirect {
+        why: crate::SignInRedirectWhy,
+    },
     Stale {
         newest: u32,
     },

@@ -123,6 +123,7 @@ pub fn domain() -> Domain {
                     tail_bytes: 128,
                     tools: core::ToolFamilies::JIG,
                     key_bytes: 256,
+                    redirect_bytes: 4096,
                     llm_providers: jig_domain_accounts::Providers {
                         providers: Box::new([jig_domain_accounts::Provider {
                             name: b"Fake".as_slice().into(),

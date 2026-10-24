@@ -115,6 +115,9 @@ pub enum SecretOwner {
 /// numbers its own values below it.
 pub const CARRIED: u64 = 1 << 63;
 
+/// The first number of values held in memory for this run alone (store.md, section 9).
+pub const HELD: u64 = CARRIED + (1 << 62);
+
 /// A request to the secrets' store (store.md, section 9).
 #[derive(Debug)]
 pub enum Secrets {
@@ -149,6 +152,11 @@ pub enum Secrets {
         number: u64,
         value: Secret,
         replaces: Option<[u8; 32]>,
+    },
+    /// Hold in memory, never written, under the next number from HELD (store.md, 9).
+    /// Carried at once, nothing committed; Stale at the held-values bound.
+    Hold {
+        value: Secret,
     },
     /// Keep a value a client's request carried, under the next number of
     /// the application's carried range, from [`CARRIED`] up (store.md 9):

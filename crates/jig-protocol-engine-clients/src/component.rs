@@ -49,6 +49,7 @@ impl Component {
             || settings.addresses.len() > usize::try_from(env.limits.providers).expect("u32 fits")
             || settings.heartbeat == skein_lib::Duration::ZERO
             || settings.rows == 0
+            || settings.redirect_bytes > env.limits.wire.keyed_value_some
             || settings.key_bytes > env.limits.wire.keyed_value_some
             || settings.moved_bytes > u64::from(env.limits.wire.keyed_value_some)
             || !crate::translate::llm::fits(&settings.models, &env.limits.wire)

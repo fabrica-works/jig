@@ -381,7 +381,8 @@ record OwnerOutcomeAccountRemoved { confirmed: bool failed_hosts: list 128 Accou
 record OwnerOutcomeRenamed { project: u32 }
 record OwnerOutcomeProjectMade { project: u32 }
 record OwnerOutcomeAccountMovedIn { account: u32 renewed: bool }
-enum OwnerOutcome { marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, amended: OwnerOutcomeAmended, proposed: OwnerOutcomeProposed, withdrawn: OwnerOutcomeWithdrawn, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, compound: OwnerOutcomeCompound, created: OwnerOutcomeCreated, account_sign_in_started: OwnerOutcomeAccountSignInStarted, account_signed_out: OwnerOutcomeAccountSignedOut, account_key_kept: OwnerOutcomeAccountKeyKept, account_changed, account_removed: OwnerOutcomeAccountRemoved, account_program_declared: OwnerOutcomeAccountProgramDeclared, renamed: OwnerOutcomeRenamed, project_made: OwnerOutcomeProjectMade, account_moved_in: OwnerOutcomeAccountMovedIn }
+record OwnerOutcomeAccountFinishing { source: u32 }
+enum OwnerOutcome { marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, amended: OwnerOutcomeAmended, proposed: OwnerOutcomeProposed, withdrawn: OwnerOutcomeWithdrawn, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, compound: OwnerOutcomeCompound, created: OwnerOutcomeCreated, account_sign_in_started: OwnerOutcomeAccountSignInStarted, account_signed_out: OwnerOutcomeAccountSignedOut, account_key_kept: OwnerOutcomeAccountKeyKept, account_changed, account_removed: OwnerOutcomeAccountRemoved, account_program_declared: OwnerOutcomeAccountProgramDeclared, renamed: OwnerOutcomeRenamed, project_made: OwnerOutcomeProjectMade, account_moved_in: OwnerOutcomeAccountMovedIn, account_finishing: OwnerOutcomeAccountFinishing }
 record MadeTasks { tasks: list 32 u64 }
 record MadeService { party: u64 credential: secret 40 }
 record MadePersonResult { task: u64 }
@@ -432,6 +433,8 @@ record RefusalAccount { account: u32 why: AccountWhy }
 record RefusalCircle { tasks: list 32 u64 cut: bool }
 record RefusalDependency { dependency: u64 how: OwnerTaskStatus }
 record RefusalKept { pending: list 32 u64 }
+enum SignInRedirectWhy { not_waiting, address, state, too_many }
+record RefusalSignInRedirect { why: SignInRedirectWhy }
 enum AccountMoveWhy { not_signed_in, not_ours, held, cancelled, moving }
 record RefusalAccountMove { why: AccountMoveWhy }
 record Cursor { value: bytes 1024 }
@@ -667,7 +670,7 @@ record MePrices { input: u64 cached: u64 cache_write: option u64 output: u64 uni
 record MeModel { name: text 4096 provider: option u32 window: u32 output: u32 efforts: list 16 text 32 prices: MePrices description: option text 512 }
 record ProviderOffer { provider: u32 name: DocumentText sign_in: bool key: bool programs: list 32 text 32 programs_cut: bool none: bool signed_in_plan: bool manage_usage: option bytes 2048 key_bytes: u32 }
 enum Readiness { usable, unavailable, unknown }
-record Me { party: MeParty projects: bytes 16777216 needs: Needs needs_total: u32 updates: Count results_seen: u64 cut: bool retention: duration deployment_role: option HeldRole providers: bytes 16777216 providers_cut: bool key_bytes: u32 }
+record Me { party: MeParty projects: bytes 16777216 needs: Needs needs_total: u32 updates: Count results_seen: u64 cut: bool retention: duration deployment_role: option HeldRole providers: bytes 16777216 providers_cut: bool key_bytes: u32 redirect_bytes: u32 }
 record WriterSlot { resource: Part task: u64 attempt: option u64 }
 record LiveDelegate { chip: Chip takeover_budget: u64 }
 record Steering { addressed: option Recipient person_revision: option Revision taken_by: option u64 revision: Revision spec: SpecificationDocument instructions: option DocumentText wake: OwnerWakePolicy dependencies: list 32 u64 authority: OwnerAuthorityDocument budget: Budget }
@@ -922,7 +925,8 @@ record AccountChangeSetUses { account: u32 uses: option list 16 OwnerAccountUse 
 record AccountChangeMoveOut { account: u32 }
 record AccountChangeWritten { number: u32 }
 record AccountChangeMoveIn { digest: fixed 32 }
-enum AccountChange { add_key: AccountChangeAddKey, replace_key: AccountChangeReplaceKey, remove_key: AccountChangeRemoveKey, resume: AccountChangeResume, remove: AccountChangeRemove, move_account: AccountChangeMoveAccount, move_source: AccountChangeMoveSource, set_uses: AccountChangeSetUses, declare_program: AccountChangeDeclareProgram, check_program: AccountChangeCheckProgram, move_out: AccountChangeMoveOut, written: AccountChangeWritten, move_in: AccountChangeMoveIn }
+record AccountChangeFinishSignIn { source: u32 digest: fixed 32 }
+enum AccountChange { add_key: AccountChangeAddKey, replace_key: AccountChangeReplaceKey, remove_key: AccountChangeRemoveKey, resume: AccountChangeResume, remove: AccountChangeRemove, move_account: AccountChangeMoveAccount, move_source: AccountChangeMoveSource, set_uses: AccountChangeSetUses, declare_program: AccountChangeDeclareProgram, check_program: AccountChangeCheckProgram, move_out: AccountChangeMoveOut, written: AccountChangeWritten, move_in: AccountChangeMoveIn, finish_sign_in: AccountChangeFinishSignIn }
 record AskAccountChange { holder: AccountHolder change: AccountChange }
 record OwnerAccountHolderParty { party: u64 }
 enum OwnerAccountHolder { deployment, party: OwnerAccountHolderParty }

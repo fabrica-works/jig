@@ -31,6 +31,7 @@ pub fn frame() -> c::Me {
         providers: List::with_capacity(0),
         providers_cut: false,
         key_bytes: 256,
+        redirect_bytes: 4096,
         party: c::MeParty {
             number: 7,
             kind: c::PartyKind::Person,

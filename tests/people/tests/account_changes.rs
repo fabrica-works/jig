@@ -49,6 +49,7 @@ fn an_account_change_is_admitted_for_its_holder_with_no_role() {
 
             AccountChange::Remove { .. } => Outcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) },
             AccountChange::MoveOut { account } => Outcome::AccountMovingOut { account, number: 2, source: 1 },
+            AccountChange::FinishSignIn { source, .. } => Outcome::AccountFinishing { source },
             AccountChange::MoveIn { .. } => Outcome::AccountMovedIn { account: 1, renewed: false },
             AccountChange::Written { .. }
             | AccountChange::CheckProgram { .. }

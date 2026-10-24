@@ -41,6 +41,8 @@ pub(super) fn key_failure(value: a::KeyFailure) -> c::OwnerAccountKeyFailure {
 }
 pub(super) fn refusal(value: a::Refusal) -> c::OwnerAccountRefusal {
     match value {
+        // A finish refusal leaves the sign-in waiting, so it never ends an accounts watch's sign-in.
+        a::Refusal::SignInRedirect { .. } => unreachable!("a redirect refusal is only a finish answer"),
         a::Refusal::NotSignedIn => c::OwnerAccountRefusal::NotSignedIn,
         a::Refusal::NotOurs => c::OwnerAccountRefusal::NotOurs,
         a::Refusal::Cancelled => c::OwnerAccountRefusal::Cancelled,

@@ -64,3 +64,20 @@ fn an_unused_carried_key_is_erased() {
     assert_eq!(story.erased_carried(), &[1 << 63]);
     assert!(story.carried().is_empty());
 }
+
+#[test]
+fn a_finish_is_answered_not_waiting_and_its_held_address_erased() {
+    let mut story = Story::live(fixtures::SEED);
+    let address = skein_lib::Secret::new(Box::from(b"http://127.0.0.1:1455/auth/callback?code=c&state=s".as_slice()));
+    story.event(jig_client::accounts::finish_sign_in(STOP, NAME, c::AccountHolder::Own, 999, address));
+    assert!(story.run_until(|s| !s.answered(STOP).is_empty(), WAIT));
+    assert_eq!(
+        story.answered(STOP).as_slice(),
+        &[Outcome::Answered(Answered::Jig(c::Answer::Refused {
+            refusal: c::Refusal::SignInRedirect { why: c::SignInRedirectWhy::NotWaiting },
+            at: None,
+        }))]
+    );
+    assert_eq!(story.erased_carried(), &[(1 << 63) + (1 << 62)]);
+    assert!(story.carried().is_empty());
+}

@@ -29,6 +29,7 @@ pub(super) struct Engine {
     /// 2^63 up as the store draws them (store.md 9).
     pub carried: BTreeMap<u64, skein_lib::Secret>,
     next_carried: u64,
+    next_held: u64,
     pub account_keys: Vec<core::Carried>,
     pub not_records: u32,
     pub erasures: Vec<u64>,
@@ -78,6 +79,7 @@ impl Engine {
             secrets: BTreeMap::new(),
             carried: BTreeMap::new(),
             next_carried: 1 << 63,
+            next_held: (1 << 63) + (1 << 62),
             account_keys: Vec::new(),
             not_records: 0,
             erasures: Vec::new(),
@@ -142,6 +144,13 @@ impl Engine {
                             self.erasures.push(number);
                         }
                         SecretsAnswer::Erased { owner }
+                    }
+                    SecretsRequest::Hold { exchange, value } => {
+                        self.rules.secret(value.expose());
+                        let number = self.next_held;
+                        self.next_held = number.checked_add(1).expect("held numbers left");
+                        self.carried.insert(number, value);
+                        SecretsAnswer::Carried { exchange, number: Some(number) }
                     }
                     SecretsRequest::Carry { exchange, value } => {
                         // The referee's domain rule: no carried value in a root input.

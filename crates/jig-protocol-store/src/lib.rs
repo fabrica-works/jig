@@ -31,6 +31,8 @@ pub struct Limits {
     pub core: jig_domain_core::Limits,
     pub store: skein_kv::Limits,
     pub secrets: skein_kv::Limits,
+    /// The clients component's carried values at once (store.md, section 9).
+    pub held: u32,
     pub journal: skein_lib::JournalLimits,
     /// Point gets available to a party page's joins (store.md, 13).
     pub joins: u32,
@@ -122,7 +124,7 @@ impl Store {
             stores,
             phase: Phase::Closed,
             directory: directory::Directory::new(),
-            secret_state: secrets::State::new(limits.secrets.queued),
+            secret_state: secrets::State::new(limits.secrets.queued, limits.held),
             transcripts: transcripts::State::new(limits),
             installation: [0; 16],
             patch_sets: PatchSets::NONE,
@@ -313,8 +315,8 @@ pub mod tasks_v9;
 pub mod core_v6;
 pub mod keys;
 pub use boundary::{
-    Arrived, Below, CARRIED, Check, Cursor, Event, Family, Generations, Get, Io, Load, Older, OpenRefusal, Request,
-    Restore, Root, Row, SecretOwner, SecretRow, Secrets, TranscriptRead, Write,
+    Arrived, Below, CARRIED, Check, Cursor, Event, Family, Generations, Get, HELD, Io, Load, Older, OpenRefusal,
+    Request, Restore, Root, Row, SecretOwner, SecretRow, Secrets, TranscriptRead, Write,
 };
 
 #[cfg(test)]

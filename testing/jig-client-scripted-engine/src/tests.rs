@@ -30,6 +30,7 @@ fn frame(number: u64) -> Me {
         providers: skein_lib::List::with_capacity(0),
         providers_cut: false,
         key_bytes: 256,
+        redirect_bytes: 4096,
         party: MeParty {
             number,
             kind: PartyKind::Person,

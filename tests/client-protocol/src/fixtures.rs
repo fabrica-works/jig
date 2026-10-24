@@ -67,6 +67,7 @@ pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
         stream: 31,
         models: models(),
         key_bytes: 7934,
+        redirect_bytes: 4096,
         moved_bytes: 70000,
     }
 }

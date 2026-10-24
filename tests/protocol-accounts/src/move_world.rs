@@ -61,7 +61,8 @@ impl Judge {
     fn take_file(&mut self, owner: &mut Owner) {
         if let Some((number, source)) = owner.account_answers().iter().find_map(|answer| match answer {
             Answer::MovingOut { number, source, .. } => Some((*number, *source)),
-            Answer::MovedIn { .. }
+            Answer::Finishing { .. }
+            | Answer::MovedIn { .. }
             | Answer::ProgramDeclared { .. }
             | Answer::KeyKept { .. }
             | Answer::Done

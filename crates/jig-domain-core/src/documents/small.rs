@@ -141,6 +141,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         providers,
         providers_cut,
         key_bytes: core.settings.key_bytes,
+        redirect_bytes: core.settings.redirect_bytes,
         party,
         kind: core.people.kind(party).ok_or(Missing::Unknown)?,
         login: text(&identity.login, limits.documents.text_bytes),

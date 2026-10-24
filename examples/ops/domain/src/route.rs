@@ -317,6 +317,7 @@ fn core_held(
                 | jig_domain_people::Outcome::AccountProgramDeclared { .. }
                 | jig_domain_people::Outcome::AccountChanged
                 | jig_domain_people::Outcome::AccountMovingOut { .. }
+                | jig_domain_people::Outcome::AccountFinishing { .. }
                 | jig_domain_people::Outcome::AccountMovedIn { .. }
                 | jig_domain_people::Outcome::AccountRemoved { .. }
                 | jig_domain_people::Outcome::Refused(_) => infrastructure::CloseOutcome::Refused,

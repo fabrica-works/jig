@@ -66,6 +66,7 @@ pub(crate) fn frame(party: u64) -> Me {
         providers: List::with_capacity(0),
         providers_cut: false,
         key_bytes: 256,
+        redirect_bytes: 4096,
         party: MeParty {
             number: party,
             kind: PartyKind::Person,

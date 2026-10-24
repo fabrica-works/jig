@@ -80,13 +80,14 @@ pub(crate) fn frame_fields(value: &w::Me, limits: &Limits) -> Result<c::Me, w::P
         Some(item) => Some(crate::translate::answers::held_role(item, limits)),
         None => None,
     };
-    if value.key_bytes() > limits.wire.keyed_value_some {
+    if value.key_bytes() > limits.wire.keyed_value_some || value.redirect_bytes() > limits.wire.keyed_value_some {
         return Err(too_large());
     }
     Ok(c::Me {
         providers: super::catalogue::offers(value.providers(), limits, &mut super::document_room(limits))?,
         providers_cut: value.providers_cut(),
         key_bytes: value.key_bytes(),
+        redirect_bytes: value.redirect_bytes(),
         party: frame_party_fields(value.party(), limits)?,
         projects: list0,
         needs: needs_fields(value.needs(), limits),

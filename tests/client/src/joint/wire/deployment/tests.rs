@@ -655,6 +655,7 @@ fn me_deployment_role_is_independent_of_project_rows() {
             providers: skein_lib::List::with_capacity(0),
             providers_cut: false,
             key_bytes: 256,
+            redirect_bytes: 4096,
             party: 17,
             kind: people::Kind::Person,
             login: documents::Text { bytes: Box::new([]), cut: false },

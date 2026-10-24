@@ -370,3 +370,66 @@ fn adopt_value_is_stale_when_the_destination_is_held() {
         panic!("matching destination digest permits adoption")
     };
 }
+
+const ADDRESS: &[u8] = b"http://127.0.0.1:1455/auth/callback?code=c&state=s";
+fn hold(store: &mut Store) -> u64 {
+    let events = ask(store, Secrets::Hold { value: Secret::new(Box::from(ADDRESS)) });
+    let [Event::Carried { owner: OWNER, number }] = &*events else { panic!("held at once") };
+    *number
+}
+#[test]
+fn a_held_address_is_read_and_erased_without_any_kv_write() {
+    let mut store = fixtures::opened();
+    let number = hold(&mut store);
+    assert_eq!(number, crate::HELD);
+    assert_eq!(get(&mut store, SecretOwner::Application, number), Some(Secret::new(Box::from(ADDRESS))));
+    let events = ask(&mut store, Secrets::Erase { owner: SecretOwner::Application, number });
+    let [Event::Erased { owner: OWNER }] = &*events else { panic!("erased at once") };
+    assert_eq!(get(&mut store, SecretOwner::Application, number), None);
+    assert_eq!(store.stores.secrets.last(), 0);
+    assert!(store.stores.secrets.is_empty());
+    assert!(store.stores.store.is_empty());
+}
+#[test]
+fn held_values_at_capacity_refuse_one_more_without_writing() {
+    // The shared store fixture holds two values at once.
+    const HELD_CAPACITY: u64 = 2;
+    let mut store = fixtures::opened();
+    for offset in 0..HELD_CAPACITY {
+        assert_eq!(hold(&mut store), crate::HELD + offset);
+    }
+    let events = ask(&mut store, Secrets::Hold { value: Secret::new(Box::from(ADDRESS)) });
+    let [Event::Stale { owner: OWNER }] = &*events else { panic!("held bound") };
+    assert_eq!(store.stores.secrets.last(), 0);
+    assert!(store.stores.secrets.is_empty());
+}
+#[test]
+fn reopening_the_store_loses_held_addresses() {
+    let mut store = fixtures::opened();
+    let number = hold(&mut store);
+    let limits = fixtures::store_limits();
+    let mut store = Store::over(&limits, fixtures::APPLICATION, &[], store.into_stores());
+    fixtures::run(
+        &mut store,
+        Request::Open { owner: OWNER, root: fixtures::ROOT, installation: fixtures::INSTALLATION },
+    );
+    assert_eq!(get(&mut store, SecretOwner::Application, number), None);
+    assert!(store.stores.secrets.is_empty());
+}
+#[test]
+fn erased_held_numbers_are_not_reused_during_the_run() {
+    let mut store = fixtures::opened();
+    let first = hold(&mut store);
+    ask(&mut store, Secrets::Erase { owner: SecretOwner::Application, number: first });
+    assert_eq!(hold(&mut store), crate::HELD + 1);
+}
+
+#[test]
+fn a_held_address_does_not_appear_in_debug() {
+    let mut store = fixtures::opened();
+    hold(&mut store);
+    let debug = alloc::fmt::format(format_args!("{store:?}"));
+    assert!(debug.contains("Secret { len:"));
+    assert!(!debug.contains("code=c"));
+    assert!(!debug.contains("state=s"));
+}
