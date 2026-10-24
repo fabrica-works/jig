@@ -1,5 +1,5 @@
 //! Deployment generations and independent stores (protocol/store.md, 2 and 10.1).
-use crate::generations::{self, Active, Map, PAGE, Progress, Removing};
+use crate::generations::{self, Active, Manifesting, Map, PAGE, Progress, Removing};
 use crate::patching::phase::{self, Patching, Pending};
 use crate::{Arrived, Below, Event, Generations, Io, Limits, Older, OpenRefusal, Phase, Root, Store, open, secrets};
 use alloc::boxed::Box;
@@ -51,6 +51,7 @@ pub(crate) enum Opening {
     LeftoverClose,
     Making(Making),
     FirstSecrets,
+    FirstManifest(Manifesting),
     FirstActive,
     CheckingOpen,
     CheckingPage { root: Root, maps: u8 },
@@ -94,6 +95,7 @@ pub(crate) struct Directory {
     pub generations_kind: Option<Kind>,
     pub leftover: bool,
     pub survey_maps: u8,
+    pub survey_manifest: bool,
     pub swept: Option<Swept>,
 }
 impl Directory {
@@ -112,6 +114,7 @@ impl Directory {
             generations_kind: None,
             leftover: false,
             survey_maps: 0,
+            survey_manifest: false,
             swept: None,
         }
     }
@@ -291,6 +294,10 @@ fn survey_page(store: &mut Store, kind: Survey, root: Root, entries: Box<[file::
                 store.directory.leftover = true;
             }
             Survey::First => {
+                if entry.kind == Kind::File && first_manifest(&entry.name) && !store.directory.survey_manifest {
+                    store.directory.survey_manifest = true;
+                    continue;
+                }
                 let bit = if entry.name.as_ref() == b"store" {
                     1
                 } else if entry.name.as_ref() == b"secrets" {
@@ -315,6 +322,24 @@ fn survey_page(store: &mut Store, kind: Survey, root: Root, entries: Box<[file::
         store.directory.opening = Opening::SurveyPage { kind, root };
         list(root, &mut below.store);
     }
+}
+/// The one file a cut first start can leave beside its empty maps (store.md 2).
+fn first_manifest(name: &[u8]) -> bool {
+    if name == b"manifest" {
+        return true;
+    }
+    let Some(hex) = name.strip_prefix(b"manifest.skein-") else {
+        return false;
+    };
+    if hex.len() != 16 {
+        return false;
+    }
+    for byte in hex {
+        if !byte.is_ascii_digit() && !(b'a'..=b'f').contains(byte) {
+            return false;
+        }
+    }
+    true
 }
 /// The checks in open.rs have passed. Only now may strays and transcripts change.
 pub(crate) fn checked(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
@@ -399,6 +424,7 @@ fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut
         Opening::LeftoverClose => leftover_closed(store, arrived, above, below),
         Opening::Making(kind) => made_generation(store, kind, arrived, above, below),
         Opening::FirstSecrets => first_secrets_opened(store, arrived, above, below),
+        Opening::FirstManifest(manifesting) => first_manifest_stored(store, manifesting, arrived, above, below),
         Opening::FirstActive => first_active_stored(store, arrived, above, below),
         Opening::CheckingOpen => checking_opened(store, arrived, above, below),
         Opening::CheckingPage { root, maps } => checking_listed(store, root, maps, arrived, above, below),
@@ -534,11 +560,30 @@ fn made_generation(store: &mut Store, kind: Making, arrived: Arrived, above: &mu
     }
 }
 fn first_secrets_opened(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
-    let root = deployment(store);
     let Some(private) = opened(arrived) else {
         return refuse(store, above);
     };
     store.directory.private_root = Some(private);
+    let bytes = generations::manifest(generations::FIRST);
+    let manifesting = generations::store_manifest(deployment(store), generations::FIRST, bytes, below);
+    store.directory.opening = Opening::FirstManifest(manifesting);
+}
+fn first_manifest_stored(
+    store: &mut Store,
+    mut manifesting: Manifesting,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    match generations::manifested(&mut manifesting, arrived) {
+        Progress::Pending => {
+            store.directory.opening = Opening::FirstManifest(manifesting);
+            return;
+        }
+        Progress::Failed => return refuse(store, above),
+        Progress::Done => {}
+    }
+    let root = deployment(store);
     store.directory.opening = Opening::FirstActive;
     below.store.push(file::Request::Store {
         owner: OWNER,
@@ -907,6 +952,7 @@ pub(crate) fn patching(store: &Store) -> Option<&Patching> {
         | Opening::LeftoverClose
         | Opening::Making(_)
         | Opening::FirstSecrets
+        | Opening::FirstManifest(_)
         | Opening::FirstActive
         | Opening::CheckingOpen
         | Opening::CheckingPage { .. }

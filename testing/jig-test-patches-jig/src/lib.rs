@@ -1,4 +1,7 @@
 //! The fixture patch owner playing jig's slot in the store's plan.
+//! Its kept texts and patches are skein-codegen's `patch` command's, run from
+//! skein at jig's pinned revision: `patch <this crate> --owner fixture-jig`
+//! (`--baseline` for the first text).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

@@ -47,6 +47,10 @@ pub(crate) fn number(name: &[u8]) -> Option<u64> {
     }
     Some(number)
 }
+/// the levels' task: the Manifest record (store.md 2)
+pub(crate) fn manifest(generation: u64) -> Box<[u8]> {
+    encode(generation)
+}
 pub(crate) fn encode(number: u64) -> Box<[u8]> {
     join(Decimal::of(number).as_bytes(), b"\n")
 }

@@ -556,10 +556,11 @@ fn launch(
     harness.spawn_restartable(roots, engine_factory);
     // The real key request is kept before these channel-story cuts.
     if matches!(script.story, crate::stories::Story::Refusals(crate::stories::MessageRefusal::Replay)) {
-        // Counts the engine's submissions from spawn, including generation startup.
-        // The trace sends the assignment at 167 and the message at 183; cut before
-        // receive 190 brings the native run's first turn carrying its refusal.
-        const BEFORE_CARRIED_REFUSAL: u32 = 190;
+        // Counts the engine's submissions from spawn, including generation startup
+        // and generation 1's manifest (ten). The trace sends the assignment at 177
+        // and the message at 193; cut before receive 200 brings the native run's
+        // first turn carrying its refusal.
+        const BEFORE_CARRIED_REFUSAL: u32 = 200;
         harness.cut(0, BEFORE_CARRIED_REFUSAL, skein_world::Cut::Kill);
     }
     if let Some(before) = held_turn {
