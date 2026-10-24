@@ -471,6 +471,17 @@ Workers keep the answers and turns they were not acknowledged for, and
 send them again after their hello; the core commits any it does not
 have, and acknowledges each.
 
+**After an upgrade.** jig's store patches a copy of a store behind the
+binary's patch levels before the root starts, and switches to it
+(`../protocol/store.md`, 10.2), so a restart always runs over the
+generation the deployment's `active` names, at the binary's levels,
+and sees nothing of the patching. The check before that switch uses
+this section's rules, strictly: where a restart counts a record that
+breaks its child's rules and leaves it in the store, the check refuses
+the upgrade, naming the record, and the old generation stays active
+(temper's `draft/upgrades.md`, 6.4). The restart then runs over the
+switched generation as any restart does.
+
 ### 6.1 Stopping
 
 The engine stops when its service is told to (a signal, an operator), and
