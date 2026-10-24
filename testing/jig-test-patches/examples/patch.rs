@@ -1,9 +1,10 @@
 //! Test-only driver of skein-codegen's patch command (codec.md 12.8).
 //! heavy cargo run -p jig-test-patches --example patch -- <crate> <base> [<after-level>|baseline]
-use std::collections::BTreeMap;
+extern crate alloc;
+use alloc::collections::BTreeMap;
+use skein_codegen::patch::{self, Landed, Options};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use skein_codegen::patch::{self, Landed, Options};
 
 fn git(owner: &Path, args: &[&str]) -> Vec<u8> {
     let output = Command::new("git").arg("-C").arg(owner).args(args).output().expect("git runs");
@@ -34,7 +35,9 @@ fn main() {
         baseline: mode == "baseline",
         after: if fixture && mode != "baseline" {
             vec![("fixture-jig".into(), mode.parse().expect("upstream level"))]
-        } else { vec![] },
+        } else {
+            vec![]
+        },
         ..Options::default()
     };
     let report = patch::run(&owner, &Landed::new(files), &options).expect("patch command runs");

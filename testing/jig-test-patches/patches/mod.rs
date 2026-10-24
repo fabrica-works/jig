@@ -2,11 +2,12 @@
 
 mod context;
 pub use context::Context;
+mod p0002;
 
 use skein_codec::patch::{Build, Halt, Old, Site};
 use skein_codec::value::Node;
 
-pub const PATCHES: &[&str] = &[include_str!("0001.patch")];
+pub const PATCHES: &[&str] = &[include_str!("0001.patch"), include_str!("0002.patch")];
 
 pub mod kept {
     pub mod fixture_label {
@@ -33,7 +34,10 @@ pub mod kept {
         }
     }
     pub mod fixture_shelf {
-        pub const TEXTS: &[&str] = &[include_str!("../schema/kept/fixture-shelf-v1.schema")];
+        pub const TEXTS: &[&str] = &[
+            include_str!("../schema/kept/fixture-shelf-v1.schema"),
+            include_str!("../schema/kept/fixture-shelf-v2.schema"),
+        ];
         pub mod v1 {
             pub mod shelf {
                 use skein_codec::schema::FieldIx;
@@ -42,13 +46,37 @@ pub mod kept {
                 pub const LABEL: FieldIx = FieldIx::new(2);
             }
         }
+        pub mod v2 {
+            pub mod shelf {
+                use skein_codec::schema::FieldIx;
+                pub const NAME: FieldIx = FieldIx::new(0);
+                pub const BOOKS: FieldIx = FieldIx::new(1);
+                pub const LABEL: FieldIx = FieldIx::new(2);
+                pub const WEIGHT: FieldIx = FieldIx::new(3);
+            }
+        }
+        pub mod p0002 {
+            pub use super::v1 as old;
+            pub use super::v2 as new;
+        }
     }
 }
 
-pub mod refusal {}
+pub mod refusal {
+    pub mod p0002 {
+        use skein_codec::patch::RefusalIx;
+        pub const EMPTY: RefusalIx = RefusalIx::new(0);
+    }
+}
 
-pub fn written(site: Site, _old: &Old, _new: &mut Build, _at: Node, _cx: &mut Context) -> Result<(), Halt> {
-    Err(Halt::NoSite(site))
+pub fn written(site: Site, old: &Old, new: &mut Build, at: Node, cx: &mut Context) -> Result<(), Halt> {
+    match site.patch() {
+        2 => match site.index() {
+            0 => p0002::shelf_weight(old, new, at, cx),
+            _ => Err(Halt::NoSite(site)),
+        },
+        _ => Err(Halt::NoSite(site)),
+    }
 }
 
 #[cfg(test)]
@@ -69,5 +97,12 @@ mod tests {
         skein_codegen::patch::goldens(owner(), 1, super::written)
             .map_err(|error| error.to_string())
             .expect("patch 0001 goldens");
+    }
+
+    #[test]
+    fn p0002_goldens() {
+        skein_codegen::patch::goldens(owner(), 2, super::written)
+            .map_err(|error| error.to_string())
+            .expect("patch 0002 goldens");
     }
 }
