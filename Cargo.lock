@@ -724,13 +724,16 @@ dependencies = [
  "jig-protocol-charter",
  "jig-protocol-config",
  "jig-protocol-engine-clients",
+ "jig-protocol-store",
  "jig-protocol-tools",
  "jig-test-connector",
  "jig-test-connector-world",
  "jig-test-domain",
+ "jig-test-patches-smith",
  "jig-test-store",
  "jig-test-store-files",
  "jig-test-system",
+ "skein-codec",
  "skein-lib",
  "skein-world",
  "smith-channel",
@@ -1538,6 +1541,7 @@ dependencies = [
  "skein-io",
  "skein-kv",
  "skein-lib",
+ "skein-sim",
 ]
 
 [[package]]

@@ -229,6 +229,7 @@ fn the_store_files_kit_uses_only_the_store_and_foundation() {
             "skein-io",
             "skein-kv",
             "skein-fake-machine",
+            "skein-sim",
         ]
         .contains(&name.as_str())
     }));

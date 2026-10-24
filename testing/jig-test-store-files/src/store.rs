@@ -25,6 +25,8 @@ pub struct Pending {
     pub writes: Box<[root::Write]>,
     pub delay: u32,
 }
+type TurnText = fn(&[u8]) -> Option<Box<[u8]>>;
+
 struct Delayed {
     event: Event,
     delay: u32,
@@ -36,7 +38,14 @@ pub struct Store {
     pub pending: VecDeque<Pending>,
     pub held: VecDeque<u64>,
     component: Option<protocol::Store>,
+    sets: protocol::PatchSets,
+    initial_sets: protocol::PatchSets,
+    patches: Vec<(usize, protocol::PatchSets)>,
+    /// Patch progress events received during the latest open.
+    patched: u32,
+    turn_text: Option<TurnText>,
     files: Files,
+    disk: Option<crate::disk::Disk>,
     routes: route::Routes,
     limits: root::Limits,
     component_limits: Limits,
@@ -67,13 +76,28 @@ impl Store {
     /// The component under a configuration's `models`, in its order.
     #[must_use]
     pub fn new(limits: &root::Limits, models: &[jig_domain_core::Model]) -> Store {
+        Self::with_patch_sets(limits, models, protocol::PatchSets::NONE)
+    }
+    /// Hand the binary's sets to the component before its first open.
+    #[must_use]
+    pub fn with_patch_sets(
+        limits: &root::Limits,
+        models: &[jig_domain_core::Model],
+        sets: protocol::PatchSets,
+    ) -> Store {
         let component_limits = component_limits(limits);
-        let stores = Stores {
-            store: skein_kv::Store::memory(&component_limits.store),
-            secrets: skein_kv::Store::memory(&component_limits.secrets),
+        let disk = if sets.sets.is_empty() { None } else { Some(crate::disk::Disk::new(&component_limits)) };
+        let application = jig_test_store::application(&limits.connector);
+        let mut component = if let Some(disk) = &disk {
+            protocol::Store::on_directory(&component_limits, application, models, disk.seeded())
+        } else {
+            let stores = Stores {
+                store: skein_kv::Store::memory(&component_limits.store),
+                secrets: skein_kv::Store::memory(&component_limits.secrets),
+            };
+            protocol::Store::over(&component_limits, application, models, stores)
         };
-        let component =
-            protocol::Store::over(&component_limits, jig_test_store::application(&limits.connector), models, stores);
+        component.patch_sets(sets);
         let mut routes = route::Routes::new(limits.routes);
         routes.configure(limits);
         let mut store = Store {
@@ -82,7 +106,13 @@ impl Store {
             pending: VecDeque::new(),
             held: VecDeque::new(),
             component: Some(component),
+            sets,
+            initial_sets: sets,
+            patches: Vec::new(),
+            patched: 0,
+            turn_text: None,
             files: Files::new(),
+            disk,
             routes,
             limits: *limits,
             component_limits,
@@ -101,9 +131,22 @@ impl Store {
         store.open();
         store
     }
+    /// A fixture binary's host renderer, applied to the component's read bytes.
+    /// The ordinary shell uses jig's smith renderer in the store route.
+    pub fn transcript_text(&mut self, render: TurnText) {
+        self.turn_text = Some(render);
+    }
+    /// Select the next binary's sets; they take effect on the next open.
+    pub fn patch_sets(&mut self, sets: protocol::PatchSets) {
+        assert!(self.disk.is_some() || sets.sets.is_empty(), "construct with sets to use a directory store");
+        self.sets = sets;
+    }
     /// Make a real transcript read unread without altering its typed mirror.
     pub fn unread_transcript(&mut self, task: u64) {
-        self.files.unread_transcript(task);
+        match &mut self.disk {
+            Some(disk) => disk.unread_transcript(task),
+            None => self.files.unread_transcript(task),
+        }
     }
     pub fn fault(&mut self, fault: Fault) {
         match fault {
@@ -159,14 +202,18 @@ impl Store {
         self.crash(seed);
     }
     pub fn crash(&mut self, seed: u64) {
-        let stores = self.component.take().expect("component exists").into_stores();
-        self.files.crash(seed);
-        self.component = Some(protocol::Store::over(
-            &self.component_limits,
-            jig_test_store::application(&self.limits.connector),
-            &self.models,
-            stores,
-        ));
+        let component = self.component.take().expect("component exists");
+        let application = jig_test_store::application(&self.limits.connector);
+        self.component = Some(if let Some(disk) = &mut self.disk {
+            drop(component);
+            disk.crash(&self.component_limits, seed);
+            protocol::Store::on_directory(&self.component_limits, application, &self.models, disk.seeded())
+        } else {
+            let stores = component.into_stores();
+            self.files.crash(seed);
+            protocol::Store::over(&self.component_limits, application, &self.models, stores)
+        });
+        self.component.as_mut().expect("rebuilt component").patch_sets(self.sets);
         self.routes = route::Routes::new(self.limits.routes);
         self.routes.configure(&self.limits);
         self.pending.clear();
@@ -183,11 +230,19 @@ impl Store {
     /// Replay durable commits into fresh stores and a fresh filesystem.
     #[must_use]
     pub fn fork(&self) -> Store {
-        let mut fresh = Store::new(&self.limits, &self.models);
-        for (number, writes) in &self.durable {
-            fresh.submit(*number, writes.clone(), 0);
-            assert_eq!(fresh.tick(false), Ok(Some(*number)));
+        let mut fresh = Store::with_patch_sets(&self.limits, &self.models, self.initial_sets);
+        for index in 0..=self.durable.len() {
+            for (_, sets) in self.patches.iter().filter(|(at, _)| *at == index) {
+                fresh.patch_sets(*sets);
+                fresh.crash(0);
+            }
+            if let Some((number, writes)) = self.durable.get(index) {
+                fresh.submit(*number, writes.clone(), 0);
+                assert_eq!(fresh.tick(false), Ok(Some(*number)));
+            }
         }
+        fresh.patch_sets(self.sets);
+        fresh.turn_text = self.turn_text;
         fresh.page_delay = self.page_delay;
         fresh
     }
@@ -223,19 +278,59 @@ impl Store {
         self.drive(VecDeque::from([request]), Queue::with_capacity(protocol::MAX_OUT_DOWN));
     }
     pub fn answers(&mut self) -> Vec<Up> {
-        std::mem::take(&mut self.replies)
+        let mut replies = std::mem::take(&mut self.replies);
+        if let Some(render) = self.turn_text {
+            for reply in &mut replies {
+                if let Up::Root(root::Event::TranscriptLoaded { rows, .. }) = reply {
+                    for (row, text) in rows {
+                        *text = render(&row.transcript);
+                    }
+                }
+            }
+        }
+        replies
     }
     #[must_use]
     pub fn loading(&self) -> bool {
         !self.delayed.is_empty() || !self.routes.idle()
     }
     fn open(&mut self) {
-        let root = self.files.root();
+        self.patched = 0;
+        let root = match &self.disk {
+            Some(disk) => disk.root(),
+            None => self.files.root(),
+        };
         self.drive(
             VecDeque::from([Request::Open { owner: Token::new(0), root, installation: INSTALLATION }]),
             Queue::with_capacity(protocol::MAX_OUT_DOWN),
         );
         assert!(!self.failed, "durable stores reopen after their files are cut");
+        if self.patched > 0 {
+            self.refresh_patched_rows();
+            self.patches.push((self.durable.len(), self.sets));
+        }
+    }
+    /// Read back the rows patching can change, including the seal's header.
+    fn refresh_patched_rows(&mut self) {
+        use jig_domain_core::{CoreKey, Key};
+        let keys: Vec<_> = self
+            .rows
+            .keys()
+            .filter_map(|key| {
+                if let root::Key::Core(key @ Key::Core(CoreKey::RunProof(_) | CoreKey::Deployment)) = key {
+                    Some(key.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for key in keys {
+            self.drive(
+                VecDeque::from([Request::Get { owner: Token::new(0), key: protocol::Get::Jig(key) }]),
+                Queue::with_capacity(protocol::MAX_OUT_DOWN),
+            );
+        }
+        assert!(!self.failed, "patched mirror rows read back through the component");
     }
     fn env(&self) -> Env<Limits> {
         Env { now: Time::ZERO, wall: Wall::EPOCH, limits: self.component_limits }
@@ -247,6 +342,10 @@ impl Store {
             transcripts: Queue::with_capacity(skein_kv::MAX_OUT.below),
         };
         loop {
+            if self.disk.is_some() {
+                let env = self.env();
+                protocol::fire(self.component.as_mut().expect("component exists"), &env, &mut above, &mut below);
+            }
             if let Some(event) = above.pop() {
                 self.event(event, &mut requests);
                 continue;
@@ -263,16 +362,22 @@ impl Store {
                 continue;
             }
             let io = if let Some(request) = below.transcripts.pop() {
-                Io::Transcripts(self.files.answer(request))
+                Io::Transcripts(self.file(2, request))
             } else if let Some(request) = below.store.pop() {
-                Io::Store(self.files.answer(request))
+                Io::Store(self.file(0, request))
             } else if let Some(request) = below.secrets.pop() {
-                Io::Secrets(self.files.answer(request))
+                Io::Secrets(self.file(1, request))
             } else {
                 break;
             };
             let env = self.env();
             protocol::up(self.component.as_mut().expect("component exists"), &env, io, &mut above, &mut below);
+        }
+    }
+    fn file(&mut self, driver: usize, request: skein_io::file::Request) -> protocol::Arrived {
+        match &mut self.disk {
+            Some(disk) => disk.answer(driver, request),
+            None => self.files.answer(request),
         }
     }
     fn event(&mut self, event: Event, requests: &mut VecDeque<Request>) {
@@ -315,8 +420,16 @@ impl Store {
                 }
             }
             // Worlds have no printed open progress lines.
-            Event::Patched { .. } => {}
-            Event::Failed { .. } | Event::OpenRefused { .. } => self.failed = true,
+            Event::Patched { .. } => self.patched = self.patched.checked_add(1).expect("bounded patch count"),
+            Event::Got { owner, row } if owner == Token::new(0) => {
+                let Some(protocol::Row::Jig(row)) = row else {
+                    panic!("patched jig row remains at its key");
+                };
+                let row = root::Record::Core(row);
+                self.rows.insert(row.key(), row);
+            }
+            Event::Failed { .. } => self.failed = true,
+            Event::OpenRefused { why, .. } => panic!("world store open refused: {why:?}"),
             event @ (Event::Restored { .. } | Event::Loaded { .. } | Event::Read { .. })
                 if self.page_delay != 0 || self.pages_paused =>
             {
@@ -326,7 +439,7 @@ impl Store {
                 self.failed = true;
                 self.route(event, requests);
             }
-            // This shell never hands patch sets; routing answers Site with NoSite.
+            // These worlds supply sets without written sites; routing answers NoSite.
             event @ (Event::Site { .. }
             | Event::Restored { .. }
             | Event::Loaded { .. }

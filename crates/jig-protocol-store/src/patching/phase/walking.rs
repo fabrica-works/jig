@@ -59,6 +59,13 @@ pub(crate) struct Walking {
     refusal: Option<OpenRefusal>,
 }
 impl Walking {
+    #[cfg(test)]
+    pub(crate) fn closing(&self) -> bool {
+        self.step().is_none() && self.pending.plan.close()
+    }
+    fn map(&self) -> KeptMap {
+        if self.step().is_none() { KeptMap::Store } else { self.pending.machines.map(FamilyIx(self.family)) }
+    }
     fn step(&self) -> Option<Planned> {
         self.pending.plan.steps().get(self.step).copied()
     }
@@ -162,6 +169,9 @@ fn interval(store: &Store, walking: &Walking) -> Option<skein_kv::Range> {
 }
 /// No request is issued here. Each iteration consumes a row, a range, a
 /// family or a plan step; commits and sites leave through the step's outputs.
+/// Closing additionally consumes at most all map rows and one load per row
+/// plus the final empty page. Three turns per row/page/commit cover that walk;
+/// commits yield and resume after `through`, including unchanged proofs.
 fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> Option<bool> {
     match walking.waiting {
         Waiting::Site(_) | Waiting::Commit { .. } => return Some(false),
@@ -178,9 +188,14 @@ fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> 
         .checked_add(1)?
         .checked_mul(steps.checked_add(1)?)?
         .checked_add(usize::try_from(ops_capacity(&store.limits)).ok()?)?
+        .checked_add(usize::try_from(store.stores.store.len()).ok()?)?
+        .checked_add(2)?
         .checked_mul(3)?;
+    if walking.step().is_none() {
+        return if walking.pending.plan.close() { close(store, walking, turns) } else { Some(true) };
+    }
     for _ in 0..turns {
-        let Some(step) = walking.step() else { return Some(true) };
+        let step = walking.step().expect("Patched yields before advancing to the next step");
         if walking.family == families {
             walking.pending.machines.advance(step);
             // Keep found as the row's levels before the walk, for the manifest.
@@ -192,6 +207,8 @@ fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> 
             });
             walking.step = walking.step.checked_add(1)?;
             walking.family = 0;
+            walking.cursor = None;
+            walking.loaded = false;
             walking.counts = Counts { records: 0, commits: 0 };
             if let Some(next) = walking.step() {
                 walking.selected = walking.pending.machines.walked(next);
@@ -244,7 +261,7 @@ fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> 
             continue;
         }
         let range = interval(store, walking)?;
-        let map = walking.pending.machines.map(FamilyIx(walking.family));
+        let map = walking.map();
         let page = pages::walk_map(store, map, &[range], walking.cursor.as_ref(), puts(&store.limits, map))?;
         if page.rows.is_empty() && page.next.is_some() {
             return None;
@@ -257,10 +274,87 @@ fn drive(store: &mut Store, walking: &mut Walking, above: &mut Queue<Event>) -> 
     }
     None
 }
+/// After the last Patched, close windows in the copy, without a patch event.
+fn close(store: &mut Store, walking: &mut Walking, turns: usize) -> Option<bool> {
+    for _ in 0..turns {
+        if !append(store, walking)? {
+            return Some(false);
+        }
+        if let Some(row) = walking.page.pop() {
+            close_row(store, walking, row)?;
+            continue;
+        }
+        if !walking.ops.is_empty() {
+            return Some(false);
+        }
+        if walking.loaded && !walking.more {
+            return Some(true);
+        }
+        // A page with no open windows makes no commit but still advances.
+        if let Some(through) = walking.through.take() {
+            walking.cursor = Some(through);
+        }
+        let range = skein_kv::Range { start: Box::new([keys::JIG, 0, 2]), end: Some(Box::new([keys::JIG, 0, 3])) };
+        let page = pages::walk_map(
+            store,
+            KeptMap::Store,
+            &[range],
+            walking.cursor.as_ref(),
+            puts(&store.limits, KeptMap::Store),
+        )?;
+        if page.rows.is_empty() && page.next.is_some() {
+            return None;
+        }
+        walking.more = page.next.is_some();
+        walking.loaded = true;
+        for row in page.rows {
+            walking.page.push(row);
+        }
+    }
+    None
+}
+fn close_row(store: &Store, walking: &mut Walking, row: pages::WalkRow) -> Option<()> {
+    // The same keyed Load refusal as the following check, including a value
+    // that decodes but whose record does not belong at this key.
+    walking.refusal = Some(OpenRefusal::Check { why: crate::Check::Load { key: row.row.key.clone() } });
+    let key = keys::decode(&row.row.key)?;
+    let record = codec::decode(&key, &row.row.value, &store.codec, &store.names)?;
+    if record.key() != key {
+        return None;
+    }
+    let mut proof = match record {
+        Record::Core(CoreRecord::RunProof(proof)) => proof,
+        Record::Core(
+            CoreRecord::Settings(_)
+            | CoreRecord::Deployment(_)
+            | CoreRecord::Projection(_)
+            | CoreRecord::Call(_)
+            | CoreRecord::Turn(_)
+            | CoreRecord::Terminal(_)
+            | CoreRecord::ProposalDecision(_)
+            | CoreRecord::EscalationDecision(_),
+        )
+        | Record::Tasks(_)
+        | Record::People(_)
+        | Record::Notes(_)
+        | Record::Accounts(_) => return None,
+    };
+    walking.refusal = None;
+    if let Some(window) = &mut proof.window
+        && !window.closed
+    {
+        window.closed = true;
+        let value = codec::encode(&Record::Core(CoreRecord::RunProof(proof)), &store.codec, &store.names)?;
+        walking.deferred = Some(Put { key: row.row.key, value, cursor: row.cursor });
+    } else {
+        walking.through = Some(row.cursor);
+    }
+    Some(())
+}
 /// A finished record that does not fit waits for the preceding page's commit.
 fn append(store: &Store, walking: &mut Walking) -> Option<bool> {
     let Some(put) = walking.deferred.take() else { return Some(true) };
-    let map = walking.pending.machines.map(FamilyIx(walking.family));
+    let map = walking.map();
     let limits = pages::map_limits(store, map);
     let size = u64::try_from(put.key.len()).ok()?.checked_add(u64::try_from(put.value.len()).ok()?)?.checked_add(9)?;
     // No part of this page is submitted on a put that cannot fit alone.
@@ -268,7 +362,11 @@ fn append(store: &Store, walking: &mut Walking) -> Option<bool> {
         || puts(&store.limits, map) == 0
         || put.value.len() > usize::try_from(limits.value).ok()?
     {
-        let key = bytes::copy_of(relative(&walking.pending.machines, FamilyIx(walking.family), &put.key)?);
+        let key = if walking.step().is_none() {
+            put.key
+        } else {
+            bytes::copy_of(relative(&walking.pending.machines, FamilyIx(walking.family), &put.key)?)
+        };
         walking.refusal = Some(OpenRefusal::Check { why: crate::Check::Large { key } });
         return None;
     }
@@ -315,7 +413,7 @@ pub(super) fn resume(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Eve
     }
     match walking.waiting {
         Waiting::Ready if !walking.ops.is_empty() => {
-            let map = walking.pending.machines.map(FamilyIx(walking.family));
+            let map = walking.map();
             let counter = match map {
                 KeptMap::Store => &mut walking.next,
                 KeptMap::Secrets => &mut walking.secrets_next,
@@ -415,7 +513,11 @@ pub(super) fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(key).checked_mul(u64::from(rows))?.checked_mul(3)?)?
         .checked_add(u64::from(commit))?
         .checked_add(u64::from(value).checked_mul(3)?)?
-        .checked_add(u64::from(key).checked_mul(8)?)
+        .checked_add(u64::from(key).checked_mul(8)?)?
+        // Closing holds a binary-decoded proof beside its source and encoded
+        // put. The shared decoder bound covers both wire and domain records,
+        // including a proof's carried terminal and its task payload.
+        .checked_add(crate::decoded_worst_case(limits)?)
 }
 
 fn start(walking: &mut Walking, family: FamilyIx, root: &str, row: pages::WalkRow) -> Option<()> {

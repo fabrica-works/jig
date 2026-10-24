@@ -39,6 +39,7 @@ pub struct World {
     refusal: Option<OpenRefusal>,
     kernel_cuts: bool,
     changes: Vec<(u32, Change)>,
+    written: Vec<(u32, Box<[u8]>)>,
     halted: bool,
     machine: Machine,
     sim: Sim,
@@ -199,6 +200,7 @@ impl World {
             refusal: None,
             kernel_cuts: false,
             changes: Vec::new(),
+            written: Vec::new(),
             halted: false,
             machine,
             sim,
@@ -257,6 +259,12 @@ impl World {
         if let Some(observe) = self.observer {
             observe(step);
         }
+    }
+
+    /// Exact bytes of traced kernel writes, for selecting commits by their records.
+    #[must_use]
+    pub fn written(&self) -> &[(u32, Box<[u8]>)] {
+        &self.written
     }
 
     pub fn cut_at(&mut self, operation: u32) {
@@ -318,6 +326,7 @@ impl World {
         self.patched.clear();
         self.refusal = None;
         self.changes.clear();
+        self.written.clear();
         self.halted = false;
         self.above = Queue::with_capacity(QUEUE);
         self.below = below();
@@ -388,27 +397,36 @@ impl World {
         events
     }
 
+    /// A request whose serving sites the shell answers at once, each by its
+    /// owner's fixture with a fresh context (store.md 8.6); `request` hands
+    /// them up instead.
+    pub fn answered(&mut self, request: Request) -> Vec<Event> {
+        let mut events = Vec::new();
+        for event in self.request(request) {
+            if !jig_protocol_store::sizes::is_patching(&self.store)
+                && let Event::Site { owner, of, key, site, at, patcher } = event
+            {
+                let mut contexts = Contexts::default();
+                let request = answer_site(owner, of, key, site, at, patcher, &mut contexts);
+                events.extend(self.answered(request));
+            } else {
+                events.push(event);
+            }
+        }
+        events
+    }
+
     pub fn open(&mut self) -> Option<u64> {
         self.patched.clear();
         self.refusal = None;
-        let mut application = jig_test_patches::patches::Context::default();
-        let mut jig = jig_test_patches_jig::patches::Context::default();
+        let mut contexts = Contexts::default();
         let mut events = self.request(Request::Open { owner: OWNER, root: self.root, installation: self.drawn });
         for _ in 0..10_000 {
             let mut answer = None;
             for event in events {
                 match event {
-                    Event::Site { owner, of, key, site, at, mut patcher } => {
-                        let (old, new) = patcher.parts();
-                        let result = match of {
-                            Owner::Application => {
-                                application.key = key;
-                                jig_test_patches::patches::written(site, old, new, at, &mut application)
-                            }
-                            Owner::Jig => jig_test_patches_jig::patches::written(site, old, new, at, &mut jig),
-                            Owner::Skein | Owner::Smith => panic!("no fixture for {of:?}"),
-                        };
-                        answer = Some(Request::Site { owner, patcher, result });
+                    Event::Site { owner, of, key, site, at, patcher } => {
+                        answer = Some(answer_site(owner, of, key, site, at, patcher, &mut contexts));
                     }
                     Event::Patched { of, patch, counts, .. } => self.patched.push((of, patch, counts)),
                     Event::Opened { last, installation, .. } => {
@@ -589,6 +607,9 @@ impl World {
                     let mut answers = Queue::with_capacity(QUEUE);
                     self.sim.calls(&mut calls);
                     while let Some(call) = calls.pop() {
+                        if let Ask::Write { bytes, .. } | Ask::Append { bytes, .. } = &call.ask {
+                            self.written.push((self.operations, bytes.clone()));
+                        }
                         if let Some(change) = change(&call.ask) {
                             self.changes.push((self.operations, change));
                         }
@@ -675,7 +696,7 @@ impl World {
     pub fn transcript(&mut self, mut read: TranscriptRead) -> Vec<core::TurnRecord> {
         let mut result = Vec::new();
         loop {
-            let events = self.request(Request::Transcript {
+            let events = self.answered(Request::Transcript {
                 owner: OWNER,
                 read,
                 rows: 2,
@@ -772,4 +793,37 @@ fn tree(machine: &mut Machine, root: skein_fake_machine::Opened, path: &[u8], pa
         }
     }
     machine.close(directory);
+}
+
+// Patching retains each owner's context for the open (store.md 10.3).
+// Serving makes a new set of defaults at each site (store.md 8.6).
+#[derive(Default)]
+struct Contexts {
+    application: jig_test_patches::patches::Context,
+    smith: jig_test_patches_smith::patches::Context,
+    jig: jig_test_patches_jig::patches::Context,
+}
+fn answer_site(
+    owner: Token,
+    of: Owner,
+    key: Box<[u8]>,
+    site: skein_codec::patch::Site,
+    at: skein_codec::value::Node,
+    mut patcher: Box<skein_codec::patch::Patcher>,
+    contexts: &mut Contexts,
+) -> Request {
+    let (old, new) = patcher.parts();
+    let result = match of {
+        Owner::Application => {
+            contexts.application.key = key;
+            jig_test_patches::patches::written(site, old, new, at, &mut contexts.application)
+        }
+        Owner::Smith => {
+            contexts.smith.key = key;
+            jig_test_patches_smith::patches::written(site, old, new, at, &mut contexts.smith)
+        }
+        Owner::Jig => jig_test_patches_jig::patches::written(site, old, new, at, &mut contexts.jig),
+        Owner::Skein => panic!("no skein fixture site"),
+    };
+    Request::Site { owner, patcher, result }
 }

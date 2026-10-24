@@ -20,6 +20,7 @@ jig-domain-views.workspace = true
 jig-protocol-store.workspace = true
 jig-test-patches.workspace = true
 jig-test-patches-jig.workspace = true
+jig-test-patches-smith.workspace = true
 skein-codec.workspace = true
 skein-kv.workspace = true
 skein-lib.workspace = true
@@ -28,7 +29,6 @@ skein-fake-machine.workspace = true
 skein-sim.workspace = true
 
 [dev-dependencies]
-jig-test-patches-smith.workspace = true
 skein-heap.workspace = true
 
 [lints.rust]

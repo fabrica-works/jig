@@ -1417,12 +1417,17 @@ generation `A` to `A + 1`:
    **Windows closed:** where a pending patch is marked fresh, a walk of
    its own after the plan's last patch, over the core's run proofs (4.4),
    one for each live task ever claimed, by pages, each page a commit as
-   a patch's are: each proof with a window not yet closed is decoded by
-   the binary's codec, since every core record is at the binary's version
-   by then, and put back at its key with its window closed (core-v6's
-   `Window.closed`), every other field as it was. Nothing else is
-   written, and no transcript: the frames are read patched (8.6), and the
-   closed window is the core's to act on (`../domain/engine.md`, 7.2).
+   a patch's are: each proof is decoded by the binary's codec, since
+   every core record is at the binary's version by then, and one with a
+   window not yet closed is put back at its key with its window closed
+   (core-v6's `Window.closed`), every other field as it was. A proof
+   with no window, or one already closed, is not written, and a page
+   with none to close makes no commit; a proof that does not decode, or
+   decodes as another key's record, refuses `Check { why: Load }` with
+   its key, as step 5 would. Nothing else is written, and no transcript:
+   the frames are read patched (8.6), and the closed window is the
+   core's to act on (`../domain/engine.md`, 7.2). The walk answers no
+   `Patched`, since it is no patch, and adds or removes no record.
    The store's
    last commit, one of its own after the last page's, writes the format
    row's levels and versions and the layouts, the binary's (5.3), and
@@ -1627,11 +1632,15 @@ pub struct Counts { pub records: u64, pub commits: u64 }
   the owners' crates and drives the store's open: the application's
   (temper's `temper-service`, its `Store`); jig has no production
   shell of its own. In jig's tests the store world's (`tests/store`) answers
-  the fixture owners', while patching and while serving; `jig-test-service`'s
-  and `jig-test-store-files`' hand
-  no sets, and would answer a site `Halt::NoSite` (skein's `codec.md`,
-  11.4: a site its caller has no function for), as their routes already
-  do for any token.
+  the fixture owners', while patching and while serving. `jig-test-service`'s
+  hands no sets. `jig-test-store-files`' hands none either, unless a core
+  world gives it fixture sets (`Store::with_patch_sets`, and `patch_sets`
+  for the next open): then it opens over a fake machine's directory,
+  so that the copy, the walk and the switch run, and it reads the
+  patched proofs back through the component. Its fixture sets write no
+  site, and both shells would answer one `Halt::NoSite` (skein's
+  `codec.md`, 11.4: a site its caller has no function for), as their
+  routes already do for any token.
 - **What a shell downstream sees** (temper's `temper-service`, its
   domain world's driver, `temper-github-app`): open's signature stays
   as it is. The component holds `PatchSets::NONE` until a shell hands
@@ -1766,7 +1775,9 @@ was made (`../domain/tasks.md`, section 3):
   the three drivers' (skein's `io.md`, section 5). Patching's peak (10.2:
   one map open, one machine per kept family within its own map's record
   room, the walk's page and commit buffers at the larger of the two
-  maps' bounds, since one walk serves both, the copy's chunk) is the
+  maps' bounds, since one walk serves both, the copy's chunk, and the
+  closing walk's run proof decoded by the binary's codec beside its
+  bytes) is the
   larger of it and serving's, since the root never serves while it
   patches. The sets are the shell's, so `worst_case_with_patches(limits, sets)`
   prices their machines, and `worst_case(limits)` prices `PatchSets::NONE`.
@@ -1841,7 +1852,9 @@ section 2).
   found closed, going back finding them as they were. The core's side
   (a closed window starting fresh with its tail, counted as a
   transition) is the core's tests' (`../domain/engine.md`, 7.2), in its
-  world. The QA of each milestone is an independent tester's from this
+  world, whose store closes the window by the walk itself: smith's
+  fixture turn kept at one text, and a patch marked fresh that changes
+  no family. The QA of each milestone is an independent tester's from this
   design, committed as `qa_*` tests the gate skips.
 - **Step tests:** each key encoder against the derived order; each
   range's intervals against its predicate; each codec both ways, with

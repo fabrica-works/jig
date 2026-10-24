@@ -29,15 +29,17 @@ struct Phase {
 }
 
 thread_local! {
+    static PRICING: RefCell<(jig_protocol_store::Limits, jig_protocol_store::PatchSets)> = RefCell::new((limits(), SETS));
     static MEASURING: RefCell<Option<Measuring>> = const { RefCell::new(None) };
 }
 
 fn observe(step: Step) {
     MEASURING.with_borrow_mut(|slot| match step {
         Step::Construct => {
+            let (limits, sets) = PRICING.with_borrow(|pricing| *pricing);
             let phases = [
-                Phase { peak: 0, bound: sizes::serving_peak(&limits(), &SETS).expect("serving bound"), steps: 0 },
-                Phase { peak: 0, bound: sizes::patching_peak(&limits(), &SETS).expect("patching bound"), steps: 0 },
+                Phase { peak: 0, bound: sizes::serving_peak(&limits, &sets).expect("serving bound"), steps: 0 },
+                Phase { peak: 0, bound: sizes::patching_peak(&limits, &sets).expect("patching bound"), steps: 0 },
             ];
             let measuring = Measuring { meter: Meter::new(), outside: None, net: 0, phases, patching: false };
             measuring.meter.start();
@@ -89,14 +91,7 @@ fn a_whole_patching_open_stays_within_its_priced_peak() {
         .collect();
     let mut peaks = [0; 2];
     for sets in [BASE, SETS] {
-        let mut world = World::unopened_observed(920, limits(), Some(observe));
-        world.lay(&items);
-        world.patch_sets(sets);
-        assert!(world.open().is_some(), "measured open: {:?}", world.refusal());
-        let phases = MEASURING.with_borrow(|slot| slot.as_ref().expect("measured").phases);
-        MEASURING.with_borrow_mut(|slot| {
-            *slot = None;
-        });
+        let phases = measured(&items, &limits(), sets);
         for (index, phase) in phases.into_iter().enumerate() {
             let name = if index == 0 { "serving" } else { "patching" };
             eprintln!("{name}: measured {} / priced {} bytes over {} steps", phase.peak, phase.bound, phase.steps);
@@ -104,4 +99,38 @@ fn a_whole_patching_open_stays_within_its_priced_peak() {
         }
     }
     assert!(peaks[1] > peaks[0], "patching peak must exceed serving: {peaks:?}");
+}
+
+fn measured(
+    items: &[skein_fake_machine::Item],
+    limits: &jig_protocol_store::Limits,
+    sets: jig_protocol_store::PatchSets,
+) -> [Phase; 2] {
+    PRICING.with_borrow_mut(|pricing| *pricing = (*limits, sets));
+    let mut world = World::unopened_observed(920, *limits, Some(observe));
+    world.lay(items);
+    world.patch_sets(sets);
+    assert!(world.open().is_some(), "measured open: {:?}", world.refusal());
+    let phases = MEASURING.with_borrow(|slot| slot.as_ref().expect("measured").phases);
+    MEASURING.with_borrow_mut(|slot| *slot = None);
+    phases
+}
+
+#[test]
+fn the_fresh_closing_walk_stays_within_its_priced_peak() {
+    use jig_store_world::patches::{FRESH_AFTER, FRESH_WINDOWS, fresh_committed, fresh_limits};
+    let mut source = fresh_committed(920, FRESH_WINDOWS);
+    let items: Vec<_> = source
+        .contents()
+        .into_iter()
+        .map(|(path, bytes)| match bytes {
+            Some(bytes) => skein_fake_machine::Item::file(&path, &bytes).mode(0o600),
+            None => skein_fake_machine::Item::directory(&path).mode(0o700),
+        })
+        .collect();
+    let phases = measured(&items, &fresh_limits(), FRESH_AFTER);
+    for (name, phase) in ["fresh serving", "fresh patching"].into_iter().zip(phases) {
+        assert!(phase.steps > 0);
+        eprintln!("{name}: measured {} / priced {} bytes over {} steps", phase.peak, phase.bound, phase.steps);
+    }
 }

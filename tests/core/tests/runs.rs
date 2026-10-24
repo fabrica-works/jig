@@ -184,6 +184,73 @@ fn a_window_past_the_resume_limit_starts_fresh_with_its_tail() {
     assert_eq!(tail.as_ref(), [b'c'; 100]);
 }
 
+#[path = "support/fresh_windows.rs"]
+mod fresh_windows;
+
+#[test]
+fn a_window_closed_by_a_fresh_mark_starts_fresh_with_its_tail() {
+    use fresh_windows as f;
+    let mut world = f::parked();
+    let mut control = f::parked();
+    f::restart(&mut world, f::AFTER);
+    f::restart(&mut control, f::BEFORE);
+    world.say(87);
+    control.say(87);
+    f::fresh(&world);
+    assert_eq!(f::tail(&world), Some(f::TAIL));
+    assert_eq!(f::tries(&world), f::tries(&control));
+    let mut activity = f::activity(&world);
+    let Some(tasks::Line::RunBegan { resumed, .. }) = activity.last_mut() else { panic!("fresh run activity") };
+    *resumed = true;
+    assert_eq!(activity, f::activity(&control));
+    assert!(control.assigned.as_ref().expect("control resumes").run.policy.resume);
+    assert_eq!(
+        control.assigned.as_ref().expect("control resumes").transcript.as_ref(),
+        [f::turn(b"closed window"), f::turn(b"window continuation"),]
+    );
+    assert_eq!(f::tail(&control), None);
+}
+
+#[test]
+fn a_closed_window_keeps_its_tail_after_a_transient_try() {
+    use fresh_windows as f;
+    let mut world = f::parked();
+    let mut control = f::parked();
+    for run in [&mut world, &mut control] {
+        // The failed attempt resumed the parked window but wrote no new turn.
+        run.say(87);
+        run.end(tasks::End::Failed(tasks::Class::Transient), 0);
+    }
+    f::restart(&mut world, f::AFTER);
+    f::restart(&mut control, f::BEFORE);
+    world.retry_due();
+    control.retry_due();
+    f::fresh(&world);
+    assert_eq!(f::tail(&world), Some(f::TAIL));
+    assert_eq!(f::tries(&world).transient, 1);
+    assert_eq!(f::tries(&world), f::tries(&control));
+    assert_eq!(f::activity(&world), f::activity(&control));
+}
+
+#[test]
+fn a_closed_windows_unread_tail_starts_fresh_without_counting() {
+    use fresh_windows as f;
+    let mut world = f::parked();
+    let mut control = f::parked();
+    f::restart(&mut world, f::AFTER);
+    f::restart(&mut control, f::BEFORE);
+    world.store.unread_transcript(f::proof(&world).task);
+    world.say(87);
+    control.say(87);
+    f::fresh(&world);
+    assert_eq!(f::tail(&world), None);
+    assert_eq!(f::tries(&world), f::tries(&control));
+    let mut activity = f::activity(&world);
+    let Some(tasks::Line::RunBegan { resumed, .. }) = activity.last_mut() else { panic!("fresh run activity") };
+    *resumed = true;
+    assert_eq!(activity, f::activity(&control));
+}
+
 fn an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh() {
     let mut world = World::new(106, false);
     world.turn(1, 1, None, b"unusable bytes");

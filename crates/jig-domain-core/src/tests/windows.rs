@@ -165,3 +165,75 @@ fn an_oversized_text_and_a_smaller_read_keep_utf8_suffixes_within_the_bound() {
     assert!(text.len() <= 24);
     assert_eq!(resumed(&mut core).as_ref(), [Box::<[u8]>::from("some earlier words éééé".as_bytes())]);
 }
+
+fn closed_window() -> (Core, Limits) {
+    let (mut core, limits) = watch_core();
+    core.counters.deployment.runs = 7;
+    let proof = core.proofs.get_mut(&1).unwrap();
+    proof.window = Some(CurrentWindow { attempt: 1, turn: 1, closed: true });
+    core.begin_transcript(1, 1);
+    (core, limits)
+}
+
+#[test]
+fn beginning_a_transcript_keeps_its_windows_closed_flag() {
+    let (core, _) = closed_window();
+    let transcript = core.transcripts.get(&1).unwrap();
+    assert!(transcript.closed);
+    assert_eq!(transcript.window, Some((1, 1)));
+}
+
+#[test]
+fn a_closed_window_within_the_limit_prepares_without_resuming() {
+    let (mut core, limits) = closed_window();
+    core.current.test_charter_mut(1).policy.resume = true;
+    run_choice::host(&mut core, &limits, Token::new(7), &[b"scripted"]);
+    let mut accounts_out = Queue::with_capacity(accounts::max_out(&limits.accounts));
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.accounts };
+    accounts::step(&mut core.accounts, &env, accounts::Event::Want, &mut accounts_out);
+    while accounts_out.pop().is_some() {}
+    accounts::step(
+        &mut core.accounts,
+        &env,
+        accounts::Event::Component(accounts::FromComponent::Granted {
+            form: accounts::Form::Credential(accounts::Scheme::Bearer),
+            account: 1,
+            generation: 1,
+            valid: Duration::from_secs(60),
+        }),
+        &mut accounts_out,
+    );
+    send_task(&mut core, &limits, tasks::Event::Prepare { reply_to: ReplyTo::new(Token::new(1)), task: 1 });
+    core.contexts.insert(1, core.tasks.run_context(1).unwrap()).unwrap();
+    append(&mut core, 1, b"closed text");
+    let _out = watch_outputs(&mut core, &limits, Event::BriefAssembled { task: 1, ready: true });
+    let attempt = *core.workspace_pending.get(&1).unwrap();
+    let out = watch_outputs(
+        &mut core,
+        &limits,
+        Event::WorkspacePrepared { task: 1, attempt, writes: Some(Box::new([])), credentials: Box::new([]) },
+    );
+    let mut prepared = false;
+    for request in out {
+        if let Request::Now(now) = request
+            && let Now::RunPrepared { run, transcript, conversation, .. } = *now
+        {
+            assert!(!run.policy.resume);
+            assert!(transcript.is_empty());
+            assert_eq!(conversation, attempt);
+            prepared = true;
+        }
+    }
+    assert!(prepared, "closed window prepares a run");
+    assert_eq!(core.proofs.get(&1).unwrap().window, None);
+}
+
+#[test]
+fn a_closed_tail_keeps_newest_text_within_its_budget() {
+    let (mut core, _) = closed_window();
+    core.settings.tail_bytes = 4;
+    append(&mut core, 1, b"old");
+    append(&mut core, 2, b"tail");
+    assert_eq!(tail(&core, 4).as_ref(), b"tail");
+    assert!(resumed(&mut core).is_empty());
+}

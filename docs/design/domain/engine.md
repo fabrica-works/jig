@@ -713,9 +713,12 @@ the per-run charter routes by them.
   starts fresh without it, and nothing is counted. However the upgrade's
   stop classes the attempt it ends (temper's `draft/upgrades.md`, 7.2),
   a closed window is kept for its tail's load, where a transient try
-  drops an open one. No attempt is live across the switch: an upgrade
-  across a fresh mark is a full one, its workers stopped first, so every
-  window the next attempt opens is its own, and open. The run proof
+  drops an open one. No attempt is to be live across the switch: an
+  upgrade across a fresh mark is to be a full one, its workers stopped
+  first, so that every window the next attempt opens is its own, and
+  open. That is temper's to make, in its `draft/upgrades.md`, section 9
+  (`../protocol/store.md`, section 16); the core assumes it and checks
+  nothing of it. The run proof
   keeps the window as a `CurrentWindow` (its attempt, its turn, whether
   it is closed: core-v6's `Window`); the transcript a run prepares keeps
   the pair it loads from, and whether it is closed beside it.

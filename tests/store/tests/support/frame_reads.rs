@@ -120,18 +120,7 @@ pub(crate) fn open(component: &mut store::Store, env: &Env<store::Limits>) {
     );
     assert!(matches!(above.pop(), Some(Event::Opened { .. })));
 }
-pub(crate) fn turn(version: u16, said: &[u8], replay: &[u8], tokens: u32) -> Box<[u8]> {
-    let mut out = version.to_be_bytes().to_vec();
-    out.extend(u32::try_from(said.len()).expect("said").to_be_bytes());
-    out.extend(said);
-    if version == 1 {
-        out.extend(u32::try_from(replay.len()).expect("replay").to_be_bytes());
-        out.extend(replay);
-    } else {
-        out.extend(tokens.to_be_bytes());
-    }
-    out.into_boxed_slice()
-}
+pub(crate) use jig_store_world::patches::fixture_turn as turn;
 // Six file operations and two patch stops cover one small fixture frame.
 const STEPS: u32 = 8;
 pub(crate) fn decode(

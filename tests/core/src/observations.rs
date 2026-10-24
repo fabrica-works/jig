@@ -704,9 +704,21 @@ impl Observer {
     }
 
     /// Snapshot only the store's durable rows, including held acknowledgements.
-    #[expect(clippy::too_many_lines, reason = "one boundary translation projects every durable family")]
     pub fn durable(&mut self, now: u64, store: &Store) {
-        if store.applied == self.applied {
+        self.durable_at(now, store, store.applied);
+    }
+
+    /// A mark-only upgrade writes windows and the seal's header. Neither is
+    /// part of the referee's snapshot: each patch commit has the same view.
+    pub fn fresh_mark(&mut self, now: u64, store: &Store) {
+        for number in self.applied + 1..=store.applied {
+            self.durable_at(now, store, number);
+        }
+    }
+
+    #[expect(clippy::too_many_lines, reason = "one boundary translation projects every durable family")]
+    fn durable_at(&mut self, now: u64, store: &Store, number: u64) {
+        if number == self.applied {
             return;
         }
         for observed in self.intents.durable(store) {
@@ -1009,9 +1021,9 @@ impl Observer {
                 "immutable activity row disappeared"
             );
         }
-        self.observe(now, r::Observed::Durable { number: store.applied, snapshot });
-        self.applied = store.applied;
-        let applied: Vec<_> = self.forgetting.keys().copied().filter(|number| *number <= store.applied).collect();
+        self.observe(now, r::Observed::Durable { number, snapshot });
+        self.applied = number;
+        let applied: Vec<_> = self.forgetting.keys().copied().filter(|commit| *commit <= number).collect();
         for number in applied {
             for task in self.forgetting.remove(&number).expect("submitted retention") {
                 self.observe(now, r::Observed::Forgotten { task });

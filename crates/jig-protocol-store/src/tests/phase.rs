@@ -141,6 +141,7 @@ enum Stage {
     Copying,
     Opening,
     Walking,
+    Windows,
     Sealing,
     Checking,
     Manifest,
@@ -154,7 +155,13 @@ fn stage(store: &Store) -> Stage {
             Patching::Dropping(_) => Stage::Dropping,
             Patching::Copying(_) => Stage::Copying,
             Patching::Mapping { .. } | Patching::Recovering { .. } => Stage::Opening,
-            Patching::Walking(_) => Stage::Walking,
+            Patching::Walking(ref walking) => {
+                if walking.closing() {
+                    Stage::Windows
+                } else {
+                    Stage::Walking
+                }
+            }
             Patching::Sealing { .. } => Stage::Sealing,
             Patching::Checking(_) => Stage::Checking,
             Patching::Manifest(_) => Stage::Manifest,
@@ -367,7 +374,7 @@ impl Harness {
                 .or_else(|| below.secrets.pop().map(|r| (1, r)))
                 .or_else(|| below.transcripts.pop().map(|r| (2, r)));
             let Some((driver, request)) = next else {
-                if stage(store) == Stage::Walking {
+                if stage(store) == Stage::Walking || stage(store) == Stage::Windows {
                     continue;
                 }
                 return fixtures::events(&mut above);
@@ -414,6 +421,7 @@ impl Harness {
                 let targeted = (stage == Stage::Manifest
                     || stage == Stage::Opening
                     || stage == Stage::Walking
+                    || stage == Stage::Windows
                     || stage == Stage::Sealing
                     || stage == Stage::Checking)
                     && changing != Change::Other;
@@ -1591,3 +1599,134 @@ fn a_restart_row_at_the_deployments_lowered_limit_loads() {
     let Some(Event::Opened { .. }) = events.last() else { panic!("row within its bound loads: {events:?}") };
     assert_eq!(disk.bytes(b"active").as_ref(), b"2\n");
 }
+
+// Three open windows take two commits with two-put closing pages. The last
+// two rows exercise skipping a windowless proof and an already closed one.
+const FRESH_TASKS: u64 = 5;
+fn fresh_record(task: u64, closed: bool) -> jig_domain_core::Record {
+    use jig_domain_core::{CoreRecord, Record};
+    let Record::Core(CoreRecord::RunProof(mut proof)) = jig_store_world::root::run_proof(task) else {
+        panic!("run fixture")
+    };
+    if task == FRESH_TASKS.checked_sub(1).expect("windowless task") {
+        proof.window = None;
+    } else {
+        proof.window.as_mut().expect("window fixture").closed = closed || task == FRESH_TASKS;
+    }
+    Record::Core(CoreRecord::RunProof(proof))
+}
+fn fresh_baseline() -> Vec<Item> {
+    let mut disk = Disk::new(&[]);
+    let mut store = disk.store_with_chunk(CHUNK);
+    store.patch_sets(FRESH_BEFORE);
+    assert_opened(&disk.open(&mut store), 0);
+    for task in 1..=FRESH_TASKS {
+        let turn = jig_store_world::root::turn(task, 1, 1, b"committed transcript");
+        let writes = Box::new([
+            fixtures::header(task),
+            fixtures::save(jig_store_world::root::live_task(task)),
+            fixtures::save(fresh_record(task, false)),
+            fixtures::save(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn))),
+        ]);
+        let events = disk.request(&mut store, fixtures::commit(task, writes));
+        let [Event::Committed { number, .. }] = events.as_ref() else { panic!("fresh fixture commit: {events:?}") };
+        assert_eq!(*number, task);
+    }
+    disk.items()
+}
+fn fresh_store(disk: &Harness, after: bool) -> Store {
+    let mut store = disk.store(false);
+    store.limits.journal.writes = 2;
+    store.patch_sets(if after { FRESH_AFTER } else { FRESH_BEFORE });
+    store
+}
+fn proof_bytes(store: &mut Store, task: u64) -> Box<[u8]> {
+    let key = crate::keys::encode(
+        &jig_domain_core::Key::Core(jig_domain_core::CoreKey::RunProof(task)),
+        store.limits.store.key,
+    )
+    .expect("proof key");
+    fixtures::get_kv(store, &key).expect("proof row")
+}
+fn assert_fresh_proofs(store: &mut Store, closed: bool) {
+    for task in 1..=FRESH_TASKS {
+        let expected =
+            crate::codec::encode(&fresh_record(task, closed), &store.codec, &store.names).expect("proof encoding");
+        assert_eq!(proof_bytes(store, task), expected, "task {task}");
+    }
+}
+fn transcript_items(items: &[Item]) -> Vec<Item> {
+    items.iter().filter(|item| item.path.starts_with(b"transcripts/")).cloned().collect()
+}
+#[test]
+fn fresh_closing_pages_keep_transcripts_and_previous_proofs_byte_identical() {
+    let items = fresh_baseline();
+    let mut disk = Harness::new(&items);
+    let mut store = fresh_store(&disk, true);
+    let events = disk.open(&mut store);
+    assert_eq!(patched(&events), [(crate::Owner::Smith, 1, crate::Counts { records: 0, commits: 0 })]);
+    assert_fresh_proofs(&mut store, true);
+    assert_eq!(store.stores.store.last(), FRESH_TASKS.checked_add(3).expect("two pages and seal"));
+    assert_eq!(transcript_items(&disk.items()), transcript_items(&items));
+    disk.assert_source_unchanged(1);
+}
+#[test]
+fn each_closing_write_and_sync_cut_retries_from_open_windows() {
+    let items = fresh_baseline();
+    let mut completed = Harness::new(&items);
+    let mut store = fresh_store(&completed, true);
+    completed.open(&mut store);
+    let cuts: Vec<_> = completed
+        .changes
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (stage, change))| {
+            (*stage == Stage::Windows && [Change::Write, Change::Sync].contains(change)).then_some(index)
+        })
+        .collect();
+    assert_eq!(cuts.len(), 4, "two closing writes and syncs");
+    for cut in cuts {
+        let mut disk = Harness::new(&items);
+        disk.cut = Some((cut, false));
+        let mut store = fresh_store(&disk, true);
+        let events = disk.open(&mut store);
+        assert!(disk.halted, "cut {cut}: {events:?}");
+        disk.assert_source_unchanged(1);
+        let mut disk = disk.crash(u64::try_from(cut).expect("seed"));
+        let mut store = fresh_store(&disk, false);
+        assert_opened(&disk.open(&mut store), FRESH_TASKS);
+        assert_fresh_proofs(&mut store, false);
+        assert_eq!(disk.bytes(b"active").as_ref(), b"1\n");
+        let mut disk = disk.crash(u64::try_from(cut).expect("seed"));
+        let mut store = fresh_store(&disk, true);
+        disk.open(&mut store);
+        assert_fresh_proofs(&mut store, true);
+        assert_eq!(disk.bytes(b"active").as_ref(), b"2\n");
+        assert_eq!(transcript_items(&disk.items()), transcript_items(&items));
+        disk.assert_source_unchanged(1);
+    }
+}
+#[test]
+fn a_closing_write_fault_refuses_failed_without_switching() {
+    let mut disk = Harness::new(&fresh_baseline());
+    disk.fault_at = Some(Stage::Windows);
+    let mut store = fresh_store(&disk, true);
+    let events = disk.open(&mut store);
+    let Some(Event::OpenRefused { why, .. }) = events.last() else { panic!("closing refusal: {events:?}") };
+    assert_eq!(*why, OpenRefusal::Failed);
+    assert_eq!(disk.fault_at, None, "fault reached the closing write");
+    assert_eq!(disk.bytes(b"active").as_ref(), b"1\n");
+    disk.assert_source_unchanged(1);
+}
+
+const FRESH_AFTER: crate::PatchSets = crate::PatchSets { sets: &[super::patching::SMITH] };
+const FRESH_BEFORE: crate::PatchSets = crate::PatchSets {
+    sets: &[crate::PatchSet {
+        patches: &[],
+        families: &[crate::KeptFamily {
+            texts: &[jig_test_patches_smith::patches::kept::fixture_turn::TEXTS[0]],
+            ..super::patching::SMITH.families[0]
+        }],
+        ..super::patching::SMITH
+    }],
+};

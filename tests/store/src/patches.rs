@@ -327,3 +327,112 @@ pub fn counts(world: &mut World) -> Vec<(Vec<u8>, u64, u64)> {
     let manifest = jig_protocol_store::codec::component::Manifest::decode(bytes).expect("manifest codec");
     manifest.counts.iter().map(|count| (count.family().to_vec(), count.before(), count.after())).collect()
 }
+
+/// Frame-only sets: only smith moves across the fresh mark.
+pub const FRESH_AFTER: PatchSets = PatchSets {
+    sets: &[
+        PatchSet {
+            owner: Owner::Jig,
+            name: jig_test_patches_jig::NAME,
+            patches: jig::PATCHES,
+            fresh: None,
+            families: &[KeptFamily {
+                name: "fixture-frame",
+                texts: jig::kept::fixture_frame::TEXTS,
+                map: KeptMap::Store,
+                keys: &[],
+                frames: Some(jig_test_patches_jig::FRAME_ROOT),
+            }],
+        },
+        PatchSet {
+            owner: Owner::Smith,
+            name: jig_test_patches_smith::NAME,
+            patches: jig_test_patches_smith::patches::PATCHES,
+            fresh: Some(jig_test_patches_smith::FRESH),
+            families: &[KeptFamily {
+                name: "fixture-turn",
+                texts: jig_test_patches_smith::patches::kept::fixture_turn::TEXTS,
+                map: KeptMap::Store,
+                keys: &[],
+                frames: Some(jig_test_patches_smith::ROOT),
+            }],
+        },
+    ],
+};
+pub const FRESH_BEFORE: PatchSets = PatchSets {
+    sets: &[
+        FRESH_AFTER.sets[0],
+        PatchSet {
+            patches: &[],
+            families: &[KeptFamily {
+                texts: &[jig_test_patches_smith::patches::kept::fixture_turn::TEXTS[0]],
+                ..FRESH_AFTER.sets[1].families[0]
+            }],
+            ..FRESH_AFTER.sets[1]
+        },
+    ],
+};
+
+/// Tight fixture limits: four puts per closing page and small file chunks.
+#[must_use]
+pub fn fresh_limits() -> jig_protocol_store::Limits {
+    let mut limits = limits();
+    limits.journal.writes = 4;
+    limits
+}
+
+/// Five windows force two closing pages at the world's four-put journal.
+/// A sixth proof has none; every task has two committed fixture turns.
+pub const FRESH_WINDOWS: &[bool] = &[true, true, true, true, true, false];
+pub const FRESH_SAID: &[u8] = b"said";
+pub const FRESH_REPLAY: &[u8] = b"replay";
+
+#[must_use]
+pub fn fresh_proof(task: u64, window: bool, closed: bool) -> jig_domain_core::Record {
+    let jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(mut proof)) = root::run_proof(task) else {
+        panic!("proof fixture")
+    };
+    proof.turn = Some(jig_domain_core::TurnProof { turn: 2, cumulative: 0, read: None });
+    proof.window = window.then_some(jig_domain_core::CurrentWindow { attempt: 1, turn: 1, closed });
+    jig_domain_core::Record::Core(jig_domain_core::CoreRecord::RunProof(proof))
+}
+
+/// Independent fixture encoding, shared with the frame-read test seam.
+#[must_use]
+pub fn fixture_turn(version: u16, said: &[u8], replay: &[u8], tokens: u32) -> Box<[u8]> {
+    let mut out = version.to_be_bytes().to_vec();
+    text(&mut out, said);
+    if version == 1 {
+        text(&mut out, replay);
+    } else {
+        out.extend(tokens.to_be_bytes());
+    }
+    out.into_boxed_slice()
+}
+
+#[must_use]
+pub fn fresh_committed(seed: u64, windows: &[bool]) -> World {
+    let mut world = World::unopened_observed(seed, fresh_limits(), None);
+    world.patch_sets(FRESH_BEFORE);
+    world.open().expect("fresh fixture open");
+    let bytes = fixture_turn(1, FRESH_SAID, FRESH_REPLAY, 0);
+    let mut number = 0;
+    for (index, window) in windows.iter().enumerate() {
+        let task = root::LIVE + u64::try_from(index).expect("task index");
+        number += 1;
+        world
+            .commit(Box::new([Write::Save(root::header(number)), Write::Save(root::live_task(task))]))
+            .expect("live task committed");
+        for turn in 1..=2 {
+            number += 1;
+            world.commit(root::turn_commit(number, task, turn, &bytes)).expect("fixture turn committed");
+        }
+        // Keep the last turn proof and remove only the designated window.
+        number += 1;
+        world
+            .commit(Box::new([Write::Save(root::header(number)), Write::Save(fresh_proof(task, *window, false))]))
+            .expect("proof committed");
+    }
+    world.crash(seed);
+    world
+}

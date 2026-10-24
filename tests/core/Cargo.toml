@@ -13,6 +13,7 @@ jig-conformance.workspace = true
 jig-test-domain.workspace = true
 jig-test-store-files.workspace = true
 jig-test-store.workspace = true
+jig-protocol-store.workspace = true
 jig-fake-workers.workspace = true
 jig-fake-parties.workspace = true
 jig-test-connector.workspace = true
@@ -34,6 +35,8 @@ skein-lib.workspace = true
 skein-world.workspace = true
 
 [dev-dependencies]
+jig-test-patches-smith.workspace = true
+skein-codec.workspace = true
 jig-protocol-engine-clients.workspace = true
 jig-client-protocol-wire.workspace = true
 jig-protocol-config.workspace = true

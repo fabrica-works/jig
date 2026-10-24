@@ -625,6 +625,7 @@ mod tests {
     fn tail_reads_count_only_omitted_original_text_and_cut_the_oldest_text() {
         let mut transcript = Transcript {
             window: None,
+            closed: false,
             previous_attempt: 1,
             last: None,
             from: 1,

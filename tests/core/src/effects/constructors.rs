@@ -168,10 +168,44 @@ impl World {
         initial: people::Ask,
         rows: Box<[root::Record]>,
     ) -> World {
+        Self::configured_with_rows_and_sets(
+            seed,
+            requirement,
+            configuration,
+            &limits,
+            initial,
+            rows,
+            jig_protocol_store::PatchSets::NONE,
+        )
+    }
+
+    /// A binary whose store receives explicit patch sets before its first open.
+    #[must_use]
+    pub fn with_patch_sets(seed: u64, requirement: bool, sets: jig_protocol_store::PatchSets) -> World {
+        let (configuration, limits) = fixture(seed, requirement);
+        let initial = crate::fixtures::create_chat(
+            &crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks),
+            1,
+            0,
+            b"make an effect".as_slice().into(),
+        );
+        let rows = crate::fixtures::account_rows(&configuration.core.settings.llm_providers);
+        Self::configured_with_rows_and_sets(seed, requirement, configuration, &limits, initial, rows, sets)
+    }
+
+    fn configured_with_rows_and_sets(
+        seed: u64,
+        requirement: bool,
+        configuration: root::Config,
+        limits: &root::Limits,
+        initial: people::Ask,
+        rows: Box<[root::Record]>,
+        sets: jig_protocol_store::PatchSets,
+    ) -> World {
         // This domain only journals roles before the exact effect configuration
         // is installed and restored below; its bootstrap needs no effect grants.
         let bootstrap = crate::world::config(seed);
-        let mut world = Self::empty(bootstrap, &limits);
+        let mut world = Self::empty_with_sets(bootstrap, limits, sets);
         world.creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
         world.initial_ask = initial;
         world.send(root::Event::Core(core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) })));
@@ -193,7 +227,7 @@ impl World {
         world.seed(rows.into_boxed_slice());
         world.move_provider =
             configuration.core.settings.llm_providers.providers.first().map(|provider| provider.number);
-        world.domain = root::Domain::new(configuration, &limits);
+        world.domain = root::Domain::new(configuration, limits);
         world.send(root::Event::RestartBegin);
         world.hello_engine();
         for (project, budget) in projects {
@@ -241,6 +275,14 @@ impl World {
     }
 
     pub(super) fn empty(configuration: root::Config, limits: &root::Limits) -> World {
+        Self::empty_with_sets(configuration, limits, jig_protocol_store::PatchSets::NONE)
+    }
+
+    fn empty_with_sets(
+        configuration: root::Config,
+        limits: &root::Limits,
+        sets: jig_protocol_store::PatchSets,
+    ) -> World {
         let observer = crate::observations::Observer::new(&configuration);
         let heap = crate::observations::Heap::new(limits);
         let creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
@@ -249,7 +291,7 @@ impl World {
         } else {
             crate::fixtures::create_chat(&creating, 1, 0, b"make an effect".as_slice().into())
         };
-        let store = Store::new(limits, &configuration.core.settings.models);
+        let store = Store::with_patch_sets(limits, &configuration.core.settings.models, sets);
         let move_provider = configuration.core.settings.llm_providers.providers.first().map(|provider| provider.number);
         World {
             bootstrap_owners: Vec::new(),

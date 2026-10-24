@@ -22,10 +22,13 @@ pub enum RunAdmission {
 }
 
 /// Bounded recent opaque conversation while a due task's store pages are read.
-/// Each retained turn counts its four-byte length beside its opaque body.
+/// Each retained turn counts its four-byte length beside its opaque body
+/// (domain/engine.md, 7.2).
 #[derive(Debug)]
 pub struct Transcript {
     pub window: Option<(u64, u32)>,
+    /// The loaded window was closed by an upgrade.
+    pub closed: bool,
     pub previous_attempt: u64,
     pub last: Option<(u64, u32)>,
     pub from: u64,
@@ -198,6 +201,13 @@ impl Core {
             },
             None => None,
         };
+        let closed = match self.proofs.get(&task) {
+            Some(proof) => match proof.window {
+                Some(window) => window.closed,
+                None => false,
+            },
+            None => false,
+        };
         let from = match self.proofs.get(&task) {
             Some(proof) => proof.conversation,
             None => 1,
@@ -208,6 +218,7 @@ impl Core {
                     task,
                     Transcript {
                         window,
+                        closed,
                         previous_attempt,
                         last: None,
                         from,
@@ -252,6 +263,9 @@ impl Core {
         transcript.bytes = total;
         transcript.last = Some((turn.attempt, turn.turn));
         transcript.append_text(text, self.settings.tail_bytes);
+        if transcript.closed {
+            return true;
+        }
         let bound = u64::from(self.settings.resume_bytes);
         if bound < 4 {
             return true;
@@ -304,7 +318,7 @@ impl Core {
     #[must_use]
     pub fn resumed_turns(&self, transcript: Transcript) -> Box<[Box<[u8]>]> {
         let mut turns = List::with_capacity(transcript.turns.len());
-        if transcript.bytes <= u64::from(self.settings.resume_bytes) {
+        if !transcript.closed && transcript.bytes <= u64::from(self.settings.resume_bytes) {
             let mut kept = transcript.turns;
             for _ in 0..kept.len() {
                 turns.push(kept.pop().expect("counted transcript turn")).expect("bounded transcript turns");

@@ -53,8 +53,12 @@ pub(crate) struct Planned {
 #[derive(Debug)]
 pub(crate) struct Plan {
     steps: List<Planned>,
+    close: bool,
 }
 impl Plan {
+    pub(crate) fn close(&self) -> bool {
+        self.close
+    }
     pub(crate) fn steps(&self) -> &[Planned] {
         self.steps.as_slice()
     }
@@ -171,6 +175,7 @@ fn validate(sets: &PatchSets, found: &Levels, wanted: &Levels) -> Result<u32, Un
 pub(crate) fn plan(sets: &PatchSets, found: &Levels, wanted: &Levels) -> Result<Plan, Unplanned> {
     let pending = validate(sets, found, wanted)?;
     let mut steps = List::with_capacity(pending);
+    let mut close = false;
     let mut stack = List::<Frame>::with_capacity(4);
     let mut reached = *found;
     // An iteration emits one patch, pushes a frame, or pops one. Every pushed
@@ -189,7 +194,7 @@ pub(crate) fn plan(sets: &PatchSets, found: &Levels, wanted: &Levels) -> Result<
                 }
             }
             if stack.is_empty() {
-                return Ok(Plan { steps });
+                return Ok(Plan { steps, close });
             }
         }
         let top = stack.len().checked_sub(1).expect("nonempty stack");
@@ -224,6 +229,11 @@ pub(crate) fn plan(sets: &PatchSets, found: &Levels, wanted: &Levels) -> Result<
         if let Some(dependency) = dependency {
             stack.push(dependency).expect("dependencies go strictly upstream: at most four frames");
         } else {
+            if let Some(word) = own.fresh
+                && head.marked(text, word.as_bytes())
+            {
+                close = true;
+            }
             steps.push(Planned { owner: frame.owner, patch }).expect("one entry per pending patch");
             reached.set(frame.owner, Some(patch));
         }

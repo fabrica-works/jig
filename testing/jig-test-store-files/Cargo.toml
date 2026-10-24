@@ -18,6 +18,7 @@ skein-lib.workspace = true
 skein-io.workspace = true
 skein-kv.workspace = true
 skein-fake-machine.workspace = true
+skein-sim.workspace = true
 
 # This is a test kit, not a step crate.
 [lints.rust]

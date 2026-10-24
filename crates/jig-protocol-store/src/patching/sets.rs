@@ -16,7 +16,7 @@ pub struct PatchSet {
     pub families: &'static [KeptFamily],
     /// Patch texts in number order.
     pub patches: &'static [&'static str],
-    /// The owner's mark across which windows start fresh (M4 reads it).
+    /// The owner's mark across which windows start fresh.
     pub fresh: Option<&'static str>,
 }
 /// Which of the deployment's two maps a kept family's records live in (store.md 9, 10.3).

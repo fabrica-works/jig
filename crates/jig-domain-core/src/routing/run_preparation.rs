@@ -121,7 +121,8 @@ pub(super) fn workspace_prepared(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
-    let resume = core.charter_of(task).policy.resume
+    let resume = !transcript.closed
+        && core.charter_of(task).policy.resume
         && context.tries.transient == 0
         && transcript.bytes <= u64::from(core.settings.resume_bytes);
     let conversation = if resume && transcript.last.is_some() { transcript.from } else { attempt };
@@ -373,7 +374,7 @@ pub(super) fn plan_brief(
             })
             .expect("dependency result section room");
     }
-    if core.transcript_oversized(task) || context.tries.transient != 0 || !core.charter_of(task).policy.resume {
+    if tail_wanted(core, task, context.tries.transient != 0) {
         let Some(text) = crate::read_brief_part(core, text_limits, task, crate::BriefPart::TranscriptTail) else {
             work.push(Event::Tasks(tasks::Event::PreparationFailed { task }));
             out.push(Request::Decided);
@@ -424,6 +425,14 @@ pub(super) fn plan_brief(
     Requests::Out(out)
 }
 
+fn tail_wanted(core: &Core, task: u64, transient: bool) -> bool {
+    let transcript = core.transcripts.get(&task).expect("brief owns a loaded transcript");
+    if transcript.closed {
+        return transcript.last.is_some();
+    }
+    core.transcript_oversized(task) || transient || !core.charter_of(task).policy.resume
+}
+
 pub(super) fn brief_parent(requester: tasks::Party) -> Option<u64> {
     match requester {
         tasks::Party::Task(parent) => Some(parent),
@@ -466,8 +475,9 @@ pub(super) fn route_prepared_agent(
         super::result_reads::clear(core, number);
         assert!(core.contexts.insert(number, context).is_ok(), "bounded activation context");
         core.begin_transcript(number, previous_attempt);
-        if fresh {
-            core.transcripts.get_mut(&number).expect("begun transcript").window = None;
+        let transcript = core.transcripts.get_mut(&number).expect("begun transcript");
+        if fresh && !transcript.closed {
+            transcript.window = None;
         }
         out.push(Request::Now(Box::new(Now::StartPreparation {
             task: number,
@@ -609,7 +619,15 @@ pub(super) fn route_claim_prepared(
 }
 
 pub(super) fn transcript_unread(core: &mut Core, work: &mut Queue<Event>, task: u64) -> Requests {
-    if core.transcripts.remove(&task).is_some() {
+    if let Some(transcript) = core.transcripts.get(&task)
+        && transcript.closed
+    {
+        let previous_attempt = transcript.previous_attempt;
+        drop(core.transcripts.remove(&task));
+        core.begin_transcript(task, previous_attempt);
+        core.transcripts.get_mut(&task).expect("restarted empty transcript").window = None;
+        work.push(Event::StartBrief { task });
+    } else if core.transcripts.remove(&task).is_some() {
         super::result_reads::clear(core, task);
         drop(core.contexts.remove(&task));
         drop(core.dependency_results.remove(&task));
@@ -619,3 +637,7 @@ pub(super) fn transcript_unread(core: &mut Core, work: &mut Queue<Event>, task: 
     out.push(Request::Decided);
     Requests::Out(out)
 }
+
+#[cfg(test)]
+#[path = "../tests/closed_unread.rs"]
+mod tests;

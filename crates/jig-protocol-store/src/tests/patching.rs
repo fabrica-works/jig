@@ -421,7 +421,7 @@ fn the_plan_honours_dependencies_through_all_four_owners() {
         families: &[NOTE],
         patches: &["patch 1\nowner first 1\n", "patch 1\nowner first 2\n"],
     };
-    const SMITH: PatchSet = PatchSet {
+    pub(super) const SMITH: PatchSet = PatchSet {
         fresh: None,
         owner: Owner::Smith,
         name: "second",
@@ -619,4 +619,46 @@ fn two_families_holding_each_other_refuse_the_plan() {
         plan::plan(&sets, &found, &plan::binary(&sets)).expect_err("hold cycle"),
         Unplanned { owner: Owner::Application, patch: 0 }
     );
+}
+
+pub(super) const SMITH: PatchSet = PatchSet {
+    owner: Owner::Smith,
+    name: jig_test_patches_smith::NAME,
+    fresh: Some(jig_test_patches_smith::FRESH),
+    patches: jig_test_patches_smith::patches::PATCHES,
+    families: &[KeptFamily {
+        name: "fixture-turn",
+        texts: jig_test_patches_smith::patches::kept::fixture_turn::TEXTS,
+        map: KeptMap::Store,
+        keys: &[],
+        frames: Some(jig_test_patches_smith::ROOT),
+    }],
+};
+#[test]
+fn a_pending_patch_marked_by_its_sets_word_closes_windows() {
+    let sets = PatchSets { sets: &[SMITH] };
+    let found = Levels { smith: Some(0), skein: None, jig: None, application: None };
+    assert!(plan::plan(&sets, &found, &plan::binary(&sets)).expect("marked plan").close());
+}
+#[test]
+fn absent_or_other_fresh_words_leave_windows_open() {
+    const NONE: PatchSets = PatchSets { sets: &[PatchSet { fresh: None, ..SMITH }] };
+    const OTHER: PatchSets = PatchSets { sets: &[PatchSet { fresh: Some("another-mark"), ..SMITH }] };
+    for sets in [NONE, OTHER] {
+        let found = Levels { smith: Some(0), skein: None, jig: None, application: None };
+        assert!(!plan::plan(&sets, &found, &plan::binary(&sets)).expect("unmarked plan").close());
+    }
+}
+#[test]
+fn an_applied_fresh_mark_does_not_close_for_later_patches() {
+    const LATER: PatchSets = PatchSets {
+        sets: &[PatchSet {
+            patches: &[jig_test_patches_smith::patches::PATCHES[0], "patch 1\nowner fixture-smith 2\n"],
+            ..SMITH
+        }],
+    };
+    let found = Levels { smith: Some(1), skein: None, jig: None, application: None };
+    let plan = plan::plan(&LATER, &found, &plan::binary(&LATER)).expect("later plan");
+    assert_eq!(plan.steps(), &[Planned { owner: Owner::Smith, patch: 2 }]);
+    assert!(!plan.close());
 }

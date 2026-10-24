@@ -158,10 +158,20 @@ impl World {
         self.restart_with(config);
     }
 
+    /// Restart under the next binary's patch sets.
+    pub fn restart_with_patch_sets(&mut self, seed: u64, requirement: bool, sets: jig_protocol_store::PatchSets) {
+        self.store.patch_sets(sets);
+        self.restart(seed, requirement);
+    }
+
     /// Cold start with the same scenario configuration, including its host slots.
     pub fn restart_with(&mut self, config: root::Config) {
         self.observer.observe(self.wall, crate::referee::Observed::Restart);
+        let before = self.store.applied;
         self.store.reconfigure(18, &config.core.settings.models);
+        if self.store.applied > before {
+            self.observer.fresh_mark(self.wall, &self.store);
+        }
         self.observer.configure_projects(&config);
         if let Some(watches) = &mut self.watches {
             watches.restart(self.store.applied);
