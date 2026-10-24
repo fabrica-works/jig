@@ -14,6 +14,8 @@ pub mod intervals;
 mod loads;
 mod open;
 mod pages;
+pub mod patching;
+pub use patching::sets::{KeptFamily, Keys, Owner, PatchSet, PatchSets};
 mod reads;
 mod restore;
 mod secrets;
@@ -68,6 +70,7 @@ pub struct Store {
     /// The installation's identifier (store.md 4.4): drawn by the shell and
     /// kept by an empty store's first commit, or restored from the store.
     installation: [u8; 16],
+    patch_sets: PatchSets,
 }
 
 /// Proof that the store's three file drivers were seeded: io's `Store` names
@@ -121,6 +124,7 @@ impl Store {
             secret_state: secrets::State::new(limits.secrets.queued),
             transcripts: transcripts::State::new(limits),
             installation: [0; 16],
+            patch_sets: PatchSets::NONE,
         }
     }
 
@@ -136,6 +140,11 @@ impl Store {
         let mut store = Store::over(limits, application, models, stores);
         store.directory.disk = true;
         store
+    }
+
+    /// Supplies the owners' static patch data (store.md 10.3).
+    pub fn patch_sets(&mut self, sets: PatchSets) {
+        self.patch_sets = sets;
     }
 
     #[must_use]

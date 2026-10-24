@@ -22,6 +22,8 @@ jig-domain-authority.workspace = true
 jig-domain-fleet.workspace = true
 
 [dev-dependencies]
+jig-test-patches.workspace = true
+jig-test-patches-jig.workspace = true
 skein-fake-machine.workspace = true
 skein-sim.workspace = true
 jig-domain-brief.workspace = true
