@@ -34,11 +34,30 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
             w::Refusal::Ended(w::RefusalEnded::new(limits, w::RefusalEndedParts { how: ending(how, limits)? })?)
         }
         p::Refusal::Taken { by } => w::Refusal::Taken(w::RefusalTaken::new(limits, w::RefusalTakenParts { by })?),
+        p::Refusal::Stale { newest } => {
+            w::Refusal::Stale(w::RefusalStale::new(limits, w::RefusalStaleParts { newest })?)
+        }
+        p::Refusal::Full { revision, tasks, more } => w::Refusal::Full(w::RefusalFull::new(
+            limits,
+            w::RefusalFullParts {
+                revision,
+                tasks: names(&tasks, limits.refusal_full_tasks, w::Path::RefusalFullTasks)?,
+                more,
+            },
+        )?),
         p::Refusal::NotWellFormed { at, why } => w::Refusal::Malformed(w::RefusalMalformed::new(
             limits,
             w::RefusalMalformedParts {
                 at,
                 why: match why {
+                    p::Malformed::Settings { setting, fault } => w::Malformed::Settings(w::MalformedSettings::new(
+                        limits,
+                        w::MalformedSettingsParts {
+                            setting: encode_setting(setting, limits)?,
+                            fault: encode_setting_fault(fault),
+                        },
+                    )?),
+                    p::Malformed::SettingsUnchanged => w::Malformed::SettingsUnchanged,
                     p::Malformed::Name(rule) => w::Malformed::Name(w::MalformedName::new(
                         limits,
                         w::MalformedNameParts { rule: name_rule(rule) },
@@ -345,5 +364,31 @@ fn name_rule(rule: p::NameRule) -> w::NameRule {
         p::NameRule::Control => w::NameRule::Control,
         p::NameRule::Space => w::NameRule::Space,
         p::NameRule::Digits => w::NameRule::Digits,
+    }
+}
+
+fn encode_setting(value: p::Setting, limits: &w::Limits) -> Result<w::Setting, w::Problem> {
+    Ok(match value {
+        p::Setting::Charter(number) => {
+            w::Setting::Charter(w::SettingNumber::new(limits, w::SettingNumberParts { number })?)
+        }
+        p::Setting::Template(number) => {
+            w::Setting::Template(w::SettingNumber::new(limits, w::SettingNumberParts { number })?)
+        }
+        p::Setting::Policy(number) => {
+            w::Setting::Policy(w::SettingNumber::new(limits, w::SettingNumberParts { number })?)
+        }
+        p::Setting::Rules => w::Setting::Rules,
+    })
+}
+fn encode_setting_fault(value: p::SettingFault) -> w::SettingFault {
+    match value {
+        p::SettingFault::Shape => w::SettingFault::Shape,
+        p::SettingFault::Count => w::SettingFault::Count,
+        p::SettingFault::Reference => w::SettingFault::Reference,
+        p::SettingFault::Rules => w::SettingFault::Rules,
+        p::SettingFault::Budget => w::SettingFault::Budget,
+        p::SettingFault::Grace => w::SettingFault::Grace,
+        p::SettingFault::Owner => w::SettingFault::Owner,
     }
 }

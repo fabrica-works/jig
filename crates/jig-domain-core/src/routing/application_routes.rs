@@ -249,6 +249,7 @@ impl Core {
                 | people::Outcome::PolicyChanged { .. }
                 | people::Outcome::Renamed { .. }
                 | people::Outcome::ProjectMade { .. }
+                | people::Outcome::SettingsChanged { .. }
                 | people::Outcome::PoolSet { .. }
                 | people::Outcome::EscalationDecided { .. }
                 | people::Outcome::AccountSignInStarted { .. }

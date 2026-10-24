@@ -65,7 +65,9 @@ pub(crate) fn action(ask: &Ask, person: u64) -> CapacityAction {
         Ask::MakeService { .. } => CapacityAction::Service,
         Ask::Adopt { .. } => CapacityAction::Adoption,
         Ask::SetRoles { .. } => CapacityAction::Roles,
-        Ask::ChangePolicy { .. } | Ask::Rename { .. } | Ask::MakeProject { .. } => CapacityAction::Policy,
+        Ask::ChangeSettings { .. } | Ask::ChangePolicy { .. } | Ask::Rename { .. } | Ask::MakeProject { .. } => {
+            CapacityAction::Policy
+        }
         Ask::SetPool { person, .. } => CapacityAction::Pool { person: *person },
         Ask::Create { .. } | Ask::Propose { .. } => CapacityAction::Create,
         Ask::Withdraw { proposal, .. } => {
@@ -117,7 +119,7 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
         | Ask::Create { project, .. }
         | Ask::Propose { project, .. }
         | Ask::Withdraw { project, .. } => Some(*project),
-        Ask::MakeProject { .. } => Some(crate::DEPLOYMENT),
+        Ask::MakeProject { .. } | Ask::ChangeSettings { .. } => Some(crate::DEPLOYMENT),
         Ask::Application { scope, .. } => match scope {
             crate::ApplicationScope::Own => None,
             crate::ApplicationScope::Project(project) => Some(*project),
@@ -157,6 +159,7 @@ pub(crate) fn permanent(outcome: &Outcome) -> Option<CapacityCause> {
         | Outcome::PolicyChanged { .. }
         | Outcome::Renamed { .. }
         | Outcome::ProjectMade { .. }
+        | Outcome::SettingsChanged { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }
@@ -218,7 +221,9 @@ fn room(refusal: &Refusal) -> Option<CapacityCause> {
             | LimitKind::Resource
             | LimitKind::Service => None,
         },
-        Refusal::Circle { .. }
+        Refusal::Stale { .. }
+        | Refusal::Full { .. }
+        | Refusal::Circle { .. }
         | Refusal::Dependency { .. }
         | Refusal::Kept { .. }
         | Refusal::NotWellFormed { .. }

@@ -1,19 +1,20 @@
 //! One whole-set check, also used after restoring stored changes (engine.md, 17.1).
-use super::{Current, Failure, Fault, Setting, Value};
+use super::{Current, Edit, Failure, Fault, Item, Setting, Value};
 use crate::{Limits, Settings};
+use alloc::boxed::Box;
 use jig_domain_authority as authority;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 
 /// Check the maps in place: no third materialised set of values is constructed.
 pub fn check(current: &Current, settings: &Settings, connectors: &[u16], limits: &Limits) -> Result<(), Failure> {
-    check_set(current, true, settings, connectors, limits)?;
-    check_set(current, false, settings, connectors, limits)
+    check_set(current, true, &[], settings, connectors, limits)?;
+    check_set(current, false, &[], settings, connectors, limits)
 }
 
 // Both passes borrow the same two maps. The flag selects one view; no values
 // or borrowed generic wrapper are materialised.
-fn value(current: &Current, defaults: bool, setting: Setting) -> Option<&Value> {
+fn base_value(current: &Current, defaults: bool, setting: Setting) -> Option<&Value> {
     if defaults {
         match current.defaults.get(&setting) {
             Some(default) => Some(&default.value),
@@ -23,37 +24,63 @@ fn value(current: &Current, defaults: bool, setting: Setting) -> Option<&Value> 
         current.value(setting)
     }
 }
-fn charter(current: &Current, defaults: bool, number: u32) -> Option<&crate::Charter> {
-    match value(current, defaults, Setting::Charter(number)) {
-        Some(Value::Charter(value)) => Some(value),
-        Some(Value::Template(_) | Value::Policy(_) | Value::Rules(_)) | None => None,
+fn edit(items: &[Item], setting: Setting) -> Option<&Edit> {
+    for item in items {
+        if item.setting == setting {
+            return Some(&item.edit);
+        }
     }
+    None
 }
-fn template(current: &Current, defaults: bool, number: u32) -> Option<&crate::Template> {
-    match value(current, defaults, Setting::Template(number)) {
-        Some(Value::Template(value)) => Some(value),
-        Some(Value::Charter(_) | Value::Policy(_) | Value::Rules(_)) | None => None,
-    }
-}
-fn rules(current: &Current, defaults: bool) -> &authority::Rules {
-    match value(current, defaults, Setting::Rules) {
-        Some(Value::Rules(value)) => value,
-        Some(Value::Charter(_) | Value::Template(_) | Value::Policy(_)) | None => unreachable!("rules checked first"),
-    }
-}
-fn offered(current: &Current, defaults: bool) -> skein_lib::List<Setting> {
-    if !defaults {
-        return current.offered();
-    }
-    let mut names = skein_lib::List::with_capacity(current.defaults.len());
+fn offered(current: &Current, defaults: bool, items: &[Item]) -> skein_lib::List<Setting> {
+    let count = current
+        .defaults
+        .capacity()
+        .checked_add(current.changes.capacity())
+        .expect("settings union")
+        .checked_add(u32::try_from(items.len()).expect("bounded items"))
+        .expect("overlay names");
+    let mut names = skein_lib::Map::with_capacity(count);
     for (&setting, _) in &current.defaults {
-        names.push(setting).expect("default names");
+        names.insert(setting, ()).expect("default names");
     }
-    names
+    if !defaults {
+        for (&setting, _) in &current.changes {
+            names.insert(setting, ()).expect("change names");
+        }
+        for item in items {
+            names.insert(item.setting, ()).expect("overlay names");
+        }
+    }
+    let mut result = skein_lib::List::with_capacity(names.len());
+    for (&setting, ()) in &names {
+        let offered = match edit(items, setting) {
+            Some(Edit::Set(value)) => Some(value),
+            Some(Edit::Removed) => None,
+            Some(Edit::Reset) => base_value(current, true, setting),
+            None => base_value(current, defaults, setting),
+        };
+        if offered.is_some() {
+            result.push(setting).expect("offered names");
+        }
+    }
+    result
+}
+/// Check proposed settings through the same borrowed selection as startup.
+pub fn check_change(
+    current: &Current,
+    items: &[Item],
+    settings: &Settings,
+    connectors: &[u16],
+    limits: &Limits,
+) -> Result<(), Failure> {
+    super::change_shape(items, limits)?;
+    check_set(current, false, items, settings, connectors, limits)
 }
 fn check_set(
     current: &Current,
     defaults: bool,
+    items: &[Item],
     settings: &Settings,
     connectors: &[u16],
     limits: &Limits,
@@ -64,14 +91,37 @@ fn check_set(
     }
     counts = [0; 3];
     for (&setting, _) in &current.changes {
+        let retained = match edit(items, setting) {
+            Some(Edit::Reset) => false,
+            Some(Edit::Removed) => current.defaults.get(&setting).is_some(),
+            Some(Edit::Set(_)) | None => true,
+        };
+        if !retained {
+            continue;
+        }
         count(setting, &mut counts, limits)?;
     }
+    for item in items {
+        let retained = match &item.edit {
+            Edit::Set(_) => true,
+            Edit::Removed => current.defaults.get(&item.setting).is_some(),
+            Edit::Reset => false,
+        };
+        if current.changes.get(&item.setting).is_none() && retained {
+            count(item.setting, &mut counts, limits)?;
+        }
+    }
     counts = [0; 3];
-    let names = offered(current, defaults);
+    let names = offered(current, defaults, items);
     for &setting in &names {
         count(setting, &mut counts, limits)?;
     }
-    let rules = match value(current, defaults, Setting::Rules) {
+    let rules = match match edit(items, Setting::Rules) {
+        Some(Edit::Set(value)) => Some(value),
+        Some(Edit::Removed) => None,
+        Some(Edit::Reset) => base_value(current, true, Setting::Rules),
+        None => base_value(current, defaults, Setting::Rules),
+    } {
         Some(Value::Rules(rules)) => rules,
         Some(Value::Charter(_) | Value::Template(_) | Value::Policy(_)) | None => {
             return Err(Failure { setting: Setting::Rules, fault: Fault::Rules });
@@ -80,7 +130,7 @@ fn check_set(
     if !authority::valid_rules(rules, &limits.authority) {
         return Err(Failure { setting: Setting::Rules, fault: Fault::Rules });
     }
-    if !authority_refs(current, defaults, &rules.ceiling, None, connectors, settings)
+    if !authority_refs(current, defaults, items, &rules.ceiling, None, connectors, settings)
         || !requirement_refs(&rules.requirements, connectors)
     {
         return Err(Failure { setting: Setting::Rules, fault: Fault::Reference });
@@ -100,12 +150,21 @@ fn check_set(
         }
     }
     for &setting in &names {
-        let fault = match value(current, defaults, setting).expect("offered setting") {
+        let fault = match (match edit(items, setting) {
+            Some(Edit::Set(value)) => Some(value),
+            Some(Edit::Removed) => None,
+            Some(Edit::Reset) => base_value(current, true, setting),
+            None => base_value(current, defaults, setting),
+        })
+        .expect("offered setting")
+        {
             Value::Charter(charter) => charter_fault(charter, settings, limits),
             Value::Template(template) => {
-                template_fault(current, defaults, template, template.executor, settings, connectors, limits)
+                template_fault(current, defaults, items, template, template.executor, settings, connectors, limits)
             }
-            Value::Policy(policy) => policy_fault(current, defaults, policy, settings, connectors, limits),
+            Value::Policy(policy) => {
+                policy_fault(current, defaults, items, policy, rules, settings, connectors, limits)
+            }
             Value::Rules(_) => None,
         };
         if let Some(fault) = fault {
@@ -181,9 +240,14 @@ fn charter_fault(charter: &crate::Charter, settings: &Settings, limits: &Limits)
     }
     None
 }
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the checker borrows current values and their overlay without a stored reference or copied set"
+)]
 fn template_fault(
     current: &Current,
     defaults: bool,
+    items: &[Item],
     template: &crate::Template,
     executor: people::TemplateExecutor,
     settings: &Settings,
@@ -220,7 +284,15 @@ fn template_fault(
     }
     match executor {
         people::TemplateExecutor::Charter(number) => {
-            let Some(charter) = charter(current, defaults, number) else { return Some(Fault::Reference) };
+            let charter = match match edit(items, Setting::Charter(number)) {
+                Some(Edit::Set(value)) => Some(value),
+                Some(Edit::Removed) => None,
+                Some(Edit::Reset) => base_value(current, true, Setting::Charter(number)),
+                None => base_value(current, defaults, Setting::Charter(number)),
+            } {
+                Some(Value::Charter(value)) => value,
+                Some(Value::Template(_) | Value::Policy(_) | Value::Rules(_)) | None => return Some(Fault::Reference),
+            };
             if let Some(choice) = &template.llm
                 && !crate::llm::takes(&settings.models, &charter.policy, choice)
             {
@@ -256,16 +328,22 @@ fn choice_valid(models: &[crate::Model], choice: &tasks::LlmChoice) -> bool {
     }
     true
 }
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the checker borrows current values and their overlay without a stored reference or copied set"
+)]
 fn policy_fault(
     current: &Current,
     defaults: bool,
+    items: &[Item],
     configured: &crate::ConfiguredPolicy,
+    rules: &authority::Rules,
     settings: &Settings,
     connectors: &[u16],
     limits: &Limits,
 ) -> Option<Fault> {
     let policy = &configured.policy;
-    if let Some(reason) = authority::policy_refusal(rules(current, defaults), &limits.authority, policy) {
+    if let Some(reason) = authority::policy_refusal(rules, &limits.authority, policy) {
         return Some(match reason {
             authority::PolicyRefusal::AboveRules => Fault::Rules,
             authority::PolicyRefusal::Oversized | authority::PolicyRefusal::InvalidRole => Fault::Shape,
@@ -277,14 +355,14 @@ fn policy_fault(
         if role.number == people::Role::Owner.number() {
             owner = role.requests.allows(authority::RequestKind::Create);
         }
-        if !authority_refs(current, defaults, &role.authority, Some(policy), connectors, settings) {
+        if !authority_refs(current, defaults, items, &role.authority, Some(policy), connectors, settings) {
             return Some(Fault::Reference);
         }
     }
     if !owner {
         return Some(Fault::Owner);
     }
-    if !authority_refs(current, defaults, &policy.ceiling, Some(policy), connectors, settings)
+    if !authority_refs(current, defaults, items, &policy.ceiling, Some(policy), connectors, settings)
         || !requirement_refs(&policy.requirements, connectors)
     {
         return Some(Fault::Reference);
@@ -317,9 +395,18 @@ fn policy_fault(
                 return Some(Fault::Shape);
             }
         }
-        let Some(template) = template(current, defaults, entry.template) else { return Some(Fault::Reference) };
+        let template = match match edit(items, Setting::Template(entry.template)) {
+            Some(Edit::Set(value)) => Some(value),
+            Some(Edit::Removed) => None,
+            Some(Edit::Reset) => base_value(current, true, Setting::Template(entry.template)),
+            None => base_value(current, defaults, Setting::Template(entry.template)),
+        } {
+            Some(Value::Template(value)) => value,
+            Some(Value::Charter(_) | Value::Policy(_) | Value::Rules(_)) | None => return Some(Fault::Reference),
+        };
         let executor = entry.executor.unwrap_or(template.executor);
-        if let Some(fault) = template_fault(current, defaults, template, executor, settings, connectors, limits) {
+        if let Some(fault) = template_fault(current, defaults, items, template, executor, settings, connectors, limits)
+        {
             return Some(fault);
         }
     }
@@ -328,6 +415,7 @@ fn policy_fault(
 fn authority_refs(
     current: &Current,
     defaults: bool,
+    items: &[Item],
     value: &authority::Authority,
     policy: Option<&authority::Policy>,
     connectors: &[u16],
@@ -350,7 +438,14 @@ fn authority_refs(
     for executor in &value.delegation.kinds {
         match executor {
             authority::Executor::Charter(number) => {
-                if charter(current, defaults, *number).is_none() {
+                if (match edit(items, Setting::Charter(*number)) {
+                    Some(Edit::Set(value)) => Some(value),
+                    Some(Edit::Removed) => None,
+                    Some(Edit::Reset) => base_value(current, true, Setting::Charter(*number)),
+                    None => base_value(current, defaults, Setting::Charter(*number)),
+                })
+                .is_none()
+                {
                     return false;
                 }
             }
@@ -379,7 +474,7 @@ fn requirement_refs(requirements: &[authority::Requirement], connectors: &[u16])
     true
 }
 
-fn count(setting: Setting, counts: &mut [u32; 3], limits: &Limits) -> Result<(), Failure> {
+pub(super) fn count(setting: Setting, counts: &mut [u32; 3], limits: &Limits) -> Result<(), Failure> {
     let (slot, bound) = match setting {
         Setting::Charter(_) => (0, limits.tasks.charters),
         Setting::Template(_) => (1, limits.templates),
@@ -393,7 +488,25 @@ fn count(setting: Setting, counts: &mut [u32; 3], limits: &Limits) -> Result<(),
 
 fn model_valid(model: &crate::Model, settings: &Settings) -> bool {
     match crate::charters::configured(settings, model) {
-        Some(index) => settings.models.get(usize::from(index)) == Some(model),
+        Some(index) => {
+            let configured = settings.models.get(usize::from(index)).expect("configured model");
+            model.dialect == configured.dialect
+                && model.endpoint == configured.endpoint
+                && model.program == configured.program
+                && model.name == configured.name
+                && model.window == configured.window
+                && model.output == configured.output
+                && model.input_price == configured.input_price
+                && model.cached_price == configured.cached_price
+                && model.cache_write_price == configured.cache_write_price
+                && model.output_price == configured.output_price
+                && model.price_unit == configured.price_unit
+                && model.efforts == configured.efforts
+                && match &model.effort {
+                    Some(effort) => configured.efforts.contains(effort),
+                    None => true,
+                }
+        }
         None => false,
     }
 }
@@ -412,4 +525,33 @@ pub(super) fn admits_change(current: &Current, setting: Setting, limits: &Limits
         count(held, &mut counts, limits)?;
     }
     count(setting, &mut counts, limits)
+}
+
+/// Only the tasks child's bounded model table is materialised for the live-task check.
+pub(crate) fn changed_charters(
+    current: &Current,
+    items: &[Item],
+    settings: &Settings,
+    limits: &Limits,
+) -> Box<[tasks::CharterModels]> {
+    let mut result = skein_lib::List::with_capacity(limits.tasks.charters);
+    let defaults = false;
+    for &setting in &offered(current, defaults, items) {
+        match setting {
+            Setting::Charter(_) => {}
+            Setting::Template(_) | Setting::Policy(_) | Setting::Rules => continue,
+        }
+        let value = match edit(items, setting) {
+            Some(Edit::Set(value)) => Some(value),
+            Some(Edit::Removed) => None,
+            Some(Edit::Reset) => base_value(current, true, setting),
+            None => base_value(current, false, setting),
+        };
+        let charter = match value {
+            Some(Value::Charter(charter)) => charter,
+            Some(Value::Template(_) | Value::Policy(_) | Value::Rules(_)) | None => unreachable!("checked charter"),
+        };
+        result.push(crate::charters::one_models(charter, settings)).expect("checked charter count");
+    }
+    result.into_boxed()
 }

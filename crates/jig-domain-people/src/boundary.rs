@@ -226,6 +226,8 @@ pub enum NoteChange {
     reason = "an amendment stays inline, as `Event` carries a keyed request whole, and is priced by size_of"
 )]
 pub enum Ask {
+    /// Deployment owner changes settings, whose value the core holds during admission.
+    ChangeSettings { against: u32, digest: [u8; 32] },
     /// Several task operations committed together under one key.
     Compound { project: u32, operations: List<crate::Operation> },
     /// Make these roots together (domain/people.md, 5.1).
@@ -382,6 +384,8 @@ pub enum EscalationChoice {
 /// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
+    /// One whole settings change committed at this revision.
+    SettingsChanged { revision: u32 },
     /// All operations were made; their issued messages start here, or at zero for none.
     Compound { project: u32, operations: u32, first_message: u64 },
     /// No operation was made; the first failure has this zero-based place.

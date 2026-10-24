@@ -7,6 +7,10 @@ use jig_domain_people as people;
 /// Refuses unsupported sparse facts; LLM refusals need the catalogue at the answer boundary.
 pub fn refusal(value: people::Refusal) -> Result<client::Refusal, super::owner::Invalid> {
     Ok(match value {
+        people::Refusal::Stale { newest } => client::Refusal::Stale(client::RefusalStale { newest }),
+        people::Refusal::Full { revision, tasks, more } => {
+            client::Refusal::Full(client::RefusalFull { revision, tasks: names(&tasks), more })
+        }
         people::Refusal::Role { held } => client::Refusal::Role { held: held.map(super::owner::held_role) },
         people::Refusal::Authority { lacking, proposable } => client::Refusal::Authority {
             lacking: lack(lacking),
@@ -25,6 +29,13 @@ pub fn refusal(value: people::Refusal) -> Result<client::Refusal, super::owner::
         people::Refusal::NotWellFormed { at, why } => client::Refusal::Malformed {
             at,
             why: match why {
+                people::Malformed::Settings { setting, fault } => {
+                    client::Malformed::Settings(client::MalformedSettings {
+                        setting: settings_name(setting),
+                        fault: settings_fault(fault),
+                    })
+                }
+                people::Malformed::SettingsUnchanged => client::Malformed::SettingsUnchanged,
                 people::Malformed::Name(rule) => client::Malformed::Name(name_rule(rule)),
                 people::Malformed::AsAllowedTwice => client::Malformed::TwoAsAllowed,
                 people::Malformed::EndedBy => client::Malformed::EndedBy,
@@ -242,6 +253,26 @@ fn name_rule(rule: people::NameRule) -> client::NameRule {
         people::NameRule::Control => client::NameRule::Control,
         people::NameRule::Space => client::NameRule::Space,
         people::NameRule::Digits => client::NameRule::Digits,
+    }
+}
+
+fn settings_name(value: people::Setting) -> client::Setting {
+    match value {
+        people::Setting::Charter(number) => client::Setting::Charter(client::SettingNumber { number }),
+        people::Setting::Template(number) => client::Setting::Template(client::SettingNumber { number }),
+        people::Setting::Policy(number) => client::Setting::Policy(client::SettingNumber { number }),
+        people::Setting::Rules => client::Setting::Rules,
+    }
+}
+fn settings_fault(value: people::SettingFault) -> client::SettingFault {
+    match value {
+        people::SettingFault::Shape => client::SettingFault::Shape,
+        people::SettingFault::Count => client::SettingFault::Count,
+        people::SettingFault::Reference => client::SettingFault::Reference,
+        people::SettingFault::Rules => client::SettingFault::Rules,
+        people::SettingFault::Budget => client::SettingFault::Budget,
+        people::SettingFault::Grace => client::SettingFault::Grace,
+        people::SettingFault::Owner => client::SettingFault::Owner,
     }
 }
 

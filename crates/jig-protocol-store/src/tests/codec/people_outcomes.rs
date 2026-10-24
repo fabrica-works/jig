@@ -202,3 +202,34 @@ fn an_account_sign_in_address_over_its_bound_is_an_encode_error() {
         })
     );
 }
+
+#[test]
+fn settings_asks_outcomes_and_all_faults_round_trip_under_people_13() {
+    super::ask_round_trip(domain::Ask::ChangeSettings { against: 7, digest: [0xa5; 32] });
+    people_round_trip(values::answered(domain::Outcome::SettingsChanged { revision: 8 }));
+    for why in [
+        domain::Refusal::Stale { newest: 8 },
+        domain::Refusal::Full { revision: 8, tasks: Box::new([1, 9]), more: 3 },
+        domain::Refusal::NotWellFormed { at: 0, why: domain::Malformed::SettingsUnchanged },
+    ] {
+        people_round_trip(values::answered(domain::Outcome::Refused(why)));
+    }
+    for setting in
+        [domain::Setting::Charter(1), domain::Setting::Template(2), domain::Setting::Policy(3), domain::Setting::Rules]
+    {
+        for fault in [
+            domain::SettingFault::Shape,
+            domain::SettingFault::Count,
+            domain::SettingFault::Reference,
+            domain::SettingFault::Rules,
+            domain::SettingFault::Budget,
+            domain::SettingFault::Grace,
+            domain::SettingFault::Owner,
+        ] {
+            people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::NotWellFormed {
+                at: 0,
+                why: domain::Malformed::Settings { setting, fault },
+            })));
+        }
+    }
+}

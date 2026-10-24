@@ -504,7 +504,9 @@ fn memory_below_the_components_sum_is_refused() {
         // and enlarge the accounts output bound and the core's routed envelopes.
         + 14_560_734
         // Stored settings' two sets, restore transients and fleet catalogue evidence.
-        + 2_010_752;
+        + 2_010_752
+        // Owner settings changes retain a bounded input and decision scratch.
+        + 1_880;
     // Regenerate this charge with JIG_MEMORY_WRITE=1 through heavy, then run
     // normally to check it. The unchanged terms above keep the act saving local.
     let charge_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/deployment_act_growth.txt");

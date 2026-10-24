@@ -63,21 +63,25 @@ pub(crate) fn models(
             | crate::settings::Setting::Rules => continue,
         };
         let charter = current.charter(number).expect("offered charter");
-        let count = charter.policy.alternatives.len().checked_add(1).expect("charter model count");
-        let mut models = List::with_capacity(u32::try_from(count).expect("charter model count"));
-        if let Some(main) = configured(settings, &charter.policy.model) {
-            models.push(main).expect("charter model count");
-        }
-        for model in &charter.policy.alternatives {
-            let Some(index) = configured(settings, model) else { continue };
-            if !models.as_slice().contains(&index) {
-                models.push(index).expect("charter model count");
-            }
-        }
-        let value = tasks::CharterModels { number: charter.number, models: models.into_boxed() };
+        let value = one_models(charter, settings);
         charters.push(value).expect("configured charter count");
     }
     charters.into_boxed()
+}
+
+pub(crate) fn one_models(charter: &Charter, settings: &Settings) -> tasks::CharterModels {
+    let count = charter.policy.alternatives.len().checked_add(1).expect("charter model count");
+    let mut models = List::with_capacity(u32::try_from(count).expect("charter model count"));
+    if let Some(main) = configured(settings, &charter.policy.model) {
+        models.push(main).expect("charter model count");
+    }
+    for model in &charter.policy.alternatives {
+        let Some(index) = configured(settings, model) else { continue };
+        if !models.as_slice().contains(&index) {
+            models.push(index).expect("charter model count");
+        }
+    }
+    tasks::CharterModels { number: charter.number, models: models.into_boxed() }
 }
 
 /// How many efforts each configured model declares, in configuration's order (tasks.md, 3).

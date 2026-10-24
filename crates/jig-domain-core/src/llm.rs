@@ -60,6 +60,14 @@ impl Core {
             return Ok(());
         }
         new.llm = self.tasks.default_llm(charter, new.authority.models);
+        if let Some(choice) = &mut new.llm
+            && let Some(charter) = self.current.charter(charter)
+        {
+            default_effort(&self.settings, &charter.policy, &mut choice.main);
+            for model in &mut choice.subagents {
+                default_effort(&self.settings, &charter.policy, model);
+            }
+        }
         if let Some(payer) = occurrence_payer.or(self.tasks.prospective_payer(new.funder, links))
             && let Some(choice) = &mut new.llm
         {
@@ -213,4 +221,18 @@ fn charter_model<'policy>(policy: &'policy RunPolicy, name: &[u8]) -> Option<&'p
         }
     }
     None
+}
+
+/// A new task takes the offered charter's selected effort for each model.
+fn default_effort(settings: &Settings, policy: &RunPolicy, choice: &mut tasks::ModelEffort) {
+    let Some(configured) = settings.models.get(usize::from(choice.model)) else { return };
+    let Some(model) = charter_model(policy, &configured.name) else { return };
+    if let Some(effort) = &model.effort {
+        for (at, offered) in configured.efforts.iter().enumerate() {
+            if offered == effort {
+                choice.effort = Some(u8::try_from(at).expect("bounded efforts"));
+                break;
+            }
+        }
+    }
 }

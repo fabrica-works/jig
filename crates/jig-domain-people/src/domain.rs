@@ -662,6 +662,7 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::PolicyChanged { .. }
         | Outcome::Renamed { .. }
         | Outcome::ProjectMade { .. }
+        | Outcome::SettingsChanged { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }
@@ -713,6 +714,7 @@ fn apply_roles(
         | Ask::ChangePolicy { .. }
         | Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::SetPool { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
@@ -763,6 +765,7 @@ fn apply_roles(
         | Ask::ChangePolicy { .. }
         | Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::SetPool { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
@@ -887,6 +890,7 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         | Ask::ChangePolicy { .. }
         | Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::SetPool { .. }
         | Ask::DecideEscalation { .. }
         | Ask::AccountSignIn { .. }
@@ -1102,7 +1106,7 @@ fn project(ask: &Ask) -> u32 {
         },
         // An account request names no project; its check is its holder (domain/authority.md, 8.4).
         Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } | Ask::AccountChange { .. } => 0,
-        Ask::MakeProject { .. } => crate::DEPLOYMENT,
+        Ask::MakeProject { .. } | Ask::ChangeSettings { .. } => crate::DEPLOYMENT,
         Ask::Rename { project, .. }
         | Ask::Compound { project, .. }
         | Ask::EditNote { project, .. }
@@ -1237,7 +1241,8 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
                     None => false,
                 }
         }
-        Ask::Application { .. }
+        Ask::ChangeSettings { .. }
+        | Ask::Application { .. }
         | Ask::AccountSignIn { .. }
         | Ask::AccountSignOut { .. }
         | Ask::AccountChange { .. } => true,
@@ -1352,6 +1357,7 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
         }
         Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::AccountChange { .. }
         | Ask::Propose { action: crate::Action::Amend { .. }, .. } => LimitKind::Words,
         Ask::Say { task, words, .. } => {
@@ -1415,6 +1421,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Policy(u32),
         Rename(u32),
         MakeProject,
+        ChangeSettings,
         Pool(u32, u64),
         Adoption(u32),
         Escalation,
@@ -1466,6 +1473,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::ChangePolicy { project, .. } => Expected::Policy(*project),
         Ask::Rename { project, .. } => Expected::Rename(*project),
         Ask::MakeProject { .. } => Expected::MakeProject,
+        Ask::ChangeSettings { .. } => Expected::ChangeSettings,
         Ask::SetPool { project, person, .. } => Expected::Pool(*project, *person),
         Ask::DecideEscalation { .. } => Expected::Escalation,
         Ask::AccountSignIn { .. } => Expected::AccountSignIn,
@@ -1523,6 +1531,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::RolesSet { project } => expected == Expected::Roles(project, true),
         Outcome::PolicyChanged { project } => expected == Expected::Policy(project),
         Outcome::Renamed { project } => expected == Expected::Rename(project),
+        Outcome::SettingsChanged { revision } => expected == Expected::ChangeSettings && revision != 0,
         Outcome::ProjectMade { project } => expected == Expected::MakeProject && project != crate::DEPLOYMENT,
         Outcome::PoolSet { project, person } => expected == Expected::Pool(project, person),
         Outcome::EscalationDecided { .. } => expected == Expected::Escalation,
@@ -1723,6 +1732,7 @@ fn reserves_answer(ask: &Ask) -> bool {
         | Ask::ChangePolicy { .. }
         | Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::SetPool { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
@@ -1784,6 +1794,7 @@ pub(super) fn answer_decided(
         | Outcome::PolicyChanged { .. }
         | Outcome::Renamed { .. }
         | Outcome::ProjectMade { .. }
+        | Outcome::SettingsChanged { .. }
         | Outcome::PoolSet { .. }
         | Outcome::Said { .. }
         | Outcome::QuestionAnswered { .. }
@@ -1974,6 +1985,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 | Ask::ChangePolicy { .. }
                 | Ask::Rename { .. }
                 | Ask::MakeProject { .. }
+                | Ask::ChangeSettings { .. }
                 | Ask::SetPool { .. }
                 | Ask::DecideEscalation { .. }
                 | Ask::DecideProposal { .. }
@@ -2005,6 +2017,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::PolicyChanged { .. }
             | Outcome::Renamed { .. }
             | Outcome::ProjectMade { .. }
+            | Outcome::SettingsChanged { .. }
             | Outcome::PoolSet { .. }
             | Outcome::Said { .. }
             | Outcome::QuestionAnswered { .. }
@@ -2082,6 +2095,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::ChangePolicy { .. }
         | Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::SetPool { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
@@ -2120,6 +2134,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::ChangePolicy { .. }
         | Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::SetPool { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
@@ -2160,6 +2175,13 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
 
 fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
     match ask {
+        Ask::ChangeSettings { .. } => {
+            if role == Some(Role::Owner) {
+                None
+            } else {
+                Some(Refusal::Role { held: role })
+            }
+        }
         Ask::Application { scope, .. } => {
             if *scope == crate::ApplicationScope::Own || role.is_some() {
                 None
@@ -2232,8 +2254,8 @@ pub fn application_part_done(domain: &mut Domain, request: Token) {
 
 fn valid_program_outcome(limits: &Limits, outcome: &Outcome) -> bool {
     if let Outcome::Refused(why) | Outcome::CompoundRefused { why, .. } = outcome {
-        if let Refusal::Circle { tasks, .. } = why {
-            return tasks.len() <= 32;
+        if let Refusal::Circle { tasks, .. } | Refusal::Full { tasks, .. } = why {
+            return tasks.len() <= usize::try_from(crate::NAMED_TASKS).expect("named tasks bound");
         }
         if let Refusal::Kept { pending } = why {
             return pending.len() <= 64;
@@ -2270,6 +2292,7 @@ fn valid_program_outcome(limits: &Limits, outcome: &Outcome) -> bool {
         | Outcome::PolicyChanged { .. }
         | Outcome::Renamed { .. }
         | Outcome::ProjectMade { .. }
+        | Outcome::SettingsChanged { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }

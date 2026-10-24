@@ -125,6 +125,7 @@ pub fn remap_models(ask: &mut Ask, moved: &[u64; 64]) {
         },
         Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::MarkSeen { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }
@@ -206,6 +207,7 @@ pub fn valid_model_context(ask: &Ask, names: &[Box<[u8]>]) -> bool {
         },
         Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::MarkSeen { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }
@@ -271,6 +273,7 @@ pub(crate) fn has_model_selector(ask: &Ask) -> bool {
         },
         Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::MarkSeen { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }

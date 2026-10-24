@@ -167,6 +167,9 @@ pub(crate) fn problems(names: Box<[Box<[u8]>]>, limits: &Limits) -> Result<fleet
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "one checked sum names each retained and in-flight owner")]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    if limits.tasks.circle > people::NAMED_TASKS {
+        return None;
+    }
     if limits.people.program_hosts < limits.fleet.configured_workers.checked_add(1)?
         || limits.people.program_host_name_bytes < limits.fleet.worker_name_bytes
         || limits.accounts.program_hosts < limits.fleet.configured_workers.checked_add(1)?

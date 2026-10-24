@@ -48,3 +48,6 @@ mod limits;
 
 #[path = "tests/programs.rs"]
 mod programs;
+
+#[path = "tests/settings.rs"]
+mod settings;

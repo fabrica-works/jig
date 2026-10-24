@@ -44,9 +44,11 @@ pub(super) fn decide(project: u32, on: w::DecideOn) -> Result<p::Ask, Untranslat
         }
     })
 }
-#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub(super) fn templates(value: w::PolicyEditTemplates) -> p::PolicyChange {
-    let values = value.into_parts().overrides;
+    p::PolicyChange::Templates { overrides: overrides(value.into_parts().overrides) }
+}
+#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
+pub(super) fn overrides(values: List<w::TemplateOverride>) -> Box<[p::TemplateOverride]> {
     let mut overrides = List::with_capacity(values.capacity());
     for value in values.into_boxed() {
         let v = value.into_parts();
@@ -69,22 +71,22 @@ pub(super) fn templates(value: w::PolicyEditTemplates) -> p::PolicyChange {
             })
             .expect("same capacity");
     }
-    p::PolicyChange::Templates { overrides: overrides.into_boxed() }
+    overrides.into_boxed()
 }
-fn executor(value: w::TemplateExecutor) -> p::TemplateExecutor {
+pub(super) fn executor(value: w::TemplateExecutor) -> p::TemplateExecutor {
     match value {
         w::TemplateExecutor::Charter(v) => p::TemplateExecutor::Charter(v.value()),
         w::TemplateExecutor::Chosen => p::TemplateExecutor::Chosen,
     }
 }
-fn budget(value: w::TemplateBudget) -> p::TemplateBudget {
+pub(super) fn budget(value: w::TemplateBudget) -> p::TemplateBudget {
     match value {
         w::TemplateBudget::Amount(v) => p::TemplateBudget::Amount(v.value()),
         w::TemplateBudget::AsAllowed(v) => p::TemplateBudget::AsAllowed { cap: *v.cap() },
         w::TemplateBudget::Given => p::TemplateBudget::Given,
     }
 }
-fn deadline(value: w::TemplateDeadline) -> p::TemplateDeadline {
+pub(super) fn deadline(value: w::TemplateDeadline) -> p::TemplateDeadline {
     match value {
         w::TemplateDeadline::None => p::TemplateDeadline::None,
         w::TemplateDeadline::Span(v) => p::TemplateDeadline::Span(v.value()),

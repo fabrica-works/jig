@@ -571,3 +571,10 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
         | Subject::Note { .. } => Some(views::End::Gone),
     }
 }
+
+/// All documents derived from templates or future-project policies see one mark.
+pub(super) fn settings_revised(core: &mut Core, _work: &mut Queue<crate::Event>, templates_changed: bool) {
+    if templates_changed {
+        core.touch_frames();
+    }
+}

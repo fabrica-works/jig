@@ -62,6 +62,7 @@ pub(super) fn ask(
             | people::Ask::SetRoles { .. }
             | people::Ask::Rename { .. }
             | people::Ask::MakeProject { .. }
+            | people::Ask::ChangeSettings { .. }
             | people::Ask::ChangePolicy { .. }
             | people::Ask::AccountSignIn { .. }
             | people::Ask::AccountSignOut { .. }

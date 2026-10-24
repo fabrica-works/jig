@@ -1008,6 +1008,7 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::RolesSet { .. }
         | people::Outcome::Renamed { .. }
         | people::Outcome::ProjectMade { .. }
+        | people::Outcome::SettingsChanged { .. }
         | people::Outcome::PolicyChanged { .. }
         | people::Outcome::PoolSet { .. }
         | people::Outcome::EscalationDecided { .. }

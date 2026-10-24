@@ -55,7 +55,10 @@ mod numbers;
 mod person_task;
 mod policy;
 mod projects;
-pub use policy::{authority_to_people, pattern_to_people, snapshot as policy_snapshot};
+pub use policy::{
+    authority_to_authority, authority_to_people, grants_to_authority, pattern_to_people, requirement_to_authority,
+    snapshot as policy_snapshot,
+};
 mod projections;
 pub use projections::{
     MilestoneId, Projection, ProjectionFeed, ProjectionGoal, ProjectionKey, ProjectionMilestone, ProjectionRecord,
@@ -283,6 +286,7 @@ pub struct Core {
     pub(crate) census_position: Option<(u64, u64, u64)>,
     pub(crate) ended_marks: Map<Token, ended_marks::Loaded>,
     pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
+    pub(crate) settings_input: Option<(Result<Box<settings::Change>, settings::Failure>, u32)>,
     pub(crate) key_input: Option<Carried>,
     pub(crate) keys: Map<Token, Carried>,
     pub(crate) application_input: Option<routing::application_routes::Input>,
@@ -632,6 +636,7 @@ impl Core {
                     .checked_add(1)
                     .expect("validated archive cache bound"),
             ),
+            settings_input: None,
             key_input: None,
             keys: Map::with_capacity(limits.people.pending),
             application_input: None,

@@ -84,6 +84,10 @@ impl Component {
         out.push(request);
     }
     /// Admit jig's key or moved file before asking the store to keep its value.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one keyed entrance handles the ordinary ask, a carried value, and a whole settings change"
+    )]
     fn jig_request(
         &mut self,
         env: &Env<Limits>,
@@ -95,16 +99,59 @@ impl Component {
     ) {
         let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
             Ok(value) => {
-                // task B
-                if settings_ask(&value) {
-                    let answer = w::KeyedAnswer::NotServed(crate::served::not_served(
-                        &self.settings,
-                        w::Owner::Jig,
-                        &env.limits.wire,
-                    ));
-                    self.respond(env, exchange, routes::encoded(&answer));
-                    return;
-                }
+                let value = match value {
+                    w::Ask::ChangeSettings(value) => {
+                        if keyed.value.is_some() {
+                            self.not_a_record(env, owner);
+                            return;
+                        }
+                        let Ok(change) =
+                            crate::translate::settings::change(value, &self.settings.models, &env.limits.wire)
+                        else {
+                            self.not_a_record(env, owner);
+                            return;
+                        };
+                        let digest = sign_in::digest(&keyed.request).expose().try_into().expect("32-byte digest");
+                        self.pending
+                            .exchanges
+                            .insert(exchange, Waiting::Ask { sign_in, family: None, version: keyed.version })
+                            .expect("get released slot");
+                        out.push(Request::Core(Box::new(core::Event::ChangeSettings {
+                            reply_to: ReplyTo::new(exchange),
+                            sign_in,
+                            key: keyed.key,
+                            digest,
+                            change: Box::new(change),
+                        })));
+                        return;
+                    }
+                    other @ (w::Ask::AccountChange(_)
+                    | w::Ask::Amend(_)
+                    | w::Ask::Answer(_)
+                    | w::Ask::Cancel(_)
+                    | w::Ask::ChangePolicy(_)
+                    | w::Ask::Compound(_)
+                    | w::Ask::Create(_)
+                    | w::Ask::Decide(_)
+                    | w::Ask::DeleteNote(_)
+                    | w::Ask::EditNote(_)
+                    | w::Ask::HandBack(_)
+                    | w::Ask::MakeProject(_)
+                    | w::Ask::MakeService(_)
+                    | w::Ask::Message(_)
+                    | w::Ask::MoveTask(_)
+                    | w::Ask::Propose(_)
+                    | w::Ask::Release(_)
+                    | w::Ask::Rename(_)
+                    | w::Ask::Seen(_)
+                    | w::Ask::SetPool(_)
+                    | w::Ask::SetRoles(_)
+                    | w::Ask::SignIn(_)
+                    | w::Ask::SignOut(_)
+                    | w::Ask::Stop(_)
+                    | w::Ask::Take(_)
+                    | w::Ask::Withdraw(_)) => other,
+                };
                 if let Some(carried) = &keyed.value {
                     let bound = carried_bound(&value, self.settings.key_bytes, self.settings.moved_bytes);
                     if u64::try_from(carried.len()).expect("value size fits u64") > bound
@@ -202,7 +249,6 @@ impl Component {
 fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
     let change = match ask {
         w::Ask::AccountChange(row) => row.change(),
-        // task B
         w::Ask::ChangeSettings(_)
         | w::Ask::Message(_)
         | w::Ask::Answer(_)
@@ -251,7 +297,6 @@ fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
 fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64) -> u64 {
     let change = match ask {
         w::Ask::AccountChange(row) => row.change(),
-        // task B
         w::Ask::ChangeSettings(_)
         | w::Ask::Message(_)
         | w::Ask::Answer(_)
@@ -292,38 +337,5 @@ fn carried_bound(ask: &w::Ask, key_bytes: u32, moved_bytes: u64) -> u64 {
         | w::AccountChange::SetUses(_)
         | w::AccountChange::MoveOut(_)
         | w::AccountChange::Written(_) => 0,
-    }
-}
-
-// task B
-fn settings_ask(value: &w::Ask) -> bool {
-    match value {
-        w::Ask::ChangeSettings(_) => true,
-        w::Ask::Message(_)
-        | w::Ask::Answer(_)
-        | w::Ask::Take(_)
-        | w::Ask::HandBack(_)
-        | w::Ask::Decide(_)
-        | w::Ask::Release(_)
-        | w::Ask::Amend(_)
-        | w::Ask::Stop(_)
-        | w::Ask::Cancel(_)
-        | w::Ask::MoveTask(_)
-        | w::Ask::Seen(_)
-        | w::Ask::EditNote(_)
-        | w::Ask::DeleteNote(_)
-        | w::Ask::ChangePolicy(_)
-        | w::Ask::SetRoles(_)
-        | w::Ask::MakeService(_)
-        | w::Ask::SetPool(_)
-        | w::Ask::Compound(_)
-        | w::Ask::Create(_)
-        | w::Ask::Propose(_)
-        | w::Ask::Withdraw(_)
-        | w::Ask::SignIn(_)
-        | w::Ask::SignOut(_)
-        | w::Ask::AccountChange(_)
-        | w::Ask::Rename(_)
-        | w::Ask::MakeProject(_) => false,
     }
 }

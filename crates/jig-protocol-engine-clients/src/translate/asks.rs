@@ -43,8 +43,16 @@ fn decode(
     names: &mut List<Box<[u8]>>,
 ) -> Result<p::Ask, Untranslatable> {
     Ok(match record {
-        // task B
-        w::Ask::ChangeSettings(_) => return Err(Untranslatable { path: w::Path::ChangeSettingsItems }),
+        w::Ask::ChangeSettings(value) => {
+            let against = value.against();
+            let record = w::Ask::ChangeSettings(value);
+            let mut bytes = skein_lib::Writer::new(usize::try_from(record.measure()).expect("wire measure"));
+            record.encode(&mut bytes).expect("measured ask");
+            p::Ask::ChangeSettings {
+                against,
+                digest: crate::sign_in::digest(&bytes.finish()).expose().try_into().expect("32-byte digest"),
+            }
+        }
         w::Ask::Propose(value) => super::operations::propose(value, models, limits, names)?,
         w::Ask::Withdraw(value) => p::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
         w::Ask::Create(value) => super::operations::create(value, models, limits, names)?,
@@ -384,7 +392,7 @@ fn sum(total: &mut u64, bytes: Option<u64>, ceiling: u32, path: w::Path) -> Resu
     }
     Ok(())
 }
-fn grant(value: w::OwnerGrant) -> p::Grant {
+pub(super) fn grant(value: w::OwnerGrant) -> p::Grant {
     let v = value.into_parts();
     p::Grant { connector: v.connector, kind: v.kind, pattern: pattern(v.pattern) }
 }
@@ -457,7 +465,7 @@ pub(super) fn authority(
         note_resources: resources.into_boxed(),
     })
 }
-fn requirement(value: w::PolicyRequirement) -> p::Requirement {
+pub(super) fn requirement(value: w::PolicyRequirement) -> p::Requirement {
     let v = value.into_parts();
     p::Requirement {
         connector: v.connector,

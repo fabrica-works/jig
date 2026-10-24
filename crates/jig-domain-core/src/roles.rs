@@ -136,6 +136,7 @@ impl Core {
             | people::Ask::Adopt { .. }
             | people::Ask::Rename { .. }
             | people::Ask::MakeProject { .. }
+            | people::Ask::ChangeSettings { .. }
             | people::Ask::ChangePolicy { .. }
             | people::Ask::SetPool { .. }
             | people::Ask::DecideEscalation { .. }

@@ -204,3 +204,76 @@ fn the_whole_check_refuses_unconfigured_contract_connectors() {
         Err(Failure { setting: Setting::Template(1), fault: Fault::Reference })
     );
 }
+
+#[test]
+fn decision_edits_apply_each_kind_over_defaults_and_additions() {
+    let limits = limits();
+    let mut config = config(1);
+    config.defaults.templates = Box::new([template()]);
+    let policy = config.seed_projects[0].policy.clone();
+    config.defaults.policies = Map::with_capacity(1);
+    config.defaults.policies.insert(1, policy).unwrap();
+    let mut current = Current::new(config.defaults, &limits);
+    for setting in [Setting::Charter(1), Setting::Template(1), Setting::Policy(1), Setting::Rules] {
+        let original = current.value(setting).unwrap().clone();
+        let items = [Item { setting, edit: Edit::Set(original.clone()) }];
+        assert!(!changes_current(&current, &items));
+        apply(&mut current, &items, 2);
+        assert_eq!(current.value(setting), Some(&original));
+        assert_eq!(current.changes.get(&setting).unwrap().revision, 2);
+        let reset = [Item { setting, edit: Edit::Reset }];
+        apply(&mut current, &reset, 3);
+        assert!(!current.changed(setting));
+        if setting == Setting::Rules {
+            assert_eq!(
+                change_shape(&[Item { setting, edit: Edit::Removed }], &limits),
+                Err(Failure { setting, fault: Fault::Shape })
+            );
+        } else {
+            let removed = [Item { setting, edit: Edit::Removed }];
+            assert!(changes_current(&current, &removed));
+            apply(&mut current, &removed, 4);
+            assert!(current.value(setting).is_none());
+            assert!(!changes_current(&current, &removed));
+            apply(&mut current, &reset, 5);
+            assert_eq!(current.value(setting), Some(&original));
+        }
+        let added = match original {
+            Value::Charter(mut value) => {
+                value.number = 2;
+                Some((Setting::Charter(2), Value::Charter(value)))
+            }
+            Value::Template(mut value) => {
+                value.number = 2;
+                Some((Setting::Template(2), Value::Template(value)))
+            }
+            Value::Policy(value) => Some((Setting::Policy(2), Value::Policy(value))),
+            Value::Rules(_) => None,
+        };
+        if let Some((setting, value)) = added {
+            for erase in [Edit::Removed, Edit::Reset] {
+                apply(&mut current, &[Item { setting, edit: Edit::Set(value.clone()) }], 6);
+                assert_eq!(current.value(setting), Some(&value));
+                apply(&mut current, &[Item { setting, edit: erase }], 7);
+                assert!(!current.changed(setting));
+                assert!(current.value(setting).is_none());
+            }
+        }
+    }
+    assert!(!changes_current(&current, &[]));
+}
+
+#[test]
+fn zero_numbered_edits_and_repeated_settings_are_malformed() {
+    let limits = limits();
+    for setting in [Setting::Charter(0), Setting::Template(0), Setting::Policy(0)] {
+        for edit in [Edit::Removed, Edit::Reset] {
+            assert_eq!(change_shape(&[Item { setting, edit }], &limits), Err(Failure { setting, fault: Fault::Shape }));
+        }
+    }
+    let setting = Setting::Template(1);
+    assert_eq!(
+        change_shape(&[Item { setting, edit: Edit::Removed }, Item { setting, edit: Edit::Reset }], &limits),
+        Err(Failure { setting, fault: Fault::Shape })
+    );
+}

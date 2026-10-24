@@ -6,6 +6,12 @@ use jig_test_connector::application_core as application;
 pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
     match value {
         people::Refusal::NotWellFormed { why: people::Malformed::Name(_), .. }
+        | people::Refusal::Stale { .. }
+        | people::Refusal::Full { .. }
+        | people::Refusal::NotWellFormed {
+            why: people::Malformed::Settings { .. } | people::Malformed::SettingsUnchanged,
+            ..
+        }
         | people::Refusal::NameTaken
         | people::Refusal::Circle { .. }
         | people::Refusal::Dependency { .. }

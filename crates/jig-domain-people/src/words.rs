@@ -44,6 +44,7 @@ pub(crate) fn valid(ask: &Ask) -> bool {
         | Ask::ChangePolicy { .. }
         | Ask::Rename { .. }
         | Ask::MakeProject { .. }
+        | Ask::ChangeSettings { .. }
         | Ask::SetPool { .. }
         | Ask::Withdraw { .. }
         | Ask::AccountSignIn { .. }

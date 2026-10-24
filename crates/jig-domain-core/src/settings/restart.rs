@@ -170,24 +170,34 @@ impl Core {
     }
 
     pub(crate) fn tell_settings(&mut self, env: &Env<Limits>) {
-        let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-        authority::step(
-            &mut self.authority,
-            authority::Event::Rules(Box::new(self.current.rules().clone())),
-            &mut facts,
-        );
-        assert!(facts.is_empty(), "rules replacement has no policy lifecycle fact");
-        let mut tasks_out = Queue::with_capacity(tasks::max_out(&env.limits.tasks));
-        tasks::step(
-            &mut self.tasks,
-            &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
-            tasks::Event::Charters {
-                charters: crate::charters::models(&self.current, &self.settings, &env.limits),
-                efforts: crate::charters::efforts(&self.settings),
-            },
-            &mut tasks_out,
-        );
-        assert!(tasks_out.is_empty(), "charter table replacement emits nothing");
+        self.tell_replaced_settings(env, true, true);
+    }
+    pub(crate) fn tell_replaced_settings(&mut self, env: &Env<Limits>, rules: bool, charters: bool) {
+        if rules {
+            let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+            authority::step(
+                &mut self.authority,
+                authority::Event::Rules(Box::new(self.current.rules().clone())),
+                &mut facts,
+            );
+            assert!(facts.is_empty(), "rules replacement has no policy lifecycle fact");
+        }
+        if charters {
+            let mut tasks_out = Queue::with_capacity(tasks::max_out(&env.limits.tasks));
+            tasks::step(
+                &mut self.tasks,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
+                tasks::Event::Charters {
+                    charters: crate::charters::models(&self.current, &self.settings, &env.limits),
+                    efforts: crate::charters::efforts(&self.settings),
+                },
+                &mut tasks_out,
+            );
+            assert!(tasks_out.is_empty(), "charter table replacement emits nothing");
+        }
+        if !charters && !rules {
+            return;
+        }
         let needs = crate::fleet_needs::current(self, &env.limits);
         let mut fleet_out = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
         fleet::step(

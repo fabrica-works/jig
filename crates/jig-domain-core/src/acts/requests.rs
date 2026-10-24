@@ -18,7 +18,8 @@ pub(crate) fn request(
 ) -> Result<(), people::Refusal> {
     let (act, subject) = match ask {
         // An account request's check is its holder's, which people made (domain/authority.md, 8.4).
-        people::Ask::MakeProject { .. }
+        people::Ask::ChangeSettings { .. }
+        | people::Ask::MakeProject { .. }
         | people::Ask::Application { .. }
         | people::Ask::Compound { .. }
         | people::Ask::Withdraw { .. }
@@ -131,6 +132,7 @@ pub(crate) fn request(
         | people::Ask::Adopt { .. }
         | people::Ask::Rename { .. }
         | people::Ask::MakeProject { .. }
+        | people::Ask::ChangeSettings { .. }
         | people::Ask::ChangePolicy { .. }
         | people::Ask::SetRoles { .. }
         | people::Ask::MakeService { .. }

@@ -193,6 +193,7 @@ pub(crate) fn ask_bytes(limits: &Limits) -> Option<u64> {
 /// Retained operation answers own configured names, not observed login inventory.
 #[must_use]
 pub fn outcome_bytes(limits: &Limits) -> Option<u64> {
+    // Circle and settings-full name at most NAMED_TASKS (32); Kept already prices 64.
     Some(host_outcome_bytes(limits)?.max(u64::from(crate::ADDRESS)).max(64 * 8))
 }
 fn host_outcome_bytes(limits: &Limits) -> Option<u64> {

@@ -10,6 +10,15 @@ pub(crate) fn answer(
     limits: &w::Limits,
 ) -> Result<w::KeyedAnswer, w::Problem> {
     let final_answer = match reply {
+        p::Reply::Outcome(p::Outcome::SettingsChanged { revision }) => w::Final::Done(w::Done::new(
+            limits,
+            w::DoneParts {
+                outcome: w::Outcome::SettingsChanged(w::OutcomeSettingsChanged::new(
+                    limits,
+                    w::OutcomeSettingsChangedParts { revision: *revision },
+                )?),
+            },
+        )?),
         p::Reply::Outcome(p::Outcome::Again(why)) | p::Reply::Again(why) => return Ok(again(*why)),
         p::Reply::Outcome(p::Outcome::SignedOut) | p::Reply::SignedOut => return Ok(w::KeyedAnswer::SignedOut),
         p::Reply::Outcome(p::Outcome::Refused(why)) | p::Reply::Refused(why) => w::Final::Refused(w::Refused::new(
@@ -91,7 +100,7 @@ fn problem() -> w::Problem {
 #[expect(clippy::too_many_lines, reason = "one total match names every people outcome")]
 fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::Problem> {
     Ok(match value {
-        p::Outcome::AccountMovingOut { .. } => return Err(problem()),
+        p::Outcome::SettingsChanged { .. } | p::Outcome::AccountMovingOut { .. } => return Err(problem()),
         p::Outcome::AccountMovedIn { account, renewed } => {
             w::OwnerOutcome::AccountMovedIn(w::OwnerOutcomeAccountMovedIn::new(
                 limits,

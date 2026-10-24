@@ -297,6 +297,10 @@ pub(super) fn decode_escalation_decision(value: wire::EscalationDecision) -> dom
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
 pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::Ask, wire::Problem> {
     Ok(match value {
+        domain::Ask::ChangeSettings { against, digest } => wire::Ask::ChangeSettings(wire::AskChangeSettings::new(
+            limits,
+            wire::AskChangeSettingsParts { against: *against, digest: *digest },
+        )?),
         domain::Ask::Compound { project, operations } => wire::Ask::Compound(wire::AskCompound::new(
             limits,
             wire::AskCompoundParts { project: *project, operations: super::compound::encode(operations, limits)? },
@@ -492,6 +496,9 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
 #[expect(clippy::manual_map, reason = "step code translates optional fields through exhaustive matches")]
 pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask, wire::Problem> {
     Ok(match value {
+        wire::Ask::ChangeSettings(value) => {
+            domain::Ask::ChangeSettings { against: value.against(), digest: *value.digest() }
+        }
         wire::Ask::Compound(value) => {
             let wire::AskCompoundParts { project, operations } = value.into_parts();
             domain::Ask::Compound { project, operations: super::compound::decode(operations, limits)? }

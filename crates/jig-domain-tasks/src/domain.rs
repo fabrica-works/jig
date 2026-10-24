@@ -127,6 +127,53 @@ impl Domain {
         crate::escalation::project_contexts(self, limits, project)
     }
 
+    /// One bounded walk returning the first tasks incompatible with prospective charters,
+    /// plus the exact count omitted (engine.md, 17.2; M3's newest-only rule).
+    #[must_use]
+    pub fn incompatible_charters(&self, charters: &[crate::CharterModels], limit: u32) -> (Box<[u64]>, u32) {
+        let mut tasks = List::with_capacity(limit);
+        let mut more = 0_u32;
+        for (number, _) in &self.names {
+            let row = record(self, *number).expect("indexed live task");
+            match row.phase {
+                Phase::Ended(_) => continue,
+                Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } => {}
+            }
+            let charter = match row.executor {
+                crate::Executor::Agent { charter } => charter,
+                crate::Executor::Procedure { .. } | crate::Executor::Person(_) => continue,
+            };
+            let mut models = None;
+            for offered in charters {
+                if offered.number == charter {
+                    models = Some(offered.models.as_ref());
+                    break;
+                }
+            }
+            let incompatible = match models {
+                None => true,
+                Some(models) => match &row.llm {
+                    None => false,
+                    Some(choice) => {
+                        let mut fits = models.contains(&choice.main.model);
+                        for model in &choice.subagents {
+                            fits &= models.contains(&model.model);
+                        }
+                        !fits
+                    }
+                },
+            };
+            if incompatible {
+                if tasks.room() != 0 {
+                    tasks.push(*number).expect("bounded named tasks");
+                } else {
+                    more = more.checked_add(1).expect("bounded live tasks");
+                }
+            }
+        }
+        (tasks.into_boxed(), more)
+    }
+
     /// Borrowed live projection copied into a bounded result for snapshot construction.
     #[must_use]
     pub fn view_tasks(&self) -> Box<[ViewTask]> {

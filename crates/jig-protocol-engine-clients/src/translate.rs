@@ -65,5 +65,6 @@ pub(crate) struct Untranslatable {
 }
 
 mod me;
+pub(crate) mod settings;
 
 mod account_hosts;

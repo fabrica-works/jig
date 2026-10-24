@@ -5,18 +5,14 @@ use jig_domain_authority as authority;
 use jig_domain_people as people;
 use skein_lib::{List, Map, Wall};
 
-mod check;
+mod change;
+pub(crate) mod check;
+pub(crate) use change::{apply, change_shape, changes_current};
 pub(crate) mod restart;
-pub use check::check;
+pub use check::{check, check_change};
 pub use restart::revision_writes;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Setting {
-    Charter(u32),
-    Template(u32),
-    Policy(u32),
-    Rules,
-}
+pub use people::{Setting, SettingFault as Fault};
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Value {
     Charter(Box<Charter>),
@@ -52,6 +48,17 @@ pub struct Item {
     pub setting: Setting,
     pub edit: Edit,
 }
+#[derive(Debug)]
+pub struct Change {
+    pub against: u32,
+    pub items: Box<[Item]>,
+    pub running: Running,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Running {
+    Stays,
+    Moves,
+}
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Decider {
     FirstStart,
@@ -76,16 +83,6 @@ pub struct Revision {
 pub struct Failure {
     pub setting: Setting,
     pub fault: Fault,
-}
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Fault {
-    Shape,
-    Count,
-    Reference,
-    Rules,
-    Budget,
-    Grace,
-    Owner,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -317,8 +314,12 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     let maps = Map::<Setting, Default>::worst_case(count)?.checked_add(Map::<Setting, Changed>::worst_case(count)?)?;
     let restore =
         Map::<Setting, bool>::worst_case(count.checked_mul(2)?)?.checked_add(Map::<Setting, ()>::worst_case(count)?)?;
-    let walks = Map::<Setting, ()>::worst_case(count.checked_mul(2)?)?
-        .checked_add(List::<Setting>::worst_case(count.checked_mul(2)?)?)?;
+    let walks = Map::<Setting, ()>::worst_case(count.checked_mul(4)?)?
+        .checked_add(List::<Setting>::worst_case(count.checked_mul(4)?)?)?
+        .checked_add(List::<jig_domain_tasks::CharterModels>::worst_case(limits.tasks.charters)?)?
+        .checked_add(u64::from(limits.tasks.charters).checked_mul(u64::from(jig_domain_tasks::MODELS))?)?
+        .checked_add(List::<u64>::worst_case(limits.tasks.circle)?)?
+        .checked_add(u64::try_from(size_of::<Change>()).ok()?)?;
     set_worst_case(limits)?
         .checked_mul(2)?
         .checked_add(walks)?
@@ -369,5 +370,5 @@ pub fn writes_worst_case(limits: &crate::Limits) -> Option<u32> {
         .checked_add(limits.people.initial_owners)?
         .checked_add(limits.authority.projects.checked_mul(2)?)?
         .checked_add(4)?;
-    Some(first.max(count.checked_mul(2)?.checked_add(6)?))
+    Some(first.max(count.checked_mul(2)?.checked_add(8)?))
 }

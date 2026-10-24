@@ -440,11 +440,32 @@ pub(super) fn decode_limit_kind(value: wire::LimitKind) -> domain::LimitKind {
 #[expect(clippy::too_many_lines, reason = "one exhaustive translation preserves every stored refusal variant")]
 pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> Result<wire::Refusal, wire::Problem> {
     Ok(match value {
+        domain::Refusal::Stale { newest } => {
+            wire::Refusal::Stale(wire::RefusalStale::new(limits, wire::RefusalStaleParts { newest: *newest })?)
+        }
+        domain::Refusal::Full { revision, tasks, more } => wire::Refusal::Full(wire::RefusalFull::new(
+            limits,
+            wire::RefusalFullParts {
+                revision: *revision,
+                tasks: names(tasks, limits.refusal_full_tasks, wire::Path::RefusalFullTasks)?,
+                more: *more,
+            },
+        )?),
         domain::Refusal::NotWellFormed { at, why } => wire::Refusal::NotWellFormed(wire::RefusalNotWellFormed::new(
             limits,
             wire::RefusalNotWellFormedParts {
                 at: *at,
                 why: match why {
+                    domain::Malformed::Settings { setting, fault } => {
+                        wire::Malformed::Settings(wire::MalformedSettings::new(
+                            limits,
+                            wire::MalformedSettingsParts {
+                                setting: encode_setting(*setting, limits)?,
+                                fault: encode_setting_fault(*fault),
+                            },
+                        )?)
+                    }
+                    domain::Malformed::SettingsUnchanged => wire::Malformed::SettingsUnchanged,
                     domain::Malformed::ProposedAsAllowed => wire::Malformed::ProposedAsAllowed,
                     domain::Malformed::Cycle => wire::Malformed::Cycle,
                     domain::Malformed::Name(rule) => wire::Malformed::Name(wire::MalformedName::new(
@@ -544,11 +565,21 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
 }
 pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
     match value {
+        wire::Refusal::Stale(value) => domain::Refusal::Stale { newest: value.newest() },
+        wire::Refusal::Full(value) => {
+            let v = value.into_parts();
+            domain::Refusal::Full { revision: v.revision, tasks: v.tasks.into_boxed(), more: v.more }
+        }
         wire::Refusal::NotWellFormed(value) => {
             let wire::RefusalNotWellFormedParts { at, why } = value.into_parts();
             domain::Refusal::NotWellFormed {
                 at,
                 why: match why {
+                    wire::Malformed::Settings(value) => domain::Malformed::Settings {
+                        setting: decode_setting(value.setting()),
+                        fault: decode_setting_fault(value.fault()),
+                    },
+                    wire::Malformed::SettingsUnchanged => domain::Malformed::SettingsUnchanged,
                     wire::Malformed::ProposedAsAllowed => domain::Malformed::ProposedAsAllowed,
                     wire::Malformed::Cycle => domain::Malformed::Cycle,
                     wire::Malformed::Name(value) => domain::Malformed::Name(decode_name_rule(value.rule().clone())),
@@ -736,5 +767,51 @@ const fn decode_account_move_why(value: wire::AccountMoveWhy) -> domain::Account
         wire::AccountMoveWhy::Held => domain::AccountMoveWhy::Held,
         wire::AccountMoveWhy::Cancelled => domain::AccountMoveWhy::Cancelled,
         wire::AccountMoveWhy::Moving => domain::AccountMoveWhy::Moving,
+    }
+}
+
+fn encode_setting(value: domain::Setting, limits: &wire::Limits) -> Result<wire::Setting, wire::Problem> {
+    Ok(match value {
+        domain::Setting::Charter(number) => {
+            wire::Setting::Charter(wire::SettingNumber::new(limits, wire::SettingNumberParts { number })?)
+        }
+        domain::Setting::Template(number) => {
+            wire::Setting::Template(wire::SettingNumber::new(limits, wire::SettingNumberParts { number })?)
+        }
+        domain::Setting::Policy(number) => {
+            wire::Setting::Policy(wire::SettingNumber::new(limits, wire::SettingNumberParts { number })?)
+        }
+        domain::Setting::Rules => wire::Setting::Rules,
+    })
+}
+fn encode_setting_fault(value: domain::SettingFault) -> wire::SettingFault {
+    match value {
+        domain::SettingFault::Shape => wire::SettingFault::Shape,
+        domain::SettingFault::Count => wire::SettingFault::Count,
+        domain::SettingFault::Reference => wire::SettingFault::Reference,
+        domain::SettingFault::Rules => wire::SettingFault::Rules,
+        domain::SettingFault::Budget => wire::SettingFault::Budget,
+        domain::SettingFault::Grace => wire::SettingFault::Grace,
+        domain::SettingFault::Owner => wire::SettingFault::Owner,
+    }
+}
+
+fn decode_setting(value: &wire::Setting) -> domain::Setting {
+    match value {
+        wire::Setting::Charter(value) => domain::Setting::Charter(value.number()),
+        wire::Setting::Template(value) => domain::Setting::Template(value.number()),
+        wire::Setting::Policy(value) => domain::Setting::Policy(value.number()),
+        wire::Setting::Rules => domain::Setting::Rules,
+    }
+}
+fn decode_setting_fault(value: &wire::SettingFault) -> domain::SettingFault {
+    match value {
+        wire::SettingFault::Shape => domain::SettingFault::Shape,
+        wire::SettingFault::Count => domain::SettingFault::Count,
+        wire::SettingFault::Reference => domain::SettingFault::Reference,
+        wire::SettingFault::Rules => domain::SettingFault::Rules,
+        wire::SettingFault::Budget => domain::SettingFault::Budget,
+        wire::SettingFault::Grace => domain::SettingFault::Grace,
+        wire::SettingFault::Owner => domain::SettingFault::Owner,
     }
 }

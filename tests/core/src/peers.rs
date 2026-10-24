@@ -571,7 +571,14 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,
         people::Refusal::AccountMove { .. } => unreachable!("fake parties ask for no account moves"),
-        people::Refusal::NameTaken | people::Refusal::NotWellFormed { why: people::Malformed::Name(_), .. } => {
+        people::Refusal::Stale { .. }
+        | people::Refusal::Full { .. }
+        | people::Refusal::NotWellFormed {
+            why: people::Malformed::Settings { .. } | people::Malformed::SettingsUnchanged,
+            ..
+        }
+        | people::Refusal::NameTaken
+        | people::Refusal::NotWellFormed { why: people::Malformed::Name(_), .. } => {
             unreachable!("fake parties ask for no project changes")
         }
         people::Refusal::Unknown => parties::Refusal::Unknown,

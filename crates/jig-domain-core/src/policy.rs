@@ -27,7 +27,8 @@ pub fn pattern_to_people(value: &authority::Pattern) -> people::Pattern {
     }
 }
 
-fn authority_to_authority(value: people::Authority) -> Option<authority::Authority> {
+#[must_use]
+pub fn authority_to_authority(value: people::Authority) -> Option<authority::Authority> {
     let mut grants = List::with_capacity(u32::try_from(value.grants.len()).ok()?);
     for grant in value.grants {
         grants
@@ -117,7 +118,8 @@ pub fn authority_to_people(value: &authority::Authority) -> Option<people::Autho
     })
 }
 
-fn requirement_to_authority(value: people::Requirement) -> authority::Requirement {
+#[must_use]
+pub fn requirement_to_authority(value: people::Requirement) -> authority::Requirement {
     authority::Requirement {
         connector: value.connector,
         kind: value.kind,
@@ -497,7 +499,8 @@ impl Core {
     }
 }
 
-fn grants_to_authority(grants: Box<[people::Grant]>) -> Option<Box<[authority::Grant]>> {
+#[must_use]
+pub fn grants_to_authority(grants: Box<[people::Grant]>) -> Option<Box<[authority::Grant]>> {
     let mut result = List::with_capacity(u32::try_from(grants.len()).ok()?);
     for grant in grants {
         result

@@ -55,6 +55,8 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+mod settings;
+pub use settings::{Setting, SettingFault};
 mod scope;
 pub use scope::ApplicationScope;
 mod templates;
@@ -110,7 +112,9 @@ pub use policy_value::{
     Guard, Judge, PermissionRole, PolicyChange, PolicyRole, PolicyValue, Requirement, policy_bytes,
     policy_change_bytes, requirements_bytes,
 };
-pub use refusals::{Accepter, Again, DependencyStatus, Ending, Lack, LimitKind, Malformed, Party, Refusal};
+pub use refusals::{
+    Accepter, Again, DependencyStatus, Ending, Lack, LimitKind, Malformed, NAMED_TASKS, Party, Refusal,
+};
 
 /// The source directory's portable public grammar (accounts.md, 3.4).
 #[must_use]

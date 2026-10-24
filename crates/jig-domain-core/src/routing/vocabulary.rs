@@ -397,6 +397,14 @@ pub struct CoreBriefBudgets {
 /// One event routed to a child of the core.
 #[derive(Debug)]
 pub enum Event {
+    /// Owner settings value held only while people admits its keyed digest.
+    ChangeSettings {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        key: [u8; 16],
+        digest: [u8; 32],
+        change: Box<crate::settings::Change>,
+    },
     /// Commit a restored release before opening, within the journal's available writes.
     SettingsCommit { room: u32 },
     /// A connector's deployment act, without a party or sign-in (people.md, 5.3).

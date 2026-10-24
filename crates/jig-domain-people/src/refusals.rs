@@ -4,6 +4,9 @@ use crate::Role;
 use alloc::boxed::Box;
 use skein_lib::Wall;
 
+/// Maximum named tasks in circle and settings-full refusal records.
+pub const NAMED_TASKS: u32 = 32;
+
 /// Who may accept a proposal of a refused request (client/domain/contract.md, 3.5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Accepter {
@@ -16,22 +19,48 @@ pub enum Accepter {
 /// A final reason a keyed request was refused.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    Stale {
+        newest: u32,
+    },
+    Full {
+        revision: u32,
+        tasks: Box<[u64]>,
+        more: u32,
+    },
     /// Another project holds this name under simple case folding.
     NameTaken,
     /// A holder's account move could not proceed (domain/accounts.md, section 6).
-    AccountMove { why: crate::AccountMoveWhy },
+    AccountMove {
+        why: crate::AccountMoveWhy,
+    },
     /// The bounded wait circle in traversal order (tasks.md, 6.7).
-    Circle { tasks: Box<[u64]>, cut: bool },
+    Circle {
+        tasks: Box<[u64]>,
+        cut: bool,
+    },
     /// An added prerequisite already failed or was cancelled (tasks.md, 7).
-    Dependency { dependency: u64, how: DependencyStatus },
+    Dependency {
+        dependency: u64,
+        how: DependencyStatus,
+    },
     /// An answer is kept by its pending prerequisites (tasks.md, 5.7).
-    Kept { pending: Box<[u64]> },
+    Kept {
+        pending: Box<[u64]>,
+    },
     /// An explicit account preference was refused before the task changes.
-    Account { account: u32, why: crate::AccountWhy },
+    Account {
+        account: u32,
+        why: crate::AccountWhy,
+    },
     /// The named batch member is not well formed.
-    NotWellFormed { at: u32, why: Malformed },
+    NotWellFormed {
+        at: u32,
+        why: Malformed,
+    },
     /// The held role does not permit this request here.
-    Role { held: Option<Role> },
+    Role {
+        held: Option<Role>,
+    },
     /// The request lacks the stated authority.
     Authority {
         lacking: Lack,
@@ -40,13 +69,21 @@ pub enum Refusal {
         proposable: Option<Accepter>,
     },
     /// The stated admission bound was reached.
-    Limit { which: LimitKind },
+    Limit {
+        which: LimitKind,
+    },
     /// The decided subject changed since it was observed.
-    Moved { now: crate::Moved },
+    Moved {
+        now: crate::Moved,
+    },
     /// The subject ended with the stated outcome.
-    Ended { how: Ending },
+    Ended {
+        how: Ending,
+    },
     /// Another party holds the role-addressed person task.
-    Taken { by: u64 },
+    Taken {
+        by: u64,
+    },
     /// The proposal or escalation waits for someone else.
     NotWaiting,
     /// The final holder cannot pass further.
@@ -63,12 +100,20 @@ pub enum Refusal {
     /// The root's requester has nobody to hold its escalations (domain/people.md, 5.1).
     NoEscalationHolder,
     /// The task's LLM choice names this configured model, refused for `why` (domain/tasks.md, 3).
-    Llm { model: u8, why: crate::LlmWhy },
+    Llm {
+        model: u8,
+        why: crate::LlmWhy,
+    },
 }
 
 /// Why a batch member is not well formed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Malformed {
+    Settings {
+        setting: crate::Setting,
+        fault: crate::SettingFault,
+    },
+    SettingsUnchanged,
     Name(crate::NameRule),
     /// A proposed batch must name every budget.
     ProposedAsAllowed,

@@ -135,6 +135,7 @@ pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
         | core::Event::ReadLoaded { .. }
         | core::Event::Read { .. }
         | core::Event::Act { .. }
+        | core::Event::ChangeSettings { .. }
         | core::Event::Key { .. }
         | core::Event::Application { .. }
         | core::Event::ApplicationPart { .. }
@@ -200,7 +201,8 @@ pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
 
 pub(crate) fn starting(value: core::Event) -> Option<kit::Event> {
     match value {
-        core::Event::SignIn { reply_to, .. }
+        core::Event::ChangeSettings { reply_to, .. }
+        | core::Event::SignIn { reply_to, .. }
         | core::Event::People(people::Event::Ask { reply_to, .. } | people::Event::SignOut { reply_to, .. }) => {
             Some(kit::Event::Reply { to: reply_to, reply: people::Reply::Again(people::Again::NotReady) })
         }

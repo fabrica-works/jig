@@ -41,3 +41,44 @@ fn project_asks_without_a_role_are_left_for_the_core() {
         );
     }
 }
+
+#[test]
+fn settings_admission_is_the_deployment_owners_and_replays_by_digest() {
+    let mut test = Test::new(LIMITS);
+    test.signin(PARTY, SIGN_IN, identity(0, PARTY));
+    let ask = Ask::ChangeSettings { against: 1, digest: [17; 32] };
+    for held in [None, Some(Role::Member)] {
+        if let Some(role) = held {
+            test.send(Event::Roles { project: DEPLOYMENT, holdings: Box::new([Holding { person: PARTY, role }]) });
+        }
+        let rows = test.request(SIGN_IN, 2 + u8::from(held.is_some()), ask.clone());
+        assert_eq!(reply(&rows), Reply::Outcome(Outcome::Refused(Refusal::Role { held })));
+        assert_eq!(
+            rows.iter().filter_map(|row| if let Request::Route { .. } = row { Some(()) } else { None }).count(),
+            0
+        );
+    }
+    test.send(Event::Roles { project: DEPLOYMENT, holdings: Box::new([Holding { person: PARTY, role: Role::Owner }]) });
+    let rows = test.request(SIGN_IN, KEY, ask.clone());
+    assert_eq!(
+        rows.iter().find_map(|row| {
+            if let Request::Route { person, project, role, .. } = row { Some((*person, *project, *role)) } else { None }
+        }),
+        Some((PARTY, DEPLOYMENT, Some(Role::Owner)))
+    );
+    let request = route(&rows);
+    let outcome = Outcome::SettingsChanged { revision: 2 };
+    assert_eq!(
+        reply(&test.send(Event::Decided { request, outcome: outcome.clone() })),
+        Reply::Outcome(outcome.clone())
+    );
+    assert_eq!(reply(&test.request(SIGN_IN, KEY, ask)), Reply::Outcome(outcome));
+    assert_eq!(
+        reply(&test.request(SIGN_IN, KEY, Ask::ChangeSettings { against: 1, digest: [18; 32] })),
+        Reply::Refused(Refusal::KeyConflict)
+    );
+    assert_eq!(
+        reply(&test.request(SIGN_IN, KEY, Ask::MakeProject { name: "Other".into(), policy: 1 })),
+        Reply::Refused(Refusal::KeyConflict)
+    );
+}

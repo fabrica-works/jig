@@ -244,6 +244,7 @@ impl Engine {
         self.rules.domain(&event).expect("no authentication secret in a root input");
         let to = if let root::Event::Core(
             core::Event::SignIn { reply_to, .. }
+            | core::Event::ChangeSettings { reply_to, .. }
             | core::Event::Key { reply_to, .. }
             | core::Event::People(
                 jig_domain_people::Event::Ask { reply_to, .. } | jig_domain_people::Event::SignOut { reply_to, .. },
@@ -480,6 +481,7 @@ pub fn watcher(event: &core::Event) -> Option<Token> {
         | core::Event::ReadLoaded { .. }
         | core::Event::Read { .. }
         | core::Event::Act { .. }
+        | core::Event::ChangeSettings { .. }
         | core::Event::Key { .. }
         | core::Event::Application { .. }
         | core::Event::ApplicationPart { .. }

@@ -112,6 +112,8 @@ impl Expectations for People {
 
 fn filled(why: Refusal) -> bool {
     match why {
+        Refusal::Stale { newest } => newest != 0,
+        Refusal::Full { revision, tasks, more } => revision != 0 && (!tasks.is_empty() || more != 0),
         Refusal::Role { held } => match held {
             Some(Role::Policy { role }) => role > 3,
             Some(Role::Owner | Role::Maintainer | Role::Member | Role::Observer) | None => true,

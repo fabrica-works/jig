@@ -13,6 +13,7 @@ pub(crate) mod key_routes;
 pub(crate) mod party_inputs;
 mod propose;
 pub(crate) mod result_reads;
+mod settings;
 
 use crate::{CallKey, CallPart, Core, RoutedCall};
 use alloc::boxed::Box;
@@ -318,7 +319,7 @@ fn route_room_checked(limits: &Limits) -> Option<u32> {
         )?
         .checked_add(limits.views.watchers.checked_mul(4)?)?
         .checked_add(8)?;
-    Some(bound.max(crate::settings::writes_worst_case(limits)?))
+    Some(bound.max(settings::room(limits)?.writes))
 }
 
 fn route_room(limits: &Limits) -> u32 {
@@ -343,6 +344,7 @@ pub fn room_max(limits: &Limits) -> Option<JournalRoom> {
 pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
     let room = room_max(limits)?;
     match event {
+        Event::ChangeSettings { .. } => settings::room(limits),
         Event::SettingsCommit { room } => Some(JournalRoom { writes: *room, held: 0 }),
         Event::Fill { .. } => Some(JournalRoom { writes: 0, held: 0 }),
         Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: room.held }),
@@ -476,6 +478,9 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Err(answer) => return answer,
     };
     match event {
+        Event::ChangeSettings { reply_to, sign_in, key, digest, change } => {
+            settings::start(core, env, work, reply_to, sign_in, key, digest, change)
+        }
         Event::SettingsCommit { room } => core.commit_restored_settings(env, room.saturating_sub(1)),
         Event::Fill { bytes } => {
             core.fill = bytes;

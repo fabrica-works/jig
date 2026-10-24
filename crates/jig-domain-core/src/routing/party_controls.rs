@@ -202,6 +202,7 @@ pub(super) fn cancel_request(
         | people::Ask::SetRoles { .. }
         | people::Ask::Rename { .. }
         | people::Ask::MakeProject { .. }
+        | people::Ask::ChangeSettings { .. }
         | people::Ask::ChangePolicy { .. }
         | people::Ask::SetPool { .. }
         | people::Ask::DecideEscalation { .. }
@@ -274,6 +275,7 @@ pub(super) fn release_request(
                 | people::Ask::SetRoles { .. }
                 | people::Ask::Rename { .. }
                 | people::Ask::MakeProject { .. }
+                | people::Ask::ChangeSettings { .. }
                 | people::Ask::ChangePolicy { .. }
                 | people::Ask::SetPool { .. }
                 | people::Ask::DecideEscalation { .. }

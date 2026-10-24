@@ -129,7 +129,8 @@ pub(super) fn tag_people(
         .checked_mul(4)
         .expect("bounded party routes")
         .checked_add(env.limits.people.inbox_tasks)
-        .expect("bounded party routes");
+        .expect("bounded party routes")
+        .max(crate::settings::writes_worst_case(&env.limits).expect("settings output room"));
     let mut pending = Queue::with_capacity(room);
     for _ in 0..child.len() {
         pending.push(child.pop().expect("party output count"));
@@ -211,6 +212,7 @@ pub(super) fn tag_people(
                     | people::Outcome::PolicyChanged { .. }
                     | people::Outcome::Renamed { .. }
                     | people::Outcome::ProjectMade { .. }
+                    | people::Outcome::SettingsChanged { .. }
                     | people::Outcome::PoolSet { .. }
                     | people::Outcome::EscalationDecided { .. }
                     | people::Outcome::AccountSignInStarted { .. }
@@ -309,6 +311,9 @@ pub(super) fn tag_people(
                     }
                     people::Ask::Rename { name, .. } => {
                         super::projects::rename_request(core, env, work, &mut out, request, person, project, name);
+                    }
+                    people::Ask::ChangeSettings { against, .. } => {
+                        super::settings::admitted(core, env, work, &mut out, request, person, against);
                     }
                     people::Ask::MakeProject { name, policy } => {
                         super::projects::make_project_request(core, env, work, &mut out, request, person, name, policy);
