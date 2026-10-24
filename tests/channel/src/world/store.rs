@@ -76,7 +76,7 @@ impl Capture {
                     });
                     if is_log(&path) {
                         self.events.push(Observed::Recovered(path.clone()));
-                    } else if path == b"store/snapshot" {
+                    } else if store_file(&path) == Some(b"snapshot".as_slice()) {
                         self.events.push(Observed::Snapshot(path.clone()));
                     }
                 }
@@ -133,7 +133,7 @@ impl Store {
         self.rows.clear();
         self.applied = 0;
         self.lengths.clear();
-        self.files.retain(|path, _| !path.starts_with(b"store/"));
+        self.files.retain(|path, _| store_file(path).is_none());
         self.crash();
     }
     pub fn crash(&mut self) {
@@ -332,5 +332,20 @@ fn frames(bytes: &[u8], after: u64) -> Vec<(u64, Box<[skein_kv::Op]>)> {
 }
 
 fn is_log(path: &[u8]) -> bool {
-    path.strip_prefix(b"store/log-").is_some_and(|number| number.len() == 20 && number.iter().all(u8::is_ascii_digit))
+    store_file(path)
+        .and_then(|name| name.strip_prefix(b"log-"))
+        .is_some_and(|number| number.len() == 20 && number.iter().all(u8::is_ascii_digit))
+}
+
+/// Map paths carry any canonical, nonzero generation number.
+fn store_file(path: &[u8]) -> Option<&[u8]> {
+    let path = path.strip_prefix(b"generations/")?;
+    let slash = path.iter().position(|byte| *byte == b'/')?;
+    let (number, rest) = path.split_at(slash);
+    let rest = rest.strip_prefix(b"/")?;
+    if number.is_empty() || number.first() == Some(&b'0') || !number.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    std::str::from_utf8(number).ok()?.parse::<u64>().ok()?;
+    rest.strip_prefix(b"store/")
 }

@@ -218,6 +218,64 @@ pub enum OpenRefusal {
     Numbers { store: u64, header: u64 },
     /// A file failed, or a store did not recover.
     Failed,
+    /// A store from an older build is left untouched (store.md 2 and 10.1).
+    OlderBuild { why: Older },
+    /// The deployment's generations refuse (store.md 10.1).
+    Generations { why: Generations },
+}
+impl OpenRefusal {
+    /// The refusal's text in pieces, in order: the deployment's directory goes
+    /// between each two consecutive pieces, wherever store.md has `<deployment>`.
+    /// No allocation, no formatting.
+    #[must_use]
+    pub fn words(&self) -> &'static [&'static str] {
+        match self {
+            // o/configuring-2's L gives these their words.
+            Self::Format { .. } | Self::Deployment | Self::Numbers { .. } | Self::Failed => &[],
+            Self::OlderBuild { why: Older::Directory } => &[
+                "",
+                " holds a store from an older build, in the layout before generations (`store/`, `secrets/` or `transcripts/` at its top), and this start has changed nothing in it. Before the first release a store is not translated, so every start refuses this one until it is moved. To start afresh, stop the service, move `store/`, `secrets/` and `transcripts/` out of ",
+                " together, and start again: nothing is deleted, and the next start makes a new, empty store. The new store has no tasks, sign-ins, accounts or keys, and every client signs in again.",
+            ],
+            Self::Generations { why: Generations::Busy } => &[
+                "Another process has ",
+                " open, and this start has changed nothing in it. Stop that process first, then start again.",
+            ],
+            Self::Generations { why: Generations::Unreadable } => &[
+                "The `active` file in ",
+                " does not name a generation, and this start has changed nothing in it. Restore ",
+                " from a backup, or write `active` again to name a generation under `generations/` that stands, and start again.",
+            ],
+            Self::Generations { why: Generations::Missing { .. } } => &[
+                "The generation `active` names in ",
+                " has lost its `store/` or `secrets/`, and this start has changed nothing in it. Restore ",
+                " from a backup, or write `active` again to name a generation under `generations/` that stands, and start again.",
+            ],
+            Self::Generations { why: Generations::Unnamed } => &[
+                "",
+                " holds generations that no `active` names, and this start has changed nothing in it. Name one again from a backup of ",
+                ", or write `active` to name the generation under `generations/` to open, and start again.",
+            ],
+        }
+    }
+}
+/// Which older build (store.md 10.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Older {
+    /// The layout before generations, with no active file (store.md 2).
+    Directory,
+}
+/// A refusal while finding the deployment's generation (store.md 10.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Generations {
+    /// Another open holds the deployment lock.
+    Busy,
+    /// Active is not decimal digits and one newline within 21 bytes.
+    Unreadable,
+    /// Generations stand that no active names, beyond a cut first start.
+    Unnamed,
+    /// The active generation's maps do not both stand as directories.
+    Missing { generation: u64 },
 }
 
 /// What the component answers.

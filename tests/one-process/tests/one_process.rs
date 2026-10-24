@@ -28,14 +28,20 @@ fn the_next_start_settles_the_worker_s_claims_at_once() {
 
 #[test]
 fn a_kill_before_a_commit_loses_nothing_a_person_saw() {
-    let outcome = crash(skein_world::Cut::Kill, 130);
+    // Engine submissions from spawn, measured against main's 130: before
+    // opening the first turn's transcript shard, eight before its durable commit.
+    const BEFORE_TURN_COMMIT: u32 = 168;
+    let outcome = crash(skein_world::Cut::Kill, BEFORE_TURN_COMMIT);
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert_eq!(outcome.restarts, 1);
     assert!(outcome.drained);
 }
 #[test]
 fn a_power_loss_mid_run_restarts_and_adopts_nothing_from_the_dead_worker() {
-    let outcome = crash(skein_world::Cut::PowerLoss, 145);
+    // Engine submissions from spawn, measured against main's 145: before
+    // closing agent stdout, seven after the first turn's durable commit.
+    const BEFORE_AGENT_OUTPUT_CLOSE: u32 = 183;
+    let outcome = crash(skein_world::Cut::PowerLoss, BEFORE_AGENT_OUTPUT_CLOSE);
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert_eq!(outcome.restarts, 1);
     assert_eq!(outcome.claims_settled_at_restart, 1);

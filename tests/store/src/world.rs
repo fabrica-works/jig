@@ -45,6 +45,7 @@ pub struct World {
     completions: Queue<Complete>,
     cut: Option<u32>,
     operations: u32,
+    starts: u64,
     transcript_sync: Option<u32>,
     next: u64,
     pub model: Model,
@@ -78,6 +79,17 @@ impl World {
 
     #[must_use]
     pub fn with_joins(seed: u64, joins: u32) -> World {
+        let mut world = Self::unopened_with_joins(seed, joins);
+        assert_eq!(world.open(), Some(0));
+        world
+    }
+
+    #[must_use]
+    pub fn unopened(seed: u64) -> World {
+        Self::unopened_with_joins(seed, root::limits().joins)
+    }
+
+    fn unopened_with_joins(seed: u64, joins: u32) -> World {
         let mut machine = Machine::for_user(0);
         let handle = machine.lay(&[]);
         let mut sim = Sim::new(seed, Config::calm());
@@ -85,13 +97,16 @@ impl World {
         let fd = sim.root(pid, Handle::new(handle.raw()));
         let mut limits = root::limits();
         limits.joins = joins;
-        let mut world = World {
+        let mut io = drivers(fd, &limits);
+        let [store, secrets, transcripts] = &mut io;
+        let seeded = jig_protocol_store::seed([store, secrets, transcripts], seed);
+        World {
             machine,
             sim,
             pid,
             root: Root { token: Token::new(1), fd },
-            io: drivers(fd, &limits),
-            store: Store::on_directory(&limits, root::APPLICATION, &[]),
+            io,
+            store: Store::on_directory(&limits, root::APPLICATION, &[], seeded),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(QUEUE),
             below: below(),
@@ -99,14 +114,13 @@ impl World {
             completions: Queue::with_capacity(QUEUE),
             cut: None,
             operations: 0,
+            starts: 0,
             transcript_sync: None,
             next: 1,
             model: Model::default(),
             drawn: [1; 16],
             installation: [0; 16],
-        };
-        assert_eq!(world.open(), 0);
-        world
+        }
     }
 
     pub fn cut_at(&mut self, operation: u32) {
@@ -150,8 +164,14 @@ impl World {
         self.pid = self.sim.spawn_process();
         let fd = self.sim.root(self.pid, Handle::new(handle.raw()));
         self.root = Root { token: Token::new(1), fd };
+        self.starts += 1;
         self.io = drivers(fd, &self.env.limits);
-        self.store = Store::on_directory(&self.env.limits, root::APPLICATION, &[]);
+        let [store, secrets, transcripts] = &mut self.io;
+        let seeded = jig_protocol_store::seed(
+            [store, secrets, transcripts],
+            seed ^ 0xd1b5_4a32_d192_ed03_u64.wrapping_mul(self.starts),
+        );
+        self.store = Store::on_directory(&self.env.limits, root::APPLICATION, &[], seeded);
         self.above = Queue::with_capacity(QUEUE);
         self.below = below();
         self.subs = Queue::with_capacity(QUEUE);
@@ -162,7 +182,7 @@ impl World {
     }
 
     pub fn reopen(&mut self) -> Restored {
-        let last = self.open();
+        let last = self.open().expect("reopen settles");
         self.next = last + 1;
         let mut restored = Restored {
             last,
@@ -219,11 +239,67 @@ impl World {
         events
     }
 
-    fn open(&mut self) -> u64 {
+    pub fn open(&mut self) -> Option<u64> {
         let events = self.request(Request::Open { owner: OWNER, root: self.root, installation: self.drawn });
+        if events.is_empty() {
+            return None;
+        }
         let [Event::Opened { last, installation, .. }] = events.as_slice() else { panic!("open terminal: {events:?}") };
         self.installation = *installation;
-        *last
+        Some(*last)
+    }
+
+    /// Lay durable scenario entries beneath the existing deployment.
+    pub fn lay(&mut self, items: &[skein_fake_machine::Item]) {
+        use skein_fake_machine::{How, Made};
+        let root = self.machine.reopen_root(0);
+        for item in items {
+            let split = item.path.iter().rposition(|b| *b == b'/');
+            let (parent, name) =
+                split.map_or((b".".as_slice(), item.path.as_slice()), |at| (&item.path[..at], &item.path[at + 1..]));
+            let parent = self.machine.open(root, parent, How::DirectoryNoFollow).expect("laid parent stands");
+            match &item.made {
+                Made::Directory => {
+                    self.machine.make_directory(parent, name, item.mode).expect("make scenario directory");
+                }
+                Made::File(bytes) => {
+                    let file = self
+                        .machine
+                        .open(parent, name, How::CreateNoFollow { mode: item.mode })
+                        .expect("make scenario file");
+                    self.machine.write(file, 0, bytes).expect("write scenario file");
+                    self.machine.sync(file);
+                    self.machine.close(file);
+                }
+                Made::Link(_) | Made::HardLink(_) | Made::Fifo | Made::Device => {
+                    panic!("generation scenarios lay files and directories")
+                }
+            }
+            self.machine.sync(parent);
+            self.machine.close(parent);
+        }
+        self.machine.close(root);
+    }
+
+    #[must_use]
+    pub fn paths(&mut self) -> Vec<Vec<u8>> {
+        let root = self.machine.reopen_root(0);
+        let mut paths = Vec::new();
+        tree(&mut self.machine, root, b"", &mut paths);
+        self.machine.close(root);
+        paths.sort();
+        paths
+    }
+
+    #[must_use]
+    pub fn active(&mut self) -> Vec<u8> {
+        use skein_fake_machine::How;
+        let root = self.machine.reopen_root(0);
+        let file = self.machine.open(root, b"active", How::ReadNoFollow).expect("active stands");
+        let bytes = self.machine.read(file, 0, 21).expect("read active");
+        self.machine.close(file);
+        self.machine.close(root);
+        bytes
     }
 
     fn drive(&mut self) {
@@ -403,4 +479,24 @@ impl World {
         }
         events
     }
+}
+
+fn tree(machine: &mut Machine, root: skein_fake_machine::Opened, path: &[u8], paths: &mut Vec<Vec<u8>>) {
+    use skein_fake_machine::{How, Is};
+    let directory =
+        machine.open(root, if path.is_empty() { b"." } else { path }, How::DirectoryNoFollow).expect("tree directory");
+    loop {
+        let entries = machine.list(directory, 32, 8192).expect("tree page");
+        if entries.is_empty() {
+            break;
+        }
+        for (kind, name) in entries {
+            let name = if path.is_empty() { name.to_vec() } else { [path, b"/", &name].concat() };
+            paths.push(name.clone());
+            if kind == Is::Directory {
+                tree(machine, root, &name, paths);
+            }
+        }
+    }
+    machine.close(directory);
 }

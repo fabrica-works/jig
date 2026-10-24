@@ -482,8 +482,13 @@ pub(super) fn engine_startup(
             system.seed(resource, state).expect("configuration checked resource count");
         }
     }
-    let store =
-        crate::store::Store::new(&parsed.limits.root, &store_limits, &root.core.settings.models, seeds.installation);
+    let store = crate::store::Store::new(
+        &parsed.limits.root,
+        &store_limits,
+        &root.core.settings.models,
+        seeds.installation,
+        seeds.seed,
+    );
     let mut engine = Engine::new(
         root,
         &parsed.limits.root,

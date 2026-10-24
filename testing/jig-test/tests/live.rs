@@ -45,6 +45,15 @@ fn a_person_signs_in_to_chatgpt_and_a_real_model_answers() {
                 fs::remove_file(path).expect("erase failed live test's trace before retaining diagnostics");
             }
         }
+        let generations = directory.path().join("state/generations");
+        if generations.exists() {
+            for generation in fs::read_dir(generations).expect("list failed live test's generations") {
+                let path = generation.expect("generation entry").path().join("secrets");
+                if path.is_dir() {
+                    fs::remove_dir_all(path).expect("erase generation secrets before retaining diagnostics");
+                }
+            }
+        }
         let path = directory.keep();
         eprintln!("live failed state retained without secrets at {}", path.display());
         eprintln!(

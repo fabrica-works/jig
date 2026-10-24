@@ -1,43 +1,114 @@
-//! Deployment directories and the two independent stores (store.md, 2, 6 and 10).
-use crate::{Arrived, Below, Event, Io, Limits, OpenRefusal, Phase, Root, Store, open, secrets};
+//! Deployment generations and independent stores (protocol/store.md, 2 and 10.1).
+use crate::generations::{self, Active, Map, PAGE, Progress, Removing};
+use crate::{Arrived, Below, Event, Generations, Io, Limits, Older, OpenRefusal, Phase, Root, Store, open, secrets};
 use alloc::boxed::Box;
-use skein_io::file;
+use skein_io::{
+    file,
+    kernel::{Error, Kind},
+};
 use skein_lib::{Env, Queue, Token};
 
 pub(crate) const OWNER: Token = Token::new(0x004a_4947);
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Survey {
+    Top,
+    Generations,
+    First,
+    Map(Map),
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Making {
+    Generations,
+    Generation,
+    Store,
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum SweepKind {
+    Generations,
+    Temporaries { first: bool },
+}
+#[derive(Debug)]
+pub(crate) struct Sweep {
+    kind: SweepKind,
+    root: Root,
+    entries: Box<[file::Entry]>,
+    next: usize,
+    dirty: bool,
+    page_dirty: bool,
+}
 #[derive(Debug)]
 pub(crate) enum Opening {
     Idle,
-    StoreMade,
-    StoreSynced,
+    Locking,
+    Reading,
+    SurveyOpen(Survey),
+    SurveyPage { kind: Survey, root: Root },
+    SurveyClose(Survey),
+    Refusing(OpenRefusal),
+    LeftoverOpen,
+    LeftoverRemoving { root: Root, removing: Removing },
+    LeftoverClose,
+    Making(Making),
+    FirstSecrets,
+    FirstActive,
+    CheckingOpen,
+    CheckingPage { root: Root, maps: u8 },
+    CheckingClose,
     StoreOpen,
-    TranscriptsMade,
-    TranscriptsSynced,
-    TranscriptsOpen,
     SecretsOpen,
-    SecretsSynced(Root),
     Stores,
+    SweepOpen { kind: SweepKind, dirty: bool },
+    SweepPage(Sweep),
+    SweepFile(Sweep),
+    SweepRemoving { sweep: Sweep, removing: Removing },
+    SweepSync { root: Root },
+    SweepClose(Closing),
+    TranscriptsMade,
+    TranscriptsOpen,
+}
+#[derive(Debug)]
+pub(crate) struct Closing {
+    kind: SweepKind,
+    dirty: bool,
+    restart: bool,
+}
+#[derive(Debug)]
+pub(crate) struct Swept {
+    root: Root,
+    dirty: bool,
 }
 #[derive(Debug)]
 pub(crate) struct Directory {
     pub disk: bool,
+    pub active: Option<Active>,
     pub transcripts: Option<Root>,
     pub root: Option<Root>,
     pub store_root: Option<Root>,
     pub owner: Token,
     pub opening: Opening,
     pub opened: u8,
+    pub private_root: Option<Root>,
+    pub generations_kind: Option<Kind>,
+    pub leftover: bool,
+    pub survey_maps: u8,
+    pub swept: Option<Swept>,
 }
 impl Directory {
     pub fn new() -> Directory {
         Directory {
             disk: false,
+            active: None,
             transcripts: None,
             root: None,
             store_root: None,
             owner: OWNER,
             opening: Opening::Idle,
             opened: 0,
+            private_root: None,
+            generations_kind: None,
+            leftover: false,
+            survey_maps: 0,
+            swept: None,
         }
     }
 }
@@ -53,7 +124,6 @@ pub(crate) fn open(
     above: &mut Queue<Event>,
     below: &mut Below,
 ) {
-    // A store that holds an identifier replaces the drawn one as it opens.
     if store.phase == Phase::Closed {
         store.installation = installation;
     }
@@ -64,26 +134,25 @@ pub(crate) fn open(
     }
     store.directory.owner = owner;
     if store.phase != Phase::Closed || store.directory.root.is_some() {
-        refuse(store, above);
-        return;
+        return refuse(store, above);
     }
     store.directory.root = Some(root);
-    store.directory.opening = Opening::StoreMade;
-    below.store.push(file::Request::MakeDirectory {
-        owner: OWNER,
-        root: root.token,
-        path: Box::from(b"store".as_slice()),
-        mode: 0o700,
-    });
+    store.directory.opening = Opening::Locking;
+    below.store.push(file::Request::Lock { owner: OWNER, root: root.token });
 }
 fn refuse(store: &mut Store, above: &mut Queue<Event>) {
-    store.phase = Phase::Stopped;
-    above.push(Event::OpenRefused { owner: store.directory.owner, why: OpenRefusal::Failed });
+    refusal(store, OpenRefusal::Failed, above);
+}
+fn refusal(store: &mut Store, why: OpenRefusal, above: &mut Queue<Event>) {
+    open::refuse(store, store.directory.owner, why, above);
+}
+fn generation_refusal(store: &mut Store, why: Generations, above: &mut Queue<Event>) {
+    refusal(store, OpenRefusal::Generations { why }, above);
 }
 fn made(event: file::Event) -> bool {
     match event {
         file::Event::Made { .. } => true,
-        file::Event::Failed { error, .. } => error == skein_io::kernel::Error::Exists,
+        file::Event::Failed { error, .. } => error == Error::Exists,
         file::Event::Opened { .. }
         | file::Event::Refused { .. }
         | file::Event::Locked { .. }
@@ -106,111 +175,554 @@ fn made(event: file::Event) -> bool {
     }
 }
 fn opened(arrived: Arrived) -> Option<Root> {
-    match arrived.event {
-        file::Event::Opened { file, .. } => Some(Root { token: file, fd: arrived.fd? }),
-        file::Event::Made { .. }
-        | file::Event::Failed { .. }
-        | file::Event::Refused { .. }
-        | file::Event::Locked { .. }
-        | file::Event::Busy { .. }
-        | file::Event::Loaded { .. }
-        | file::Event::Scanned { .. }
-        | file::Event::Stored { .. }
-        | file::Event::Conflict { .. }
-        | file::Event::TooLarge { .. }
-        | file::Event::Stated { .. }
-        | file::Event::Written { .. }
-        | file::Event::Read { .. }
-        | file::Event::Cut { .. }
-        | file::Event::Synced { .. }
-        | file::Event::Closed { .. }
-        | file::Event::Renamed { .. }
-        | file::Event::Removed { .. }
-        | file::Event::Listed { .. }
-        | file::Event::Cancelled { .. } => None,
+    let file::Event::Opened { file, .. } = arrived.event else {
+        return None;
+    };
+    Some(Root { token: file, fd: arrived.fd? })
+}
+fn deployment(store: &Store) -> Root {
+    store.directory.root.expect("opening keeps deployment root")
+}
+fn active(store: &Store) -> u64 {
+    store.directory.active.expect("active has been read or stored").number
+}
+fn open_directory(root: Root, name: Box<[u8]>, queue: &mut Queue<file::Request>) {
+    queue.push(file::Request::OpenDirectory { owner: OWNER, root: root.fd, name, no_follow: true });
+}
+fn list(root: Root, queue: &mut Queue<file::Request>) {
+    queue.push(file::Request::ListPage { owner: OWNER, directory: root.token, max: PAGE });
+}
+fn close(root: Root, queue: &mut Queue<file::Request>) {
+    queue.push(file::Request::Close { owner: OWNER, file: root.token });
+}
+fn survey(store: &mut Store, kind: Survey, below: &mut Below) {
+    let name = match kind {
+        Survey::Top => Box::from(b".".as_slice()),
+        Survey::Generations => Box::from(generations::GENERATIONS),
+        Survey::First => generations::generation(generations::FIRST),
+        Survey::Map(map) => generations::map(generations::FIRST, map),
+    };
+    store.directory.opening = Opening::SurveyOpen(kind);
+    open_directory(deployment(store), name, &mut below.store);
+}
+fn make(store: &mut Store, kind: Making, below: &mut Below) {
+    let path = match kind {
+        Making::Generations => Box::from(generations::GENERATIONS),
+        Making::Generation => generations::generation(generations::FIRST),
+        Making::Store => generations::map(generations::FIRST, Map::Store),
+    };
+    store.directory.opening = Opening::Making(kind);
+    below.store.push(file::Request::MakeDirectory { owner: OWNER, root: deployment(store).token, path, mode: 0o700 });
+}
+fn check(store: &mut Store, below: &mut Below) {
+    store.directory.opening = Opening::CheckingOpen;
+    open_directory(deployment(store), generations::generation(active(store)), &mut below.store);
+}
+fn missing(store: &mut Store, above: &mut Queue<Event>) {
+    generation_refusal(store, Generations::Missing { generation: active(store) }, above);
+}
+fn leftover(store: &mut Store, below: &mut Below) {
+    if store.directory.leftover {
+        store.directory.opening = Opening::LeftoverOpen;
+        open_directory(deployment(store), Box::from(generations::GENERATIONS), &mut below.store);
+    } else {
+        sweep_open(store, SweepKind::Temporaries { first: true }, false, below);
+    }
+}
+fn surveyed(store: &mut Store, kind: Survey, above: &mut Queue<Event>, below: &mut Below) {
+    match kind {
+        Survey::Top => match store.directory.generations_kind {
+            Some(Kind::Directory) => survey(store, Survey::Generations, below),
+            Some(Kind::File | Kind::Symlink | Kind::Other) => generation_refusal(store, Generations::Unnamed, above),
+            None => leftover(store, below),
+        },
+        Survey::Generations => {
+            if store.directory.leftover {
+                survey(store, Survey::First, below);
+            } else {
+                leftover(store, below);
+            }
+        }
+        Survey::First => {
+            if store.directory.survey_maps & 1 != 0 {
+                survey(store, Survey::Map(Map::Store), below);
+            } else if store.directory.survey_maps & 2 != 0 {
+                survey(store, Survey::Map(Map::Secrets), below);
+            } else {
+                leftover(store, below);
+            }
+        }
+        Survey::Map(Map::Store) => {
+            if store.directory.survey_maps & 2 != 0 {
+                survey(store, Survey::Map(Map::Secrets), below);
+            } else {
+                leftover(store, below);
+            }
+        }
+        Survey::Map(Map::Secrets) => leftover(store, below),
+    }
+}
+fn refusing(store: &mut Store, root: Root, why: OpenRefusal, below: &mut Below) {
+    close(root, &mut below.store);
+    store.directory.opening = Opening::Refusing(why);
+}
+fn survey_page(store: &mut Store, kind: Survey, root: Root, entries: Box<[file::Entry]>, below: &mut Below) {
+    for entry in &entries {
+        match kind {
+            Survey::Top => {
+                if entry.name.as_ref() == b"store"
+                    || entry.name.as_ref() == b"secrets"
+                    || entry.name.as_ref() == generations::TRANSCRIPTS
+                {
+                    return refusing(store, root, OpenRefusal::OlderBuild { why: Older::Directory }, below);
+                }
+                if entry.name.as_ref() == generations::GENERATIONS {
+                    store.directory.generations_kind = Some(entry.kind);
+                }
+            }
+            Survey::Generations => {
+                if entry.name.as_ref() != b"1" || entry.kind != Kind::Directory {
+                    return refusing(store, root, OpenRefusal::Generations { why: Generations::Unnamed }, below);
+                }
+                store.directory.leftover = true;
+            }
+            Survey::First => {
+                let bit = if entry.name.as_ref() == b"store" {
+                    1
+                } else if entry.name.as_ref() == b"secrets" {
+                    2
+                } else {
+                    0
+                };
+                if bit == 0 || entry.kind != Kind::Directory {
+                    return refusing(store, root, OpenRefusal::Generations { why: Generations::Unnamed }, below);
+                }
+                store.directory.survey_maps |= bit;
+            }
+            Survey::Map(Map::Store | Map::Secrets) => {
+                return refusing(store, root, OpenRefusal::Generations { why: Generations::Unnamed }, below);
+            }
+        }
+    }
+    if entries.is_empty() {
+        store.directory.opening = Opening::SurveyClose(kind);
+        close(root, &mut below.store);
+    } else {
+        store.directory.opening = Opening::SurveyPage { kind, root };
+        list(root, &mut below.store);
+    }
+}
+/// The checks in open.rs have passed. Only now may strays and transcripts change.
+pub(crate) fn checked(store: &mut Store, above: &mut Queue<Event>, below: &mut Below) {
+    if !store.directory.disk {
+        crate::transcripts::cut::begin(store, above, below);
+        return;
+    }
+    sweep_open(store, SweepKind::Generations, false, below);
+}
+fn sweep_open(store: &mut Store, kind: SweepKind, dirty: bool, below: &mut Below) {
+    let name = match kind {
+        SweepKind::Generations => generations::GENERATIONS,
+        SweepKind::Temporaries { .. } => b".",
+    };
+    store.directory.opening = Opening::SweepOpen { kind, dirty };
+    open_directory(deployment(store), Box::from(name), &mut below.transcripts);
+}
+fn sweep_next(store: &mut Store, mut sweep: Sweep, below: &mut Below) {
+    // A page holds at most PAGE entries; skip retained entries in this one step.
+    for _ in 0..PAGE {
+        let Some(entry) = sweep.entries.get(sweep.next) else {
+            break;
+        };
+        sweep.next = sweep.next.checked_add(1).expect("bounded page index");
+        let remove = match sweep.kind {
+            SweepKind::Generations => {
+                let number = generations::number(&entry.name);
+                number != Some(active(store)) && !(active(store) > 1 && number == active(store).checked_sub(1))
+            }
+            SweepKind::Temporaries { .. } => generations::is_temporary(&entry.name),
+        };
+        if !remove {
+            continue;
+        }
+        sweep.dirty = true;
+        sweep.page_dirty = true;
+        if entry.kind == Kind::Directory {
+            let removing = generations::remove(sweep.root, entry.name.clone(), &mut below.transcripts);
+            store.directory.opening = Opening::SweepRemoving { sweep, removing };
+        } else {
+            below.transcripts.push(file::Request::Remove {
+                owner: OWNER,
+                root: sweep.root.fd,
+                name: entry.name.clone(),
+                directory: false,
+            });
+            store.directory.opening = Opening::SweepFile(sweep);
+        }
+        return;
+    }
+    if sweep.page_dirty {
+        close(sweep.root, &mut below.transcripts);
+        store.directory.opening = Opening::SweepClose(Closing { kind: sweep.kind, dirty: sweep.dirty, restart: true });
+    } else if !sweep.entries.is_empty() {
+        sweep.entries = Box::new([]);
+        list(sweep.root, &mut below.transcripts);
+        store.directory.opening = Opening::SweepPage(sweep);
+    } else {
+        match sweep.kind {
+            SweepKind::Generations => {
+                store.directory.swept = Some(Swept { root: sweep.root, dirty: sweep.dirty });
+                sweep_open(store, SweepKind::Temporaries { first: false }, false, below);
+            }
+            SweepKind::Temporaries { .. } => {
+                close(sweep.root, &mut below.transcripts);
+                store.directory.opening =
+                    Opening::SweepClose(Closing { kind: sweep.kind, dirty: sweep.dirty, restart: false });
+            }
+        }
     }
 }
 fn directory(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
-    let root = store.directory.root.expect("opening keeps the deployment root");
     match core::mem::replace(&mut store.directory.opening, Opening::Idle) {
-        Opening::StoreMade => {
-            if !made(arrived.event) {
-                return refuse(store, above);
-            }
-            store.directory.opening = Opening::StoreSynced;
-            below.store.push(file::Request::SyncDirectory { owner: OWNER, root: root.fd });
+        Opening::Locking => locked(store, arrived, above, below),
+        Opening::Reading => active_read(store, arrived, above, below),
+        Opening::SurveyOpen(kind) => survey_opened(store, kind, arrived, above, below),
+        Opening::SurveyPage { kind, root } => survey_listed(store, kind, root, arrived, above, below),
+        Opening::SurveyClose(kind) => survey_closed(store, kind, arrived, above, below),
+        Opening::Refusing(why) => refused(store, why, arrived, above),
+        Opening::LeftoverOpen => leftover_opened(store, arrived, above, below),
+        Opening::LeftoverRemoving { root, removing } => leftover_removed(store, root, removing, arrived, above, below),
+        Opening::LeftoverClose => leftover_closed(store, arrived, above, below),
+        Opening::Making(kind) => made_generation(store, kind, arrived, above, below),
+        Opening::FirstSecrets => first_secrets_opened(store, arrived, above, below),
+        Opening::FirstActive => first_active_stored(store, arrived, above, below),
+        Opening::CheckingOpen => checking_opened(store, arrived, above, below),
+        Opening::CheckingPage { root, maps } => checking_listed(store, root, maps, arrived, above, below),
+        Opening::CheckingClose => checking_closed(store, arrived, above, below),
+        Opening::StoreOpen => store_opened(store, env, arrived, above, below),
+        Opening::SecretsOpen => secrets_opened(store, env, arrived, above, below),
+        Opening::SweepOpen { kind, dirty } => sweep_opened(store, kind, dirty, arrived, above, below),
+        Opening::SweepPage(sweep) => sweep_listed(store, sweep, arrived, above, below),
+        Opening::SweepFile(sweep) => sweep_file_removed(store, sweep, arrived, above, below),
+        Opening::SweepRemoving { sweep, removing } => sweep_tree_removed(store, sweep, removing, arrived, above, below),
+        Opening::SweepSync { root } => sweep_synced(store, root, arrived, above, below),
+        Opening::SweepClose(closing) => sweep_closed(store, closing, arrived, above, below),
+        Opening::TranscriptsMade => transcripts_made(store, arrived, above, below),
+        Opening::TranscriptsOpen => transcripts_opened(store, arrived, above, below),
+        Opening::Idle | Opening::Stores => refuse(store, above),
+    }
+}
+fn locked(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let root = deployment(store);
+    if let file::Event::Busy { .. } = arrived.event {
+        return generation_refusal(store, Generations::Busy, above);
+    }
+    let file::Event::Locked { .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    store.directory.opening = Opening::Reading;
+    below.store.push(file::Request::Load {
+        owner: OWNER,
+        root: root.token,
+        path: Box::from(generations::ACTIVE),
+        max: generations::ACTIVE_BYTES,
+        no_follow: true,
+    });
+}
+fn active_read(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    if let file::Event::Failed { error: Error::NotFound, .. } = arrived.event {
+        survey(store, Survey::Top, below);
+        return;
+    }
+    if let file::Event::TooLarge { .. } = arrived.event {
+        return generation_refusal(store, Generations::Unreadable, above);
+    }
+    let file::Event::Loaded { bytes, .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    let Some(number) = generations::parse(&bytes) else {
+        return generation_refusal(store, Generations::Unreadable, above);
+    };
+    store.directory.active = Some(Active { number, digest: skein_io::digest::digest(&bytes) });
+    check(store, below);
+}
+fn survey_opened(store: &mut Store, kind: Survey, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let Some(root) = opened(arrived) else {
+        return refuse(store, above);
+    };
+    store.directory.opening = Opening::SurveyPage { kind, root };
+    list(root, &mut below.store);
+}
+fn survey_listed(
+    store: &mut Store,
+    kind: Survey,
+    root: Root,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    let file::Event::Listed { entries, .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    survey_page(store, kind, root, entries, below);
+}
+fn survey_closed(store: &mut Store, kind: Survey, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let file::Event::Closed { .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    surveyed(store, kind, above, below);
+}
+fn refused(store: &mut Store, why: OpenRefusal, arrived: Arrived, above: &mut Queue<Event>) {
+    let file::Event::Closed { .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    refusal(store, why, above);
+}
+fn leftover_opened(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let Some(root) = opened(arrived) else {
+        return refuse(store, above);
+    };
+    let removing = generations::remove(root, Box::from(b"1".as_slice()), &mut below.store);
+    store.directory.opening = Opening::LeftoverRemoving { root, removing };
+}
+fn leftover_removed(
+    store: &mut Store,
+    root: Root,
+    mut removing: Removing,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    match generations::removed(&mut removing, arrived, &mut below.store) {
+        Progress::Pending => store.directory.opening = Opening::LeftoverRemoving { root, removing },
+        Progress::Done => {
+            close(root, &mut below.store);
+            store.directory.opening = Opening::LeftoverClose;
         }
-        Opening::StoreSynced => {
-            let file::Event::Synced { .. } = arrived.event else {
-                return refuse(store, above);
-            };
-            store.directory.opening = Opening::StoreOpen;
-            below.store.push(file::Request::OpenDirectory {
+        Progress::Failed => refuse(store, above),
+    }
+}
+fn leftover_closed(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let file::Event::Closed { .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    sweep_open(store, SweepKind::Temporaries { first: true }, false, below);
+}
+fn made_generation(store: &mut Store, kind: Making, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let root = deployment(store);
+    if !made(arrived.event) {
+        return refuse(store, above);
+    }
+    match kind {
+        Making::Generations => make(store, Making::Generation, below),
+        Making::Generation => make(store, Making::Store, below),
+        Making::Store => {
+            store.directory.opening = Opening::FirstSecrets;
+            below.secrets.push(file::Request::OpenPrivate {
                 owner: OWNER,
-                root: root.fd,
-                name: Box::from(b"store".as_slice()),
-                no_follow: true,
+                root: root.token,
+                path: generations::map(generations::FIRST, Map::Secrets),
             });
         }
-        Opening::StoreOpen => {
-            let Some(opened) = opened(arrived) else {
-                return refuse(store, above);
-            };
-            store.directory.store_root = Some(opened);
+    }
+}
+fn first_secrets_opened(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let root = deployment(store);
+    let Some(private) = opened(arrived) else {
+        return refuse(store, above);
+    };
+    store.directory.private_root = Some(private);
+    store.directory.opening = Opening::FirstActive;
+    below.store.push(file::Request::Store {
+        owner: OWNER,
+        root: root.token,
+        path: Box::from(generations::ACTIVE),
+        bytes: generations::encode(generations::FIRST),
+        expected: file::Expect::Absent,
+        no_follow: true,
+    });
+}
+fn first_active_stored(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let file::Event::Stored { digest, .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    store.directory.active = Some(Active { number: generations::FIRST, digest });
+    check(store, below);
+}
+fn checking_opened(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    if let file::Event::Failed { error: Error::NotFound | Error::NotADirectory, .. } = arrived.event {
+        return missing(store, above);
+    }
+    let Some(root) = opened(arrived) else {
+        return refuse(store, above);
+    };
+    list(root, &mut below.store);
+    store.directory.opening = Opening::CheckingPage { root, maps: 0 };
+}
+fn checking_listed(
+    store: &mut Store,
+    root: Root,
+    mut maps: u8,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    let file::Event::Listed { entries, .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    for entry in &entries {
+        if entry.kind == Kind::Directory {
+            if entry.name.as_ref() == b"store" {
+                maps |= 1;
+            }
+            if entry.name.as_ref() == b"secrets" {
+                maps |= 2;
+            }
+        }
+    }
+    if entries.is_empty() {
+        if maps != 3 {
+            let why = OpenRefusal::Generations { why: Generations::Missing { generation: active(store) } };
+            return refusing(store, root, why, below);
+        }
+        close(root, &mut below.store);
+        store.directory.opening = Opening::CheckingClose;
+    } else {
+        list(root, &mut below.store);
+        store.directory.opening = Opening::CheckingPage { root, maps };
+    }
+}
+fn checking_closed(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let root = deployment(store);
+    let file::Event::Closed { .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    open_directory(root, generations::map(active(store), Map::Store), &mut below.store);
+    store.directory.opening = Opening::StoreOpen;
+}
+fn store_opened(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let root = deployment(store);
+    let Some(opened) = opened(arrived) else {
+        return refuse(store, above);
+    };
+    store.directory.store_root = Some(opened);
+    if let Some(private) = store.directory.private_root.take() {
+        open_stores(store, env, private, above, below);
+    } else {
+        store.directory.opening = Opening::SecretsOpen;
+        below.secrets.push(file::Request::OpenPrivate {
+            owner: OWNER,
+            root: root.token,
+            path: generations::map(active(store), Map::Secrets),
+        });
+    }
+}
+fn secrets_opened(store: &mut Store, env: &Env<Limits>, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let Some(opened) = opened(arrived) else {
+        return refuse(store, above);
+    };
+    open_stores(store, env, opened, above, below);
+}
+fn sweep_opened(
+    store: &mut Store,
+    kind: SweepKind,
+    dirty: bool,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    let Some(root) = opened(arrived) else {
+        return refuse(store, above);
+    };
+    list(root, &mut below.transcripts);
+    store.directory.opening =
+        Opening::SweepPage(Sweep { kind, root, entries: Box::new([]), next: 0, dirty, page_dirty: false });
+}
+fn sweep_listed(store: &mut Store, mut sweep: Sweep, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let file::Event::Listed { entries, .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    sweep.entries = entries;
+    sweep.next = 0;
+    sweep.page_dirty = false;
+    sweep_next(store, sweep, below);
+}
+fn sweep_file_removed(store: &mut Store, sweep: Sweep, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let file::Event::Removed { .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    sweep_next(store, sweep, below);
+}
+fn sweep_tree_removed(
+    store: &mut Store,
+    sweep: Sweep,
+    mut removing: Removing,
+    arrived: Arrived,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    match generations::removed(&mut removing, arrived, &mut below.transcripts) {
+        Progress::Pending => store.directory.opening = Opening::SweepRemoving { sweep, removing },
+        Progress::Done => sweep_next(store, sweep, below),
+        Progress::Failed => refuse(store, above),
+    }
+}
+fn sweep_synced(store: &mut Store, root: Root, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let file::Event::Synced { .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    close(root, &mut below.transcripts);
+    store.directory.opening =
+        Opening::SweepClose(Closing { kind: SweepKind::Generations, dirty: true, restart: false });
+}
+fn sweep_closed(store: &mut Store, closing: Closing, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let root = deployment(store);
+    let Closing { kind, dirty, restart } = closing;
+    let file::Event::Closed { .. } = arrived.event else {
+        return refuse(store, above);
+    };
+    if restart {
+        sweep_open(store, kind, dirty, below);
+        return;
+    }
+    match kind {
+        SweepKind::Generations => {
             store.directory.opening = Opening::TranscriptsMade;
             below.transcripts.push(file::Request::MakeDirectory {
                 owner: OWNER,
                 root: root.token,
-                path: Box::from(b"transcripts".as_slice()),
+                path: Box::from(generations::TRANSCRIPTS),
                 mode: 0o700,
             });
         }
-        Opening::TranscriptsMade => {
-            if !made(arrived.event) {
-                return refuse(store, above);
+        SweepKind::Temporaries { first: true } => make(store, Making::Generations, below),
+        SweepKind::Temporaries { first: false } => {
+            let swept = store.directory.swept.take().expect("generations swept before temporaries");
+            if swept.dirty {
+                below.transcripts.push(file::Request::SyncDirectory { owner: OWNER, root: swept.root.fd });
+                store.directory.opening = Opening::SweepSync { root: swept.root };
+            } else {
+                close(swept.root, &mut below.transcripts);
+                store.directory.opening =
+                    Opening::SweepClose(Closing { kind: SweepKind::Generations, dirty: false, restart: false });
             }
-            store.directory.opening = Opening::TranscriptsSynced;
-            below.transcripts.push(file::Request::SyncDirectory { owner: OWNER, root: root.fd });
         }
-        Opening::TranscriptsSynced => {
-            let file::Event::Synced { .. } = arrived.event else {
-                return refuse(store, above);
-            };
-            store.directory.opening = Opening::TranscriptsOpen;
-            below.transcripts.push(file::Request::OpenDirectory {
-                owner: OWNER,
-                root: root.fd,
-                name: Box::from(b"transcripts".as_slice()),
-                no_follow: true,
-            });
-        }
-        Opening::TranscriptsOpen => {
-            let Some(opened) = opened(arrived) else {
-                return refuse(store, above);
-            };
-            store.directory.transcripts = Some(opened);
-            store.directory.opening = Opening::SecretsOpen;
-            below.secrets.push(file::Request::OpenPrivate {
-                owner: OWNER,
-                root: root.token,
-                path: Box::from(b"secrets".as_slice()),
-            });
-        }
-        Opening::SecretsOpen => {
-            let Some(opened) = opened(arrived) else {
-                return refuse(store, above);
-            };
-            store.directory.opening = Opening::SecretsSynced(opened);
-            below.secrets.push(file::Request::SyncDirectory { owner: OWNER, root: root.fd });
-        }
-        Opening::SecretsSynced(opened) => {
-            let file::Event::Synced { .. } = arrived.event else {
-                return refuse(store, above);
-            };
-            open_stores(store, env, opened, above, below);
-        }
-        Opening::Idle | Opening::Stores => refuse(store, above),
     }
+}
+fn transcripts_made(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let root = deployment(store);
+    if !made(arrived.event) {
+        return refuse(store, above);
+    }
+    store.directory.opening = Opening::TranscriptsOpen;
+    open_directory(root, Box::from(generations::TRANSCRIPTS), &mut below.transcripts);
+}
+fn transcripts_opened(store: &mut Store, arrived: Arrived, above: &mut Queue<Event>, below: &mut Below) {
+    let Some(opened) = opened(arrived) else {
+        return refuse(store, above);
+    };
+    store.directory.transcripts = Some(opened);
+    crate::transcripts::cut::begin(store, above, below);
 }
 fn open_stores(store: &mut Store, env: &Env<Limits>, opened: Root, above: &mut Queue<Event>, below: &mut Below) {
     store.directory.opening = Opening::Stores;
@@ -246,7 +758,9 @@ pub(crate) fn up(store: &mut Store, env: &Env<Limits>, io: Io, above: &mut Queue
         Io::Transcripts(arrived) => {
             match store.phase {
                 Phase::Ready { .. } => {
-                    if arrived.event.owner() == crate::transcripts::cut::OWNER {
+                    if arrived.event.owner() == OWNER {
+                        directory(store, env, arrived, above, below);
+                    } else if arrived.event.owner() == crate::transcripts::cut::OWNER {
                         crate::transcripts::cut::arrived(store, arrived, above, below);
                     } else if arrived.event.owner() == crate::transcripts::drop::OWNER {
                         crate::transcripts::drop::arrived(store, env, arrived, above, below);

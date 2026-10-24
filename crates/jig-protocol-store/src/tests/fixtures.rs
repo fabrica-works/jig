@@ -729,6 +729,7 @@ pub const DEPLOYMENT: [u8; 16] = [7; 16];
 /// The installation's identifier the fixtures' opens draw.
 pub const INSTALLATION: [u8; 16] = [5; 16];
 
+pub mod disk;
 mod reads;
 mod store;
 pub use reads::{

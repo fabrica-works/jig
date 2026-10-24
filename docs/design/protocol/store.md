@@ -107,12 +107,12 @@ skein-io                        files: the ring, or the simulator's disk
 └── transcripts/    one file per task, in directories by the task's number
 ```
 
-- **A first start** is a directory with no `active`, and neither
-  `store/` nor `secrets/` at its top (today's layout, below). A
-  `generations/` that holds only a `1/` whose `store/` and `secrets/`
-  hold no file is a first start a cut stopped before `active` named it
-  (the stores' first open, which makes their files, comes after
-  `active`): it is removed, with any temporary io's durable replace
+- **A first start** is a directory with no `active`, and none of
+  `store/`, `secrets/` and `transcripts/` at its top (today's layout,
+  below). A `generations/` that holds only a `1/` whose `store/` and
+  `secrets/` hold no file is a first start a cut stopped before
+  `active` named it (the stores' first open, which makes their files,
+  comes after `active`): it is removed, with any temporary io's durable replace
   left beside `active` (`active.skein-<16 hex>`; skein's `io.md`, 5.2).
   A `generations/` that holds anything else, with no `active`, is
   refused, `Generations::Unnamed`, and left as it is: a generation
@@ -150,19 +150,22 @@ skein-io                        files: the ring, or the simulator's disk
   Nothing at open reads it: it is the operator's record of what an
   upgrade did, and what temper's `upgrade --check` and `versions`
   print (temper's `draft/upgrades.md`, 3.1).
-- **A directory in today's layout** (`store/` or `secrets/` at its
-  top, which generations never have, `transcripts/` beside them, and
-  no `active`) is a store from an older build, made before generations:
-  open refuses it, `OlderBuild` with `Older::Directory`, before
-  anything is written, and leaves it untouched (5.3). Before the first
-  release nothing is translated: the operator stops the service, moves
-  `store/`, `secrets/` and `transcripts/` out of the deployment's
-  directory together (its transcripts belong to its tasks), and starts
-  again, which is a first start. The refusal's text says so, naming
+- **A directory in today's layout** (`store/`, `secrets/` or
+  `transcripts/` at its top, and no `active`) is a store from an older
+  build, made before generations. Generations never have the first
+  two at the top, and a first start makes `transcripts/` last, after
+  `active`, so no cut leaves it alone; a new store beside it would
+  number its tasks again over its files. Open refuses it, `OlderBuild`
+  with `Older::Directory`, before anything is written, and leaves it
+  untouched (5.3). Before the first release nothing is translated:
+  the operator stops the service, moves `store/`, `secrets/` and
+  `transcripts/` out of the deployment's directory together (its
+  transcripts belong to its tasks), and starts again, which is a first
+  start. The refusal's text says so, naming
   the directory:
 
   > `<deployment>` holds a store from an older build, in the layout
-  > before generations (`store/`, `secrets/` and `transcripts/` at its
+  > before generations (`store/`, `secrets/` or `transcripts/` at its
   > top), and this start has changed nothing in it. Before the first
   > release a store is not translated, so every start refuses this one
   > until it is moved. To start afresh, stop the service, move
@@ -1007,7 +1010,13 @@ Removing a missing file is not a failure.
 
 Before a map opens, the component reads the deployment's directory
 (section 2). Nothing is removed or made until the active generation has
-opened and nothing refuses:
+opened and nothing refuses. The shell seeds each of the store's file
+drivers before the open, through `seed`, whose `Seeded` witness
+`on_directory` takes: io names a `Store`'s temporaries from a driver's
+randomness (skein's `io.md`, 5), and an unseeded driver refuses every
+`Store`, a first start's write of `active` among them, so a shell that
+seeds none does not build. The witness proves that three drivers were
+seeded, not that they are the three the shell serves the store with.
 
 1. **The lock:** io's `Lock` on the deployment's root, held as long as
    the process (skein's `io.md`, 5). `Busy` refuses,
@@ -1043,8 +1052,26 @@ opened and nothing refuses:
 Each refusal names the deployment's directory and what to do: another
 process holding the lock is stopped first; an unreadable or missing
 generation is restored from a backup, or `active` written again to name
-one that stands; an older build's is moved aside (section 2). The
-refusals at open, beside section 3's others:
+one that stands; an older build's is moved aside (section 2). Each
+`Generations` refusal's text, whole, as `OpenRefusal::words` gives it
+(the deployment's directory where `<deployment>` stands):
+
+- `Busy`: "Another process has `<deployment>` open, and this start has
+  changed nothing in it. Stop that process first, then start again."
+- `Unreadable`: "The `active` file in `<deployment>` does not name a
+  generation, and this start has changed nothing in it. Restore
+  `<deployment>` from a backup, or write `active` again to name a
+  generation under `generations/` that stands, and start again."
+- `Missing`: "The generation `active` names in `<deployment>` has lost
+  its `store/` or `secrets/`, and this start has changed nothing in it.
+  Restore `<deployment>` from a backup, or write `active` again to name
+  a generation under `generations/` that stands, and start again."
+- `Unnamed`: "`<deployment>` holds generations that no `active` names,
+  and this start has changed nothing in it. Name one again from a
+  backup of `<deployment>`, or write `active` to name the generation
+  under `generations/` to open, and start again."
+
+The refusals at open, beside section 3's others:
 
 ```rust
 pub enum OpenRefusal {

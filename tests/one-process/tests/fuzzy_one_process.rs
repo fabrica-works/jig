@@ -3,11 +3,17 @@ use skein_world::domain::Verdict;
 
 #[test]
 fn drawn_kills_and_drains_keep_the_conformance_rules() {
+    // Engine submissions from spawn. The real key request is kept after 125
+    // (main: 87); preserve main's offset of 130 - 87 and its 20-submission
+    // run/commit window, beginning before the first transcript shard opens.
+    const KEY_KEPT: u32 = 125;
+    const RUN_COMMIT_BASE: u32 = KEY_KEPT + 43;
+    const RUN_COMMIT_WIDTH: u64 = 20;
     for seed in 1..=7 {
         for (label, cut) in [("kill", skein_world::Cut::Kill), ("power-loss", skein_world::Cut::PowerLoss)] {
             let mut draw = skein_lib::Rng::new(seed);
-            // Cut in the run/commit window after the real key request is kept.
-            let before = 130 + u32::try_from(draw.below(20)).expect("bounded submission draw");
+            let before =
+                RUN_COMMIT_BASE + u32::try_from(draw.below(RUN_COMMIT_WIDTH)).expect("bounded submission draw");
             eprintln!("{label} seed {seed}, before {before}");
             let outcome = world::crash(fixtures::calm(seed), cut, before);
             assert_eq!(outcome.verdict, Verdict::Passed, "{label} seed {seed}, before {before}");

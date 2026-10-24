@@ -81,15 +81,20 @@ impl Store {
         limits: &protocol::Limits,
         models: &[jig_domain_core::Model],
         installation: [u8; 16],
+        seed: u64,
     ) -> Self {
         let room = root::max_out(application).checked_mul(2).expect("store route room");
         let mut routes = route::Routes::new(room);
         routes.configure(application);
+        let mut drivers = [driver(limits, room), driver(limits, room), driver(limits, room)];
+        let [store, secrets, transcripts] = &mut drivers;
+        let seeded = protocol::seed([&mut store.io, &mut secrets.io, &mut transcripts.io], seed);
         Self {
             component: protocol::Store::on_directory(
                 limits,
                 jig_test_store::application(&application.connector),
                 models,
+                seeded,
             ),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             routes,
@@ -102,7 +107,7 @@ impl Store {
                 secrets: Queue::with_capacity(room),
                 transcripts: Queue::with_capacity(room),
             },
-            drivers: [driver(limits, room), driver(limits, room), driver(limits, room)],
+            drivers,
             submitted: Queue::with_capacity(room),
             opened: false,
             installation,
@@ -434,11 +439,8 @@ fn max_read(limits: &protocol::Limits) -> u32 {
         .max(u32::try_from(limits.core.load_bytes.min(u64::from(u32::MAX))).expect("file read length"))
 }
 fn driver(limits: &protocol::Limits, capacity: u32) -> Driver {
-    Driver {
-        io: FileIo::new(handles(limits), max_read(limits), 32, limits.store.deadline),
-        above: Queue::with_capacity(capacity),
-        handles: Map::with_capacity(handles(limits)),
-    }
+    let io = FileIo::new(handles(limits), max_read(limits), 32, limits.store.deadline);
+    Driver { io, above: Queue::with_capacity(capacity), handles: Map::with_capacity(handles(limits)) }
 }
 fn close(file: Token) -> file::Request {
     file::Request::Close { owner: CLOSE, file }

@@ -5,6 +5,7 @@ mod directory;
 pub(crate) mod fixtures;
 mod format;
 mod frames;
+mod generations;
 mod gets;
 mod intervals;
 mod keys;
@@ -16,3 +17,6 @@ mod secrets;
 mod transcripts;
 
 mod settings;
+
+mod operations;
+mod words;

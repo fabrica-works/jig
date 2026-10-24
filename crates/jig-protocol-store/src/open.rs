@@ -160,7 +160,7 @@ fn ready(
     };
     store.phase = Phase::Ready { next, format_due };
     store.directory.owner = owner;
-    crate::transcripts::cut::begin(store, above, below);
+    crate::directory::checked(store, above, below);
 }
 
 pub(crate) fn refuse(store: &mut Store, owner: Token, why: OpenRefusal, above: &mut Queue<Event>) {

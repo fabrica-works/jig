@@ -7,6 +7,7 @@ pub mod codec;
 mod commits;
 mod directory;
 pub mod format;
+mod generations;
 mod gets;
 pub mod historical;
 pub mod intervals;
@@ -68,6 +69,25 @@ pub struct Store {
     installation: [u8; 16],
 }
 
+/// Proof that the store's three file drivers were seeded: io's `Store` names
+/// its temporaries from a driver's randomness and refuses unseeded (store.md 10.1).
+/// It proves three drivers were seeded, not that they are the three the shell
+/// serves the store with.
+#[derive(Clone, Copy, Debug)]
+pub struct Seeded(());
+
+/// Seeds each store driver from `seed` mixed with its index.
+#[must_use]
+pub fn seed(drivers: [&mut skein_io::file_layer::FileIo; 3], seed: u64) -> Seeded {
+    for (index, driver) in drivers.into_iter().enumerate() {
+        let index = u64::try_from(index).expect("three driver indices");
+        driver.seed_randomness(
+            seed ^ 0x9e37_79b9_7f4a_7c15_u64.wrapping_mul(index.checked_add(1).expect("three drivers")),
+        );
+    }
+    Seeded(())
+}
+
 impl Store {
     /// A component over open stores; `models` are the configuration's, in its order.
     #[must_use]
@@ -103,7 +123,12 @@ impl Store {
     }
 
     #[must_use]
-    pub fn on_directory(limits: &Limits, application: sizes::Application, models: &[jig_domain_core::Model]) -> Store {
+    pub fn on_directory(
+        limits: &Limits,
+        application: sizes::Application,
+        models: &[jig_domain_core::Model],
+        _seeded: Seeded,
+    ) -> Store {
         let stores =
             Stores { store: skein_kv::Store::new(&limits.store), secrets: skein_kv::Store::new(&limits.secrets) };
         let mut store = Store::over(limits, application, models, stores);
@@ -162,6 +187,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(secrets::worst_case(limits)?)?
         .checked_add(transcripts::worst_case(limits)?)?
         .checked_add(Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below.checked_mul(2)?)?)?
+        .checked_add(generations::worst_case()?)?
+        .checked_add(generations::operations_worst_case(limits.store.chunk)?)?
         .checked_add(names_worst_case()?)
 }
 
@@ -251,8 +278,8 @@ pub mod tasks_v9;
 pub mod core_v6;
 pub mod keys;
 pub use boundary::{
-    Arrived, Below, CARRIED, Cursor, Event, Family, Get, Io, Load, OpenRefusal, Request, Restore, Root, Row,
-    SecretOwner, SecretRow, Secrets, TranscriptRead, Write,
+    Arrived, Below, CARRIED, Cursor, Event, Family, Generations, Get, Io, Load, Older, OpenRefusal, Request, Restore,
+    Root, Row, SecretOwner, SecretRow, Secrets, TranscriptRead, Write,
 };
 
 #[cfg(test)]

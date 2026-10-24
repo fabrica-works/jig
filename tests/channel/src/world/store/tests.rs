@@ -36,7 +36,7 @@ fn a_repair_snapshot_preserves_the_durable_prefix_through_another_restart() {
     assert_eq!(store.applied, 1);
     let snapshot = snapshot(&key, &value);
     let mut capture = Capture::default();
-    capture.names.insert(1, b"store/snapshot.tmp".to_vec());
+    capture.names.insert(1, b"generations/7/store/snapshot.tmp".to_vec());
     let write = Op::Write { fd: Fd::new(1), bytes: snapshot.clone().into(), from: 0, at: 0 };
     assert!(!capture.pending(&write), "repair snapshot write reaches the observer without yielding log frames");
     capture.complete(&Complete {
@@ -50,7 +50,7 @@ fn a_repair_snapshot_preserves_the_durable_prefix_through_another_restart() {
     );
     assert_eq!(store.rows.get(&root::Record::Core(row.clone()).key()), Some(&root::Record::Core(row.clone())));
     store.recovering();
-    capture.names.insert(1, b"store/snapshot".to_vec());
+    capture.names.insert(1, b"generations/7/store/snapshot".to_vec());
     capture.complete(&Complete {
         op: Token::new(3),
         kind: Op::Read { fd: Fd::new(1), buf: snapshot.clone().into(), at: 0 },
@@ -66,7 +66,7 @@ fn a_repair_snapshot_preserves_the_durable_prefix_through_another_restart() {
 }
 
 fn log_path() -> Vec<u8> {
-    b"store/log-00000000000000000001".to_vec()
+    b"generations/7/store/log-00000000000000000001".to_vec()
 }
 
 fn log_frame(number: u64, key: &[u8], value: &[u8]) -> Vec<u8> {

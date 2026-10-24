@@ -1243,9 +1243,11 @@ dependencies = [
  "jig-domain-tasks",
  "jig-domain-views",
  "skein-codec",
+ "skein-fake-machine",
  "skein-io",
  "skein-kv",
  "skein-lib",
+ "skein-sim",
 ]
 
 [[package]]

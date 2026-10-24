@@ -246,8 +246,18 @@ pub fn below() -> Below {
         transcripts: Queue::with_capacity(skein_kv::MAX_OUT.below),
     }
 }
+fn unseeded_driver() -> skein_io::file_layer::FileIo {
+    skein_io::file_layer::FileIo::new(8, 1, 32, limits().store.deadline)
+}
 pub fn directory() -> (Store, Below) {
-    let mut store = Store::on_directory(&limits(), APPLICATION, &[]);
+    let mut drivers = [unseeded_driver(), unseeded_driver(), unseeded_driver()];
+    let [store, secrets, transcripts] = &mut drivers;
+    // Scripted terminals need no randomness; reuse the fixture's installation bytes as their seed.
+    let seeded = crate::seed(
+        [store, secrets, transcripts],
+        u64::from_le_bytes(INSTALLATION.get(..8).expect("installation seed").try_into().expect("eight bytes")),
+    );
+    let mut store = Store::on_directory(&limits(), APPLICATION, &[], seeded);
     let mut below = below();
     let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
     crate::down(
